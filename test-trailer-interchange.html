@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Trailer Interchange Coverage</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        .success {
+            border-left-color: #48bb78;
+            background: #f0fff4;
+        }
+        .error {
+            border-left-color: #f56565;
+            background: #fff5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-truck"></i> Test Coverage Options</h1>
+
+        <div class="form-group">
+            <label>Policy Number</label>
+            <input type="text" id="policyNumber" value="TEST-COVERAGE-001" />
+        </div>
+
+        <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" id="companyName" value="Test Trucking Co" />
+        </div>
+
+        <div class="form-group">
+            <label>Trailer Interchange Coverage Limit</label>
+            <select id="trailerInterchange">
+                <option value="">Select Limit</option>
+                <option value="0">No Coverage</option>
+                <option value="20000">$20,000 (NEW)</option>
+                <option value="25000">$25,000</option>
+                <option value="50000">$50,000</option>
+                <option value="75000">$75,000</option>
+                <option value="100000">$100,000</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Uninsured/Underinsured Motorist</label>
+            <select id="umUim">
+                <option value="">Select Limit</option>
+                <option value="0">Rejected</option>
+                <option value="25/50">$25K/$50K</option>
+                <option value="50/100">$50K/$100K</option>
+                <option value="100/300">$100K/$300K</option>
+                <option value="100000">$100,000 CSL (NEW)</option>
+                <option value="250/500">$250K/$500K</option>
+                <option value="500/1000">$500K/$1M</option>
+                <option value="750000">$750,000 CSL</option>
+                <option value="1000000">$1,000,000 CSL</option>
+            </select>
+        </div>
+
+        <button onclick="testSavePolicy()">
+            <i class="fas fa-save"></i> Save Policy with Coverage Options
+        </button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testSavePolicy() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="result">Saving policy...</div>';
+
+            const trailerInterchangeValue = document.getElementById('trailerInterchange').value;
+            const umUimValue = document.getElementById('umUim').value;
+
+            if (!trailerInterchangeValue || !umUimValue) {
+                resultDiv.innerHTML = '<div class="result error">Please select both coverage options</div>';
+                return;
+            }
+
+            const policyData = {
+                policy_number: document.getElementById('policyNumber').value,
+                company_name: document.getElementById('companyName').value,
+                policy_type: 'commercial-auto',
+                carrier: 'Test Carrier',
+                effective_date: new Date().toISOString().split('T')[0],
+                expiration_date: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+                premium: 10000,
+                coverage_limits: {
+                    trailer_interchange: trailerInterchangeValue,
+                    um_uim: umUimValue
+                },
+                deductibles: {
+                    collision: 1000,
+                    comprehensive: 500
+                },
+                status: 'active'
+            };
+
+            try {
+                // Save to localStorage for testing
+                let policies = JSON.parse(localStorage.getItem('test_policies') || '[]');
+                policies.push(policyData);
+                localStorage.setItem('test_policies', JSON.stringify(policies));
+
+                // Display result
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        <h3>✓ Policy Saved Successfully!</h3>
+                        <p><strong>Policy Number:</strong> ${policyData.policy_number}</p>
+                        <p><strong>Company:</strong> ${policyData.company_name}</p>
+                        <p><strong>Trailer Interchange Coverage:</strong> $${parseInt(trailerInterchangeValue).toLocaleString()}</p>
+                        <p><strong>UM/UIM Coverage:</strong> ${umUimValue.includes('/') ? umUimValue : '$' + parseInt(umUimValue).toLocaleString() + ' CSL'}</p>
+                        <p><strong>Coverage Data:</strong></p>
+                        <pre>${JSON.stringify(policyData.coverage_limits, null, 2)}</pre>
+                    </div>
+                `;
+
+                // Also try to save via API if available
+                try {
+                    const response = await fetch('http://localhost:8000/api/policies', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(policyData)
+                    });
+
+                    if (response.ok) {
+                        const apiResult = await response.json();
+                        resultDiv.innerHTML += '<div class="result success">✓ Also saved to API successfully!</div>';
+                    }
+                } catch (apiError) {
+                    console.log('API not available, saved to localStorage only');
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        Error saving policy: ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- Cache buster: 2025-10-28-VICIDIAL-OVERRIDE -->
+    <title>Vanguard Insurance Software - All-in-One Agency Management Platform</title>
+    <link rel="stylesheet" href="css/styles.css?v=33">
+    <link rel="stylesheet" href="css/carrier-profile.css?v=2">
+    <link rel="stylesheet" href="css/policy-modal.css?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Dancing+Script:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="pdf.min.js"></script>
+    <!-- Critical Performance Fix - MUST LOAD FIRST -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <!-- SIP calling library for VoIP functionality -->
+    <script src="js/jssip.min.js"></script>
+    <script src="js/performance-critical-fix.js?v=1"></script>
+    <script src="js/disable-heavy-scripts.js?v=1"></script>
+    <script>
+        // Check authentication first
+        if (!sessionStorage.getItem('vanguard_user')) {
+            window.location.href = '/login.html';
+        }
+
+        // Set up PDF.js worker
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
+        }
+    </script>
+    <!-- COI Email Timeout Fix -->
+    <script src="js/fix-coi-email-timeout.js?v=1"></script>
+
+    <!-- Call Status Fix -->
+    <script src="js/call-status-fix.js?v=1"></script>
+    <script src="js/simple-call-fix.js?v=1"></script>
+    <script src="js/incoming-calls.js?v=2"></script>
+    <script src="js/fix-call-disconnect-detection.js?v=1"></script>
+    <style>
+        /* Force lead name truncation and contact icon display */
+        #leadsTableBody .lead-name {
+            max-width: 150px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+
+        #leadsTableBody .lead-name strong {
+            display: block !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+            max-width: 150px !important;
+        }
+
+        #leadsTableBody .contact-info {
+            display: flex !important;
+            gap: 12px !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-width: 70px !important;
+            max-width: 80px !important;
+        }
+
+        #leadsTableBody .contact-info div {
+            display: none !important;
+        }
+
+        #leadsTableBody .contact-info a {
+            display: inline-flex !important;
+            width: 28px !important;
+            height: 28px !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: #e6f2ff !important;
+            border-radius: 50% !important;
+            color: #0066cc !important;
+            text-decoration: none !important;
+        }
+
+        #leadsTableBody .contact-info a:hover {
+            background: #0066cc !important;
+            color: white !important;
+        }
+
+        /* Optimize table with uniform spacing */
+        #leadsTable {
+            width: 100% !important;
+            table-layout: fixed !important;
+        }
+
+        #leadsTable th,
+        #leadsTable td {
+            padding: 10px 12px !important;
+            text-align: left !important;
+        }
+
+        /* Checkbox column */
+        #leadsTable th:nth-child(1),
+        #leadsTable td:nth-child(1) {
+            width: 40px !important;
+            text-align: center !important;
+        }
+
+        /* Name column */
+        #leadsTable th:nth-child(2),
+        #leadsTable td:nth-child(2) {
+            width: 160px !important;
+            max-width: 160px !important;
+        }
+
+        /* Contact column - centered icons */
+        #leadsTable th:nth-child(3),
+        #leadsTable td:nth-child(3) {
+            width: 90px !important;
+            text-align: center !important;
+        }
+
+        /* Product Interest */
+        #leadsTable th:nth-child(4),
+        #leadsTable td:nth-child(4) {
+            width: 180px !important;
+        }
+
+        /* Premium */
+        #leadsTable th:nth-child(5),
+        #leadsTable td:nth-child(5) {
+            width: 100px !important;
+        }
+
+        /* Stage */
+        #leadsTable th:nth-child(6),
+        #leadsTable td:nth-child(6) {
+            width: 110px !important;
+        }
+
+        /* Renewal Date - needs more space for header + sort arrow */
+        #leadsTable th:nth-child(7),
+        #leadsTable td:nth-child(7) {
+            width: 130px !important;
+        }
+
+        #leadsTable th:nth-child(7) {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+        }
+
+        /* Assigned To */
+        #leadsTable th:nth-child(8),
+        #leadsTable td:nth-child(8) {
+            width: 110px !important;
+        }
+
+        /* Created */
+        #leadsTable th:nth-child(9),
+        #leadsTable td:nth-child(9) {
+            width: 100px !important;
+        }
+
+        /* Actions */
+        #leadsTable th:nth-child(10),
+        #leadsTable td:nth-child(10) {
+            width: 140px !important;
+        }
+
+        /* Fix sort arrows to prevent overflow */
+        #leadsTable th.sortable {
+            position: relative !important;
+            padding-right: 25px !important;
+        }
+
+        #leadsTable th.sortable .sort-arrow {
+            position: absolute !important;
+            right: 8px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+        }
+
+        /* Ensure Product Interest text doesn't wrap unnecessarily */
+        #leadsTableBody td:nth-child(4) {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        /* Policy Management Table Spacing */
+        #policyTableBody td,
+        .policies-view .data-table td {
+            padding: 12px 15px !important;
+            white-space: nowrap !important;
+        }
+
+        .policies-view .data-table th {
+            padding: 12px 15px !important;
+            text-align: left !important;
+            font-weight: 600 !important;
+            white-space: nowrap !important;
+        }
+
+        /* Ensure proper spacing for policy table columns */
+        .policies-view .data-table {
+            table-layout: fixed !important;
+            width: 100% !important;
+        }
+
+        /* Policy number column */
+        .policies-view .data-table td.policy-number {
+            font-weight: 500 !important;
+            color: #3b82f6 !important;
+        }
+
+        /* Force hide Type and Status columns in Clients Management */
+        .clients-view .data-table th:nth-child(4):contains("Type"),
+        .clients-view .data-table th:nth-child(5):contains("Status"),
+        .clients-view .data-table td:nth-child(4).client-type,
+        .clients-view .data-table td:nth-child(5).client-status {
+            display: none !important;
+        }
+
+        /* Ensure clients table has correct column count */
+        .clients-view .data-table thead tr th {
+            padding: 12px 15px !important;
+        }
+
+        .clients-view .data-table {
+            table-layout: auto !important;
+        }
+    </style>
+    <!-- Authentication Service -->
+    <script src="js/auth-service.js"></script>
+    <!-- API Configuration - MUST LOAD FIRST -->
+    <script src="js/api-config.js?v=2"></script>
+    <!-- API Integration Layer -->
+    <!-- <script src="js/api-integration.js?v=1"></script> DISABLED - Overriding loadLeadsView -->
+    <!-- Policy API Integration -->
+    <script src="js/policy-api-integration.js?v=1"></script>
+    <!-- Reminders API Integration -->
+    <script src="js/reminders-api-integration.js?v=1"></script>
+    <!-- API Integration Test Suite - DISABLED to remove popup -->
+    <!-- <script src="js/api-integration-test.js?v=1"></script> -->
+    <!-- API Configuration Validator - DISABLED to remove popup -->
+    <!-- <script src="js/api-config-validator.js?v=1"></script> -->
+
+    <!-- Preserve ORIGINAL stage display (don't override) -->
+    <script src="js/preserve-original-stages.js?v=1"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <img src="images/vanguard-logo.png" alt="Vanguard Insurance Group" class="logo">
+                    <div class="brand-text">
+                        <h1>Vanguard Software</h1>
+                        <span>Agency Management Platform</span>
+                    </div>
+                </div>
+                <ul class="nav-menu">
+                    <li><a href="#dashboard" class="nav-link active">Dashboard</a></li>
+                    <li class="dropdown">
+                        <a href="#" class="nav-link">Tools <i class="fas fa-chevron-down"></i></a>
+                        <div class="dropdown-menu">
+                            <a href="#" onclick="openPhoneTool(); return false;"><i class="fas fa-phone"></i> Phone</a>
+                            <a href="#" onclick="openEmailTool(); return false;"><i class="fas fa-envelope"></i> Email</a>
+                            <a href="#" onclick="openNotepad(); return false;"><i class="fas fa-sticky-note"></i> Notepad</a>
+                        </div>
+                    </li>
+                    <li><a href="#analytics" class="nav-link">Analytics</a></li>
+                    <li><a href="#integrations" class="nav-link">Integrations</a></li>
+                </ul>
+                <div class="nav-actions">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge">5</span>
+                    </button>
+                    <div class="user-menu" id="userMenuNav" onclick="toggleUserMenu()" style="cursor: pointer;">
+                        <img src="https://ui-avatars.com/api/?name=User&background=0066cc&color=fff" alt="User" class="user-avatar" id="userAvatar">
+                        <span id="userNameDisplay">User</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div id="userDropdown" style="display: none; position: absolute; top: 60px; right: 20px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); z-index: 1000; min-width: 180px;">
+                        <a href="#" onclick="logout(); return false;" style="display: block; padding: 12px 16px; color: #374151; text-decoration: none; hover: background: #f3f4f6; border-radius: 8px;">
+                            <i class="fas fa-sign-out-alt" style="margin-right: 8px; color: #6b7280;"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+                <script>
+                    function toggleUserMenu() {
+                        const dropdown = document.getElementById('userDropdown');
+                        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+                    }
+
+                    // Close dropdown when clicking outside
+                    document.addEventListener('click', (e) => {
+                        if (!e.target.closest('#userMenuNav') && !e.target.closest('#userDropdown')) {
+                            document.getElementById('userDropdown').style.display = 'none';
+                        }
+                    });
+
+                    // Update user display
+                    const updateUserDisplay = () => {
+                        const userData = sessionStorage.getItem('vanguard_user');
+                        if (userData) {
+                            const user = JSON.parse(userData);
+                            const nameDisplay = document.getElementById('userNameDisplay');
+                            const avatar = document.getElementById('userAvatar');
+
+                            if (nameDisplay) {
+                                // Check if user is admin
+                                const isAdmin = (username) => {
+                                    const adminUsers = ['grant', 'maureen'];
+                                    return adminUsers.includes(username.toLowerCase());
+                                };
+
+                                // Create admin badge if user is admin
+                                const adminBadge = isAdmin(user.username) ? `
+                                    <span style="
+                                        background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+                                        color: white;
+                                        padding: 2px 6px;
+                                        border-radius: 10px;
+                                        font-size: 10px;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        margin-left: 6px;
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                        border: 1px solid rgba(255,255,255,0.3);
+                                    ">
+                                        <i class="fas fa-crown" style="margin-right: 3px; font-size: 9px;"></i>ADMIN
+                                    </span>
+                                ` : '';
+
+                                nameDisplay.innerHTML = user.username + adminBadge;
+                            }
+                            if (avatar) avatar.src = `https://ui-avatars.com/api/?name=${user.username}&background=0066cc&color=fff`;
+
+                            // Control admin UI sections based on user role
+                            controlAdminUI(user.username);
+                        }
+                    };
+
+                    // Control admin UI visibility based on user role
+                    const controlAdminUI = (username) => {
+                        console.log('controlAdminUI called with username:', username);
+
+                        const isAdmin = (username) => {
+                            const adminUsers = ['grant', 'maureen'];
+                            const isAdminUser = adminUsers.includes(username.toLowerCase());
+                            console.log('Checking admin status for:', username, '-> isAdmin:', isAdminUser);
+                            return isAdminUser;
+                        };
+
+                        const applyAdminControls = () => {
+                            console.log('Applying admin controls...');
+
+                            // Find Administration section in sidebar
+                            const menuSections = document.querySelectorAll('.sidebar-menu .menu-section');
+                            console.log('Found menu sections:', menuSections.length);
+
+                            let administrationSectionFound = false;
+
+                            menuSections.forEach((section, index) => {
+                                const heading = section.querySelector('h3');
+                                if (heading) {
+                                    console.log(`Section ${index} heading:`, heading.textContent.trim());
+
+                                    if (heading.textContent.trim() === 'Administration') {
+                                        administrationSectionFound = true;
+                                        console.log('Found Administration section!');
+
+                                        if (isAdmin(username)) {
+                                            section.style.display = 'block';
+                                            section.style.visibility = 'visible';
+                                            console.log('✅ Admin user - Administration section visible');
+                                        } else {
+                                            section.style.display = 'none';
+                                            section.style.visibility = 'hidden';
+                                            console.log('❌ Non-admin user - Administration section hidden');
+                                        }
+                                    }
+                                }
+                            });
+
+                            if (!administrationSectionFound) {
+                                console.warn('⚠️ Administration section not found in sidebar!');
+                            }
+
+                            // Hide dashboard stats for non-admin users
+                            const adminOnlyStats = [
+                                'Active Clients',
+                                'Active Policies',
+                                'All Time Premium',
+                                'Monthly Lead Premium'
+                            ];
+
+                            const statCards = document.querySelectorAll('.stat-card');
+                            console.log('Found stat cards:', statCards.length);
+
+                            statCards.forEach((card, index) => {
+                                const statTitle = card.querySelector('.stat-details h3');
+                                if (statTitle) {
+                                    const titleText = statTitle.textContent.trim();
+                                    console.log(`Stat card ${index} title:`, titleText);
+
+                                    if (adminOnlyStats.includes(titleText)) {
+                                        if (isAdmin(username)) {
+                                            card.style.display = 'block';
+                                            card.style.visibility = 'visible';
+                                            console.log(`✅ Admin - Showing stat: ${titleText}`);
+                                        } else {
+                                            card.style.display = 'none';
+                                            card.style.visibility = 'hidden';
+                                            console.log(`❌ Non-admin - Hiding stat: ${titleText}`);
+                                        }
+                                    }
+                                }
+                            });
+                        };
+
+                        // Apply controls with multiple attempts
+                        setTimeout(applyAdminControls, 100);
+                        setTimeout(applyAdminControls, 500);
+                        setTimeout(applyAdminControls, 1000);
+
+                        // Also apply when DOM is ready
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', applyAdminControls);
+                        } else {
+                            applyAdminControls();
+                        }
+
+                        // Set up MutationObserver to watch for content changes (like dashboard reloads)
+                        const adminControlObserver = new MutationObserver((mutations) => {
+                            let shouldReapply = false;
+
+                            mutations.forEach((mutation) => {
+                                // Check if stat cards or sidebar sections were added/modified
+                                if (mutation.type === 'childList') {
+                                    const addedNodes = Array.from(mutation.addedNodes);
+                                    const hasStatCard = addedNodes.some(node =>
+                                        node.nodeType === 1 && (
+                                            node.classList?.contains('stat-card') ||
+                                            node.querySelector?.('.stat-card') ||
+                                            node.classList?.contains('menu-section') ||
+                                            node.querySelector?.('.menu-section')
+                                        )
+                                    );
+
+                                    if (hasStatCard) {
+                                        shouldReapply = true;
+                                        console.log('Content reload detected, reapplying admin controls...');
+                                    }
+                                }
+                            });
+
+                            if (shouldReapply) {
+                                // Small delay to ensure content is fully loaded
+                                setTimeout(applyAdminControls, 100);
+                            }
+                        });
+
+                        // Start observing
+                        adminControlObserver.observe(document.body, {
+                            childList: true,
+                            subtree: true
+                        });
+
+                        console.log('Admin control observer set up to watch for content changes');
+                    };
+
+                    // Update on load
+                    updateUserDisplay();
+                    // Update after DOM ready
+                    document.addEventListener('DOMContentLoaded', updateUserDisplay);
+                </script>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main class="main-content">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-menu">
+                <div class="menu-section">
+                    <h3>Main</h3>
+                    <ul>
+                        <li class="active">
+                            <a href="#dashboard" data-tooltip="Dashboard">
+                                <i class="fas fa-home"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#leads" data-tooltip="Leads">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Leads</span>
+                                <span class="count badge-new">156</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#clients" data-tooltip="Clients">
+                                <i class="fas fa-users"></i>
+                                <span>Clients</span>
+                                <span class="count">2,847</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#policies" data-tooltip="Policies">
+                                <i class="fas fa-file-contract"></i>
+                                <span>Policies</span>
+                                <span class="count">5,234</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#renewals" data-tooltip="Renewals">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>Renewals</span>
+                                <span class="count">87</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="menu-section">
+                    <h3>Tools</h3>
+                    <ul>
+                        <li>
+                            <a href="#lead-generation" data-tooltip="Lead Generation">
+                                <i class="fas fa-search-location"></i>
+                                <span>Lead Generation</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#rating-engine" data-tooltip="Rating Engine">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Rating Engine</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#automation" data-tooltip="Automation">
+                                <i class="fas fa-robot"></i>
+                                <span>Automation</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#coi" data-tooltip="COI Management">
+                                <i class="fas fa-certificate"></i>
+                                <span>COI Management</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#communications" data-tooltip="Communications">
+                                <i class="fas fa-envelope"></i>
+                                <span>Communications</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="menu-section">
+                    <h3>Administration</h3>
+                    <ul>
+                        <li>
+                            <a href="#carriers" data-tooltip="Carriers">
+                                <i class="fas fa-building"></i>
+                                <span>Carriers</span>
+                                <span class="count">47</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#producers" data-tooltip="Producers">
+                                <i class="fas fa-user-tie"></i>
+                                <span>Producers</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#accounting" data-tooltip="Accounting">
+                                <i class="fas fa-dollar-sign"></i>
+                                <span>Accounting</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#reports" data-tooltip="Reports">
+                                <i class="fas fa-chart-bar"></i>
+                                <span>Reports</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#settings" data-tooltip="Settings">
+                                <i class="fas fa-cog"></i>
+                                <span>Settings</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Dashboard Content -->
+        <section class="dashboard-content">
+            <!-- Stats Overview -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3>Active Clients</h3>
+                        <p class="stat-number stat-value">0</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> 0% from last month
+                        </span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <i class="fas fa-file-contract"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3>Active Policies</h3>
+                        <p class="stat-number stat-value">0</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> 0% from last month
+                        </span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3>All Time Premium</h3>
+                        <p class="stat-number stat-value">$0</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> 0% from last month
+                        </span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3>Monthly Lead Premium</h3>
+                        <p class="stat-number stat-value">$0</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> 0% from last month
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="showNewQuote()">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>New Quote</span>
+                    </button>
+                    <button class="action-btn" onclick="showNewClient()">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Add Client</span>
+                    </button>
+                    <button class="action-btn" onclick="showRatingEngine()">
+                        <i class="fas fa-calculator"></i>
+                        <span>Compare Rates</span>
+                    </button>
+                    <button class="action-btn" onclick="showRenewalsList()">
+                        <i class="fas fa-sync"></i>
+                        <span>Renewals</span>
+                    </button>
+                    <button class="action-btn" onclick="showClaims()">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Claims</span>
+                    </button>
+                    <button class="action-btn" onclick="showReports()">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Reports</span>
+                    </button>
+                    <button class="action-btn" onclick="showAppSubmissions()">
+                        <i class="fas fa-file-contract"></i>
+                        <span>App Submissions</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Sections -->
+            <div class="dashboard-sections">
+                <!-- Recent Activities -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2>Recent Activities</h2>
+                        <a href="#" class="view-all">View All</a>
+                    </div>
+                    <div class="activities-list">
+                        <!-- Activities will be populated dynamically by recent-activities.js -->
+                    </div>
+                    <script>
+                        // Force clear ALL demo data immediately
+                        document.addEventListener('DOMContentLoaded', function() {
+                            // Clear demo stat values
+                            document.querySelectorAll('.stat-value').forEach(el => {
+                                if (el.textContent.includes('2,547') || el.textContent.includes('3,892') || 
+                                    el.textContent.includes('1.2M') || el.textContent.includes('68%')) {
+                                    el.textContent = '0';
+                                }
+                            });
+                            
+                            // Clear percentage changes
+                            document.querySelectorAll('.stat-change').forEach(el => {
+                                if (el.textContent.includes('12%') || el.textContent.includes('8%') || 
+                                    el.textContent.includes('15%') || el.textContent.includes('3%')) {
+                                    el.innerHTML = '<i class="fas fa-arrow-up"></i> 0% from last month';
+                                }
+                            });
+                            
+                            // Clear renewals table
+                            const renewalsTbody = document.getElementById('renewals-tbody');
+                            if (renewalsTbody && (renewalsTbody.innerHTML.includes('David Wilson') || 
+                                renewalsTbody.innerHTML.includes('Robert Wilson') ||
+                                renewalsTbody.innerHTML.includes('Lisa Anderson'))) {
+                                renewalsTbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">No upcoming renewals in the next 30 days</td></tr>';
+                            }
+                            
+                            // Clear activities if they contain demo data
+                            const activitiesList = document.querySelector('.activities-list');
+                            if (activitiesList && activitiesList.innerHTML.includes('John Smith')) {
+                                activitiesList.innerHTML = '';
+                            }
+                        });
+                    </script>
+                </div>
+
+                <!-- Upcoming Renewals -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2>Upcoming Renewals</h2>
+                        <a href="#" class="view-all">View All</a>
+                    </div>
+                    <div class="renewals-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Policy Type</th>
+                                    <th>Expiry Date</th>
+                                    <th>Premium</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="renewals-tbody">
+                                <!-- Renewals will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-section">
+                <div class="chart-card">
+                    <h3>Premium Growth</h3>
+                    <canvas id="premiumChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Policy Distribution</h3>
+                    <canvas id="policyChart"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Rating Engine Modal -->
+    <div id="ratingModal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>Comparative Rating Engine</h2>
+                <button class="close-btn" onclick="closeModal('ratingModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="rating-form">
+                    <h3>Get Instant Quotes from Multiple Carriers</h3>
+                    <form id="ratingForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Insurance Type</label>
+                                <select id="insuranceType">
+                                    <option>Auto Insurance</option>
+                                    <option>Homeowners Insurance</option>
+                                    <option>Commercial Auto</option>
+                                    <option>Commercial Property</option>
+                                    <option>General Liability</option>
+                                    <option>Life Insurance</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Coverage Amount</label>
+                                <input type="text" placeholder="$100,000">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Client Name</label>
+                                <input type="text" placeholder="Enter client name">
+                            </div>
+                            <div class="form-group">
+                                <label>Effective Date</label>
+                                <input type="date">
+                            </div>
+                        </div>
+                        <button type="button" class="btn-primary" onclick="getQuotes()">
+                            <i class="fas fa-search"></i> Get Quotes
+                        </button>
+                    </form>
+                </div>
+                
+                <div id="quotesResults" class="quotes-results" style="display:none;">
+                    <h3>Available Quotes</h3>
+                    <div class="quotes-grid">
+                        <div class="quote-card">
+                            <div class="carrier-logo">
+                                <img src="https://via.placeholder.com/100x40" alt="Carrier A">
+                            </div>
+                            <div class="quote-details">
+                                <h4>Progressive</h4>
+                                <p class="quote-price">$1,200<span>/year</span></p>
+                                <ul class="coverage-list">
+                                    <li><i class="fas fa-check"></i> Comprehensive Coverage</li>
+                                    <li><i class="fas fa-check"></i> $500 Deductible</li>
+                                    <li><i class="fas fa-check"></i> Roadside Assistance</li>
+                                </ul>
+                                <button class="btn-success">Select Quote</button>
+                            </div>
+                        </div>
+                        <div class="quote-card">
+                            <div class="carrier-logo">
+                                <img src="https://via.placeholder.com/100x40" alt="Carrier B">
+                            </div>
+                            <div class="quote-details">
+                                <h4>State Farm</h4>
+                                <p class="quote-price">$1,350<span>/year</span></p>
+                                <ul class="coverage-list">
+                                    <li><i class="fas fa-check"></i> Premium Coverage</li>
+                                    <li><i class="fas fa-check"></i> $250 Deductible</li>
+                                    <li><i class="fas fa-check"></i> Rental Car Coverage</li>
+                                </ul>
+                                <button class="btn-success">Select Quote</button>
+                            </div>
+                        </div>
+                        <div class="quote-card">
+                            <div class="carrier-logo">
+                                <img src="https://via.placeholder.com/100x40" alt="Carrier C">
+                            </div>
+                            <div class="quote-details">
+                                <h4>Allstate</h4>
+                                <p class="quote-price">$1,150<span>/year</span></p>
+                                <ul class="coverage-list">
+                                    <li><i class="fas fa-check"></i> Basic Coverage</li>
+                                    <li><i class="fas fa-check"></i> $1000 Deductible</li>
+                                    <li><i class="fas fa-check"></i> Liability Only</li>
+                                </ul>
+                                <button class="btn-success">Select Quote</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Client Modal -->
+    <div id="clientModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Client</h2>
+                <button class="close-btn" onclick="closeModal('clientModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="newClientForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>First Name</label>
+                            <input type="text" name="firstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name</label>
+                            <input type="text" name="lastName" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="clientEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="tel" name="clientPhone" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <input type="text" name="clientAddress" placeholder="Street Address">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" name="clientCity">
+                        </div>
+                        <div class="form-group">
+                            <label>State</label>
+                            <select name="clientState">
+                                <option>Select State</option>
+                                <option>NY</option>
+                                <option>CA</option>
+                                <option>TX</option>
+                                <option>FL</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>ZIP</label>
+                            <input type="text" name="clientZip">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Assigned Agent</label>
+                            <select name="assignedTo" style="width: 100%;">
+                                <option value="">Unassigned</option>
+                                <option value="Grant">Grant</option>
+                                <option value="Maureen">Maureen</option>
+                                <option value="Hunter">Hunter</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Representative</label>
+                            <input type="text" name="representative" placeholder="Sales Representative">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeModal('clientModal')">Cancel</button>
+                        <button type="submit" class="btn-primary">Add Client</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Automation Center -->
+    <div class="automation-panel" id="automationPanel" style="display:none;">
+        <div class="panel-header">
+            <h2>Automation Center</h2>
+            <button onclick="hidePanel('automationPanel')" class="close-panel">&times;</button>
+        </div>
+        <div class="panel-content">
+            <div class="automation-stats">
+                <div class="auto-stat">
+                    <i class="fas fa-robot"></i>
+                    <div>
+                        <h4>Active Workflows</h4>
+                        <p>24</p>
+                    </div>
+                </div>
+                <div class="auto-stat">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <h4>Time Saved</h4>
+                        <p>156 hrs/month</p>
+                    </div>
+                </div>
+                <div class="auto-stat">
+                    <i class="fas fa-check-circle"></i>
+                    <div>
+                        <h4>Tasks Completed</h4>
+                        <p>1,247</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="workflows-list">
+                <h3>Automated Workflows</h3>
+                <div class="workflow-item">
+                    <div class="workflow-info">
+                        <i class="fas fa-envelope"></i>
+                        <div>
+                            <h4>Welcome Email Series</h4>
+                            <p>Sends 5 emails to new clients over 30 days</p>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="workflow-item">
+                    <div class="workflow-info">
+                        <i class="fas fa-bell"></i>
+                        <div>
+                            <h4>Renewal Reminders</h4>
+                            <p>Auto-notify clients 60, 30, and 7 days before renewal</p>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="workflow-item">
+                    <div class="workflow-info">
+                        <i class="fas fa-file-invoice"></i>
+                        <div>
+                            <h4>Document Generation</h4>
+                            <p>Auto-create certificates and ID cards</p>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="workflow-item">
+                    <div class="workflow-info">
+                        <i class="fas fa-chart-line"></i>
+                        <div>
+                            <h4>Lead Scoring</h4>
+                            <p>Automatically score and prioritize new leads</p>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <button class="btn-primary full-width">
+                <i class="fas fa-plus"></i> Create New Workflow
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- CDN Fallback Handler -->
+    <script src="js/cdn-fallback.js"></script>
+
+    <!-- Agent Configuration -->
+    <script src="js/agent-config.js"></script>
+
+    <!-- Protect Vicidial leads from being removed -->
+    <!-- <script src="js/protect-vicidial-leads.js?v=3"></script> DISABLED - May load leads -->
+    <!-- Lead Archive System -->
+    <!-- <script src="js/lead-archive-system.js?v=2"></script> DISABLED - May load leads -->
+    <script src="js/api-service.js?v=26"></script>
+    <!-- Fix ALL API ports BEFORE any other scripts -->
+    <script src="js/fix-all-api-ports.js"></script>
+    <script src="js/crm-api.js?v=1"></script>
+    <script src="js/crm-integration-override.js?v=1"></script>
+    <!-- DISABLED FOR TESTING - These were blocking leads -->
+    <!-- <script src="js/nuclear-lead-cleanup.js?v=2"></script> -->
+    <script src="js/integrations.js?v=20"></script>
+    <!-- <script src="js/localStorage-interceptor.js?v=2"></script> -->
+    <script src="js/data-sync.js?v=1"></script>
+    <!-- Performance Optimization - MUST LOAD EARLY -->
+    <script src="js/performance-optimization.js"></script>
+
+    <!-- <script src="js/auto-clean-leads.js?v=3"></script> -->
+    <script src="js/app.js?v=64"></script>
+
+    <!-- Protect ViciDial leads stored in database from localStorage clearing -->
+    <script src="js/protect-database-leads.js?v=5"></script>
+
+    <script src="js/restore-coi-features.js?v=1"></script>
+
+    <!-- CRITICAL: Load Titan emails immediately after app.js so loadCOIInbox function is available -->
+    <script src="js/titan-emails-only-simple.js?v=6"></script>
+
+    <!-- TITAN COI EMAIL COMPOSE MOVED TO END TO PREVENT OVERRIDES -->
+
+    <!-- COI Form and Signature Scripts -->
+    <script src="js/coi-form-capture.js?v=1"></script>
+    <script src="js/coi-signature-modal.js?v=1"></script>
+    <!-- Fix Archived Leads Permanently - Must load EARLY to override sync functions -->
+    <script src="js/fix-archived-leads-permanent.js?v=1"></script>
+    <script src="js/ai-functions-fallback.js"></script>
+    <script src="debug-agent-save.js"></script>
+    <script src="js/policy-modal.js?v=30"></script>
+    <script src="js/fix-policy-server-save.js?v=1"></script>
+    <script src="js/policy-to-client-auto-sync.js?v=1"></script>
+    <script src="js/fix-policy-types.js"></script>
+    <!-- Removed carrier-profile-fixed.js to avoid conflicts -->
+    <script src="js/database-connector.js?v=22"></script>
+    <script src="vicidial-config.js"></script>
+    <script src="js/vicidial-integration.js"></script>
+    <script src="js/vicidial-uploader.js?v=6"></script>
+    <!-- DISABLED: Conflicts with selective sync - <script src="js/vicidial-sync-restored.js"></script> -->
+    <!-- Telnyx WebRTC SDK for browser calling -->
+    <script src="https://unpkg.com/@telnyx/webrtc@2.10.1/lib/bundle.js"></script>
+    <script src="js/telnyx-webrtc.js?v=1"></script>
+    <script src="js/tool-windows.js?v=11"></script>
+    <script src="js/twilio-sip.js?v=3"></script>
+    <script src="js/click-to-dial-email.js"></script>
+    <script src="js/integrations-config.js"></script>
+    <script src="js/dashboard-stats.js?v=27"></script>
+    <script src="js/recent-activities.js?v=32"></script>
+    <script src="js/dashboard-renewals.js?v=2"></script>
+    <script src="js/renewal-persistence-loader.js?v=1"></script>
+    <script src="js/fix-renewal-finalize-update.js?v=2"></script>
+    <script src="js/renewal-finalize-indicator.js?v=2"></script>
+    <script src="js/communications-reminders.js?v=1"></script>
+    <script src="js/test-communications-data.js?v=1"></script>
+    <script src="js/clear-test-clients.js?v=1"></script>
+    <!-- <script src="js/load-vicidial-leads.js"></script> DISABLED - Auto-loads mock data -->
+    <script src="js/load-vicidial-transcripts.js"></script>
+    <script src="js/fix-navigation.js"></script>
+    <!-- Re-enabled for proper profile function -->
+    <script src="js/final-profile-fix.js"></script>
+    <script src="js/add-test-button.js"></script>
+    <!-- DISABLED: Overrides proper generateClientRows with outdated logic
+    <script src="js/fix-clients-view.js"></script> -->
+    <!-- DISABLED: Conflicts with original-client-profile.js
+    <script src="js/fix-client-profile-policies.js"></script> -->
+    <!-- TEMPORARILY DISABLED - This was blocking Vicidial lead imports -->
+    <!-- <script src="js/fix-lead-persistence.js"></script> -->
+    <script src="js/fix-stage-update.js"></script>
+    <script src="js/fix-stage-save-to-db.js"></script>
+    <script src="js/ai-lead-caller.js"></script>
+    <script src="js/create-sample-ai-campaign.js"></script>
+    <script src="js/sms-persistence-test.js"></script>
+    <script src="js/quote-application.js"></script>
+    <script src="js/quote-application-server.js"></script>
+    <script src="js/test-quote-modal.js"></script>
+    <script src="js/quote-applications-view.js"></script>
+    <script src="js/fix-quote-application-button.js"></script>
+    <script src="js/show-comprehensive-application.js"></script>
+    <script src="js/app-submissions.js"></script>
+    <script src="js/force-app-submissions-local.js"></script>
+    <script src="js/fix-quote-application-click.js"></script>
+    <script src="js/cleanup-modals.js"></script>
+    <!-- Ensure required functions exist -->
+    <script src="js/ensure-functions.js"></script>
+    <!-- USING PROFILE FROM SEP 22 -->
+    <script src="js/final-profile-fix.js"></script>
+    <!-- DEBUG: Monitor localStorage persistence -->
+    <script src="js/debug-localstorage-persistence.js"></script>
+    <script src="js/fix-stage-saving-unified.js?v=4"></script>
+    <!-- Critical Lead Profile Scripts from Working System -->
+    <script src="js/fix-lead-table-eye-icon-only.js"></script>
+    <script src="js/fix-profile-quotes.js"></script>
+    <script src="js/fix-add-quote-direct.js"></script>
+    <script src="js/load-display-quotes.js"></script>
+    <script src="js/load-lead-from-api.js"></script>
+    <script src="js/force-save-button-v2.js"></script>
+    <!-- Demo Data Blocking Script -->
+    <script src="js/block-demo-data-import.js"></script>
+    <!-- Fix Profile Display Issues -->
+    <script src="js/fix-profile-display.js"></script>
+    <!-- Fix Profile Position -->
+    <script src="js/fix-profile-position.js"></script>
+    <!-- Fix Gmail API URL -->
+    <!-- DISABLED: Interfering with Titan email expansion - <script src="js/fix-gmail-api-url.js"></script> -->
+    <!-- Connect eye icon to proper profile -->
+    <script src="js/connect-eye-icon-properly.js?v=1"></script>
+    <!-- Fix viewLead to use createEnhancedProfile -->
+    <script src="js/fix-viewlead-proper.js"></script>
+    <!-- Disabled: Overrides viewLead incorrectly
+    <script src="js/save-button-in-profile.js"></script> -->
+    <script src="js/debug-lead-storage.js"></script>
+    <script src="js/unarchive-all-leads.js"></script>
+    <script src="js/fix-lead-not-found.js"></script>
+
+    <!-- ALL RECENTLY CREATED PROFILE SCRIPTS DISABLED -->
+    <!-- <script src="js/use-original-app-profile.js"></script> -->
+    <!-- <script src="js/lead-profile-enhanced.js"></script> -->
+    <!-- <script src="js/connect-viewlead.js"></script> -->
+    <!-- <script src="js/simple-lead-profile.js"></script> -->
+    <!-- <script src="js/fix-view-lead-click.js"></script> -->
+    <!-- <script src="js/keep-profile-open.js"></script> -->
+    <!-- <script src="js/restore-original-profile.js"></script> -->
+    <!-- Removed debug script that adds test button -->
+    <!-- <script src="js/debug-profile-open.js"></script> -->
+    <!-- DISABLED - This script was blocking lead imports with "No new leads to import" message -->
+    <!-- <script src="js/sync-new-vicidial-leads.js"></script> -->
+    
+    <!-- Commented out scripts causing connection errors
+    <!-- <script src="js/import-new-leads-now.js"></script> DISABLED - Auto-imports leads on page load -->
+    <!-- <script src="js/force-sync-leads.js"></script> DISABLED - Adds mock data automatically -->
+    -->
+    <!-- <script src="js/direct-import-leads.js"></script> -->
+    <!-- <script src="js/remove-fake-leads.js"></script> -->
+    <!-- Previous sync attempts - disabled -->
+    <!-- <script src="js/manual-vicidial-sync.js"></script> -->
+    <!-- <script src="js/force-real-sync.js"></script> -->
+    <!-- <script src="js/fix-lead-addition.js"></script> -->
+    
+    <!-- Working sync solution - These are the ONLY active sync scripts -->
+    <!-- <script src="js/vicidial-sync-with-transcription.js"></script> DISABLED - conflicts with enhanced selective sync -->
+    <script src="js/add-sync-button.js"></script>
+    <script src="js/manual-lead-refresh.js"></script>
+    <script src="js/emergency-lead-refresh.js"></script>
+    <!-- MAIN IMPORT SCRIPT - Full data import with transcripts, vehicles, notes -->
+    <!-- <script src="js/vicidial-full-data-import.js?v=2"></script> DISABLED - Imports leads -->
+    <!-- Enhanced lead details view to show all the imported data -->
+    <!-- <script src="js/enhanced-lead-details.js"></script> DISABLED - May load leads -->
+    <!-- Backup scripts if needed -->
+    <!-- <script src="js/force-show-vicidial-leads.js"></script> -->
+    <!-- <script src="js/reset-and-import.js"></script> -->
+    <!-- <script src="js/fix-lead-table.js"></script> -->
+    <!-- <script src="js/fix-lead-display.js"></script> -->
+    <!-- <script src="js/force-add-vicidial-leads.js"></script> -->
+    
+    <!-- Loading Spinner Fix - DISABLED -->
+    <!-- <script src="js/fix-loading-spinner.js"></script> -->
+
+    <!-- Lead Archive System - DISABLED -->
+    <!-- <script src="js/lead-archive-system.js?v=2"></script> -->
+    
+    <!-- Deduplication System - Prevents duplicates across leads, clients, archives -->
+    <script src="js/deduplication-system.js?v=1"></script>
+    
+    <!-- Bulk Client Import - 21 clients ready to import -->
+    <script src="js/bulk-import-clients.js?v=2"></script>
+    
+    <!-- Fix Client IDs to prevent JavaScript errors -->
+    <script src="js/fix-client-ids.js?v=1"></script>
+    
+    <!-- Client Pagination System - 12 clients per page -->
+    <!-- DISABLED: Uses outdated client.policies array and wrong premium field
+    <script src="js/client-pagination.js?v=2"></script> -->
+    
+    <!-- Fix stuck leads -->
+    <!-- <script src="js/fix-stuck-leads.js?v=1"></script> DISABLED - May load leads -->
+    
+    <!-- FMCSA Data Updater - Updates client data from FMCSA API -->
+    <script src="js/fmcsa-data-updater.js?v=1"></script>
+    
+    <!-- FMCSA Insurance Lead Generator - Uses insurance API for lead generation -->
+    <!-- <script src="js/fmcsa-insurance-leads.js?v=1"></script> DISABLED - Generates leads -->
+    
+    <!-- Fix Policy View Modal Tabs - Makes tabs properly show/hide content -->
+    <script src="js/fix-policy-view-tabs.js?v=1"></script>
+    
+    <!-- Fix Policy Management Statistics - Calculate actual values from data -->
+    <script src="js/fix-policy-stats.js?v=1"></script>
+    
+    <!-- Force FMCSA Update - Temporary script to force immediate update -->
+    <script src="js/force-fmcsa-update.js?v=1"></script>
+    
+    <!-- Force restore Vicidial leads - MUST BE LAST -->
+    <script src="js/force-restore-vicidial.js?v=1"></script>
+    
+    <!-- Cloud Sync System - Syncs data across all devices and accounts -->
+    <!-- Removed firebase-sync.js to disable Export/Import/Gist popup -->
+    
+    <!-- Optional: Firebase SDK for real-time sync (uncomment to enable) -->
+    <!--
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    -->
+
+    <!-- ORIGINAL CLIENT PROFILE - Must be LAST to override all other viewClient functions -->
+    <script src="js/original-client-profile.js?v=2"></script>
+
+    <!-- FIX PREMIUM DISPLAY - Must be absolutely LAST to fix premium calculation -->
+    <script src="js/fix-premium-display.js?v=1"></script>
+
+    <!-- COI Email Integration - Auto-switches between Gmail and Outlook -->
+    <!-- DISABLED: Interfering with Titan - <script src="js/coi-email-integration.js?v=1"></script> -->
+
+    <!-- COI Gmail Proxy - DISABLED: Was overriding with demo data
+    <script src="js/coi-gmail-proxy.js?v=1"></script> -->
+
+    <!-- COI Email Fix - Ensures email expansion works -->
+    <!-- DISABLED: Interfering with Titan - <script src="js/coi-email-fix.js?v=2"></script> -->
+    <!-- COI Real Policies - Load policies from localStorage -->
+    <script src="js/coi-real-policies.js?v=13"></script>
+    <!-- COI Policy Sync - Keep policies in sync -->
+    <script src="js/coi-policy-sync.js?v=1"></script>
+
+    <!-- Prevent duplicate policy loads - MUST LOAD AFTER COI SCRIPTS -->
+    <script src="js/preserve-coi-policy-list.js"></script>
+
+    <!-- COI Field Mapping Fix - Enhanced field extraction for policy data -->
+    <script src="js/coi-field-mapping-fix.js?v=2"></script>
+    <!-- ULTIMATE ACORD FIX - This WILL show real ACORD form -->
+    <!-- Remove ultimate-acord-fix as it conflicts -->
+    <!-- <script src="js/ultimate-acord-fix.js?v=2"></script> -->
+    <!-- Carrier Import System - Import from Progressive, GEICO, etc -->
+    <script src="js/carrier-import-system.js?v=1"></script>
+    <!-- FORCE REAL EMAILS - Aggressively loads real Gmail emails -->
+    <!-- DISABLED: Interfering with Titan - <script src="js/coi-force-real-emails.js?v=2"></script> -->
+    <!-- DISABLED: Interfering with Titan email expansion - COI Inbox Fix - Fixes back arrow navigation -->
+    <!-- <script src="js/coi-inbox-fix.js?v=1"></script> -->
+
+    <!-- CRITICAL SEPT 29 FIXES - Restoring missing functionality -->
+    <!-- Sept 29 ACORD display -->
+    <!-- <script src="js/acord-25-display.js?v=1"></script> -->
+    <script src="js/fix-everything-final.js?v=1"></script>
+    <script src="js/email-status-tracker.js?v=6"></script>
+    <script src="js/fix-view-email-details.js?v=1"></script>
+    <script src="js/fix-back-to-inbox.js?v=1"></script>
+    <script src="js/disable-popups.js?v=1"></script>
+    <!-- COI Back Arrow Ultimate Fix - Ensures back arrow works -->
+    <script src="js/coi-back-arrow-fix.js?v=1"></script>
+    <!-- COI Button Intercept - Directly intercepts back button clicks -->
+    <script src="js/coi-button-intercept.js?v=1"></script>
+    <!-- COI Email Read Status - Tracks and styles read/unread emails -->
+    <!-- DISABLED: Interfering with Titan - <script src="js/coi-email-read-status.js?v=2"></script> -->
+    <!-- COI Hover Fix - AGGRESSIVE fix for hover behavior -->
+    <script src="js/coi-hover-fix.js?v=1"></script>
+    <!-- COI Inline Style Fix - Forces inline styles for emails -->
+    <script src="js/coi-inline-style-fix.js?v=1"></script>
+    <!-- Real ACORD 25 Display - Shows actual ACORD 25 certificate form -->
+    <!-- <script src="js/real-acord-25-display.js?v=1"></script> -->
+    <!-- ACORD PDF Viewer - Displays the real fillable ACORD 25 PDF -->
+    <!-- <script src="js/acord-pdf-viewer.js?v=1"></script> -->
+    <!-- FORCE ACORD PDF - Ultimate override to ensure real PDF shows -->
+    <!-- <script src="js/force-acord-pdf.js?v=1"></script> -->
+    <!-- ACORD PDF Pre-fill - Fills ACORD with policy data -->
+    <!-- <script src="js/acord-pdf-prefill.js?v=1"></script> -->
+    <!-- ACORD Simple View - Clean PDF display with email/save -->
+    <!-- <script src="js/acord-simple-view.js?v=1"></script> -->
+    <!-- ACORD Stable View - Prevents zoom changes -->
+    <!-- <script src="js/acord-stable-view.js?v=1"></script> -->
+    <!-- ACORD Auto-Fill - Fills PDF with policy data -->
+    <!-- <script src="js/acord-auto-fill.js?v=1"></script> -->
+    <!-- ACORD Form Filler - Shows filled data on PDF -->
+    <!-- <script src="js/acord-form-filler.js?v=1"></script> -->
+    <!-- Load PDF.js and jsPDF for ACORD form handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        if (window.jspdf) {
+            window.jsPDF = window.jspdf.jsPDF;
+        }
+    </script>
+    <!-- Save to Profile functionality - MUST load before ACORD viewers -->
+    <script src="js/save-to-profile.js?v=14"></script>
+    <!-- Load ACORD Real Viewer for PDF with fillable fields overlay -->
+    <script src="js/acord-real-viewer.js?v=6"></script>
+    <!-- Load the ACORD 25 Display with download/print functions -->
+    <!-- Disabled because it conflicts with real viewer -->
+    <!-- <script src="js/acord-25-display.js?v=2"></script> -->
+    <!-- Load ACORD Embedded handler - this must be last to override prepareCOI -->
+    <script src="js/acord-25-embedded.js?v=2"></script>
+    <!-- COI Email System with PDF Attachment -->
+    <!-- DISABLED: Interfering with Titan - <script src="js/coi-email-with-pdf.js?v=5"></script> -->
+    <!-- DISABLED: Interfering with Titan - <script src="js/coi-email-final-override.js?v=2"></script> -->
+    <!-- Fix ACORD Download and Print functions -->
+    <script src="js/fix-acord-download-print.js?v=1"></script>
+    <!-- Removed lead-filter-530.js to disable 5/30 Filter button -->
+    <!-- Carrier Profile Modal - Shows comprehensive carrier details with inspections -->
+    <script src="js/carrier-profile-modal.js?v=5"></script>
+    <!-- Carrier Profile Integration - Links eye icon to carrier profile -->
+    <script src="js/carrier-profile-integration.js?v=5"></script>
+    <!-- DISABLED: Conflicting with final-profile-fix.js
+    <script src="js/fix-eye-icon-viewlead.js?v=2"></script>
+    <script src="js/ultimate-eye-icon-fix.js?v=1"></script> -->
+    <!-- COI Reply System - Enable email replies -->
+    <script src="js/coi-reply-system.js?v=1"></script>
+    <!-- Aggressive Back Fix - Auto-reload emails when back arrow clicked -->
+    <script src="js/aggressive-back-fix.js?v=1"></script>
+    <!-- Force Policy List Navigation - Ensures Policy Profile back button goes to Policy List -->
+    <script src="js/force-policy-list-navigation.js?v=1"></script>
+    <!-- DEBUG Navigation Loop - Find the real cause of the loop -->
+    <script src="js/debug-navigation-loop.js?v=1"></script>
+    <!-- Only Check X Buttons - Force status buttons to show -->
+    <!-- DISABLED: Interfering with Titan - <script src="js/only-check-x-buttons.js?v=2"></script> -->
+    <!-- Renewal Tasks Server Storage - Save task completion to server -->
+    <!-- TEMPORARILY DISABLED for COI performance - <script src="js/renewal-tasks-server.js?v=1"></script> -->
+
+    <!-- Fix Archive Persistence - Prevent archived leads from reappearing -->
+    <!-- DISABLED - Conflicting with proper-archive-system.js -->
+    <!-- <script src="js/fix-archive-persistence.js?v=1"></script> -->
+    <!-- DISABLED - Conflicting with proper-archive-system.js -->
+    <!-- <script src="js/enforce-archive-separation.js"></script> -->
+    <!-- Fix permanent delete - prevent deleted leads from reappearing -->
+    <!-- <script src="js/fix-permanent-delete.js"></script> DISABLED - Conflicting with archive system -->
+
+    <!-- DISABLED - This was causing archived leads to reappear -->
+    <!-- <script src="js/fix-aggressive-lead-restore.js?v=1"></script> -->
+
+    <!-- MOVED TO END: ULTIMATE Gmail Fix -->
+
+    <!-- Fix Policy Data Contamination - Separates Adam 1 and Du Road policies -->
+    <script src="js/fix-policy-data.js?v=1"></script>
+
+    <!-- Format Coverage Limits with Commas - Auto-formats all coverage amounts -->
+    <script src="js/format-coverage-limits.js?v=1"></script>
+
+    <!-- Complete Fix for Lead Creation - Ensures leads save with all data -->
+    <script src="js/fix-lead-creation-complete.js?v=1"></script>
+
+    <!-- FINAL Lead System Fix - DISABLED (conflicting with main app.js) -->
+    <!-- <script src="js/fix-lead-system-final.js?v=1"></script> -->
+
+    <!-- DEBUG NEW LEAD CREATION - Comprehensive debugging -->
+    <script src="debug-new-lead.js"></script>
+
+    <!-- Auto-select client when navigating from incoming calls -->
+    <script src="js/auto-select-client.js"></script>
+
+    <!-- Direct client profile navigation -->
+    <script src="js/client-profile-router.js"></script>
+
+    <!-- Clean up invalid leads with undefined IDs -->
+    <script src="js/clean-undefined-leads.js?v=1"></script>
+
+    <!-- Complete fix for unarchive functionality -->
+    <script src="js/fix-unarchive-complete.js?v=1"></script>
+
+    <!-- Unified stage saving fix - ensures ALL leads save properly -->
+    <!-- Moved to load right after final-profile-fix.js -->
+    <!-- <script src="js/fix-stage-saving-unified.js?v=1"></script> -->
+
+    <!-- Agent assignment persistence fix - saves assigned_to field to server -->
+    <script src="js/fix-agent-assignment-persistence.js?v=2"></script>
+
+    <!-- Add Assigned To dropdown to lead profiles -->
+    <script src="js/add-assigned-to-dropdown.js?v=2"></script>
+
+    <!-- Authentication Manager -->
+    <script src="js/auth-manager.js?v=1"></script>
+
+    <!-- User-specific COI Customization -->
+    <script src="js/user-coi-customization.js?v=1"></script>
+
+    <!-- Proper Archive System - Moves leads between tables -->
+    <script src="js/proper-archive-system.js?v=1"></script>
+
+    <!-- DISABLED - Using real database dates instead -->
+    <!-- <script src="js/fix-export-dates.js"></script> -->
+
+    <!-- Export REAL Database Dates - Fetches actual renewal dates from FMCSA database -->
+    <script src="js/export-real-database-dates.js"></script>
+
+    <!-- Fix Lead Generation to use REAL database data -->
+    <script src="js/fix-lead-gen-real-data.js?v=fcsma4"></script>
+
+    <!-- FCSMA API Override - Replace external API with local FCSMA database -->
+    <script src="js/fcsma-api-override-v5.js?v=20251015_fixed_endpoint"></script>
+
+    <!-- Remove Maureen's clients from the system -->
+    <script src="js/remove-maureen-clients.js?v=2"></script>
+    <script src="js/aggressive-maureen-cleaner.js?v=1"></script>
+
+    <!-- DISABLED: Interfering with Titan emails - Gmail Fix MUST be absolutely LAST to override all other expandEmail functions -->
+    <!-- <script src="js/fix-gmail-ultimate.js?v=8&t=1729480400"></script> -->
+
+    <!-- Fix Missing Leads Display -->
+    <script src="js/fix-missing-leads-display.js?v=1"></script>
+
+    <!-- DISABLED: Conflicts with selective sync - Enhanced Vicidial Sync - MUST load last to override other sync functions -->
+    <!-- <script src="js/enhanced-vicidial-sync.js?v=1"></script> -->
+
+    <!-- Fix Lead Generation Function - MUST be absolutely LAST -->
+    <script src="js/fix-lead-generation-function.js?v=1"></script>
+
+    <!-- Maureen United Insurance Group - Changes company name when Maureen Corp signs -->
+    <script src="js/maureen-united-insurance.js?v=1"></script>
+
+    <!-- RESTORE Complete Lead Generation Functionality - MUST BE LAST -->
+    <!-- Enabled lead generation scripts for full functionality -->
+    <script src="js/restore-lead-generation-complete.js?v=1"></script>
+    <!-- <script src="js/counts-only-lead-generation.js?v=3"></script> -->
+
+    <!-- Complete Lead Generation with Day Skip feature -->
+    <script src="js/complete-lead-generation-restoration.js?v=11"></script>
+
+    <!-- Fix Lead Generation to use Matched Carriers CSV Database - MUST LOAD AFTER COMPLETE RESTORATION -->
+    <script src="js/fix-lead-generation-matched-carriers.js?v=9"></script>
+
+    <!-- Selective Vicidial Sync - Choose which leads to import - MUST BE ABSOLUTELY LAST -->
+    <script src="js/selective-vicidial-sync-clean.js?v=12"></script>
+
+    <!-- Force COI to use Outlook instead of Gmail - MUST BE ABSOLUTELY LAST -->
+    <!-- DISABLED: Contains mock data - <script src="js/coi-use-outlook.js?v=1"></script> -->
+
+    <!-- DISABLED: May interfere - <script src="js/disable-all-gmail.js?v=1"></script> -->
+
+    <!-- DISABLED: File doesn't exist - <script src="js/fetch-real-outlook-emails.js?v=1"></script> -->
+
+    <!-- DISABLED: Was adding mock data - <script src="js/force-outlook-only.js?v=1"></script> -->
+
+    <!-- DISPLAY REAL OUTLOOK EMAILS - Find test2006 -->
+    <!-- DISABLED: Mock data source - <script src="js/display-real-outlook-emails.js?v=1"></script> -->
+
+    <!-- DISABLED: Being replaced with titan-emails-only.js
+    <script src="js/force-real-outlook-emails.js?v=4"></script> -->
+
+    <!-- TITAN SCRIPT MOVED TO LOAD RIGHT AFTER APP.JS -->
+
+    <!-- TITAN COI EMAIL COMPOSE - MUST BE LAST TO OVERRIDE ACORD SCRIPTS -->
+    <script src="js/coi-email-compose-titan.js?v=4"></script>
+
+    <!-- PDF COMPARISON TEST -->
+    <script src="test-pdf-comparison.js"></script>
+
+    <!-- DISABLED: This was hiding all renewal cards with negative days
+    <script src="js/remove-overdue-renewals.js?v=1"></script>
+    -->
+
+    <!-- Fix ViciDial lead display after import -->
+    <script src="js/fix-vicidial-lead-display.js?v=1"></script>
+
+    <!-- Fix instant delete - remove leads immediately from UI -->
+    <script src="js/fix-instant-delete.js?v=3"></script>
+
+    <!-- BULLETPROOF DELETE - Must load AFTER other delete scripts to override them -->
+    <script src="js/bulletproof-delete.js?v=2"></script>
+
+    <!-- DEBUG DELETE TEST - Console testing tools -->
+    <script src="js/debug-delete-test.js?v=1"></script>
+
+    <!-- SUPER SIMPLE DELETE - Final override with hardcoded URL -->
+    <script src="js/super-simple-delete.js?v=1"></script>
+
+    <!-- DATABASE SYNC FIX - Ensures all operations use the correct backend database -->
+    <script src="js/fix-database-sync.js?v=1"></script>
+
+    <script src="js/cleanup-invalid-leads.js?v=1"></script>
+
+    <!-- Fix button flashing/flickering issue -->
+    <script src="js/fix-button-flashing.js?v=1"></script>
+
+    <!-- Fix new lead form - remove Lead Source and improve validation -->
+    <script src="js/fix-new-lead-form.js?v=1"></script>
+
+    <!-- Transcriptions now processed by backend with Deepgram and OpenAI -->
+
+    <!-- Fix stage count display issue - prevents "$0$0$0..." concatenation -->
+    <script src="js/fix-stage-count-display.js?v=1"></script>
+
+    <!-- Fix stage count concatenation - ensures numeric addition -->
+    <script src="js/fix-stage-count-concatenation.js?v=1"></script>
+
+    <!-- Fix Assigned To column sorting -->
+    <script src="js/fix-assigned-to-sorting.js?v=1"></script>
+
+    <!-- Debug lead not found issues -->
+    <script src="js/debug-lead-not-found.js?v=1"></script>
+
+    <!-- Fix lead data synchronization -->
+    <script src="js/fix-lead-data-sync.js?v=1"></script>
+
+    <!-- Enable simple lead profile -->
+    <script src="js/simple-lead-profile.js"></script>
+
+    <!-- Unified save system - handles lead field updates -->
+    <script src="js/unified-save-system.js"></script>
+
+    <!-- Restore original lead profile UI - MUST LOAD BEFORE TIMESTAMP FEATURE -->
+    <script src="js/restore-original-lead-profile.js"></script>
+
+    <!-- Lead Stage Timestamp Feature - DISABLED - Moved to lead profile
+    <script src="js/lead-stage-timestamp.js?v=10"></script> -->
+
+    <script src="js/transcription-progress.js?v=1760730555"></script>
+
+    <!-- FINAL FIX - Must load absolutely last to override everything -->
+    <script src="js/fix-lead-table-final.js?v=3"></script>
+
+    <!-- Timestamp highlighting fixes -->
+    <!-- Disabled old attempts
+    <script src="js/ultimate-timestamp-fix.js"></script>
+    <script src="js/diagnose-timestamp-problem.js"></script>
+    <script src="js/create-test-timestamps.js"></script>
+    <script src="js/force-color-no-matter-what.js"></script>
+    <script src="js/manual-color-override.js"></script>
+    -->
+
+    <!-- THE REAL FIX - This one actually works -->
+    <!-- OLD: <script src="js/automatic-timestamp-colors.js"></script>
+    <script src="js/fix-missing-highlights.js"></script> -->
+
+    <!-- SYNCHRONIZED FIX - Uses exact same logic as profile -->
+    <script src="js/synchronized-timestamp-colors.js"></script>
+    <script src="js/final-debug-timestamps.js"></script>
+    <script src="js/fix-year-2025-timestamps.js"></script>
+</body>
+</html>

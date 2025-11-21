@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test COI Policy Loading</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>Testing COI Policy Loading</h1>
+    <div id="results"></div>
+
+    <!-- Load the API config that sets the URL -->
+    <script src="js/api-config.js"></script>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = message;
+            resultsDiv.appendChild(div);
+        }
+
+        async function testPolicyLoading() {
+            // Check window.VANGUARD_API_URL
+            addResult(`window.VANGUARD_API_URL = ${window.VANGUARD_API_URL || 'undefined'}`);
+
+            // Simulate the loadPolicyList function
+            const API_URL = window.VANGUARD_API_URL || 'http://localhost:3001';
+            addResult(`Using API URL: ${API_URL}`);
+
+            try {
+                const response = await fetch(`${API_URL}/api/policies`, {
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Bypass-Tunnel-Reminder': 'true'
+                    }
+                });
+
+                if (!response.ok) {
+                    addResult(`API Error: ${response.status}`, 'error');
+                    return;
+                }
+
+                const policies = await response.json();
+                addResult(`✅ Successfully fetched ${policies.length} policies`, 'success');
+
+                if (policies.length > 0) {
+                    addResult(`First policy: ${policies[0].clientName} - ${policies[0].policyNumber}`, 'success');
+                    addResult(`Last policy: ${policies[policies.length-1].clientName} - ${policies[policies.length-1].policyNumber}`, 'success');
+                }
+
+                // Now test the display logic
+                if (policies.length === 0) {
+                    addResult('Would show: "No policies found"', 'error');
+                } else {
+                    addResult(`Would display ${policies.length} policies in table`, 'success');
+                }
+
+            } catch (error) {
+                addResult(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Run the test
+        testPolicyLoading();
+    </script>
+</body>
+</html>

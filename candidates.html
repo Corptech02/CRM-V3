@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quote Application Candidates</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .candidate {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 5px solid #3b82f6;
+        }
+        .candidate h2 {
+            color: #1f2937;
+            margin: 0 0 10px 0;
+            font-size: 24px;
+        }
+        .candidate-number {
+            background: #3b82f6;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+        .details {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+        .file-path {
+            font-family: monospace;
+            background: #1f2937;
+            color: #10b981;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .preview-button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .field-count {
+            background: #fbbf24;
+            color: #92400e;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .header {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Quote Application Candidates</h1>
+        <p>Based on deep code analysis, here are the quote applications with comprehensive auto/vehicle fields:</p>
+    </div>
+
+    <div class="candidate">
+        <h2><span class="candidate-number">1</span>Comprehensive Trucking Application (35 Vehicles) <span class="field-count">245 Fields</span></h2>
+        <div class="file-path">/var/www/vanguard/js/app-submissions.js</div>
+        <div class="details">
+            <strong>Features:</strong>
+            <ul>
+                <li>35 vehicles maximum capacity</li>
+                <li>7 fields per vehicle: Year, Make/Model, Type of Truck, Trailer Type, VIN, Value, Radius</li>
+                <li>Schedule of Autos section</li>
+                <li>Schedule of Drivers section (25 drivers)</li>
+                <li>United Insurance Group/Vanguard Insurance Group branding</li>
+                <li>Professional trucking application format</li>
+            </ul>
+            <strong>Status:</strong> Display/View only - needs input form connection
+        </div>
+        <button class="preview-button" onclick="alert('This is the comprehensive form with 245 vehicle fields you mentioned!')">View Details</button>
+    </div>
+
+    <div class="candidate">
+        <h2><span class="candidate-number">2</span>Enhanced Lead Profile Vehicle Form <span class="field-count">8+ Fields per Vehicle</span></h2>
+        <div class="file-path">/var/www/vanguard/js/lead-profile-enhanced.js</div>
+        <div class="details">
+            <strong>Features:</strong>
+            <ul>
+                <li>Dynamic vehicle addition (unlimited)</li>
+                <li>8 fields per vehicle: Year, Make, Model, VIN, Value, Deductible, Type, GVWR</li>
+                <li>7 fields per trailer: Year, Make, Type, VIN, Length, Value, Deductible</li>
+                <li>8 fields per driver: Name, License, CDL Type, DOB, Experience, Endorsements, MVR, Violations</li>
+                <li>Commercial auto lead profile interface</li>
+            </ul>
+            <strong>Status:</strong> Full input/edit form with save functionality
+        </div>
+        <button class="preview-button" onclick="alert('This is the dynamic commercial auto form for lead profiles')">View Details</button>
+    </div>
+
+    <div class="candidate">
+        <h2><span class="candidate-number">3</span>Policy Modal Vehicle Form <span class="field-count">24+ Fields</span></h2>
+        <div class="file-path">/var/www/vanguard/js/policy-modal.js</div>
+        <div class="details">
+            <strong>Features:</strong>
+            <ul>
+                <li>8 vehicle fields: Year, Make, Model, VIN, Value, Deductible, Coverage Type</li>
+                <li>7 trailer fields: Year, Make, Model, VIN, Value, Deductible, Coverage</li>
+                <li>9+ driver fields: Name, DOB, License, CDL Endorsements (Hazmat, Tanker, Doubles/Triples, Passenger)</li>
+                <li>Modal dialog interface</li>
+                <li>Add/remove functionality</li>
+            </ul>
+            <strong>Status:</strong> Input form with modal interface
+        </div>
+        <button class="preview-button" onclick="alert('This is the policy modal with comprehensive vehicle/driver forms')">View Details</button>
+    </div>
+
+    <div class="candidate">
+        <h2><span class="candidate-number">4</span>Vanguard Insurance Group Quote Application <span class="field-count">Standard Fields</span></h2>
+        <div class="file-path">/var/www/vanguard/js/test-quote-modal.js</div>
+        <div class="details">
+            <strong>Features:</strong>
+            <ul>
+                <li>Blue/purple header with "Vanguard Insurance Group LLC"</li>
+                <li>Black and white application styling</li>
+                <li>Save buttons included</li>
+                <li>Professional trucking application format</li>
+                <li>Brunswick, OH contact information</li>
+                <li>Currently connected to Quote Application button</li>
+            </ul>
+            <strong>Status:</strong> Active quote application - currently working
+        </div>
+        <button class="preview-button" onclick="alert('This is the current working Vanguard application with blue header')">View Details</button>
+    </div>
+
+    <div class="candidate">
+        <h2><span class="candidate-number">5</span>Quote Application Main Form <span class="field-count">Unknown Field Count</span></h2>
+        <div class="file-path">/var/www/vanguard/js/quote-application.js</div>
+        <div class="details">
+            <strong>Features:</strong>
+            <ul>
+                <li>Main quote application system</li>
+                <li>Vehicle input functionality detected</li>
+                <li>Potentially contains the input form for the 35-vehicle system</li>
+                <li>Large file (~1000+ lines)</li>
+            </ul>
+            <strong>Status:</strong> Needs detailed analysis to count vehicle fields
+        </div>
+        <button class="preview-button" onclick="alert('This is the main quote application - needs inspection for vehicle field count')">View Details</button>
+    </div>
+
+    <div style="background: white; padding: 20px; border-radius: 8px; margin-top: 30px; text-align: center;">
+        <h3>Instructions:</h3>
+        <p>Please tell me which number corresponds to the quote application you want to use when clicking the Quote Application button.</p>
+        <p><strong>Based on your requirements:</strong> "over 20 auto fields" - Candidate #1 has 245 vehicle fields (35 vehicles × 7 fields each)</p>
+    </div>
+</body>
+</html>

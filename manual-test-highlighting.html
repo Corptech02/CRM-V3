@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manual Test Highlighting</title>
+</head>
+<body>
+    <h3>Manual Highlighting Test</h3>
+    <button onclick="runTest()">Run Manual Test</button>
+    <button onclick="window.forceAllHighlighting()">Force Highlights</button>
+    <button onclick="window.debugTimestampHighlight()">Debug</button>
+    <div id="output"></div>
+
+    <script>
+        function runTest() {
+            console.log('🔍 MANUAL TEST STARTING...');
+
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+
+            // Check table exists
+            const table = document.getElementById('leadsTableBody');
+            if (!table) {
+                output.innerHTML = '<p style="color: red;">ERROR: No table found!</p>';
+                return;
+            }
+
+            const rows = table.querySelectorAll('tr');
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+            output.innerHTML += `<p>Found ${rows.length} rows and ${leads.length} leads</p>`;
+
+            // Check each row
+            rows.forEach((row, index) => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 7) {
+                    const nameCell = cells[1];
+                    const todoCell = cells[6];
+
+                    const name = nameCell.textContent.trim();
+                    const todo = todoCell.textContent.trim();
+
+                    // Find lead
+                    const lead = leads.find(l => {
+                        if (!l.name) return false;
+                        const leadName = l.name.length > 15 ? l.name.substring(0, 15) + '...' : l.name;
+                        return leadName === name || l.name === name;
+                    });
+
+                    if (lead && todo && todo.length > 0) {
+                        if (lead.stageTimestamps && lead.stageTimestamps[lead.stage]) {
+                            const timestamp = lead.stageTimestamps[lead.stage];
+                            const stageDate = new Date(timestamp);
+                            const now = new Date();
+
+                            const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            const compareDate = new Date(stageDate.getFullYear(), stageDate.getMonth(), stageDate.getDate());
+                            const diffDays = Math.round((nowDate - compareDate) / (1000 * 60 * 60 * 24));
+
+                            if (diffDays > 0) {
+                                let color = 'black';
+                                let highlight = 'none';
+                                if (diffDays === 1) {
+                                    color = '#f59e0b';
+                                    highlight = 'YELLOW';
+                                } else if (diffDays < 7) {
+                                    color = '#fb923c';
+                                    highlight = 'ORANGE';
+                                } else {
+                                    color = '#ef4444';
+                                    highlight = 'RED';
+                                }
+
+                                output.innerHTML += `<p style="color: ${color};">Row ${index}: ${name} - ${diffDays} days old - Should be ${highlight}</p>`;
+
+                                // Try to apply highlight NOW
+                                console.log(`Manually applying ${highlight} to row ${index}`);
+                                row.setAttribute('style', `background-color: ${color === '#f59e0b' ? '#fef3c7' : color === '#fb923c' ? '#fed7aa' : '#fecaca'} !important; border-left: 4px solid ${color} !important;`);
+                            }
+                        }
+                    }
+                }
+            });
+
+            output.innerHTML += '<p style="color: green;">Test complete - check table for highlights</p>';
+        }
+    </script>
+</body>
+</html>

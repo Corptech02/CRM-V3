@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Leads</title>
+</head>
+<body>
+    <h1>Checking Leads Data...</h1>
+    <div id="results"></div>
+    <br>
+    <button onclick="clearLeads()">Clear All Lead Data</button>
+    <script>
+        // Check all lead sources
+        const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+        const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+
+        let html = '<h2>Lead Data in Browser:</h2>';
+        html += '<p><strong>insurance_leads:</strong> ' + insuranceLeads.length + ' leads</p>';
+        html += '<p><strong>leads:</strong> ' + regularLeads.length + ' leads</p>';
+        html += '<p><strong>archivedLeads:</strong> ' + archivedLeads.length + ' leads</p>';
+
+        // Show first lead from each if exists
+        if (insuranceLeads.length > 0) {
+            html += '<p>First insurance_lead: ' + (insuranceLeads[0].name || 'No name') + '</p>';
+        }
+        if (regularLeads.length > 0) {
+            html += '<p>First lead: ' + (regularLeads[0].name || 'No name') + '</p>';
+        }
+
+        document.getElementById('results').innerHTML = html;
+
+        function clearLeads() {
+            localStorage.removeItem('insurance_leads');
+            localStorage.removeItem('leads');
+            localStorage.removeItem('archivedLeads');
+            localStorage.removeItem('archived_leads');
+            localStorage.removeItem('PERMANENT_ARCHIVED_IDS');
+
+            document.getElementById('results').innerHTML = '<h2>All lead data cleared!</h2><p>Please <a href="/">return to main app</a></p>';
+        }
+    </script>
+</body>
+</html>

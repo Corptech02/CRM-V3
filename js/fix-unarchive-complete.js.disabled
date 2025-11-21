@@ -1,0 +1,192 @@
+// Complete fix for unarchive functionality
+(function() {
+    'use strict';
+
+    console.log('🔧 Loading complete unarchive fix...');
+
+    // Override the unarchiveLead function
+    window.unarchiveLead = function(leadId) {
+        console.log('📤 UNARCHIVE FIX: Restoring lead:', leadId);
+
+        if (!leadId) {
+            console.error('No lead ID provided');
+            return;
+        }
+
+        // Convert to string for consistency
+        leadId = String(leadId);
+
+        try {
+            // 1. Get all data stores
+            let activeLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            let archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+            let archivedLeads2 = JSON.parse(localStorage.getItem('archived_leads') || '[]');
+            let permanentArchiveIds = JSON.parse(localStorage.getItem('PERMANENT_ARCHIVED_IDS') || '[]');
+            let permanentArchive = JSON.parse(localStorage.getItem('permanentArchive') || '[]');
+
+            console.log('Current state:', {
+                activeCount: activeLeads.length,
+                archivedCount: archivedLeads.length,
+                permanentCount: permanentArchiveIds.length
+            });
+
+            // 2. Find the lead in any archived location
+            let leadToRestore = null;
+            let foundInArchived = false;
+
+            // Check first archived list
+            const archivedIndex = archivedLeads.findIndex(l => String(l.id) === leadId);
+            if (archivedIndex !== -1) {
+                leadToRestore = archivedLeads[archivedIndex];
+                archivedLeads.splice(archivedIndex, 1);
+                foundInArchived = true;
+                console.log('Found in archivedLeads');
+            }
+
+            // Check second archived list
+            const archivedIndex2 = archivedLeads2.findIndex(l => String(l.id) === leadId);
+            if (archivedIndex2 !== -1) {
+                if (!leadToRestore) {
+                    leadToRestore = archivedLeads2[archivedIndex2];
+                }
+                archivedLeads2.splice(archivedIndex2, 1);
+                foundInArchived = true;
+                console.log('Found in archived_leads');
+            }
+
+            // If not found in archived, check if it's in active but marked as archived
+            if (!leadToRestore) {
+                const activeIndex = activeLeads.findIndex(l => String(l.id) === leadId);
+                if (activeIndex !== -1) {
+                    leadToRestore = activeLeads[activeIndex];
+                    console.log('Found in active leads (was marked as archived)');
+                }
+            }
+
+            if (!leadToRestore) {
+                console.error('Lead not found in any list');
+                alert('Lead not found. It may have been deleted.');
+                return;
+            }
+
+            // 3. Clean the lead data
+            delete leadToRestore.archived;
+            delete leadToRestore.archivedDate;
+            delete leadToRestore.archivedBy;
+            leadToRestore.status = leadToRestore.status || 'Active';
+
+            console.log('Lead to restore:', leadToRestore);
+
+            // 4. Add to active leads if not already there
+            const existingIndex = activeLeads.findIndex(l => String(l.id) === leadId);
+            if (existingIndex === -1) {
+                // Add at the beginning for visibility
+                activeLeads.unshift(leadToRestore);
+                console.log('✅ Added to active leads');
+            } else {
+                // Update existing
+                activeLeads[existingIndex] = leadToRestore;
+                console.log('✅ Updated in active leads');
+            }
+
+            // 5. Remove from ALL permanent archive lists
+            permanentArchiveIds = permanentArchiveIds.filter(id => String(id) !== leadId);
+            permanentArchive = permanentArchive.filter(id => String(id) !== leadId);
+
+            // Also check for the lead in the server's archived list
+            try {
+                fetch('http://162-220-14-239.nip.io:3001/api/unarchive-lead', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ leadId: leadId })
+                }).then(response => {
+                    if (response.ok) {
+                        console.log('✅ Also unarchived on server');
+                    }
+                }).catch(err => {
+                    console.log('Server unarchive failed (continuing locally):', err);
+                });
+            } catch (e) {
+                console.log('Could not update server (continuing locally)');
+            }
+
+            // 6. Save all changes
+            localStorage.setItem('insurance_leads', JSON.stringify(activeLeads));
+            localStorage.setItem('leads', JSON.stringify(activeLeads)); // Keep both in sync
+            localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+            localStorage.setItem('archived_leads', JSON.stringify(archivedLeads2));
+            localStorage.setItem('PERMANENT_ARCHIVED_IDS', JSON.stringify(permanentArchiveIds));
+            localStorage.setItem('permanentArchive', JSON.stringify(permanentArchive));
+
+            console.log('✅ All localStorage updated');
+            console.log('Final state:', {
+                activeCount: activeLeads.length,
+                archivedCount: archivedLeads.length,
+                permanentCount: permanentArchiveIds.length,
+                restoredLead: leadToRestore.name || leadToRestore.company
+            });
+
+            // 7. Show success message
+            if (window.showNotification) {
+                window.showNotification(`Lead "${leadToRestore.name || leadToRestore.company || 'Unknown'}" restored to active leads!`, 'success');
+            }
+
+            // 8. Refresh the view
+            setTimeout(() => {
+                console.log('🔄 Refreshing view...');
+                if (window.loadLeadsView) {
+                    window.loadLeadsView();
+                } else if (window.loadArchivedLeadsView) {
+                    window.loadArchivedLeadsView();
+                }
+            }, 500);
+
+            return true;
+
+        } catch (error) {
+            console.error('❌ Error unarchiving lead:', error);
+            alert('Error restoring lead: ' + error.message);
+            return false;
+        }
+    };
+
+    // Also create a restore function alias
+    window.restoreLead = window.unarchiveLead;
+
+    // Override the archive view button handler if it exists
+    const originalLoadArchived = window.loadArchivedLeadsView;
+    if (originalLoadArchived) {
+        window.loadArchivedLeadsView = function() {
+            console.log('📁 Loading archived leads view...');
+
+            // Call original
+            if (originalLoadArchived) {
+                originalLoadArchived();
+            }
+
+            // Ensure unarchive buttons work
+            setTimeout(() => {
+                const unarchiveButtons = document.querySelectorAll('[onclick*="unarchiveLead"], [onclick*="restoreLead"]');
+                console.log(`Found ${unarchiveButtons.length} unarchive buttons`);
+
+                unarchiveButtons.forEach(btn => {
+                    // Get the lead ID from onclick
+                    const onclick = btn.getAttribute('onclick');
+                    const match = onclick?.match(/(?:unarchiveLead|restoreLead)\(['"]([^'"]+)['"]\)/);
+                    if (match && match[1]) {
+                        const leadId = match[1];
+
+                        // Replace with our fixed version
+                        btn.onclick = function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.unarchiveLead(leadId);
+                        };
+                    }
+                });
+            }, 1000);
+        };
+    }
+
+    console.log('✅ Complete unarchive fix loaded!');
+})();

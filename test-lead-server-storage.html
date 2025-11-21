@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Lead Server Storage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: green;
+            padding: 10px;
+            background: #d4edda;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            color: red;
+            padding: 10px;
+            background: #f8d7da;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #004085;
+            padding: 10px;
+            background: #d1ecf1;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        #output {
+            min-height: 200px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        .lead-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Lead Server Storage</h1>
+
+    <div class="test-section">
+        <h2>1. Test Loading Leads from Server</h2>
+        <button onclick="testLoadLeads()">Load Leads from Server</button>
+        <div id="loadResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Test Saving New Lead to Server</h2>
+        <button onclick="testSaveLead()">Save Test Lead</button>
+        <div id="saveResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Test Importing Multiple Leads</h2>
+        <button onclick="testImportLeads()">Import 3 Test Leads</button>
+        <div id="importResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Test Updating a Lead</h2>
+        <button onclick="testUpdateLead()">Update First Lead</button>
+        <div id="updateResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Test Syncing Local Leads to Server</h2>
+        <button onclick="testSyncLocal()">Sync LocalStorage to Server</button>
+        <div id="syncResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Output Log:</h2>
+        <div id="output"></div>
+    </div>
+
+    <script src="js/lead-server-storage.js"></script>
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            output.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function testLoadLeads() {
+            const resultDiv = document.getElementById('loadResult');
+            try {
+                log('Loading leads from server...', 'info');
+                const leads = await window.loadLeadsFromServer();
+                resultDiv.innerHTML = `<div class="success">Successfully loaded ${leads.length} leads from server!</div>`;
+
+                // Show first 3 leads
+                const preview = leads.slice(0, 3).map(lead =>
+                    `<div class="lead-item">
+                        <strong>${lead.name || 'No Name'}</strong> -
+                        ${lead.phone || 'No Phone'} -
+                        Stage: ${lead.stage || 'unknown'}
+                    </div>`
+                ).join('');
+
+                resultDiv.innerHTML += preview;
+
+                if (leads.length > 3) {
+                    resultDiv.innerHTML += `<div class="info">... and ${leads.length - 3} more leads</div>`;
+                }
+
+                log(`Loaded ${leads.length} leads successfully`, 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                log(`Error loading leads: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSaveLead() {
+            const resultDiv = document.getElementById('saveResult');
+            const testLead = {
+                id: `test_${Date.now()}`,
+                name: `Test Company ${Date.now()}`,
+                phone: '555-' + Math.floor(Math.random() * 9000 + 1000),
+                email: `test${Date.now()}@example.com`,
+                stage: 'new',
+                product: 'Commercial Auto',
+                premium: Math.floor(Math.random() * 50000 + 10000),
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                log(`Saving new lead: ${testLead.name}...`, 'info');
+                const result = await window.saveLeadToServer(testLead);
+                resultDiv.innerHTML = `<div class="success">Successfully saved lead: ${testLead.name}</div>`;
+                resultDiv.innerHTML += `<div class="lead-item">${JSON.stringify(result, null, 2)}</div>`;
+                log(`Lead saved successfully: ${testLead.name}`, 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                log(`Error saving lead: ${error.message}`, 'error');
+            }
+        }
+
+        async function testImportLeads() {
+            const resultDiv = document.getElementById('importResult');
+            const testLeads = [
+                {
+                    name: `Import Test 1 - ${Date.now()}`,
+                    phone: '555-0001',
+                    email: 'import1@test.com',
+                    stage: 'new',
+                    product: 'General Liability'
+                },
+                {
+                    name: `Import Test 2 - ${Date.now()}`,
+                    phone: '555-0002',
+                    email: 'import2@test.com',
+                    stage: 'contacted',
+                    product: 'Commercial Auto'
+                },
+                {
+                    name: `Import Test 3 - ${Date.now()}`,
+                    phone: '555-0003',
+                    email: 'import3@test.com',
+                    stage: 'quoted',
+                    product: 'Workers Compensation'
+                }
+            ];
+
+            try {
+                log('Importing 3 test leads...', 'info');
+                const result = await window.importLeadsToServer(testLeads);
+                resultDiv.innerHTML = `<div class="success">
+                    Successfully imported ${result.saved.length} leads!
+                    ${result.failed.length > 0 ? `Failed: ${result.failed.length}` : ''}
+                </div>`;
+
+                result.saved.forEach(lead => {
+                    resultDiv.innerHTML += `<div class="lead-item">✅ ${lead.name}</div>`;
+                });
+
+                log(`Import complete: ${result.saved.length} saved, ${result.failed.length} failed`, 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                log(`Error importing leads: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUpdateLead() {
+            const resultDiv = document.getElementById('updateResult');
+
+            try {
+                // First load leads to get one to update
+                log('Loading leads to find one to update...', 'info');
+                const leads = await window.loadLeadsFromServer();
+
+                if (leads.length === 0) {
+                    resultDiv.innerHTML = `<div class="error">No leads found to update</div>`;
+                    return;
+                }
+
+                const leadToUpdate = leads[0];
+                const updates = {
+                    stage: 'closed',
+                    notes: `Updated via test at ${new Date().toLocaleString()}`,
+                    premium: leadToUpdate.premium ? leadToUpdate.premium + 1000 : 5000
+                };
+
+                log(`Updating lead: ${leadToUpdate.name || leadToUpdate.id}...`, 'info');
+                const result = await window.updateLeadOnServer(leadToUpdate.id, updates);
+
+                resultDiv.innerHTML = `<div class="success">Successfully updated lead: ${leadToUpdate.name || leadToUpdate.id}</div>`;
+                resultDiv.innerHTML += `<div class="lead-item">
+                    <strong>Updates Applied:</strong><br>
+                    Stage: ${updates.stage}<br>
+                    Premium: ${updates.premium}<br>
+                    Notes: ${updates.notes}
+                </div>`;
+
+                log(`Lead updated successfully`, 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                log(`Error updating lead: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSyncLocal() {
+            const resultDiv = document.getElementById('syncResult');
+
+            try {
+                // First add some test data to localStorage
+                const localTestLeads = [
+                    {
+                        id: `local_${Date.now()}_1`,
+                        name: 'Local Only Lead 1',
+                        phone: '555-9991',
+                        stage: 'new'
+                    },
+                    {
+                        id: `local_${Date.now()}_2`,
+                        name: 'Local Only Lead 2',
+                        phone: '555-9992',
+                        stage: 'new'
+                    }
+                ];
+
+                // Add to localStorage
+                const existingLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                localStorage.setItem('insurance_leads', JSON.stringify([...existingLeads, ...localTestLeads]));
+
+                log(`Added ${localTestLeads.length} test leads to localStorage`, 'info');
+                log('Syncing local leads to server...', 'info');
+
+                const result = await window.syncLocalLeadsToServer();
+
+                if (result) {
+                    resultDiv.innerHTML = `<div class="success">
+                        Sync Complete!<br>
+                        Saved: ${result.saved.length}<br>
+                        Failed: ${result.failed.length}
+                    </div>`;
+                    log(`Sync complete: ${result.saved.length} saved, ${result.failed.length} failed`, 'success');
+                } else {
+                    resultDiv.innerHTML = `<div class="info">No local leads to sync</div>`;
+                    log('No local leads to sync', 'info');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                log(`Error syncing local leads: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-load leads on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Test page loaded. Lead Server Storage module ready.', 'success');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,5308 @@
+%PDF-1.6
+%‚„œ”
+1 0 obj
+<<
+/Type /Pages
+/Count 1
+/Kids [ 4 0 R ]
+>>
+endobj
+2 0 obj
+<<
+/Producer (PyPDF2)
+>>
+endobj
+3 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+>>
+endobj
+4 0 obj
+<<
+/Annots [ 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R 18 0 R 19 0 R 20 0 R 21 0 R 22 0 R 23 0 R 24 0 R 25 0 R 26 0 R 27 0 R 28 0 R 29 0 R 30 0 R 31 0 R 32 0 R 33 0 R 34 0 R 35 0 R 36 0 R 37 0 R 41 0 R 45 0 R 49 0 R 53 0 R 54 0 R 58 0 R 59 0 R 63 0 R 67 0 R 71 0 R 75 0 R 76 0 R 77 0 R 78 0 R 79 0 R 80 0 R 81 0 R 82 0 R 83 0 R 84 0 R 85 0 R 86 0 R 87 0 R 88 0 R 89 0 R 90 0 R 94 0 R 98 0 R 102 0 R 106 0 R 107 0 R 111 0 R 115 0 R 119 0 R 120 0 R 121 0 R 122 0 R 123 0 R 124 0 R 125 0 R 126 0 R 127 0 R 128 0 R 129 0 R 130 0 R 131 0 R 132 0 R 136 0 R 140 0 R 144 0 R 148 0 R 152 0 R 156 0 R 157 0 R 158 0 R 159 0 R 160 0 R 161 0 R 162 0 R 163 0 R 164 0 R 165 0 R 166 0 R 167 0 R 168 0 R 169 0 R 170 0 R 171 0 R 172 0 R 176 0 R 180 0 R 181 0 R 182 0 R 183 0 R 184 0 R 185 0 R 186 0 R 187 0 R 188 0 R 189 0 R 190 0 R 191 0 R 192 0 R 193 0 R 194 0 R 195 0 R 196 0 R 197 0 R 198 0 R 199 0 R 200 0 R 201 0 R 202 0 R 203 0 R 204 0 R ]
+/Contents 205 0 R
+/CropBox [ 0 0 612 792 ]
+/MediaBox [ 0 0 612 792 ]
+/Resources <<
+/Font <<
+/F1 206 0 R
+/F2 207 0 R
+/F1dd4712d3-0304-4eff-b7a5-ba213ff4cb92 <<
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Name /F1
+/Subtype /Type1
+/Type /Font
+>>
+/F2af46b03a-697a-4404-8b23-c36665eb979c <<
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+/Name /F2
+/Subtype /Type1
+/Type /Font
+>>
+>>
+/XObject <<
+/Img1 210 0 R
+>>
+/ProcSet [ /ImageC /Text /PDF /ImageI /ImageB ]
+>>
+/Rotate 0
+/Type /Page
+/Parent 1 0 R
+>>
+endobj
+5 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 511 744 590 756 ]
+/Subtype /Widget
+/T (Form\137CompletionDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Form\137CompletionDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040date\040on\040which\040the\040form\040is\040completed\056\040\040\050MM\057DD\057YYYY\051\040)
+/Type /Annot
+>>
+endobj
+6 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 22 648 302 660 ]
+/Subtype /Widget
+/T (Producer\137FullName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137FullName\137A\1330\135)
+/TU (Enter\040text\072\040The\040full\040name\040of\040the\040producer\040\057\040agency\056\040)
+/Type /Annot
+>>
+endobj
+7 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 22 636 302 648 ]
+/Subtype /Widget
+/T (Producer\137MailingAddress\137LineOne\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137MailingAddress\137LineOne\137A\1330\135)
+/TU (Enter\040text\072\040The\040mailing\040address\040line\040one\040of\040the\040producer\040\057\040agency\056\040)
+/Type /Annot
+>>
+endobj
+8 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 22 624 302 636 ]
+/Subtype /Widget
+/T (Producer\137MailingAddress\137LineTwo\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137MailingAddress\137LineTwo\137A\1330\135)
+/TU (Enter\040text\072\040The\040mailing\040address\040line\040two\040of\040the\040producer\040\057\040agency\056\040)
+/Type /Annot
+>>
+endobj
+9 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 22 612 238 624 ]
+/Subtype /Widget
+/T (Producer\137MailingAddress\137CityName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137MailingAddress\137CityName\137A\1330\135)
+/TU (Enter\040text\072\040The\040mailing\040address\040city\040name\040of\040the\040producer\040\057\040agency\056\040)
+/Type /Annot
+>>
+endobj
+10 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 238 612 256 624 ]
+/Subtype /Widget
+/T (Producer\137MailingAddress\137StateOrProvinceCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137MailingAddress\137StateOrProvinceCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040mailing\040address\040state\040or\040province\040code\040of\040the\040producer\040\057\040agency\056\040)
+/Type /Annot
+>>
+endobj
+11 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 256 612 302 624 ]
+/Subtype /Widget
+/T (Producer\137MailingAddress\137PostalCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137MailingAddress\137PostalCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040mailing\040address\040postal\040code\040of\040the\040producer\040\057\040agency\056\040)
+/Type /Annot
+>>
+endobj
+12 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 346 660 590 672 ]
+/Subtype /Widget
+/T (Producer\137ContactPerson\137FullName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137ContactPerson\137FullName\137A\1330\135)
+/TU (Enter\040text\072\040The\040name\040of\040the\040individual\040at\040the\040producer\047s\040establishment\040that\040is\040the\040primary\040contact\056\040)
+/Type /Annot
+>>
+endobj
+13 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 353 648 479 660 ]
+/Subtype /Widget
+/T (Producer\137ContactPerson\137PhoneNumber\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137ContactPerson\137PhoneNumber\137A\1330\135)
+/TU (Enter\040number\072\040The\040producer\047s\040contact\040person\047s\040phone\040number\056\040\040If\040applicable\054\040include\040the\040area\040code\040and\040extension\056\040)
+/Type /Annot
+>>
+endobj
+14 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 518 648 590 660 ]
+/Subtype /Widget
+/T (Producer\137FaxNumber\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137FaxNumber\137A\1330\135)
+/TU (Enter\040number\072\040The\040fax\040number\040of\040the\040producer\040\057\040agency\056\040)
+/Type /Annot
+>>
+endobj
+15 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 346 636 590 648 ]
+/Subtype /Widget
+/T (Producer\137ContactPerson\137EmailAddress\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137ContactPerson\137EmailAddress\137A\1330\135)
+/TU (Enter\040text\072\040The\040producer\047s\040contact\040person\047s\040e\055mail\040address\056\040)
+/Type /Annot
+>>
+endobj
+16 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 588 302 600 ]
+/Subtype /Widget
+/T (NamedInsured\137FullName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056NamedInsured\137FullName\137A\1330\135)
+/TU (Enter\040text\072\040The\040named\040insured\050s\051\040as\040it\040\057\040they\040will\040appear\040on\040the\040policy\040declarations\040page\056\040)
+/Type /Annot
+>>
+endobj
+17 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 576 302 588 ]
+/Subtype /Widget
+/T (NamedInsured\137MailingAddress\137LineOne\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056NamedInsured\137MailingAddress\137LineOne\137A\1330\135)
+/TU (Enter\040text\072\040The\040named\040insured\047s\040mailing\040address\040line\040one\056\040)
+/Type /Annot
+>>
+endobj
+18 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 564 302 576 ]
+/Subtype /Widget
+/T (NamedInsured\137MailingAddress\137LineTwo\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056NamedInsured\137MailingAddress\137LineTwo\137A\1330\135)
+/TU (Enter\040text\072\040The\040named\040insured\047s\040mailing\040address\040line\040two\056\040)
+/Type /Annot
+>>
+endobj
+19 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 552 238 564 ]
+/Subtype /Widget
+/T (NamedInsured\137MailingAddress\137CityName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056NamedInsured\137MailingAddress\137CityName\137A\1330\135)
+/TU (Enter\040text\072\040The\040named\040insured\047s\040mailing\040address\040city\040name\056\040)
+/Type /Annot
+>>
+endobj
+20 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 238 552 256 564 ]
+/Subtype /Widget
+/T (NamedInsured\137MailingAddress\137StateOrProvinceCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056NamedInsured\137MailingAddress\137StateOrProvinceCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040named\040insured\047s\040mailing\040address\040state\040or\040province\040code\056\040)
+/Type /Annot
+>>
+endobj
+21 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 256 552 302 564 ]
+/Subtype /Widget
+/T (NamedInsured\137MailingAddress\137PostalCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056NamedInsured\137MailingAddress\137PostalCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040named\040insured\047s\040mailing\040address\040postal\040code\056\040)
+/Type /Annot
+>>
+endobj
+22 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 349 612 536 624 ]
+/Subtype /Widget
+/T (Insurer\137FullName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137FullName\137A\1330\135)
+/TU (Enter\040text\072\040The\040insurer\047s\040full\040legal\040company\040name\050s\051\040as\040found\040in\040the\040file\040copy\040of\040the\040policy\056\040\040Use\040the\040actual\040name\040of\040the\040company\040within\040the\040group\040to\040which\040the\040policy\040has\040been\040issued\056\040\040This\040is\040not\040the\040insurer\047s\040group\040name\040or\040trade\040name\056\040As\040used\040here\054\040this\040is\040Insurer\040A\056)
+/Type /Annot
+>>
+endobj
+23 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 544 612 590 624 ]
+/Subtype /Widget
+/T (Insurer\137NAICCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137NAICCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040identification\040code\040assigned\040to\040the\040insurer\040by\040the\040National\040Association\040of\040Insurance\040Commissioners\040\050NAIC\051\056\040As\040used\040here\054\040this\040is\040Insurer\040A\056)
+/Type /Annot
+>>
+endobj
+24 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 349 600 536 612 ]
+/Subtype /Widget
+/T (Insurer\137FullName\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137FullName\137B\1330\135)
+/TU (Enter\040text\072\040The\040insurer\047s\040full\040legal\040company\040name\050s\051\040as\040found\040in\040the\040file\040copy\040of\040the\040policy\056\040\040Use\040the\040actual\040name\040of\040the\040company\040within\040the\040group\040to\040which\040the\040policy\040has\040been\040issued\056\040\040This\040is\040not\040the\040insurer\047s\040group\040name\040or\040trade\040name\056\040As\040used\040here\054\040this\040is\040Insurer\040B\056)
+/Type /Annot
+>>
+endobj
+25 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 544 600 590 612 ]
+/Subtype /Widget
+/T (Insurer\137NAICCode\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137NAICCode\137B\1330\135)
+/TU (Enter\040code\072\040The\040identification\040code\040assigned\040to\040the\040insurer\040by\040the\040National\040Association\040of\040Insurance\040Commissioners\040\050NAIC\051\056\040As\040used\040here\054\040this\040is\040Insurer\040B\056)
+/Type /Annot
+>>
+endobj
+26 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 349 588 536 600 ]
+/Subtype /Widget
+/T (Insurer\137FullName\137C\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137FullName\137C\1330\135)
+/TU (Enter\040text\072\040The\040insurer\047s\040full\040legal\040company\040name\050s\051\040as\040found\040in\040the\040file\040copy\040of\040the\040policy\056\040\040Use\040the\040actual\040name\040of\040the\040company\040within\040the\040group\040to\040which\040the\040policy\040has\040been\040issued\056\040\040This\040is\040not\040the\040insurer\047s\040group\040name\040or\040trade\040name\056\040As\040used\040here\054\040this\040is\040Insurer\040C\056)
+/Type /Annot
+>>
+endobj
+27 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 544 588 590 600 ]
+/Subtype /Widget
+/T (Insurer\137NAICCode\137C\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137NAICCode\137C\1330\135)
+/TU (Enter\040code\072\040The\040identification\040code\040assigned\040to\040the\040insurer\040by\040the\040National\040Association\040of\040Insurance\040Commissioners\040\050NAIC\051\056\040As\040used\040here\054\040this\040is\040Insurer\040C\056)
+/Type /Annot
+>>
+endobj
+28 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 349 576 536 588 ]
+/Subtype /Widget
+/T (Insurer\137FullName\137D\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137FullName\137D\1330\135)
+/TU (Enter\040text\072\040The\040insurer\047s\040full\040legal\040company\040name\050s\051\040as\040found\040in\040the\040file\040copy\040of\040the\040policy\056\040\040Use\040the\040actual\040name\040of\040the\040company\040within\040the\040group\040to\040which\040the\040policy\040has\040been\040issued\056\040\040This\040is\040not\040the\040insurer\047s\040group\040name\040or\040trade\040name\056\040As\040used\040here\054\040this\040is\040Insurer\040D\056)
+/Type /Annot
+>>
+endobj
+29 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 544 576 590 588 ]
+/Subtype /Widget
+/T (Insurer\137NAICCode\137D\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137NAICCode\137D\1330\135)
+/TU (Enter\040code\072\040The\040identification\040code\040assigned\040to\040the\040insurer\040by\040the\040National\040Association\040of\040Insurance\040Commissioners\040\050NAIC\051\056\040As\040used\040here\054\040this\040is\040Insurer\040D\056)
+/Type /Annot
+>>
+endobj
+30 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 349 564 536 576 ]
+/Subtype /Widget
+/T (Insurer\137FullName\137E\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137FullName\137E\1330\135)
+/TU (Enter\040text\072\040The\040insurer\047s\040full\040legal\040company\040name\050s\051\040as\040found\040in\040the\040file\040copy\040of\040the\040policy\056\040\040Use\040the\040actual\040name\040of\040the\040company\040within\040the\040group\040to\040which\040the\040policy\040has\040been\040issued\056\040\040This\040is\040not\040the\040insurer\047s\040group\040name\040or\040trade\040name\056\040As\040used\040here\054\040this\040is\040Insurer\040E\056)
+/Type /Annot
+>>
+endobj
+31 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 544 564 590 576 ]
+/Subtype /Widget
+/T (Insurer\137NAICCode\137E\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137NAICCode\137E\1330\135)
+/TU (Enter\040code\072\040The\040identification\040code\040assigned\040to\040the\040insurer\040by\040the\040National\040Association\040of\040Insurance\040Commissioners\040\050NAIC\051\056\040As\040used\040here\054\040this\040is\040Insurer\040E\056)
+/Type /Annot
+>>
+endobj
+32 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 349 552 536 564 ]
+/Subtype /Widget
+/T (Insurer\137FullName\137F\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137FullName\137F\1330\135)
+/TU (Enter\040text\072\040The\040insurer\047s\040full\040legal\040company\040name\050s\051\040as\040found\040in\040the\040file\040copy\040of\040the\040policy\056\040\040Use\040the\040actual\040name\040of\040the\040company\040within\040the\040group\040to\040which\040the\040policy\040has\040been\040issued\056\040\040This\040is\040not\040the\040insurer\047s\040group\040name\040or\040trade\040name\056\040As\040used\040here\054\040this\040is\040Insurer\040F\056)
+/Type /Annot
+>>
+endobj
+33 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 544 552 590 564 ]
+/Subtype /Widget
+/T (Insurer\137NAICCode\137F\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Insurer\137NAICCode\137F\1330\135)
+/TU (Enter\040code\072\040The\040identification\040code\040assigned\040to\040the\040insurer\040by\040the\040National\040Association\040of\040Insurance\040Commissioners\040\050NAIC\051\056\040As\040used\040here\054\040this\040is\040Insurer\040F\056)
+/Type /Annot
+>>
+endobj
+34 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 259 540 349 552 ]
+/Subtype /Widget
+/T (CertificateOfInsurance\137CertificateNumberIdentifier\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateOfInsurance\137CertificateNumberIdentifier\137A\1330\135)
+/TU (Enter\040identifier\072\040The\040producer\040assigned\040number\040for\040the\040certificate\056\040)
+/Type /Annot
+>>
+endobj
+35 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 508 540 590 552 ]
+/Subtype /Widget
+/T (CertificateOfInsurance\137RevisionNumberIdentifier\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateOfInsurance\137RevisionNumberIdentifier\137A\1330\135)
+/TU (Enter\040number\072\040The\040producer\040assigned\040revision\040number\040for\040the\040certificate\056\040)
+/Type /Annot
+>>
+endobj
+36 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 18 444 36 456 ]
+/Subtype /Widget
+/T (GeneralLiability\137InsurerLetterCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137InsurerLetterCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040Company\040Letter\040of\040the\040insurer\054\040as\040identified\040in\040the\040\042Insurer\050s\051\040Affording\040Coverage\042\040form\040section\054\040associated\040with\040the\040general\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+37 0 obj
+<<
+/AP <<
+/D <<
+/1 38 0 R
+/Off 39 0 R
+>>
+/N <<
+/1 40 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 480 50 492 ]
+/Subtype /Widget
+/T (GeneralLiability\137CoverageIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137CoverageIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040claims\040made\040or\040occurrence\040option\040applies\040for\040the\040general\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+38 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+39 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+40 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+41 0 obj
+<<
+/AP <<
+/D <<
+/1 42 0 R
+/Off 43 0 R
+>>
+/N <<
+/1 44 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 50 468 65 480 ]
+/Subtype /Widget
+/T (GeneralLiability\137ClaimsMadeIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137ClaimsMadeIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040\042claims\040made\042\040option\040applies\040on\040the\040general\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+42 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+43 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+44 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+45 0 obj
+<<
+/AP <<
+/D <<
+/1 46 0 R
+/Off 47 0 R
+>>
+/N <<
+/1 48 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 115 468 130 480 ]
+/Subtype /Widget
+/T (GeneralLiability\137OccurrenceIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137OccurrenceIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040general\040liability\040policy\054\040occurrence\040basis\040applies\056\040)
+/Type /Annot
+>>
+endobj
+46 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+47 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+48 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+49 0 obj
+<<
+/AP <<
+/D <<
+/1 50 0 R
+/Off 51 0 R
+>>
+/N <<
+/1 52 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 456 50 468 ]
+/Subtype /Widget
+/T (GeneralLiability\137OtherCoverageIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137OtherCoverageIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040other\040coverage\040not\040found\040on\040the\040form\040exists\040for\040the\040general\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+50 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+51 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+52 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+53 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 54 456 173 468 ]
+/Subtype /Widget
+/T (GeneralLiability\137OtherCoverageDescription\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137OtherCoverageDescription\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040other\040coverage\040\050not\040the\040limit\051\040on\040the\040general\040liability\040policy\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+54 0 obj
+<<
+/AP <<
+/D <<
+/1 55 0 R
+/Off 56 0 R
+>>
+/N <<
+/1 57 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 444 50 456 ]
+/Subtype /Widget
+/T (GeneralLiability\137OtherCoverageIndicator\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137OtherCoverageIndicator\137B\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040other\040coverage\040not\040found\040on\040the\040form\040exists\040for\040the\040general\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+55 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+56 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+57 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+58 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 54 444 173 456 ]
+/Subtype /Widget
+/T (GeneralLiability\137OtherCoverageDescription\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137OtherCoverageDescription\137B\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040other\040coverage\040\050not\040the\040limit\051\040on\040the\040general\040liability\040policy\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+59 0 obj
+<<
+/AP <<
+/D <<
+/1 60 0 R
+/Off 61 0 R
+>>
+/N <<
+/1 62 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 420 50 432 ]
+/Subtype /Widget
+/T (GeneralLiability\137GeneralAggregate\137LimitAppliesPerPolicyIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137GeneralAggregate\137LimitAppliesPerPolicyIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040general\040liability\040policy\054\040general\040aggregate\040limit\040applies\040per\040policy\056\040)
+/Type /Annot
+>>
+endobj
+60 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+61 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+62 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+63 0 obj
+<<
+/AP <<
+/D <<
+/1 64 0 R
+/Off 65 0 R
+>>
+/N <<
+/1 66 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 79 420 94 432 ]
+/Subtype /Widget
+/T (GeneralLiability\137GeneralAggregate\137LimitAppliesPerProjectIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137GeneralAggregate\137LimitAppliesPerProjectIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040general\040liability\040policy\054\040general\040aggregate\040limit\040applies\040per\040project\056\040)
+/Type /Annot
+>>
+endobj
+64 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+65 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+66 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+67 0 obj
+<<
+/AP <<
+/D <<
+/1 68 0 R
+/Off 69 0 R
+>>
+/N <<
+/1 70 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 122 420 137 432 ]
+/Subtype /Widget
+/T (GeneralLiability\137GeneralAggregate\137LimitAppliesPerLocationIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137GeneralAggregate\137LimitAppliesPerLocationIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040general\040liability\040policy\054\040general\040aggregate\040limit\040applies\040per\040location\056\040)
+/Type /Annot
+>>
+endobj
+68 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+69 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+70 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+71 0 obj
+<<
+/AP <<
+/D <<
+/1 72 0 R
+/Off 73 0 R
+>>
+/N <<
+/1 74 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 408 50 420 ]
+/Subtype /Widget
+/T (GeneralLiability\137GeneralAggregate\137LimitAppliesToOtherIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137GeneralAggregate\137LimitAppliesToOtherIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040general\040liability\040policy\054\040general\040aggregate\040limit\040applies\040to\040option\040is\040other\040than\040those\040listed\040on\040the\040form\056\040)
+/Type /Annot
+>>
+endobj
+72 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+73 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+74 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+75 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 79 408 173 420 ]
+/Subtype /Widget
+/T (GeneralLiability\137GeneralAggregate\137LimitAppliesToCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137GeneralAggregate\137LimitAppliesToCode\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040the\040other\040option\040to\040which\040the\040general\040liability\040policy\054\040general\040aggregate\040limit\040applies\056\040)
+/Type /Annot
+>>
+endobj
+76 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 176 444 194 456 ]
+/Subtype /Widget
+/T (CertificateOfInsurance\137GeneralLiability\137AdditionalInsuredCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateOfInsurance\137GeneralLiability\137AdditionalInsuredCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040the\040certificate\040holder\040has\040been\040named\040as\040an\040additional\040insured\040on\040the\040general\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+77 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 194 444 212 456 ]
+/Subtype /Widget
+/T (Policy\137GeneralLiability\137SubrogationWaivedCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137GeneralLiability\137SubrogationWaivedCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040subrogation\040has\040been\040waived\040on\040the\040general\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+78 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 216 444 328 456 ]
+/Subtype /Widget
+/T (Policy\137GeneralLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137GeneralLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TU (Enter\040identifier\072\040The\040identifier\040assigned\040by\040the\040insurer\040to\040the\040general\040liability\040policy\054\040or\040submission\054\040being\040referenced\040exactly\040as\040it\040appears\040on\040the\040policy\054\040including\040prefix\040and\040suffix\040symbols\056\040If\040required\040for\040self\055insurance\054\040the\040self\055insured\040license\040or\040contract\040number\056\040)
+/Type /Annot
+>>
+endobj
+79 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 331 444 378 456 ]
+/Subtype /Widget
+/T (Policy\137GeneralLiability\137EffectiveDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137GeneralLiability\137EffectiveDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040effective\040date\040of\040the\040general\040liability\040policy\056\040\040The\040date\040that\040the\040terms\040and\040conditions\040of\040the\040policy\040commence\056\040)
+/Type /Annot
+>>
+endobj
+80 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 378 444 425 456 ]
+/Subtype /Widget
+/T (Policy\137GeneralLiability\137ExpirationDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137GeneralLiability\137ExpirationDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040date\040on\040which\040the\040terms\040and\040conditions\040of\040the\040general\040liability\040policy\040will\040expire\056\040)
+/Type /Annot
+>>
+endobj
+81 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 480 590 492 ]
+/Subtype /Widget
+/T (GeneralLiability\137EachOccurrence\137LimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137EachOccurrence\137LimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040general\040liability\054\040each\040occurrence\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+82 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 468 590 480 ]
+/Subtype /Widget
+/T (GeneralLiability\137FireDamageRentedPremises\137EachOccurrenceLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137FireDamageRentedPremises\137EachOccurrenceLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040general\040liability\054\040damage\040to\040rented\040premises\040each\040occurrence\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+83 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 456 590 468 ]
+/Subtype /Widget
+/T (GeneralLiability\137MedicalExpense\137EachPersonLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137MedicalExpense\137EachPersonLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040general\040liability\054\040medical\040expense\040each\040person\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+84 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 444 590 456 ]
+/Subtype /Widget
+/T (GeneralLiability\137PersonalAndAdvertisingInjury\137LimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137PersonalAndAdvertisingInjury\137LimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040general\040liability\054\040personal\040and\040advertising\040injury\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+85 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 432 590 444 ]
+/Subtype /Widget
+/T (GeneralLiability\137GeneralAggregate\137LimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137GeneralAggregate\137LimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040general\040liability\054\040general\040aggregate\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+86 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 420 590 432 ]
+/Subtype /Widget
+/T (GeneralLiability\137ProductsAndCompletedOperations\137AggregateLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137ProductsAndCompletedOperations\137AggregateLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040general\040liability\054\040products\040and\040completed\040operations\040aggregate\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+87 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 428 408 511 420 ]
+/Subtype /Widget
+/T (GeneralLiability\137OtherCoverageLimitDescription\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137OtherCoverageLimitDescription\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040other\040coverage\040\050not\040the\040limit\051\040on\040the\040general\040liability\040policy\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+88 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 408 590 420 ]
+/Subtype /Widget
+/T (GeneralLiability\137OtherCoverageLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056GeneralLiability\137OtherCoverageLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040general\040liability\054\040other\040coverage\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+89 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 18 372 36 384 ]
+/Subtype /Widget
+/T (Vehicle\137InsurerLetterCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137InsurerLetterCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040Company\040Letter\040of\040the\040insurer\054\040as\040identified\040in\040the\040\042Insurer\050s\051\040Affording\040Coverage\042\040form\040section\054\040associated\040with\040the\040policy\056\040)
+/Type /Annot
+>>
+endobj
+90 0 obj
+<<
+/AP <<
+/D <<
+/1 91 0 R
+/Off 92 0 R
+>>
+/N <<
+/1 93 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 384 50 396 ]
+/Subtype /Widget
+/T (Vehicle\137AnyAutoIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137AnyAutoIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040commercial\040vehicle\040policy\040covers\040any\040auto\056\040As\040used\040here\054\040complete\040this\040section\040only\040if\040you\040are\040certifying\040automobile\040liability\056\040\040Check\040all\040appropriate\040boxes\040to\040correspond\040with\040the\040covered\040auto\040symbols\040found\040on\040the\040policy\040declarations\040page\056\040\040If\040the\040certificate\040is\040being\040issued\040to\040the\040owner\040of\040a\040leased\040vehicle\054\040DO\040NOT\040USE\040THIS\040FORM\056\040\040Use\040\040ACORD\04023\054\040Vehicle\040or\040Equipment\040Certificate\040of\040Insurance\056)
+/Type /Annot
+>>
+endobj
+91 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+92 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+93 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+94 0 obj
+<<
+/AP <<
+/D <<
+/1 95 0 R
+/Off 96 0 R
+>>
+/N <<
+/1 97 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 372 50 384 ]
+/Subtype /Widget
+/T (Vehicle\137AllOwnedAutosIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137AllOwnedAutosIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040commercial\040vehicle\040policy\040covers\040owned\040autos\040only\056\040)
+/Type /Annot
+>>
+endobj
+95 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+96 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+97 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+98 0 obj
+<<
+/AP <<
+/D <<
+/1 99 0 R
+/Off 100 0 R
+>>
+/N <<
+/1 101 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 360 50 372 ]
+/Subtype /Widget
+/T (Vehicle\137HiredAutosIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137HiredAutosIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040vehicle\040policy\040covers\040hired\040autos\040only\056\040)
+/Type /Annot
+>>
+endobj
+99 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+100 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+101 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+102 0 obj
+<<
+/AP <<
+/D <<
+/1 103 0 R
+/Off 104 0 R
+>>
+/N <<
+/1 105 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 348 50 360 ]
+/Subtype /Widget
+/T (Vehicle\137OtherCoveredAutoIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137OtherCoveredAutoIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040vehicle\040policy\040covers\040autos\040other\040than\040those\040listed\056\040)
+/Type /Annot
+>>
+endobj
+103 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+104 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+105 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+106 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 54 348 101 360 ]
+/Subtype /Widget
+/T (Vehicle\137OtherCoveredAutoDescription\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137OtherCoveredAutoDescription\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040the\040other\040covered\040autos\056\040)
+/Type /Annot
+>>
+endobj
+107 0 obj
+<<
+/AP <<
+/D <<
+/1 108 0 R
+/Off 109 0 R
+>>
+/N <<
+/1 110 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 104 372 119 384 ]
+/Subtype /Widget
+/T (Vehicle\137ScheduledAutosIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137ScheduledAutosIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040vehicle\040policy\040covers\040scheduled\040autos\056\040)
+/Type /Annot
+>>
+endobj
+108 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+109 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+110 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+111 0 obj
+<<
+/AP <<
+/D <<
+/1 112 0 R
+/Off 113 0 R
+>>
+/N <<
+/1 114 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 104 360 119 372 ]
+/Subtype /Widget
+/T (Vehicle\137NonOwnedAutosIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137NonOwnedAutosIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040vehicle\040policy\040covers\040non\055owned\040autos\040only\056\040)
+/Type /Annot
+>>
+endobj
+112 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+113 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+114 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+115 0 obj
+<<
+/AP <<
+/D <<
+/1 116 0 R
+/Off 117 0 R
+>>
+/N <<
+/1 118 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 104 348 119 360 ]
+/Subtype /Widget
+/T (Vehicle\137OtherCoveredAutoIndicator\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137OtherCoveredAutoIndicator\137B\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040vehicle\040policy\040covers\040autos\040other\040than\040those\040listed\056\040)
+/Type /Annot
+>>
+endobj
+116 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+117 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+118 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+119 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 122 348 173 360 ]
+/Subtype /Widget
+/T (Vehicle\137OtherCoveredAutoDescription\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137OtherCoveredAutoDescription\137B\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040the\040other\040covered\040autos\056\040)
+/Type /Annot
+>>
+endobj
+120 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 176 372 194 384 ]
+/Subtype /Widget
+/T (CertificateOfInsurance\137AutomobileLiability\137AdditionalInsuredCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateOfInsurance\137AutomobileLiability\137AdditionalInsuredCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040the\040certificate\040holder\040has\040been\040named\040as\040an\040additional\040insured\040on\040the\040automobile\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+121 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 194 372 212 384 ]
+/Subtype /Widget
+/T (Policy\137AutomobileLiability\137SubrogationWaivedCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137AutomobileLiability\137SubrogationWaivedCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040subrogation\040has\040been\040waived\040on\040the\040automobile\040policy\056\040)
+/Type /Annot
+>>
+endobj
+122 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 216 372 328 384 ]
+/Subtype /Widget
+/T (Policy\137AutomobileLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137AutomobileLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TU (Enter\040identifier\072\040The\040identifier\040assigned\040by\040the\040insurer\040to\040the\040automobile\040liability\040policy\054\040or\040submission\054\040being\040referenced\040exactly\040as\040it\040appears\040on\040the\040policy\054\040including\040prefix\040and\040suffix\040symbols\056\040If\040required\040for\040self\055insurance\054\040the\040self\055insured\040license\040or\040contract\040number\056\040)
+/Type /Annot
+>>
+endobj
+123 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 331 372 378 384 ]
+/Subtype /Widget
+/T (Policy\137AutomobileLiability\137EffectiveDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137AutomobileLiability\137EffectiveDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040effective\040date\040of\040the\040automobile\040liability\040policy\056\040\040The\040date\040that\040the\040terms\040and\040conditions\040of\040the\040policy\040commence\056\040)
+/Type /Annot
+>>
+endobj
+124 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 378 372 425 384 ]
+/Subtype /Widget
+/T (Policy\137AutomobileLiability\137ExpirationDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137AutomobileLiability\137ExpirationDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040date\040on\040which\040the\040terms\040and\040conditions\040of\040the\040automobile\040liability\040policy\040will\040expire\056\040)
+/Type /Annot
+>>
+endobj
+125 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 396 590 408 ]
+/Subtype /Widget
+/T (Vehicle\137CombinedSingleLimit\137EachAccidentAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137CombinedSingleLimit\137EachAccidentAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040vehicle\040combined\040single\040limit\040liability\040each\040accident\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+126 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 384 590 396 ]
+/Subtype /Widget
+/T (Vehicle\137BodilyInjury\137PerPersonLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137BodilyInjury\137PerPersonLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040vehicle\040policy\054\040bodily\040injury\040per\040person\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+127 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 372 590 384 ]
+/Subtype /Widget
+/T (Vehicle\137BodilyInjury\137PerAccidentLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137BodilyInjury\137PerAccidentLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040vehicle\040policy\054\040bodily\040injury\040per\040accident\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+128 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 360 590 372 ]
+/Subtype /Widget
+/T (Vehicle\137PropertyDamage\137PerAccidentLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137PropertyDamage\137PerAccidentLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040vehicle\040policy\054\040property\040damage\040per\040accident\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+129 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 428 348 511 360 ]
+/Subtype /Widget
+/T (Vehicle\137OtherCoverage\137CoverageDescription\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137OtherCoverage\137CoverageDescription\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040the\040coverage\056\040)
+/Type /Annot
+>>
+endobj
+130 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 348 590 360 ]
+/Subtype /Widget
+/T (Vehicle\137OtherCoverage\137LimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Vehicle\137OtherCoverage\137LimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040limit\040amount\040of\040the\040other\040coverage\056\040)
+/Type /Annot
+>>
+endobj
+131 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 18 324 36 336 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137InsurerLetterCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137InsurerLetterCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040Company\040Letter\040of\040the\040insurer\054\040as\040identified\040in\040the\040\042Insurer\050s\051\040Affording\040Coverage\042\040form\040section\054\040associated\040with\040the\040commercial\040excess\040or\040umbrella\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+132 0 obj
+<<
+/AP <<
+/D <<
+/1 133 0 R
+/Off 134 0 R
+>>
+/N <<
+/1 135 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 336 50 348 ]
+/Subtype /Widget
+/T (Policy\137PolicyType\137UmbrellaIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137PolicyType\137UmbrellaIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040type\040of\040policy\040is\040umbrella\056\040\040As\040used\040here\054\040if\040evidencing\040an\040umbrella\040coverage\054\040underlying\040policy\040number\050s\051\054\040term\050s\051\040and\040line\050s\051\040of\040business\040may\040be\040listed\040on\040an\040ACORD\040101\056)
+/Type /Annot
+>>
+endobj
+133 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+134 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+135 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+136 0 obj
+<<
+/AP <<
+/D <<
+/1 137 0 R
+/Off 138 0 R
+>>
+/N <<
+/1 139 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 324 50 336 ]
+/Subtype /Widget
+/T (Policy\137PolicyType\137ExcessIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137PolicyType\137ExcessIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040type\040of\040policy\040is\040excess\056\040\040As\040used\040here\054\040if\040evidencing\040an\040excess\040coverage\054\040underlying\040policy\040number\050s\051\054\040term\050s\051\040and\040line\050s\051\040of\040business\040may\040be\040listed\040on\040an\040ACORD\040101\056)
+/Type /Annot
+>>
+endobj
+137 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+138 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+139 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+140 0 obj
+<<
+/AP <<
+/D <<
+/1 141 0 R
+/Off 142 0 R
+>>
+/N <<
+/1 143 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 115 336 130 348 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137OccurrenceIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137OccurrenceIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040\042coverage\040trigger\042\040is\040on\040an\040occurrence\040basis\040on\040an\040excess\040or\040umbrella\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+141 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+142 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+143 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+144 0 obj
+<<
+/AP <<
+/D <<
+/1 145 0 R
+/Off 146 0 R
+>>
+/N <<
+/1 147 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 115 324 130 336 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137ClaimsMadeIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137ClaimsMadeIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040the\040\042coverage\040trigger\042\040is\040on\040a\040claims\055made\040basis\040on\040an\040excess\040or\040umbrella\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+145 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+146 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+147 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+148 0 obj
+<<
+/AP <<
+/D <<
+/1 149 0 R
+/Off 150 0 R
+>>
+/N <<
+/1 151 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 36 312 50 324 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137DeductibleIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137DeductibleIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040a\040deductible\040amount\040applies\040to\040the\040excess\040or\040umbrella\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+149 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+150 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+151 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+152 0 obj
+<<
+/AP <<
+/D <<
+/1 153 0 R
+/Off 154 0 R
+>>
+/N <<
+/1 155 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 72 312 86 324 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137RetentionIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137RetentionIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040a\040retention\040amount\040applies\040to\040the\040excess\040or\040umbrella\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+153 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+154 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+155 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+156 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 133 312 173 324 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137Umbrella\137DeductibleOrRetentionAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137Umbrella\137DeductibleOrRetentionAmount\137A\1330\135)
+/TU (Enter\040deductible\072\040The\040excess\040or\040umbrella\040liability\040deductible\040or\040retention\040amount\056\040)
+/Type /Annot
+>>
+endobj
+157 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 176 324 194 336 ]
+/Subtype /Widget
+/T (CertificateOfInsurance\137ExcessLiability\137AdditionalInsuredCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateOfInsurance\137ExcessLiability\137AdditionalInsuredCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040the\040certificate\040holder\040has\040been\040named\040as\040an\040additional\040insured\040on\040the\040umbrella\057excess\040liability\040policy\056\040\040Place\040a\040\042Y\042\040next\040to\040each\040coverage\040where\040an\040additional\040insured\040endorsement\040has\040been\040issued\040or\040for\040umbrella\040\057\040excess\040where\040there\040is\040an\040additional\040insured\040on\040the\040underlying\040primary\040policy\040and\040this\040umbrella\040\057\040excess\040is\040follow\040form\056\040)
+/Type /Annot
+>>
+endobj
+158 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 194 324 212 336 ]
+/Subtype /Widget
+/T (Policy\137ExcessLiability\137SubrogationWaivedCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137ExcessLiability\137SubrogationWaivedCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040subrogation\040has\040been\040waived\040on\040the\040excess\040policy\056\040\040For\040umbrella\040\057\040excess\054\040place\040a\040\042Y\042\040next\040to\040each\040coverage\040where\040subrogation\040has\040been\040waived\040on\040the\040underlying\040primary\040policy\040and\040this\040umbrella\040\057\040excess\040is\040follow\040form\056\040)
+/Type /Annot
+>>
+endobj
+159 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 216 324 328 336 ]
+/Subtype /Widget
+/T (Policy\137ExcessLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137ExcessLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TU (Enter\040identifier\072\040The\040identifier\040assigned\040by\040the\040insurer\040to\040the\040excess\040liability\040policy\054\040or\040submission\054\040being\040referenced\040exactly\040as\040it\040appears\040on\040the\040policy\054\040including\040prefix\040and\040suffix\040symbols\056\040If\040required\040for\040self\055insurance\054\040the\040self\055insured\040license\040or\040contract\040number\056\040)
+/Type /Annot
+>>
+endobj
+160 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 331 324 378 336 ]
+/Subtype /Widget
+/T (Policy\137ExcessLiability\137EffectiveDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137ExcessLiability\137EffectiveDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040effective\040date\040of\040the\040excess\040liability\040policy\056\040\040The\040date\040that\040the\040terms\040and\040conditions\040of\040the\040policy\040commence\056\040)
+/Type /Annot
+>>
+endobj
+161 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 378 324 425 336 ]
+/Subtype /Widget
+/T (Policy\137ExcessLiability\137ExpirationDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137ExcessLiability\137ExpirationDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040date\040on\040which\040the\040terms\040and\040conditions\040of\040the\040excess\040liability\040policy\040will\040expire\056\040)
+/Type /Annot
+>>
+endobj
+162 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 336 590 348 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137Umbrella\137EachOccurrenceAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137Umbrella\137EachOccurrenceAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040excess\040or\040umbrella\040liability\040each\040occurrence\040limit\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056)
+/Type /Annot
+>>
+endobj
+163 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 324 590 336 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137Umbrella\137AggregateAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137Umbrella\137AggregateAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040excess\040or\040umbrella\040liability\040aggregate\040limit\040should\040be\040listed\040as\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+164 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 428 312 511 324 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137OtherCoverageDescription\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137OtherCoverageDescription\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040other\040coverage\040\050not\040the\040limit\051\040on\040the\040excess\040or\040umbrella\040liability\040policy\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+165 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 312 590 324 ]
+/Subtype /Widget
+/T (ExcessUmbrella\137OtherCoverageLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056ExcessUmbrella\137OtherCoverageLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040excess\040or\040umbrella\040liability\040other\040coverage\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+166 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 18 282 36 294 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137InsurerLetterCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137InsurerLetterCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040Company\040Letter\040of\040the\040insurer\054\040as\040identified\040in\040the\040\042Insurer\050s\051\040Affording\040Coverage\042\040form\040section\054\040associated\040with\040the\040commercial\040workers\040compensation\040and\040employers\040liability\040policy\056\040)
+/Type /Annot
+>>
+endobj
+167 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 158 282 173 294 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137AnyPersonsExcludedIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137AnyPersonsExcludedIndicator\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040whether\040the\040workers\040compensation\040and\040employers\040liability\040policy\040excludes\040any\040proprietor\054\040partner\054\040executive\040officer\054\040or\040member\056\040As\040used\040here\054\040the\040DESCRIPTION\040OF\040OPERATIONS\040section\040is\040available\054\040if\040needed\054\040to\040provide\040details\040of\040any\040\042Yes\042\040response\056\040\040In\040NH\054\040if\040\042Yes\042\040response\040is\040indicated\054\040it\040is\040mandatory\040to\040provide\040corresponding\040details\040in\040the\040DESCRIPTION\040OF\040OPERATIONS\040section\056)
+/Type /Annot
+>>
+endobj
+168 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 194 282 212 294 ]
+/Subtype /Widget
+/T (Policy\137WorkersCompensation\137SubrogationWaivedCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137WorkersCompensation\137SubrogationWaivedCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040subrogation\040has\040been\040waived\040on\040the\040workers\040compensation\040policy\056\040)
+/Type /Annot
+>>
+endobj
+169 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 216 282 328 294 ]
+/Subtype /Widget
+/T (Policy\137WorkersCompensationAndEmployersLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137WorkersCompensationAndEmployersLiability\137PolicyNumberIdentifier\137A\1330\135)
+/TU (Enter\040identifier\072\040The\040identifier\040assigned\040by\040the\040insurer\040to\040the\040workers\047\040compensation\040and\040employers\040liability\040policy\054\040or\040submission\054\040being\040referenced\040exactly\040as\040it\040appears\040on\040the\040policy\054\040including\040prefix\040and\040suffix\040symbols\056\040\040If\040required\040for\040self\055insurance\054\040the\040self\055insured\040license\040or\040contract\040number\056\040)
+/Type /Annot
+>>
+endobj
+170 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 331 282 378 294 ]
+/Subtype /Widget
+/T (Policy\137WorkersCompensationAndEmployersLiability\137EffectiveDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137WorkersCompensationAndEmployersLiability\137EffectiveDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040effective\040date\040of\040the\040workers\047\040compensation\040and\040employers\040liability\040policy\056\040\040The\040date\040that\040the\040terms\040and\040conditions\040of\040the\040policy\040commence\056\040\056)
+/Type /Annot
+>>
+endobj
+171 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 378 282 425 294 ]
+/Subtype /Widget
+/T (Policy\137WorkersCompensationAndEmployersLiability\137ExpirationDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Policy\137WorkersCompensationAndEmployersLiability\137ExpirationDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040date\040on\040which\040the\040terms\040and\040conditions\040of\040the\040workers\047\040compensation\040and\040employers\040liability\040policy\040will\040expire\056\040)
+/Type /Annot
+>>
+endobj
+172 0 obj
+<<
+/AP <<
+/D <<
+/1 173 0 R
+/Off 174 0 R
+>>
+/N <<
+/1 175 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 425 300 439 312 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137WorkersCompensationStatutoryLimitIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137WorkersCompensationStatutoryLimitIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040that\040workers\040compensation\040coverage\040is\040per\040statute\056\040)
+/Type /Annot
+>>
+endobj
+173 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+174 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+175 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+176 0 obj
+<<
+/AP <<
+/D <<
+/1 177 0 R
+/Off 178 0 R
+>>
+/N <<
+/1 179 0 R
+>>
+>>
+/AS /Off
+/DV /Off
+/F 4
+/FT /Btn
+/MK <<
+/CA (8)
+>>
+/P 4 0 R
+/Rect [ 475 300 490 312 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137OtherCoverageIndicator\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137OtherCoverageIndicator\137A\1330\135)
+/TU (Check\040the\040box\040\050if\040applicable\051\072\040Indicates\040that\040additional\040coverage\040above\040the\040workers\040compensation\040statutory\040limits\040applies\040\050permitted\040in\040some\040states\051\056\040)
+/Type /Annot
+>>
+endobj
+177 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 67
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\∆zF@∞l./ó°!àñœÅÒ‡í∆»r¡º\Åº\ ∞WË
+endstream
+endobj
+178 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 41
+>>
+stream
+xú+‰Â2–37UH—
+`¬–DœHÅÿE©º\iº\Åº\ ´Q®
+endstream
+endobj
+179 0 obj
+<<
+/BBox [ 0 0 14.4 12 ]
+/Filter [ /FlateDecode ]
+/FormType 1
+/Subtype /Form
+/Type /XObject
+/Length 45
+>>
+stream
+xú+‰Â2÷32P04–30P»ÂÂ24qç@º.iå,ÃÀ»À |Á1
+endstream
+endobj
+180 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 518 300 590 312 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137OtherCoverageDescription\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137OtherCoverageDescription\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040other\040coverage\040\050not\040the\040limit\051\040on\040the\040workers\040compensation\040and\040employers\040liability\040policy\056\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040DESCRIPTION\040OF\040OPERATIONS\040section\040is\040available\040if\040more\040space\040is\040required\056)
+/Type /Annot
+>>
+endobj
+181 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 288 590 300 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137EmployersLiability\137EachAccidentLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137EmployersLiability\137EachAccidentLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040workers\040compensation\040and\040employers\040liability\040policy\054\040employers\040liability\040each\040accident\040limit\040amount\056\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+182 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 276 590 288 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137EmployersLiability\137DiseaseEachEmployeeLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137EmployersLiability\137DiseaseEachEmployeeLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040workers\040compensation\040and\040employers\040liability\040policy\054\040employers\040liability\040disease\040each\040employee\040limit\040amount\056\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+183 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 264 590 276 ]
+/Subtype /Widget
+/T (WorkersCompensationEmployersLiability\137EmployersLiability\137DiseasePolicyLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056WorkersCompensationEmployersLiability\137EmployersLiability\137DiseasePolicyLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040workers\040compensation\040and\040employers\040liability\040policy\054\040employers\040liability\040disease\040policy\040limit\040amount\056\040\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040)
+/Type /Annot
+>>
+endobj
+184 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 18 240 36 252 ]
+/Subtype /Widget
+/T (OtherPolicy\137InsurerLetterCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137InsurerLetterCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040Company\040Letter\040of\040the\040insurer\054\040as\040identified\040in\040the\040\042Insurer\050s\051\040Affording\040Coverage\042\040form\040section\054\040associated\040with\040the\040other\040policy\056\040)
+/Type /Annot
+>>
+endobj
+185 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 40 234 173 258 ]
+/Subtype /Widget
+/T (OtherPolicy\137OtherPolicyDescription\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137OtherPolicyDescription\137A\1330\135)
+/TU (Enter\040text\072\040The\040description\040of\040the\040other\040policy\040not\040listed\040on\040the\040form\056\040)
+/Type /Annot
+>>
+endobj
+186 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 176 240 194 252 ]
+/Subtype /Widget
+/T (CertificateOfInsurance\137OtherPolicy\137AdditionalInsuredCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateOfInsurance\137OtherPolicy\137AdditionalInsuredCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040if\040the\040certificate\040holder\040has\040been\040named\040as\040an\040additional\040insured\040on\040the\040other\040policy\056\040)
+/Type /Annot
+>>
+endobj
+187 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 194 240 212 252 ]
+/Subtype /Widget
+/T (OtherPolicy\137SubrogationWaivedCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137SubrogationWaivedCode\137A\1330\135)
+/TU (Enter\040Y\040for\040a\040\215Yes\216\040response\056\040Input\040N\040for\040\215No\216\040response\056\040Indicates\040subrogation\040has\040been\040waived\040on\040the\040other\040policy\056\040)
+/Type /Annot
+>>
+endobj
+188 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 216 240 328 252 ]
+/Subtype /Widget
+/T (OtherPolicy\137PolicyNumberIdentifier\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137PolicyNumberIdentifier\137A\1330\135)
+/TU (Enter\040identifier\072\040The\040other\040policy\040number\040exactly\040as\040it\040appears\040on\040the\040policy\054\040including\040prefix\040and\040suffix\040symbols\056\040)
+/Type /Annot
+>>
+endobj
+189 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 331 240 378 252 ]
+/Subtype /Widget
+/T (OtherPolicy\137PolicyEffectiveDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137PolicyEffectiveDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040date\040on\040which\040the\040terms\040and\040conditions\040of\040the\040other\040policy\040commence\056\040)
+/Type /Annot
+>>
+endobj
+190 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 378 240 425 252 ]
+/Subtype /Widget
+/T (OtherPolicy\137PolicyExpirationDate\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137PolicyExpirationDate\137A\1330\135)
+/TU (Enter\040date\072\040The\040date\040on\040which\040the\040terms\040and\040conditions\040of\040the\040other\040policy\040expires\056\040)
+/Type /Annot
+>>
+endobj
+191 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 432 252 511 264 ]
+/Subtype /Widget
+/T (OtherPolicy\137CoverageCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137CoverageCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040coverage\040code\040for\040the\040other\040policy\056\040)
+/Type /Annot
+>>
+endobj
+192 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 252 590 264 ]
+/Subtype /Widget
+/T (OtherPolicy\137CoverageLimitAmount\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137CoverageLimitAmount\137A\1330\135)
+/TU (Enter\040limit\072\040The\040other\040policy\054\040coverage\040limit\040amount\056\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+193 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 432 240 511 252 ]
+/Subtype /Widget
+/T (OtherPolicy\137CoverageCode\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137CoverageCode\137B\1330\135)
+/TU (Enter\040code\072\040The\040coverage\040code\040for\040the\040other\040policy\056\040)
+/Type /Annot
+>>
+endobj
+194 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 240 590 252 ]
+/Subtype /Widget
+/T (OtherPolicy\137CoverageLimitAmount\137B\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137CoverageLimitAmount\137B\1330\135)
+/TU (Enter\040limit\072\040The\040other\040policy\054\040coverage\040limit\040amount\056\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+195 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 432 228 511 240 ]
+/Subtype /Widget
+/T (OtherPolicy\137CoverageCode\137C\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137CoverageCode\137C\1330\135)
+/TU (Enter\040code\072\040The\040coverage\040code\040for\040the\040other\040policy\056\040)
+/Type /Annot
+>>
+endobj
+196 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 526 228 590 240 ]
+/Subtype /Widget
+/T (OtherPolicy\137CoverageLimitAmount\137C\1330\135)
+/TM (F\1330\135\056P1\1330\135\056OtherPolicy\137CoverageLimitAmount\137C\1330\135)
+/TU (Enter\040limit\072\040The\040other\040policy\054\040coverage\040limit\040amount\056\040Any\040questions\040about\040appropriate\040limits\040or\040applicable\040policy\040coverage\050s\051\040should\040be\040answered\040by\040the\040issuing\040insurer\050s\051\056\040As\040used\040here\054\040the\040limit\040should\040be\040listed\040as\040a\040whole\040dollar\040amount\054\040as\040governed\040by\040the\040policy\056)
+/Type /Annot
+>>
+endobj
+197 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 22 150 590 216 ]
+/Subtype /Widget
+/T (CertificateOfLiabilityInsurance\137ACORDForm\137RemarkText\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateOfLiabilityInsurance\137ACORDForm\137RemarkText\137A\1330\135)
+/TU (Enter\040text\072\040The\040Certificate\040Of\040Liability\040Insurance\040general\040remarks\056\040\040The\040additional\040comments\040or\040special\040conditions\040that\040may\040exist\040upon\040the\040policy\056\040\040ACORD\040101\054\040Additional\040Remarks\040Schedule\054\040may\040be\040attached\040if\040more\040space\040is\040required\056\040As\040used\040here\054\040records\040information\040necessary\040to\040identify\040the\040operations\054\040locations\040and\040vehicles\040for\040which\040the\040certificate\040was\040issued\056)
+/Type /Annot
+>>
+endobj
+198 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 90 302 102 ]
+/Subtype /Widget
+/T (CertificateHolder\137FullName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateHolder\137FullName\137A\1330\135)
+/TU (Enter\040text\072\040The\040certificate\040holder\047s\040full\040name\056\040)
+/Type /Annot
+>>
+endobj
+199 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 78 302 90 ]
+/Subtype /Widget
+/T (CertificateHolder\137MailingAddress\137LineOne\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateHolder\137MailingAddress\137LineOne\137A\1330\135)
+/TU (Enter\040text\072\040The\040certificate\040holder\047s\040mailing\040address\040line\040one\056\040)
+/Type /Annot
+>>
+endobj
+200 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 66 302 78 ]
+/Subtype /Widget
+/T (CertificateHolder\137MailingAddress\137LineTwo\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateHolder\137MailingAddress\137LineTwo\137A\1330\135)
+/TU (Enter\040text\072\040The\040certificate\040holder\047s\040mailing\040address\040line\040two\056\040)
+/Type /Annot
+>>
+endobj
+201 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 72 54 238 66 ]
+/Subtype /Widget
+/T (CertificateHolder\137MailingAddress\137CityName\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateHolder\137MailingAddress\137CityName\137A\1330\135)
+/TU (Enter\040text\072\040The\040certificate\040holder\047s\040mailing\040address\040city\040name\056\040)
+/Type /Annot
+>>
+endobj
+202 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Q 1
+/Rect [ 238 54 256 66 ]
+/Subtype /Widget
+/T (CertificateHolder\137MailingAddress\137StateOrProvinceCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateHolder\137MailingAddress\137StateOrProvinceCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040certificate\040holder\047s\040mailing\040address\040state\040or\040province\040code\056\040)
+/Type /Annot
+>>
+endobj
+203 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 256 54 302 66 ]
+/Subtype /Widget
+/T (CertificateHolder\137MailingAddress\137PostalCode\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056CertificateHolder\137MailingAddress\137PostalCode\137A\1330\135)
+/TU (Enter\040code\072\040The\040certificate\040holder\047s\040mailing\040address\040postal\040code\056\040)
+/Type /Annot
+>>
+endobj
+204 0 obj
+<<
+/DA (\057F1\0408\040Tf\0400\040g)
+/F 4
+/FT /Tx
+/Ff 4096
+/MK <<
+>>
+/P 4 0 R
+/Rect [ 310 48 590 72 ]
+/Subtype /Widget
+/T (Producer\137AuthorizedRepresentative\137Signature\137A\1330\135)
+/TM (F\1330\135\056P1\1330\135\056Producer\137AuthorizedRepresentative\137Signature\137A\1330\135)
+/TU (Sign\040here\072\040Accommodates\040the\040signature\040of\040the\040authorized\040representative\040\050e\056g\056\054\040producer\054\040agent\054\040broker\054\040etc\056\051\040of\040the\040company\050ies\051\040listed\040on\040the\040document\056\040\040This\040is\040required\040in\040most\040states\056\040)
+/Type /Annot
+>>
+endobj
+205 0 obj
+<<
+/Length 15951
+>>
+stream
+q
+0.12 0 0 0.12 0 0 cm
+BT
+/F1 58.33 Tf
+2640 950.5 Td
+-0.07 Tw
+(SHOULD\040ANY\040OF\040THE\040ABOVE\040DESCRIBED\040POLICIES\040BE\040CANCELLED\040BEFORE) Tj
+ET
+BT
+/F1 58.33 Tf
+2640 881.5 Td
+40.88 Tw
+(THE\040EXPIRATION\040DATE\040THEREOF\054\040NOTICE\040WILL\040BE\040DELIVERED\040IN) Tj
+ET
+BT
+/F1 58.33 Tf
+2640 812.5 Td
+-2.35 Tw
+(ACCORDANCE\040WITH\040THE\040POLICY\040PROVISIONS\056) Tj
+ET
+2 J
+2550 5200 m
+2 w
+4950 5200 l
+S
+BT
+/F1 50 Tf
+3076 5214 Td
+-2.38 Tw
+(INSURER\050S\051\040AFFORDING\040COVERAGE) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 4613 Td
+-0.5 Tw
+(INSURER\040F\040\072) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 4713 Td
+-0.42 Tw
+(INSURER\040E\040\072) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 4813 Td
+-0.75 Tw
+(INSURER\040D\040\072) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 4913 Td
+-0.75 Tw
+(INSURER\040C\040\072) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 5013 Td
+-0.75 Tw
+(INSURER\040B\040\072) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 5113 Td
+-0.75 Tw
+(INSURER\040A\040\072) Tj
+ET
+BT
+/F1 50 Tf
+4644 5214 Td
+-1.92 Tw
+(NAIC\040\043) Tj
+ET
+2 J
+4500 5300 m
+2 w
+4500 4600 l
+S
+2 J
+150 5100 m
+2 w
+4950 5100 l
+S
+2 J
+4020 5500 m
+2 w
+4020 5400 l
+S
+2 J
+4950 4600 m
+4 w
+2550 4600 l
+S
+2 J
+4950 5600 m
+8 w
+4950 4600 l
+S
+2 J
+150 5600 m
+8 w
+4950 5600 l
+S
+2 J
+2550 4700 m
+2 w
+4950 4700 l
+S
+2 J
+2550 4800 m
+2 w
+4950 4800 l
+S
+2 J
+2550 4900 m
+2 w
+4950 4900 l
+S
+2 J
+2550 5500 m
+2 w
+4950 5500 l
+S
+BT
+/F1 49.17 Tf
+2580 5509 Td
+0 Tw
+(NAME\072) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 5555 Td
+0 Tw
+(CONTACT) Tj
+ET
+2 J
+2550 5000 m
+2 w
+4950 5000 l
+S
+2 J
+2550 5100 m
+2 w
+4950 5100 l
+S
+BT
+/F1 49.17 Tf
+4050 5409 Td
+-0.5 Tw
+(\050A\057C\054\040No\051\072) Tj
+ET
+BT
+/F1 49.17 Tf
+4050 5455 Td
+0 Tw
+(FAX) Tj
+ET
+2 w
+2550 5400 2400 -100 re
+S
+BT
+/F1 49.17 Tf
+2580 5354 Td
+0 Tw
+(E\055MAIL) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 5308 Td
+0 Tw
+(ADDRESS\072) Tj
+ET
+2 w
+2550 5400 2400 -100 re
+S
+2 J
+150 5600 m
+2 w
+150 4600 l
+S
+2 J
+2550 5600 m
+2 w
+4950 5600 l
+S
+BT
+/F1 49.17 Tf
+180 5534 Td
+0 Tw
+(PRODUCER) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 5405 Td
+-0.17 Tw
+(\050A\057C\054\040No\054\040Ext\051\072) Tj
+ET
+BT
+/F1 49.17 Tf
+2580 5451 Td
+0 Tw
+(PHONE) Tj
+ET
+2 J
+2550 5400 m
+2 w
+4050 5400 l
+S
+2 J
+2550 5500 m
+2 w
+2550 5400 l
+S
+BT
+/F1 49.17 Tf
+180 5034 Td
+0 Tw
+(INSURED) Tj
+ET
+2 J
+2550 5600 m
+6 w
+2550 4600 l
+S
+8 w
+150 5600 4800 -1000 re
+S
+BT
+/F1 70 Tf
+3540 4520 Td
+3.5 Tw
+(REVISION\040NUMBER\072) Tj
+ET
+BT
+/F1 70 Tf
+1320 4520 Td
+5.17 Tw
+(CERTIFICATE\040NUMBER\072) Tj
+ET
+BT
+/F1 70 Tf
+180 4520 Td
+0 Tw
+(COVERAGES) Tj
+ET
+BT
+/F1 66.67 Tf
+240 5783 Td
+3.94 Tw
+(IMPORTANT\072\040\040If\040the\040certificate\040holder\040is\040an\040ADDITIONAL\040INSURED\054\040the\040policy\050ies\051\040must\040have\040ADDITIONAL\040INSURED\040provisions\040or\040be\040endorsed\056) Tj
+ET
+BT
+/F1 66.67 Tf
+240 5703 Td
+5.94 Tw
+(If\040SUBROGATION\040IS\040WAIVED\054\040subject\040to\040the\040terms\040and\040conditions\040of\040the\040policy\054\040certain\040policies\040may\040require\040an\040endorsement\056\040\040A\040statement\040on) Tj
+ET
+BT
+/F1 66.67 Tf
+240 5623 Td
+1.05 Tw
+(this\040certificate\040does\040not\040confer\040rights\040to\040the\040certificate\040holder\040in\040lieu\040of\040such\040endorsement\050s\051\056) Tj
+ET
+2 J
+150 5850 m
+8 w
+4950 5850 l
+S
+BT
+/F1 66.67 Tf
+240 6123 Td
+9.69 Tw
+(THIS\040CERTIFICATE\040IS\040ISSUED\040AS\040A\040MATTER\040OF\040INFORMATION\040ONLY\040AND\040CONFERS\040NO\040RIGHTS\040UPON\040THE\040CERTIFICATE\040HOLDER\056\040THIS) Tj
+ET
+BT
+/F1 66.67 Tf
+240 6043 Td
+15.56 Tw
+(CERTIFICATE\040DOES\040NOT\040AFFIRMATIVELY\040OR\040NEGATIVELY\040AMEND\054\040EXTEND\040OR\040ALTER\040THE\040COVERAGE\040AFFORDED\040BY\040THE\040POLICIES) Tj
+ET
+BT
+/F1 66.67 Tf
+240 5963 Td
+15.33 Tw
+(BELOW\056\040\040THIS\040CERTIFICATE\040OF\040INSURANCE\040DOES\040NOT\040CONSTITUTE\040A\040CONTRACT\040BETWEEN\040THE\040ISSUING\040INSURER\050S\051\054\040AUTHORIZED) Tj
+ET
+BT
+/F1 66.67 Tf
+240 5883 Td
+-0.54 Tw
+(REPRESENTATIVE\040OR\040PRODUCER\054\040AND\040THE\040CERTIFICATE\040HOLDER\056) Tj
+ET
+8 w
+150 6200 4800 -600 re
+S
+BT
+/F2 50 Tf
+450 3413 Td
+0 Tw
+(OTHER\072) Tj
+ET
+2 w
+600 2700 120 -100 re
+S
+2 J
+3540 3400 m
+2 w
+3540 2900 l
+S
+BT
+/F2 50 Tf
+3570 3008.5 Td
+2.58 Tw
+(\050Per\040accident\051) Tj
+ET
+BT
+/F2 50 Tf
+3570 3308.5 Td
+2.25 Tw
+(\050Ea\040accident\051) Tj
+ET
+BT
+/F2 50 Tf
+4320 3433.5 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+4320 2933.5 Td
+0 Tw
+(\044) Tj
+ET
+2 J
+3540 3000 m
+2 w
+4950 3000 l
+S
+BT
+/F1 50 Tf
+1488.5 2383.5 Td
+-0.46 Tw
+(N\040\057\040A) Tj
+ET
+2 J
+3150 4200 m
+2 w
+3150 1900 l
+S
+2 J
+1620 4200 m
+2 w
+1620 1900 l
+S
+BT
+/F1 48.33 Tf
+1626.5 4158.5 Td
+0 Tw
+(SUBR) Tj
+ET
+BT
+/F1 48.33 Tf
+1638.67 4105 Td
+0 Tw
+(WVD) Tj
+ET
+BT
+/F1 48.33 Tf
+1477.92 4158.5 Td
+0 Tw
+(ADDL) Tj
+ET
+BT
+/F1 48.33 Tf
+1487.25 4105 Td
+0 Tw
+(INSD) Tj
+ET
+2 J
+1770 4200 m
+2 w
+1770 1900 l
+S
+BT
+/F2 60 Tf
+240 4434 Td
+7.27 Tw
+(THIS\040IS\040TO\040CERTIFY\040THAT\040THE\040POLICIES\040OF\040INSURANCE\040LISTED\040BELOW\040HAVE\040BEEN\040ISSUED\040TO\040THE\040INSURED\040NAMED\040ABOVE\040FOR\040THE\040POLICY\040PERIOD) Tj
+ET
+BT
+/F2 60 Tf
+240 4365 Td
+9.07 Tw
+(INDICATED\056\040\040NOTWITHSTANDING\040ANY\040REQUIREMENT\054\040TERM\040OR\040CONDITION\040OF\040ANY\040CONTRACT\040OR\040OTHER\040DOCUMENT\040WITH\040RESPECT\040TO\040WHICH\040THIS) Tj
+ET
+BT
+/F2 60 Tf
+240 4296 Td
+12 Tw
+(CERTIFICATE\040MAY\040BE\040ISSUED\040OR\040MAY\040PERTAIN\054\040THE\040INSURANCE\040AFFORDED\040BY\040THE\040POLICIES\040DESCRIBED\040HEREIN\040IS\040SUBJECT\040TO\040ALL\040THE\040TERMS\054) Tj
+ET
+BT
+/F2 60 Tf
+240 4227 Td
+-0.4 Tw
+(EXCLUSIONS\040AND\040CONDITIONS\040OF\040SUCH\040POLICIES\056\040LIMITS\040SHOWN\040MAY\040HAVE\040BEEN\040REDUCED\040BY\040PAID\040CLAIMS\056) Tj
+ET
+2 J
+150 4200 m
+2 w
+4950 4200 l
+S
+BT
+/F2 50 Tf
+4320 3333.5 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+4320 3233.5 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+4320 3133.5 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+4320 3033.5 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 3054 Td
+-2.58 Tw
+(PROPERTY\040DAMAGE) Tj
+ET
+BT
+/F2 50 Tf
+3570 3133.5 Td
+0.61 Tw
+(BODILY\040INJURY\040\050Per\040accident\051) Tj
+ET
+BT
+/F2 50 Tf
+3570 3233.5 Td
+0.39 Tw
+(BODILY\040INJURY\040\050Per\040person\051) Tj
+ET
+BT
+/F2 50 Tf
+3570 3354 Td
+-0.79 Tw
+(COMBINED\040SINGLE\040LIMIT) Tj
+ET
+2 J
+3540 2900 m
+2 w
+4950 2900 l
+S
+2 J
+3540 2900 m
+2 w
+4950 2900 l
+S
+2 J
+3540 3300 m
+2 w
+4950 3300 l
+S
+2 J
+3540 3200 m
+2 w
+4950 3200 l
+S
+2 J
+3540 3100 m
+2 w
+4950 3100 l
+S
+2 J
+4290 3400 m
+2 w
+4290 2900 l
+S
+2 J
+3540 3400 m
+2 w
+3540 3200 l
+S
+2 J
+3540 2900 m
+2 w
+4950 2900 l
+S
+2 w
+870 3000 120 -100 re
+S
+2 w
+300 3000 120 -100 re
+S
+BT
+/F2 50 Tf
+1020 3004 Td
+-0.33 Tw
+(AUTOS\040ONLY) Tj
+ET
+2 w
+870 3100 120 -100 re
+S
+2 w
+300 3100 120 -100 re
+S
+2 w
+870 3200 120 -100 re
+S
+BT
+/F2 50 Tf
+1020 3104 Td
+0 Tw
+(AUTOS) Tj
+ET
+BT
+/F2 50 Tf
+450 3104 Td
+-0.33 Tw
+(AUTOS\040ONLY) Tj
+ET
+2 w
+300 3200 120 -100 re
+S
+2 w
+300 3300 120 -100 re
+S
+2 J
+300 3400 m
+2 w
+300 2900 l
+S
+BT
+/F2 50 Tf
+1020 3055.5 Td
+0 Tw
+(NON\055OWNED) Tj
+ET
+BT
+/F2 50 Tf
+1020 3154 Td
+0 Tw
+(SCHEDULED) Tj
+ET
+BT
+/F2 50 Tf
+450 3154 Td
+0 Tw
+(OWNED) Tj
+ET
+BT
+/F2 50 Tf
+450 3237 Td
+-0.58 Tw
+(ANY\040AUTO) Tj
+ET
+BT
+/F1 49.17 Tf
+330 3334 Td
+-4.92 Tw
+(AUTOMOBILE\040LIABILITY) Tj
+ET
+2 J
+150 2900 m
+6 w
+4950 2900 l
+S
+2 J
+1470 3400 m
+2 w
+1470 2600 l
+S
+2 J
+300 3400 m
+2 w
+300 2600 l
+S
+BT
+/F1 50 Tf
+1324.5 2464 Td
+-0.08 Tw
+(Y\040\057\040N) Tj
+ET
+BT
+/F1 49.17 Tf
+315 2544 Td
+-3.08 Tw
+(WORKERS\040COMPENSATION) Tj
+ET
+BT
+/F1 49.17 Tf
+315 2486 Td
+-1.58 Tw
+(AND\040EMPLOYERS\047\040LIABILITY) Tj
+ET
+BT
+/F2 48.33 Tf
+315 2371 Td
+-8.33 Tw
+(OFFICER\057MEMBER\040EXCLUDED\077) Tj
+ET
+4 w
+1320 2450 120 -100 re
+S
+BT
+/F1 50 Tf
+315 2321 Td
+-0.42 Tw
+(\050Mandatory\040in\040NH\051) Tj
+ET
+BT
+/F2 50 Tf
+315 2213 Td
+-0.14 Tw
+(DESCRIPTION\040OF\040OPERATIONS\040below) Tj
+ET
+BT
+/F2 50 Tf
+315 2263 Td
+1.19 Tw
+(If\040yes\054\040describe\040under) Tj
+ET
+BT
+/F2 48.33 Tf
+315 2421 Td
+-15.25 Tw
+(ANY\040PROPRIETOR\057PARTNER\057EXECUTIVE) Tj
+ET
+2 J
+1470 2600 m
+2 w
+1470 2200 l
+S
+2 J
+300 2600 m
+2 w
+300 2200 l
+S
+2 J
+4290 2600 m
+2 w
+4290 1900 l
+S
+2 J
+3540 2600 m
+2 w
+3540 2200 l
+S
+BT
+/F2 50 Tf
+4320 2217 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+4320 2317 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+4320 2417 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 2217 Td
+-0.33 Tw
+(E\056L\056\040DISEASE\040\055\040POLICY\040LIMIT) Tj
+ET
+BT
+/F2 50 Tf
+3570 2317 Td
+-0.94 Tw
+(E\056L\056\040DISEASE\040\055\040EA\040EMPLOYEE) Tj
+ET
+BT
+/F2 50 Tf
+3570 2417 Td
+-0.58 Tw
+(E\056L\056\040EACH\040ACCIDENT) Tj
+ET
+BT
+/F2 50 Tf
+4110 2508.5 Td
+0 Tw
+(ER) Tj
+ET
+BT
+/F2 50 Tf
+4108.92 2554 Td
+0 Tw
+(OTH\055) Tj
+ET
+BT
+/F2 50 Tf
+3690 2508.5 Td
+0 Tw
+(STATUTE) Tj
+ET
+BT
+/F2 50 Tf
+3690 2554 Td
+0 Tw
+(PER) Tj
+ET
+2 J
+150 2200 m
+6 w
+4950 2200 l
+S
+2 J
+3540 2500 m
+2 w
+4950 2500 l
+S
+2 J
+3540 2400 m
+2 w
+4950 2400 l
+S
+2 J
+3540 2300 m
+2 w
+4950 2300 l
+S
+2 J
+3660 2600 m
+2 w
+3660 2500 l
+S
+2 J
+3960 2600 m
+2 w
+3960 2500 l
+S
+2 J
+4080 2600 m
+2 w
+4080 2500 l
+S
+2 J
+1470 4200 m
+2 w
+1470 4100 l
+S
+2 J
+3540 4200 m
+2 w
+3540 4100 l
+S
+2 J
+300 4200 m
+2 w
+300 4100 l
+S
+BT
+/F1 49.17 Tf
+4164.5 4121.5 Td
+0 Tw
+(LIMITS) Tj
+ET
+BT
+/F1 49.17 Tf
+3172.92 4109.5 Td
+0 Tw
+(\050MM\057DD\057YYYY\051) Tj
+ET
+BT
+/F1 49.17 Tf
+3197.5 4155 Td
+-0.25 Tw
+(POLICY\040EXP) Tj
+ET
+BT
+/F1 49.17 Tf
+2782.92 4109.5 Td
+0 Tw
+(\050MM\057DD\057YYYY\051) Tj
+ET
+BT
+/F1 49.17 Tf
+2810.5 4155 Td
+-0.58 Tw
+(POLICY\040EFF) Tj
+ET
+BT
+/F1 49.17 Tf
+2060 4113 Td
+-2.5 Tw
+(POLICY\040NUMBER) Tj
+ET
+BT
+/F1 49.17 Tf
+628 4121.5 Td
+-1.21 Tw
+(TYPE\040OF\040INSURANCE) Tj
+ET
+BT
+/F1 48.33 Tf
+178.08 4109.5 Td
+0 Tw
+(LTR) Tj
+ET
+BT
+/F1 48.33 Tf
+167.25 4155 Td
+0 Tw
+(INSR) Tj
+ET
+2 J
+150 4100 m
+6 w
+4950 4100 l
+S
+BT
+/F1 49.17 Tf
+180 1834 Td
+-0.77 Tw
+(DESCRIPTION\040OF\040OPERATIONS\040\057\040LOCATIONS\040\057\040VEHICLES\040\040\050ACORD\040101\054\040Additional\040Remarks\040Schedule\054\040may\040be\040attached\040if\040more\040space\040is\040required\051) Tj
+ET
+BT
+/F1 49.17 Tf
+450 2734 Td
+-1 Tw
+(EXCESS\040LIAB) Tj
+ET
+BT
+/F1 49.17 Tf
+450 2834 Td
+-3.08 Tw
+(UMBRELLA\040LIAB) Tj
+ET
+2 w
+960 2900 120 -100 re
+S
+2 J
+420 2700 m
+2 w
+1470 2700 l
+S
+2 w
+300 2700 120 -100 re
+S
+2 J
+4290 2900 m
+2 w
+4290 2800 l
+S
+2 J
+3540 2900 m
+2 w
+3540 2800 l
+S
+BT
+/F2 50 Tf
+4320 2817 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 2817 Td
+-1.92 Tw
+(EACH\040OCCURRENCE) Tj
+ET
+2 J
+3540 2800 m
+2 w
+4950 2800 l
+S
+2 J
+3540 2700 m
+2 w
+4950 2700 l
+S
+2 J
+3540 2800 m
+2 w
+3540 2700 l
+S
+2 J
+4290 2800 m
+2 w
+4290 2700 l
+S
+BT
+/F2 50 Tf
+4320 2717 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 2717 Td
+0 Tw
+(AGGREGATE) Tj
+ET
+2 J
+3540 2600 m
+2 w
+4950 2600 l
+S
+2 J
+3540 2700 m
+2 w
+3540 2600 l
+S
+2 J
+4290 2700 m
+2 w
+4290 2600 l
+S
+BT
+/F2 50 Tf
+4320 2617 Td
+0 Tw
+(\044) Tj
+ET
+2 J
+300 2900 m
+2 w
+300 2500 l
+S
+2 J
+420 2900 m
+2 w
+420 2700 l
+S
+2 J
+300 2700 m
+2 w
+420 2700 l
+S
+2 J
+300 2800 m
+2 w
+420 2800 l
+S
+2 J
+150 2600 m
+6 w
+4950 2600 l
+S
+BT
+/F2 50 Tf
+1110 2813 Td
+0 Tw
+(OCCUR) Tj
+ET
+BT
+/F2 50 Tf
+1110 2717 Td
+0 Tw
+(CLAIMS\055MADE) Tj
+ET
+BT
+/F2 50 Tf
+450 2613 Td
+0 Tw
+(DED) Tj
+ET
+BT
+/F2 50 Tf
+750 2613 Td
+0 Tw
+(RETENTION) Tj
+ET
+BT
+/F2 50 Tf
+1050 2613 Td
+0 Tw
+(\044) Tj
+ET
+2 J
+1470 2900 m
+2 w
+1470 2500 l
+S
+2 w
+960 2800 120 -100 re
+S
+2 J
+4290 3600 m
+2 w
+4290 3500 l
+S
+2 J
+3540 3600 m
+2 w
+3540 3500 l
+S
+BT
+/F2 50 Tf
+4320 3517 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 3517 Td
+-0.42 Tw
+(PRODUCTS\040\055\040COMP\057OP\040AGG) Tj
+ET
+2 J
+3540 3500 m
+2 w
+4950 3500 l
+S
+2 J
+4290 3700 m
+2 w
+4290 3600 l
+S
+2 J
+3540 3700 m
+2 w
+3540 3600 l
+S
+BT
+/F2 50 Tf
+4320 3617 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 3617 Td
+-1.58 Tw
+(GENERAL\040AGGREGATE) Tj
+ET
+2 J
+3540 3600 m
+2 w
+4950 3600 l
+S
+2 J
+4290 3800 m
+2 w
+4290 3700 l
+S
+2 J
+3540 3800 m
+2 w
+3540 3700 l
+S
+BT
+/F2 50 Tf
+4320 3717 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 3717 Td
+-0.86 Tw
+(PERSONAL\040\046\040ADV\040INJURY) Tj
+ET
+2 J
+3540 3700 m
+2 w
+4950 3700 l
+S
+2 J
+4290 3900 m
+2 w
+4290 3800 l
+S
+2 J
+3540 3800 m
+2 w
+4950 3800 l
+S
+2 J
+3540 3900 m
+2 w
+3540 3800 l
+S
+BT
+/F2 50 Tf
+4320 3817 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 3817 Td
+0.06 Tw
+(MED\040EXP\040\050Any\040one\040person\051) Tj
+ET
+2 J
+4290 4100 m
+2 w
+4290 4000 l
+S
+2 J
+3540 4100 m
+2 w
+3540 4000 l
+S
+BT
+/F2 50 Tf
+4320 4017 Td
+0 Tw
+(\044) Tj
+ET
+BT
+/F2 50 Tf
+3570 4017 Td
+-1.92 Tw
+(EACH\040OCCURRENCE) Tj
+ET
+2 J
+3540 4000 m
+2 w
+4950 4000 l
+S
+2 J
+3540 3500 m
+2 w
+3540 3400 l
+S
+2 J
+4290 3500 m
+2 w
+4290 3400 l
+S
+2 J
+3540 3400 m
+2 w
+4950 3400 l
+S
+2 J
+3540 3900 m
+2 w
+4950 3900 l
+S
+BT
+/F2 50 Tf
+3570 3958.5 Td
+-0.75 Tw
+(DAMAGE\040TO\040RENTED) Tj
+ET
+BT
+/F2 50 Tf
+4320 3917 Td
+0 Tw
+(\044) Tj
+ET
+2 J
+3540 4000 m
+2 w
+3540 3900 l
+S
+2 J
+4290 4000 m
+2 w
+4290 3900 l
+S
+BT
+/F2 50 Tf
+3570 3908.5 Td
+-0.08 Tw
+(PREMISES\040\050Ea\040occurrence\051) Tj
+ET
+2 J
+300 4100 m
+2 w
+300 3400 l
+S
+2 J
+1080 4000 m
+2 w
+1080 3900 l
+S
+2 J
+960 4000 m
+2 w
+960 3900 l
+S
+2 J
+540 4000 m
+2 w
+540 3900 l
+S
+2 J
+1140 3600 m
+2 w
+1140 3500 l
+S
+2 J
+1020 3600 m
+2 w
+1020 3500 l
+S
+2 J
+780 3600 m
+2 w
+780 3500 l
+S
+2 J
+660 3600 m
+2 w
+660 3500 l
+S
+2 J
+420 3600 m
+2 w
+420 3400 l
+S
+2 J
+420 4100 m
+2 w
+420 3700 l
+S
+2 J
+1020 3500 m
+2 w
+1140 3500 l
+S
+2 J
+660 3500 m
+2 w
+780 3500 l
+S
+2 J
+300 3500 m
+2 w
+420 3500 l
+S
+2 J
+1020 3600 m
+2 w
+1140 3600 l
+S
+2 J
+660 3600 m
+2 w
+780 3600 l
+S
+2 J
+300 3600 m
+2 w
+420 3600 l
+S
+2 J
+450 3700 m
+2 w
+1440 3700 l
+S
+2 J
+300 3700 m
+2 w
+420 3700 l
+S
+2 J
+450 3800 m
+2 w
+1440 3800 l
+S
+2 J
+300 3800 m
+2 w
+420 3800 l
+S
+2 J
+960 3900 m
+2 w
+1080 3900 l
+S
+2 J
+300 3900 m
+2 w
+540 3900 l
+S
+2 J
+960 4000 m
+2 w
+1080 4000 l
+S
+2 J
+300 4000 m
+2 w
+540 4000 l
+S
+2 J
+300 4100 m
+2 w
+420 4100 l
+S
+2 J
+150 3400 m
+6 w
+4950 3400 l
+S
+BT
+/F1 50 Tf
+450 4033.5 Td
+-3.33 Tw
+(COMMERCIAL\040GENERAL\040LIABILITY) Tj
+ET
+BT
+/F2 50 Tf
+570 3917 Td
+0 Tw
+(CLAIMS\055MADE) Tj
+ET
+BT
+/F2 50 Tf
+1110 3917 Td
+0 Tw
+(OCCUR) Tj
+ET
+BT
+/F2 50 Tf
+330 3617 Td
+-0.54 Tw
+(GEN\047L\040AGGREGATE\040LIMIT\040APPLIES\040PER\072) Tj
+ET
+BT
+/F2 50 Tf
+450 3517 Td
+0 Tw
+(POLICY) Tj
+ET
+BT
+/F2 50 Tf
+810 3550 Td
+0 Tw
+(PRO\055) Tj
+ET
+BT
+/F2 50 Tf
+810 3505 Td
+0 Tw
+(JECT) Tj
+ET
+BT
+/F2 50 Tf
+1170 3517 Td
+0 Tw
+(LOC) Tj
+ET
+2 J
+300 4100 m
+2 w
+300 3400 l
+S
+2 J
+2760 4200 m
+2 w
+2760 1900 l
+S
+2 J
+1470 4100 m
+2 w
+1470 3400 l
+S
+2 J
+150 1900 m
+6 w
+4950 1900 l
+S
+2 J
+1470 2200 m
+2 w
+1470 1900 l
+S
+2 J
+3540 2200 m
+2 w
+3540 1900 l
+S
+2 J
+300 2200 m
+2 w
+300 1900 l
+S
+q
+570 0 0 244 180 6206 cm
+/Img1 Do
+Q
+BT
+/F1 116.67 Tf
+1353 6261 Td
+-2.47 Tw
+(CERTIFICATE\040OF\040LIABILITY\040INSURANCE) Tj
+ET
+BT
+/F1 49.17 Tf
+4344.5 6334 Td
+-0.67 Tw
+(DATE\040\050MM\057DD\057YYYY\051) Tj
+ET
+8 w
+4230 6400 720 -200 re
+S
+2 J
+2550 700 m
+8 w
+4950 700 l
+S
+BT
+/F1 70 Tf
+2580 1117 Td
+0 Tw
+(CANCELLATION) Tj
+ET
+2 J
+2550 400 m
+6 w
+4650 400 l
+S
+BT
+/F1 49.17 Tf
+2580 634 Td
+-4.42 Tw
+(AUTHORIZED\040REPRESENTATIVE) Tj
+ET
+8 w
+2550 1100 2400 -700 re
+S
+BT
+/F1 70 Tf
+180 226.5 Td
+-1 Tw
+(ACORD\04025\040\0502016\05703\051) Tj
+ET
+BT
+/F1 70 Tf
+3010 326.5 Td
+-1.2 Tw
+(\251\0401988\0552015\040ACORD\040CORPORATION\056\040\040All\040rights\040reserved\056) Tj
+ET
+2 J
+570 450 m
+2 w
+570 400 l
+S
+BT
+/F1 70 Tf
+180 1117 Td
+3.25 Tw
+(CERTIFICATE\040HOLDER) Tj
+ET
+8 w
+150 1100 2400 -700 re
+S
+BT
+/F1 70 Tf
+1560 226.5 Td
+-0.38 Tw
+(The\040ACORD\040name\040and\040logo\040are\040registered\040marks\040of\040ACORD) Tj
+ET
+BT
+/F2 50 Tf
+450 3054 Td
+0 Tw
+(HIRED) Tj
+ET
+BT
+/F2 50 Tf
+450 3004 Td
+-0.33 Tw
+(AUTOS\040ONLY) Tj
+ET
+8 w
+150 4500 4800 -3300 re
+S
+Q
+q
+0 0 612 792 re
+W
+n
+1 0 0 1 0 0 cm
+BT
+/F1dd4712d3-0304-4eff-b7a5-ba213ff4cb92 12 Tf
+14.4 TL
+ET
+BT
+/F1dd4712d3-0304-4eff-b7a5-ba213ff4cb92 10 Tf
+12 TL
+ET
+BT
+1 0 0 1 45 640 Tm
+(VANGUARD\040INSURANCE\040GROUP\040LLC) Tj
+T*
+ET
+BT
+1 0 0 1 45 628 Tm
+(2888\040Nationwide\040Pkwy\054\040Brunswick) Tj
+T*
+ET
+BT
+1 0 0 1 45 616 Tm
+(Brunswick\054\040OH\04044212) Tj
+T*
+ET
+BT
+1 0 0 1 230 640 Tm
+(330\055241\0557570) Tj
+T*
+ET
+BT
+1 0 0 1 230 628 Tm
+(330\055281\0554025) Tj
+T*
+ET
+BT
+1 0 0 1 500 680 Tm
+(10\05731\0572025) Tj
+T*
+ET
+BT
+/F2af46b03a-697a-4404-8b23-c36665eb979c 10 Tf
+12 TL
+ET
+BT
+1 0 0 1 45 480 Tm
+(MJG\040TRANSPORT\040LLC) Tj
+T*
+ET
+BT
+/F1dd4712d3-0304-4eff-b7a5-ba213ff4cb92 10 Tf
+12 TL
+ET
+BT
+1 0 0 1 45 468 Tm
+T*
+ET
+BT
+1 0 0 1 320 400 Tm
+(Progressive) Tj
+T*
+ET
+BT
+1 0 0 1 580 400 Tm
+(37834) Tj
+T*
+ET
+BT
+/F1dd4712d3-0304-4eff-b7a5-ba213ff4cb92 9 Tf
+10.8 TL
+ET
+BT
+1 0 0 1 400 350 Tm
+(947869406) Tj
+T*
+ET
+BT
+1 0 0 1 480 350 Tm
+(01\05701\0572024) Tj
+T*
+ET
+BT
+1 0 0 1 560 350 Tm
+(01\05701\0572025) Tj
+T*
+ET
+BT
+/F2af46b03a-697a-4404-8b23-c36665eb979c 11 Tf
+13.2 TL
+ET
+BT
+1 0 0 1 420 115 Tm
+(Grant\040Corp) Tj
+T*
+ET
+Q
+
+endstream
+endobj
+206 0 obj
+<<
+/BaseFont /Arial,Bold
+/Encoding /WinAnsiEncoding
+/FirstChar 0
+/FontDescriptor <<
+/Ascent 905.27
+/CapHeight 715.82
+/Descent -211.91
+/Flags 32
+/FontBBox [ -45.9 -175.78 1000 938.48 ]
+/FontName /Arial,Bold
+/ItalicAngle 0
+/StemV 0
+/Type /FontDescriptor
+>>
+/LastChar 255
+/Subtype /Type1
+/Type /Font
+/Widths [ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 277.83 333.01 474.12 556.15 556.15 889.16 722.17 237.79 333.01 333.01 389.16 583.98 277.83 333.01 277.83 277.83 556.15 556.15 556.15 556.15 556.15 556.15 556.15 556.15 556.15 556.15 333.01 333.01 583.98 583.98 583.98 610.84 975.1 722.17 722.17 722.17 722.17 666.99 610.84 777.83 722.17 277.83 556.15 722.17 610.84 833.01 722.17 777.83 666.99 777.83 722.17 666.99 610.84 722.17 666.99 943.85 666.99 666.99 610.84 333.01 277.83 333.01 583.98 556.15 333.01 556.15 610.84 556.15 610.84 556.15 333.01 610.84 610.84 277.83 277.83 556.15 277.83 889.16 610.84 610.84 610.84 610.84 389.16 556.15 333.01 610.84 556.15 777.83 556.15 556.15 500 389.16 279.79 389.16 583.98 0 556.15 0 277.83 556.15 500 1000 556.15 556.15 333.01 1000 666.99 333.01 1000 0 610.84 0 0 277.83 277.83 500 500 350.1 556.15 1000 333.01 1000 556.15 333.01 943.85 0 500 666.99 277.83 333.01 556.15 556.15 556.15 556.15 279.79 556.15 333.01 736.82 370.12 556.15 583.98 333.01 736.82 552.25 399.9 548.83 333.01 333.01 333.01 576.17 556.15 333.01 333.01 333.01 365.23 556.15 833.98 833.98 833.98 610.84 722.17 722.17 722.17 722.17 722.17 722.17 1000 722.17 666.99 666.99 666.99 666.99 277.83 277.83 277.83 277.83 722.17 722.17 777.83 777.83 777.83 777.83 777.83 583.98 777.83 722.17 722.17 722.17 722.17 666.99 666.99 610.84 556.15 556.15 556.15 556.15 556.15 556.15 889.16 556.15 556.15 556.15 556.15 556.15 277.83 277.83 277.83 277.83 610.84 610.84 610.84 610.84 610.84 610.84 610.84 548.83 610.84 610.84 610.84 610.84 610.84 556.15 610.84 556.15 ]
+>>
+endobj
+207 0 obj
+<<
+/BaseFont /Arial
+/Encoding /WinAnsiEncoding
+/FirstChar 0
+/FontDescriptor <<
+/Ascent 905.27
+/CapHeight 716.31
+/Descent -211.91
+/Flags 32
+/FontBBox [ -45.9 -168.46 1000 938.48 ]
+/FontName /Arial
+/ItalicAngle 0
+/StemV 0
+/Type /FontDescriptor
+>>
+/LastChar 255
+/Subtype /Type1
+/Type /Font
+/Widths [ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 277.83 277.83 354.98 556.15 556.15 889.16 666.99 190.92 333.01 333.01 389.16 583.98 277.83 333.01 277.83 277.83 556.15 556.15 556.15 556.15 556.15 556.15 556.15 556.15 556.15 556.15 277.83 277.83 583.98 583.98 583.98 556.15 1015.14 666.99 666.99 722.17 722.17 666.99 610.84 777.83 722.17 277.83 500 666.99 556.15 833.01 722.17 777.83 666.99 777.83 722.17 666.99 610.84 722.17 666.99 943.85 666.99 666.99 610.84 277.83 277.83 277.83 469.24 556.15 333.01 556.15 556.15 500 556.15 556.15 277.83 556.15 556.15 222.17 222.17 500 222.17 833.01 556.15 556.15 556.15 556.15 333.01 500 277.83 556.15 500 722.17 500 500 500 333.98 259.77 333.98 583.98 0 556.15 0 222.17 556.15 333.01 1000 556.15 556.15 333.01 1000 666.99 333.01 1000 0 610.84 0 0 222.17 222.17 333.01 333.01 350.1 556.15 1000 333.01 1000 500 333.01 943.85 0 500 666.99 277.83 333.01 556.15 556.15 556.15 556.15 259.77 556.15 333.01 736.82 370.12 556.15 583.98 333.01 736.82 552.25 399.9 548.83 333.01 333.01 333.01 576.17 537.11 333.01 333.01 333.01 365.23 556.15 833.98 833.98 833.98 610.84 666.99 666.99 666.99 666.99 666.99 666.99 1000 722.17 666.99 666.99 666.99 666.99 277.83 277.83 277.83 277.83 722.17 722.17 777.83 777.83 777.83 777.83 777.83 583.98 777.83 722.17 722.17 722.17 722.17 666.99 666.99 610.84 556.15 556.15 556.15 556.15 556.15 556.15 889.16 500 556.15 556.15 556.15 556.15 277.83 277.83 277.83 277.83 556.15 556.15 556.15 556.15 556.15 556.15 556.15 548.83 610.84 556.15 556.15 556.15 556.15 500 556.15 500 ]
+>>
+endobj
+208 0 obj
+<<
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Name /F1
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+209 0 obj
+<<
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+/Name /F2
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+210 0 obj
+<<
+/BitsPerComponent 8
+/ColorSpace /DeviceGray
+/Filter [ /FlateDecode ]
+/Height 122
+/Subtype /Image
+/Type /XObject
+/Width 285
+/Length 4626
+>>
+stream
+xúÌ]{\LÈ?]U£+ÂRH*]F+óB…-ä≤YªâQ¨≤?¨{XÎ≤vÂ≥Ó,-k±.â!a—ŸhY∂Tí›Ë2›k~gŒôô˜ôôsfNôf
+ﬂ?V˚ûÁΩ=Ûæœ˚‹ﬁs∏‹è¯àçµUúä≈Âú™:eèß5†Æ$Îﬁ•#;æ˚:»w¨˚pá>}˙∏çÁºlÎ—ÎÈoï=>%°·’›√Áçw∂È¨É—@ﬂjP¿∫≥9 ©B—òõ˙˚≤…˝Mhô"u£´Kî=fÖ†‚ü”ìÌô±A’u”#eèºe—Xí¥'x`WÕ&2Ü”†deO†≈êü∏#†∑ZÛ¯¬áVp™≤g—»¸9∏øÓ;1ÜÑŸŒ˜ÏÑ/L¸ﬁÕXå!Ò˘KeœG~H?2ßè‹C¿·_eœI.hÃ⁄„g°*cÆ*Íj$‘Urá˝è≤'ˆÓ»8¸ÕfRaôÙrpÒò∑zc‘˛ËÑxóèEÌ\≥0–sê]Á|ﬂ|eœÌ›êwdíπ‰¨T≠GO]∏5Ê ΩgÙ:]√Î	GW:KS~’
+úäúÒÊBH/±3[€ÿ¡wÈÓÀÈ˘Ã⁄h(…<ª¬≥≥:5w¢Zv-áƒà~"igÎ>w[\Vys⁄ 9‚H≈´<yèZxΩ€]L¢£ÀWüø”&xıGêæ$w∂»k¿
+CŸÕ¬·∑ÔÂìQ)áf”÷Xà3ßoçV Úˆè÷å›¬w√•l9∂ùπ Tî9j7‰ÿzK£>eæ%‹Ü£÷'º`(vô#cñ®lﬁ$ÔZeq˛⁄ƒê5ŸA˚‰πb NıÑÃ	j°^‰ç¬Ω√à˝§„∂Í‚ÛÏÁ±`é{õ:ÈÊº¡vˆ˙)ï”¬]UMCÃ¸¶Ö;ìíÊ·#Ì0aóB¨AŒd!s˙ºPDáÔÇ€≥qÂw¯ñTE9Yﬁ∏	ò”ÔµÇ∫l™/O≈0◊uÈ~ Ë∆gŒ–
+ˆ⁄dúça÷·ó=∆√|Ê|*weAn®âw¡4<NæR|œu„HÊÃQ|◊ÎéŸ-}¢úæœë±ã] È]&.é“Û<¶4≥∏| è77•—D≤Y,ñwDä¢%¿Õ±÷∑îà‡1«∫åû Ü«ﬁYäó{o¶cD∫";îDè9¡Ùœ#q¶∞√bÆF‚ò∆(l\ôÎ'nU∫ÚıÇßvû•}Ã„M$©>gÒÿsU1£ ?πˆX©b∫íÜ∑66Ä÷}_-)ë$¢ﬁD·ˇßàù’p?˙F≥\ùÚF%Æ%Ø£}ÍÕb≈p"«4_Ga
+SMé®HTªc]”=La±π8sÿ¯¬aÛ„ b)T(+ú°XÌC|•§ò„çˇ˝Ü˜O.Å76•„m/M˙êß7ãÕ0'ä¯G1˚™µ Wù~·‡Ã·±E®ÁDJ>ú1ñ+aéi~§ª~PÃ˘z±îáÅ,S.π≠IaÛÜX>
+JÁJy…;…	Êd±às
+<m6v‹t‰Hµ&qñ∏ÚrÔøoLY¶m¿€,/4J∆;ùÊ‡|aEπ∂ÏIﬁPVX\\T\€Ñoãäãã92¶—2»¬Y29Ê*oy•\ç2%#‰oä<ppÎF±•˙“ÃÛ˚÷ÕÒ3¢øΩÉC◊ëüÖm8x£Ä>)†°ÏŸ•˝kÁ~Ó>¬ëÌ‡‡¿4¬kÍí]g2iÎÜáß>«˝ú‚‚R™¯z›Éø%à»+yÀ©R¶‡aGÒ∂RJ$è77U.ﬂuøAaC∆πçmÙƒÉ˜8Tªå\õE±ä≤„7˚€P‘¿ÙŸsé¸G—…-#um>¥pêtÏj÷€u∆ñDqáQåéÜ65¥¥M∫ZÚç8ú\ƒÁé+Ôwı&º:ÅyÛr∏£•¶>4‹ﬂÏ”LN”∞SOS#®∂¸K¨JÊn_{îx≠Æo‹£G«ˆêAΩÇ‚%˙YO≈I!G?=/J&çöÑâÛ¸+§◊=R‡ÌÚfÍØ(.hÖ%%”9{»Ø—≥ô∫˘‘_èüÂ=æ∂?ÃQõ_Ï^kº>Ó€AP°ù≈ßké\òYXêû˚ìØπ∂èò_≥nzÿm≈äeÀf˘ªvSm7˛ÑENËIWÔ—$<ÜÿôädêÈ∏EWÙ)Q∏·yïÒ1ï;
+µAõ°p‰◊`øΩ.rùáD,shÂfØe£Qœã-iÓŸ÷^`‡ÎDƒ’£ŒË—R≤®>s3(ƒ¬¡ÓM )î€ã ∑∂<ˇnÙ™—"È„hvz†uÉc05Õã∞.à∆ÌÑdH±ÒJ¸…ATP¥¡RX°”j
+…í5	t\ûÏEÂ*hQù’B≈ZwıjTl$~?§<)¶ÛZ\ëÕQî˘BÓjﬂ£ ©é)V{®èÓºÒÿda4≠1•_´L¢ñWN˝ŒFb∂»πÎÚüÖ≈UÉPÈò*Æ¢ajSè&^)á? éµí$¿ÛI¥˛°¢£¬‡‹`¥ﬂıv— ﬂ|⁄›+,ŒÈàJøF‘’@aø
+ãS¿Œ°<kÔ¿˝8¥IŸUÅ¢º¡ÜKË◊m—SµL"/)}QçÆÁËÈéëi!îIø¢BU (√–}(,˛ïÍâï$∂¡Ù˜£Ü/@±¥’:†⁄wƒHbAF¥ÊN&ç&tG5ØI!Ã≥√˛EP
+÷©-à^úÙÓüÍë®t ≈Æ¬Ò
+pÛa2~”ADçÔˆÉÍ?àí\ 
+ü*#[‰
+ÿÿiîçü i|ì‚E7T6é#%¸ÆﬂP˜ef_ƒd
+<pà
+Àπô†Wy{*Àô4ösÔIß]H›¯™«!∞¿ÆäC™£˙>Tº´%—Ù≤Ù“ÖiòCÆõ‹
+†Èh> $Ö0I‹ÖIå° Ê®;K'^hmIªÆ¨3§=BöπˆV‘@%»dSÔ*.7Ùb|õ¡p‘MFTaáﬁ±ˇÅr=FÌ~j®üëA<€êÃ…r»_Hx•b;@Î!ÕQØ†È§nﬁûiL&¡-'Sß©ó…‚å~Å0{ûQ⁄À]†™acex&j›ÒP2Rã‰Æ⁄	>Ÿ›,Aô˝j°±’◊˙ì¶óÇ†ó~åŒÚ⁄‰èCjYúÅ®æÓ5M›d–¨>£›
+í:1ï8ƒi¿"¡¸Hu¨U”˚Ørüﬁä^Á%êb∆æ‚ôÃ`QÙ-†ËÅádxE+à…$™C»	¢∏Ph-=‘•å¡(ø»íQPˆbÎâ¢r∞´4Ãªõô¥'ÔË⁄è?ù-ÆdÂ ıw]/ﬂÉNÈ9‰/Ï/‘ŒØÄ
+BÒ´`≥ø“4E?]˙®5âZ/@¨K⁄-"[HZ’É(ÕË®;:˘VÔëˆdpí◊}Iê˙°î∆rp˘D#Å?¯·†Y#F©7sA}©V85 µÈ∞[äJÃªQ`€˜†<úÄøŸS‡ÚFÂ∞lhÇo—@u¿$7¥r,®Òâüâ øëÄ&i0óŸ7éª	t†y/¨—Û ∫!πÅFÿ“B7$¯z±⁄sß	å[ÃûdD2Ùmz“iÂ£Aç	2àè¿m3ü,ªNÕ-‹
+@1BÚú9åŒ4ΩÏÀS3ZÊjÅöEMR=ør/&wÍDò3I:Ì3hXÊÀÇ5®Hı	æÒ‡A#)¬†á∆4k"ﬁßëΩ©82yÉ+Üe6tÖgr±Æ ‘óJ Å“ÿíÔ•™ä ÜÒÃ Ç0ÉKbMî ã“ø^ºïPúNM¿_7æ±'èã‡"ÙS$ú†upªvbÙ®Q{J#lÑ¢€J‡É∫V F^A)êŸâ9 /Ågª){©ˇ
+êÃñ)5´¶Ñ^í	|P◊&’∑-†ilè¨¶âÒÇWºÙîrı¨ZŒBÔÃT®Gûu—–<CÙßüáûòR∫á´BÖÍôÉÁÎ~˝(vh-‘≤…Û*ﬂ92qÿWÉ@çﬁ˘S∑ˆ(	’ïÚõ⁄œ •⁄ÿH)P`(Ø;d'ggŸiÌ3	 æî÷4^≠»ï‚\)W¨®$P√ö.ı6…óÙ#TæÑ_vœA⁄æWÅ˛æ]≤ì ˝H´~*˚ŒW%π—{P[I—`ÿ≤l?îÕ£K¶Mõ/<ÀˆµC∆P&˙?_É6∞Ó0ÿé™™_Ç≠Üa˝ÅÙw=âÀÖ«¡¡ÈtH¶(Ê6Ü§Üí!Fi0»+0¡OBc…„Eµ¸√SL∞ÕhYÔÕñ¥îÛ~D2VÕ[‰ñ3tŸŸµö2∏›±/Ö‘e‡∏S©ﬁ&,ë>áÖ“˘¬C5…õv«iûóÅ≈éŸ~¢«`ıj˘¸˛»¸™‹€;&ô‚ˆM(lÁ∆0PaÍï<Ù´UdùöÖ‘”ÈâyÉ‚+T'Ú/°Ï∏]9Ÿ2”ì„ˆØÒ1G´∑À«ôdHD7≠∏∫4ê2yv"ÿ)Xœ9Îûâã;{p„W„{ìﬁõ~¢I„ïø #@ïq &Ó¬ŸCõÊz† p{èm[·0®∆52«HX˚ˆËB¢ì»˚≠z˙o{(ﬁ	%JI16á~˚ASõä6JÕÌ%∂¢oa”‘—Acπ‹oÈuåØ1¥œ5tX¿	¶n:~wä§“—0ëX¬◊‡¸#Oò#©ÌT√†óTµ-=÷úœê-j‘ØÌﬁœeH_À…R|,qùª€Ÿ:uÍdkg÷_‰˝Wµâ[¸ú∫âøÿG«ÃqÏíﬂQ˙˚r£π€äΩ[I›∞∑€‘ü‚©e@°πÖ]ü!..ÏlLD	;;w≥≥Ì;‘≈≈≈¡÷V5Ò≥Âsr°¿ê¡c}æ\æ˚Û•0'-≠∏º,?]⁄¨H~òì]R^V^íùÛ‡éÑ°Yí‚ßï·!°8BB≠ﬁy*˛Å‘{∏uœn˛ÒÀÜ≈°dç∞ÂùªôIoÖTﬁ}íÛ≤¨¨¨Ëy÷—vkÔ•ÊdÁó„œ^fgﬂJ%òSSÚ∂å••≠˜ÇÁ{éö‹è¨ß≈ÈJIfl(uY6—áäh€6˘ +Ö†—…≠Mº_E)àW˘Ï£»°√tlRÎ`NMA´;4ˇÎÑMlÉ™∏˜LŸcê¿.sS˛Ëä3?R‰´*ç>fNïoØH‰Ì
+˘˛©í«@ÖßqÉ[VjDÀ‚ﬂ•.Ûôπçì<Àô.H∏Ò•’î÷˙
+D¬+€[Y/u*8‹øõœﬂJÍ\6∆Nó¶§Í wVX∂ÛøÆîÆ°⁄ô`N?≈Ä£¯†ßû ∫l–VÅó¸ÿÛ2Ÿ§ÚD—≈y0ÉYJ~ıé,º‡ß≥Í“øÅFÓ®øΩbÜuZ|_q]6/I!]ÙÒN Z≥^ﬂ^Fí#LÑ∂W¿ám ˇ¸÷ïí∂[˘:9Ä+>÷ΩõãäÑï.ºì¶œÈVÒV" 7PLéµX/µœOÖ€a,≥Èwöp']…XCL°-"^∆Øü¿OŸM(Zú˘jâÂ^9_ÇÛpGÄ5?^k◊∆æàWd%†yJn(L>0∑ø }T≈qE¸bŒ2±x/6d«≥wo5˜“ñÄÅ(m∑„¥?‰Ñ¥>§õàsÎ>„èÊ5™,˜∆ﬁÊ â≈`¯ˆß≠¡◊ÿDH0áE¡˚M˛ÇE—£Û€Áé4˝Ë@øo˛bò¯–QÓN≈ÎÏy˝y%Á{]…≥§√ﬂÜåaõià6°jπ‡rÎs~6	È]©πÉC√–…oÒˆò[ˇdÊïT‘÷’XSÀ)}ùìñöt˛∑ÔL’[ó‚ãäöv¡1Ô¡◊6/IäQ∞:Z:∫ç˘ÃgJËlBß¯LÈÃÓ—°=ÌÁûyOævw”ínéÕÇ¡‡ï∑d\ÉmKx<^^åQ±˘Ò^[=õhP∂∂ÉÏâÀÑ˛∞E1Oﬁ3Œ¯wÂk§£€êE—O€«Ìd‡⁄Läoé1Çπ«¬CJz{ø‚p›@-Ÿ¨Ä–4¯cBV´˛^á‹P{˚ªqñÌd3√¥Ãÿc√∑_Nœ>ﬁ+ui6ÕlLÛUH\14ËÂ¥r◊≈œ?‘úß“‹‰[ñá˙èqv≤∂¬aÈ0ƒŸÀoˆ7>ïî]Pﬁ:zZ*9<¥a„Ò#öÑˇ”ÖM
+endstream
+endobj
+xref
+0 211
+0000000000 65535 f 
+0000000015 00000 n 
+0000000074 00000 n 
+0000000114 00000 n 
+0000000163 00000 n 
+0000001658 00000 n 
+0000002048 00000 n 
+0000002398 00000 n 
+0000002803 00000 n 
+0000003208 00000 n 
+0000003616 00000 n 
+0000004072 00000 n 
+0000004488 00000 n 
+0000004940 00000 n 
+0000005423 00000 n 
+0000005780 00000 n 
+0000006182 00000 n 
+0000006604 00000 n 
+0000007000 00000 n 
+0000007396 00000 n 
+0000007795 00000 n 
+0000008241 00000 n 
+0000008647 00000 n 
+0000009361 00000 n 
+0000009867 00000 n 
+0000010581 00000 n 
+0000011087 00000 n 
+0000011801 00000 n 
+0000012307 00000 n 
+0000013021 00000 n 
+0000013527 00000 n 
+0000014241 00000 n 
+0000014747 00000 n 
+0000015461 00000 n 
+0000015967 00000 n 
+0000016395 00000 n 
+0000016825 00000 n 
+0000017376 00000 n 
+0000017908 00000 n 
+0000018115 00000 n 
+0000018296 00000 n 
+0000018481 00000 n 
+0000019004 00000 n 
+0000019211 00000 n 
+0000019392 00000 n 
+0000019577 00000 n 
+0000020080 00000 n 
+0000020287 00000 n 
+0000020468 00000 n 
+0000020653 00000 n 
+0000021197 00000 n 
+0000021404 00000 n 
+0000021585 00000 n 
+0000021770 00000 n 
+0000022415 00000 n 
+0000022959 00000 n 
+0000023166 00000 n 
+0000023347 00000 n 
+0000023532 00000 n 
+0000024177 00000 n 
+0000024767 00000 n 
+0000024974 00000 n 
+0000025155 00000 n 
+0000025340 00000 n 
+0000025933 00000 n 
+0000026140 00000 n 
+0000026321 00000 n 
+0000026506 00000 n 
+0000027104 00000 n 
+0000027311 00000 n 
+0000027492 00000 n 
+0000027677 00000 n 
+0000028325 00000 n 
+0000028532 00000 n 
+0000028713 00000 n 
+0000028898 00000 n 
+0000029417 00000 n 
+0000030048 00000 n 
+0000030594 00000 n 
+0000031336 00000 n 
+0000031851 00000 n 
+0000032322 00000 n 
+0000033081 00000 n 
+0000033926 00000 n 
+0000034723 00000 n 
+0000035532 00000 n 
+0000036297 00000 n 
+0000037143 00000 n 
+0000037799 00000 n 
+0000038394 00000 n 
+0000038903 00000 n 
+0000039920 00000 n 
+0000040127 00000 n 
+0000040308 00000 n 
+0000040493 00000 n 
+0000040981 00000 n 
+0000041188 00000 n 
+0000041369 00000 n 
+0000041554 00000 n 
+0000042024 00000 n 
+0000042231 00000 n 
+0000042413 00000 n 
+0000042599 00000 n 
+0000043102 00000 n 
+0000043310 00000 n 
+0000043492 00000 n 
+0000043678 00000 n 
+0000044064 00000 n 
+0000044542 00000 n 
+0000044750 00000 n 
+0000044932 00000 n 
+0000045118 00000 n 
+0000045605 00000 n 
+0000045813 00000 n 
+0000045995 00000 n 
+0000046181 00000 n 
+0000046686 00000 n 
+0000046894 00000 n 
+0000047076 00000 n 
+0000047262 00000 n 
+0000047649 00000 n 
+0000048290 00000 n 
+0000048833 00000 n 
+0000049585 00000 n 
+0000050110 00000 n 
+0000050591 00000 n 
+0000051373 00000 n 
+0000052141 00000 n 
+0000052762 00000 n 
+0000053542 00000 n 
+0000053930 00000 n 
+0000054316 00000 n 
+0000054895 00000 n 
+0000055615 00000 n 
+0000055823 00000 n 
+0000056005 00000 n 
+0000056191 00000 n 
+0000056903 00000 n 
+0000057111 00000 n 
+0000057293 00000 n 
+0000057479 00000 n 
+0000058038 00000 n 
+0000058246 00000 n 
+0000058428 00000 n 
+0000058614 00000 n 
+0000059183 00000 n 
+0000059391 00000 n 
+0000059573 00000 n 
+0000059759 00000 n 
+0000060285 00000 n 
+0000060493 00000 n 
+0000060675 00000 n 
+0000060861 00000 n 
+0000061384 00000 n 
+0000061592 00000 n 
+0000061774 00000 n 
+0000061960 00000 n 
+0000062418 00000 n 
+0000063423 00000 n 
+0000064230 00000 n 
+0000064970 00000 n 
+0000065483 00000 n 
+0000065952 00000 n 
+0000066717 00000 n 
+0000067416 00000 n 
+0000068076 00000 n 
+0000068782 00000 n 
+0000069426 00000 n 
+0000070497 00000 n 
+0000071053 00000 n 
+0000071888 00000 n 
+0000072496 00000 n 
+0000073056 00000 n 
+0000073643 00000 n 
+0000073851 00000 n 
+0000074033 00000 n 
+0000074219 00000 n 
+0000074851 00000 n 
+0000075059 00000 n 
+0000075241 00000 n 
+0000075427 00000 n 
+0000076287 00000 n 
+0000077034 00000 n 
+0000077963 00000 n 
+0000078717 00000 n 
+0000079244 00000 n 
+0000079665 00000 n 
+0000080272 00000 n 
+0000080768 00000 n 
+0000081243 00000 n 
+0000081674 00000 n 
+0000082106 00000 n 
+0000082476 00000 n 
+0000083196 00000 n 
+0000083566 00000 n 
+0000084286 00000 n 
+0000084656 00000 n 
+0000085376 00000 n 
+0000086274 00000 n 
+0000086630 00000 n 
+0000087040 00000 n 
+0000087450 00000 n 
+0000087863 00000 n 
+0000088323 00000 n 
+0000088743 00000 n 
+0000089383 00000 n 
+0000105389 00000 n 
+0000107290 00000 n 
+0000109159 00000 n 
+0000109268 00000 n 
+0000109382 00000 n 
+trailer
+<<
+/Size 211
+/Root 3 0 R
+/Info 2 0 R
+>>
+startxref
+114185
+%%EOF

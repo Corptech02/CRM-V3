@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Vanguard Insurance Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .welcome-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .welcome-title {
+            font-size: 32px;
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+
+        .welcome-subtitle {
+            color: #666;
+            font-size: 18px;
+            margin: 0;
+        }
+
+        .policy-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-size: 24px;
+            color: #333;
+            margin: 0 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .policy-card {
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: border-color 0.3s;
+        }
+
+        .policy-card:hover {
+            border-color: #667eea;
+        }
+
+        .policy-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .policy-number {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .policy-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .policy-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            font-size: 16px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid rgba(102, 126, 234, 0.2);
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+            text-align: center;
+        }
+
+        .no-policies {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i> Vanguard Insurance
+            </div>
+            <div class="user-info">
+                <span id="userWelcome">Welcome</span>
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="welcome-section">
+            <h1 class="welcome-title">Dashboard</h1>
+            <p class="welcome-subtitle">View your policy information and manage your account</p>
+        </div>
+
+        <div class="policy-section">
+            <h2 class="section-title">
+                <i class="fas fa-file-contract"></i>
+                Your Policies
+            </h2>
+
+            <div id="loadingIndicator" class="loading">
+                <div class="spinner"></div>
+                <p>Loading your policy information...</p>
+            </div>
+
+            <div id="errorMessage" class="error-message" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="errorText">Unable to load policy information</span>
+            </div>
+
+            <div id="policiesContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        console.log('Dashboard loaded - Version 2.0 with test mode support');
+
+        // Check authentication
+        const authToken = localStorage.getItem('auth_token');
+        const policyNumber = localStorage.getItem('policy_number');
+
+        if (!authToken) {
+            window.location.href = '/pages/login.html';
+        }
+
+        // Update user welcome
+        if (policyNumber) {
+            document.getElementById('userWelcome').textContent = `Welcome, ${policyNumber}`;
+        }
+
+        // Load policies
+        async function loadPolicies() {
+            console.log('Loading policies. Test mode: false');
+
+            try {
+                const response = await fetch('/api/policyholder/policies', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log('Policies response:', response.status);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayPolicies(data.policies || []);
+                } else if (response.status === 401) {
+                    // Token expired, redirect to login
+                    logout();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+            } catch (error) {
+                console.error('Error loading policies:', error);
+                showError('Unable to load policy information. Please try refreshing the page.');
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        function displayPolicies(policies) {
+            const container = document.getElementById('policiesContainer');
+
+            if (!policies || policies.length === 0) {
+                container.innerHTML = `
+                    <div class="no-policies">
+                        <i class="fas fa-file-alt" style="font-size: 48px; color: #ccc; margin-bottom: 20px;"></i>
+                        <p>No policies found for your account.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = policies.map(policy => `
+                <div class="policy-card">
+                    <div class="policy-header">
+                        <div class="policy-number">${policy.policy_number || 'N/A'}</div>
+                        <div class="policy-status status-active">Active</div>
+                    </div>
+                    <div class="policy-details">
+                        <div class="detail-item">
+                            <div class="detail-label">Company Name</div>
+                            <div class="detail-value">${policy.company_name || policy.legal_name || 'N/A'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">DOT Number</div>
+                            <div class="detail-value">${policy.dot_number || 'N/A'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Phone</div>
+                            <div class="detail-value">${policy.phone || 'N/A'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Email</div>
+                            <div class="detail-value">${policy.email || 'N/A'}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Address</div>
+                            <div class="detail-value">${formatAddress(policy)}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Representative</div>
+                            <div class="detail-value">${policy.representative_1_name || 'N/A'}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatAddress(policy) {
+            const parts = [
+                policy.address,
+                policy.city,
+                policy.state,
+                policy.zip_code
+            ].filter(part => part && part.trim());
+
+            return parts.length > 0 ? parts.join(', ') : 'N/A';
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('policy_number');
+            window.location.href = '/pages/login.html';
+        }
+
+        // Load policies when page loads
+        window.addEventListener('load', loadPolicies);
+    </script>
+</body>
+</html>

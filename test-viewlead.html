@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test viewLead Function</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test viewLead Function</h1>
+
+    <div class="test-section">
+        <h2>Function Status Check</h2>
+        <button class="btn btn-primary" onclick="checkFunctions()">Check Available Functions</button>
+        <div id="function-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Eye Icon Click</h2>
+        <p>These simulate the eye icon buttons in the leads table:</p>
+        <button class="btn btn-primary" onclick="viewLead('90037')">
+            <i class="fas fa-eye"></i> View Lead 90037
+        </button>
+        <button class="btn btn-primary" onclick="viewLead('88571')">
+            <i class="fas fa-eye"></i> View Lead 88571
+        </button>
+        <div id="test-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <pre id="console-output"></pre>
+    </div>
+
+    <script>
+        // Capture console logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const logs = [];
+
+        console.log = function() {
+            originalLog.apply(console, arguments);
+            logs.push('[LOG] ' + Array.from(arguments).join(' '));
+            updateConsoleOutput();
+        };
+
+        console.error = function() {
+            originalError.apply(console, arguments);
+            logs.push('[ERROR] ' + Array.from(arguments).join(' '));
+            updateConsoleOutput();
+        };
+
+        function updateConsoleOutput() {
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.textContent = logs.slice(-20).join('\n');
+            }
+        }
+
+        // Check what functions are available
+        function checkFunctions() {
+            const statusDiv = document.getElementById('function-status');
+            let html = '<div class="status info"><h3>Available Functions:</h3><ul>';
+
+            const functions = [
+                'viewLead',
+                'showLeadProfile',
+                'viewLeadDetails',
+                'createEnhancedProfile',
+                'closeLeadProfile',
+                'showLoadingOverlay',
+                'hideLoadingOverlay'
+            ];
+
+            functions.forEach(func => {
+                const exists = typeof window[func] === 'function';
+                html += `<li style="color: ${exists ? 'green' : 'red'};">
+                    ${exists ? '✓' : '✗'} ${func}
+                    ${exists ? ` (${window[func].toString().substring(0, 50)}...)` : ''}
+                </li>`;
+            });
+
+            html += '</ul></div>';
+            statusDiv.innerHTML = html;
+
+            // Also check localStorage for leads
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const leads2 = JSON.parse(localStorage.getItem('leads') || '[]');
+
+            html += `<div class="status info" style="margin-top: 10px;">
+                <h3>Lead Data:</h3>
+                <p>insurance_leads: ${leads.length} leads</p>
+                <p>leads: ${leads2.length} leads</p>
+            </div>`;
+
+            statusDiv.innerHTML = html;
+        }
+
+        // Load all required scripts
+        function loadScripts() {
+            console.log('Loading scripts...');
+
+            // List of scripts to load in order
+            const scripts = [
+                '/js/app.js',
+                '/js/final-profile-fix.js',
+                '/js/connect-eye-icon-properly.js'
+            ];
+
+            let loaded = 0;
+
+            scripts.forEach((src, index) => {
+                setTimeout(() => {
+                    const script = document.createElement('script');
+                    script.src = src + '?t=' + Date.now();
+                    script.onload = () => {
+                        console.log(`Loaded: ${src}`);
+                        loaded++;
+                        if (loaded === scripts.length) {
+                            console.log('All scripts loaded!');
+                            setTimeout(checkFunctions, 500);
+                        }
+                    };
+                    script.onerror = () => {
+                        console.error(`Failed to load: ${src}`);
+                    };
+                    document.body.appendChild(script);
+                }, index * 200);
+            });
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded, initializing...');
+            loadScripts();
+        });
+
+        // Monitor for profile modal
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) {
+                        if (node.id === 'lead-profile-container' ||
+                            node.id === 'lead-profile-modal' ||
+                            node.className === 'modal-overlay') {
+                            console.log('✅ Profile modal detected!');
+                            document.getElementById('test-status').innerHTML =
+                                '<div class="status success">Lead profile opened successfully!</div>';
+                        }
+                    }
+                });
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    </script>
+</body>
+</html>

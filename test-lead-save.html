@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Lead Save</title>
+</head>
+<body>
+    <h1>Test Lead Save Functionality</h1>
+    <button onclick="testSaveLead()">Test Save Lead</button>
+    <div id="result"></div>
+
+    <script>
+    async function testSaveLead() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Testing...';
+
+        const timestamp = Date.now();
+        const newLead = {
+            id: `test-${timestamp}`,
+            name: `Test Company ${timestamp}`,
+            contact: 'Test Contact',
+            phone: '555-1234',
+            email: 'test@example.com',
+            stage: 'new',
+            product: 'Commercial Auto',
+            premium: 15000,
+            created: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+        };
+
+        try {
+            // Test saving to API
+            const response = await fetch('http://162.220.14.239:3001/api/leads', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newLead)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('Save result:', result);
+
+            // Test loading from API
+            const loadResponse = await fetch('http://162.220.14.239:3001/api/leads');
+            const allLeads = await loadResponse.json();
+            const savedLead = allLeads.find(l => l.id === newLead.id);
+
+            if (savedLead) {
+                resultDiv.innerHTML = `
+                    <h2 style="color: green;">✅ SUCCESS!</h2>
+                    <p>Lead saved and retrieved successfully!</p>
+                    <pre>${JSON.stringify(savedLead, null, 2)}</pre>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <h2 style="color: orange;">⚠️ PARTIAL SUCCESS</h2>
+                    <p>Lead saved but not found in retrieve.</p>
+                `;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `
+                <h2 style="color: red;">❌ ERROR</h2>
+                <p>${error.message}</p>
+            `;
+            console.error('Error:', error);
+        }
+    }
+    </script>
+</body>
+</html>

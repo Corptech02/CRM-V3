@@ -1,0 +1,55 @@
+===============================================
+QUESTIONS TO ASK YOUR IT ADMIN
+===============================================
+
+You gave me the server settings (which are correct), but the authentication is still failing.
+Here are the specific questions to ask:
+
+1. "Is basic authentication enabled for IMAP on our Office 365 tenant?"
+   - This is the #1 issue - Microsoft disabled it by default in Oct 2022
+   - If disabled, IMAP won't work with passwords
+
+2. "Is IMAP protocol enabled for the account contact@vigagency.com?"
+   - Can be disabled per-user or organization-wide
+   - Check in Exchange Admin Center > Recipients > Mailboxes > [User] > Mailbox features
+
+3. "Do we enforce Modern Authentication only (OAuth2)?"
+   - If yes, password auth won't work for IMAP
+   - Would need to use OAuth2 flow instead
+
+4. "Are there any Conditional Access policies blocking IMAP?"
+   - Some orgs block IMAP from external IPs
+   - Or require specific conditions (compliant device, etc.)
+
+5. "Should I create an app-specific password?"
+   - If 2FA is enabled, might need app password
+   - Created in security settings of the account
+
+6. "Can you check the sign-in logs for contact@vigagency.com?"
+   - They can see exactly why authentication is failing
+   - Azure AD > Sign-in logs will show the specific error
+
+===============================================
+WHAT TO TELL YOUR IT ADMIN
+===============================================
+
+"I'm trying to connect to contact@vigagency.com via IMAP from our application server.
+The connection works but authentication fails with 'LOGIN failed' error.
+I'm using the correct password and the settings you provided:
+- Server: outlook.office365.com
+- Port: 993 with TLS
+- Username: contact@vigagency.com
+- Password: [correct password]
+
+Can you check if basic authentication is enabled for IMAP and if there are any policies blocking this?"
+
+===============================================
+IF THEY SAY "BASIC AUTH IS DISABLED"
+===============================================
+
+Ask: "Can you either:
+1. Enable basic auth for IMAP for this specific account, OR
+2. Create an app password for this account, OR
+3. Help me set up OAuth2 authentication with app registration in Azure AD?"
+
+===============================================

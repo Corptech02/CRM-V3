@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>COI Email Test - LIVE</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background: #1f2937;
+            color: white;
+            padding: 10px 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #iframe-container {
+            flex: 1;
+            position: relative;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        #status {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: white;
+            border: 2px solid #3b82f6;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-size: 14px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        🔍 COI Email Test - Forcing Real Outlook Emails (NO MOCK DATA)
+    </div>
+    <div id="status">Loading COI Management Tab...</div>
+    <div id="iframe-container">
+        <iframe id="vanguard" src="http://162-220-14-239.nip.io/#coi"></iframe>
+    </div>
+
+    <script>
+        // Wait for iframe to load
+        const iframe = document.getElementById('vanguard');
+        const status = document.getElementById('status');
+
+        iframe.onload = function() {
+            status.innerHTML = '✅ COI Tab Loaded - Check for real emails or authentication errors';
+
+            // Try to trigger the email load
+            setTimeout(() => {
+                try {
+                    iframe.contentWindow.loadCOIInbox();
+                    status.innerHTML = '🔄 Triggered loadCOIInbox() - Fetching real emails...';
+                } catch(e) {
+                    status.innerHTML = '⚠️ Could not trigger loadCOIInbox: ' + e.message;
+                }
+            }, 2000);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete SIP Configuration Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/jssip@3.10.1/dist/jssip.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .success { background: #d1fae5; color: #065f46; border: 1px solid #10b981; }
+        .error { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+        .warning { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+        .info { background: #dbeafe; color: #1e40af; border: 1px solid #3b82f6; }
+        .config-section {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .config-item {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .config-label {
+            font-weight: bold;
+            color: #374151;
+        }
+        .config-value {
+            font-family: monospace;
+            color: #6b7280;
+        }
+        .log {
+            background: #1f2937;
+            color: #f3f4f6;
+            padding: 20px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 SIP Configuration & Connection Test</h1>
+        <p>This tool tests the complete SIP configuration for the phone system.</p>
+
+        <div class="config-section">
+            <h3>📋 Current SIP Configuration</h3>
+            <div class="config-item">
+                <span class="config-label">Username:</span>
+                <span class="config-value">Grant</span>
+            </div>
+            <div class="config-item">
+                <span class="config-label">Password:</span>
+                <span class="config-value">GrantCorp2006@</span>
+            </div>
+            <div class="config-item">
+                <span class="config-label">Primary Domain:</span>
+                <span class="config-value">vanguard1.sip.twilio.com</span>
+            </div>
+            <div class="config-item">
+                <span class="config-label">Alternative Domain:</span>
+                <span class="config-value">vanguard1.sip.us1.twilio.com</span>
+            </div>
+            <div class="config-item">
+                <span class="config-label">Outbound Proxy:</span>
+                <span class="config-value">sip.twilio.com</span>
+            </div>
+            <div class="config-item">
+                <span class="config-label">Caller ID:</span>
+                <span class="config-value">+13306369079</span>
+            </div>
+        </div>
+
+        <div id="status" class="status info">
+            🔍 Ready to test - Click "Start Test" to begin
+        </div>
+
+        <div>
+            <button onclick="startTest()" id="startBtn">🚀 Start Test</button>
+            <button onclick="clearLog()" id="clearBtn">🗑️ Clear Log</button>
+            <button onclick="location.reload()" id="refreshBtn">🔄 Refresh Page</button>
+        </div>
+
+        <div class="log" id="log">Click "Start Test" to begin the SIP connection test...</div>
+    </div>
+
+    <script>
+        let sipClient = null;
+        let testResults = {
+            jsip: false,
+            domains: [],
+            registration: false
+        };
+
+        const log = (message, type = 'info') => {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEl = document.getElementById('log');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logEl.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[SIP Test] ${message}`);
+        };
+
+        const updateStatus = (message, type = 'info') => {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.innerHTML = message;
+        };
+
+        const clearLog = () => {
+            document.getElementById('log').innerHTML = '';
+        };
+
+        async function startTest() {
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.innerHTML = '⏳ Testing...';
+
+            clearLog();
+            log('🚀 Starting comprehensive SIP test');
+            log('======================================');
+
+            try {
+                // Test 1: JsSIP Library
+                await testJsSIPLibrary();
+
+                // Test 2: Domain connectivity
+                await testDomainConnectivity();
+
+                // Test 3: SIP Registration
+                if (testResults.jsip && testResults.domains.length > 0) {
+                    await testSIPRegistration();
+                }
+
+                // Final results
+                showFinalResults();
+
+            } catch (error) {
+                log(`Unexpected error: ${error.message}`, 'error');
+                updateStatus('❌ Test failed with unexpected error', 'error');
+            } finally {
+                startBtn.disabled = false;
+                startBtn.innerHTML = '🚀 Start Test';
+            }
+        }
+
+        async function testJsSIPLibrary() {
+            log('\n1️⃣ Testing JsSIP Library...');
+
+            if (typeof JsSIP !== 'undefined') {
+                log(`JsSIP version: ${JsSIP.version || 'unknown'}`, 'success');
+                log('JsSIP library loaded successfully', 'success');
+                testResults.jsip = true;
+            } else {
+                log('JsSIP library not found', 'error');
+                log('SIP functionality will not be available', 'warning');
+                testResults.jsip = false;
+            }
+        }
+
+        async function testDomainConnectivity() {
+            log('\n2️⃣ Testing domain connectivity...');
+
+            const domains = [
+                'vanguard1.sip.twilio.com',
+                'vanguard1.sip.us1.twilio.com'
+            ];
+
+            for (const domain of domains) {
+                log(`Testing WebSocket to: wss://${domain}:443`);
+
+                try {
+                    const result = await testWebSocket(domain);
+                    if (result) {
+                        log(`Domain ${domain} is reachable`, 'success');
+                        testResults.domains.push(domain);
+                    } else {
+                        log(`Domain ${domain} connection failed`, 'error');
+                    }
+                } catch (error) {
+                    log(`Domain ${domain} error: ${error.message}`, 'error');
+                }
+            }
+
+            if (testResults.domains.length > 0) {
+                log(`✅ ${testResults.domains.length} domain(s) accessible`, 'success');
+            } else {
+                log('❌ No domains are accessible', 'error');
+            }
+        }
+
+        async function testWebSocket(domain) {
+            return new Promise((resolve) => {
+                const ws = new WebSocket(`wss://${domain}:443`);
+
+                const timeout = setTimeout(() => {
+                    ws.close();
+                    resolve(false);
+                }, 5000);
+
+                ws.onopen = () => {
+                    clearTimeout(timeout);
+                    ws.close();
+                    resolve(true);
+                };
+
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    resolve(false);
+                };
+
+                ws.onclose = () => {
+                    clearTimeout(timeout);
+                };
+            });
+        }
+
+        async function testSIPRegistration() {
+            log('\n3️⃣ Testing SIP registration...');
+
+            if (!testResults.jsip) {
+                log('Skipping SIP test - JsSIP not available', 'warning');
+                return;
+            }
+
+            const workingDomain = testResults.domains[0];
+            log(`Using domain: ${workingDomain}`);
+
+            const sipConfig = {
+                uri: `sip:Grant@${workingDomain}`,
+                password: 'GrantCorp2006@',
+                ws_servers: [`wss://${workingDomain}:443`],
+                display_name: 'Grant',
+                register: true,
+                register_expires: 300,
+                session_timers: false,
+                connection_recovery_min_interval: 2,
+                connection_recovery_max_interval: 30,
+                use_preloaded_route: false
+            };
+
+            try {
+                sipClient = new JsSIP.UA(sipConfig);
+
+                // Set up event listeners
+                sipClient.on('connected', () => {
+                    log('SIP WebSocket connected', 'success');
+                });
+
+                sipClient.on('disconnected', () => {
+                    log('SIP WebSocket disconnected', 'warning');
+                });
+
+                sipClient.on('registered', () => {
+                    log('🎉 SIP REGISTRATION SUCCESSFUL!', 'success');
+                    log(`Registered as: Grant@${workingDomain}`, 'success');
+                    testResults.registration = true;
+                });
+
+                sipClient.on('unregistered', () => {
+                    log('SIP unregistered', 'warning');
+                    testResults.registration = false;
+                });
+
+                sipClient.on('registrationFailed', (e) => {
+                    log(`SIP registration failed: ${e.cause}`, 'error');
+                    if (e.response) {
+                        log(`Response code: ${e.response.status_code} ${e.response.reason_phrase}`, 'error');
+                    }
+                    testResults.registration = false;
+                });
+
+                log('Starting SIP User Agent...');
+                sipClient.start();
+
+                // Wait for registration attempt
+                await new Promise(resolve => setTimeout(resolve, 8000));
+
+            } catch (error) {
+                log(`Failed to create SIP client: ${error.message}`, 'error');
+                testResults.registration = false;
+            }
+        }
+
+        function showFinalResults() {
+            log('\n📊 FINAL TEST RESULTS');
+            log('====================');
+
+            if (testResults.jsip) {
+                log('✅ JsSIP Library: Available', 'success');
+            } else {
+                log('❌ JsSIP Library: Not Available', 'error');
+            }
+
+            if (testResults.domains.length > 0) {
+                log(`✅ Domain Connectivity: ${testResults.domains.length} domain(s) working`, 'success');
+                testResults.domains.forEach(domain => {
+                    log(`   - ${domain}`, 'success');
+                });
+            } else {
+                log('❌ Domain Connectivity: Failed', 'error');
+            }
+
+            if (testResults.registration) {
+                log('✅ SIP Registration: Successful', 'success');
+                updateStatus('🎉 SIP is fully configured and working!', 'success');
+            } else if (testResults.jsip && testResults.domains.length > 0) {
+                log('❌ SIP Registration: Failed', 'error');
+                updateStatus('⚠️ SIP connectivity works but registration failed - check credentials', 'warning');
+            } else {
+                log('❌ SIP Registration: Cannot test (prerequisites failed)', 'error');
+                updateStatus('❌ SIP test failed - check connectivity and library', 'error');
+            }
+
+            log('\n🎯 NEXT STEPS:');
+            if (testResults.registration) {
+                log('1. SIP is working! You can now make calls through the phone tool');
+                log('2. Open the phone tool and test making a call');
+                log('3. The SIP configuration is ready for production use');
+            } else if (testResults.jsip && testResults.domains.length > 0) {
+                log('1. Check Twilio SIP credentials (username/password)');
+                log('2. Verify the SIP domain is correctly configured in Twilio');
+                log('3. Contact Twilio support if credentials are correct');
+            } else if (!testResults.jsip) {
+                log('1. Ensure the JsSIP library is loaded on your main application');
+                log('2. Add <script src="https://cdn.jsdelivr.net/npm/jssip@3.10.1/dist/jssip.min.js"></script>');
+            } else {
+                log('1. Check internet connectivity');
+                log('2. Verify firewall allows WebSocket connections to *.twilio.com');
+                log('3. Test from different network if possible');
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            log('SIP Test Tool loaded and ready');
+            log('JsSIP library status: ' + (typeof JsSIP !== 'undefined' ? 'Loaded' : 'Not loaded'));
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sync Test Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .data-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .data-section h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .data-count {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .last-sync {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .test-controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real-Time Sync Test Dashboard</h1>
+
+        <div id="connectionStatus" class="status">
+            Checking connection...
+        </div>
+
+        <div class="test-controls">
+            <h3>Test Controls</h3>
+            <button onclick="addTestLead()">Add Test Lead</button>
+            <button onclick="addTestClient()">Add Test Client</button>
+            <button onclick="addTestPolicy()">Add Test Policy</button>
+            <button onclick="forceSync()">Force Sync Now</button>
+            <button onclick="clearTestData()">Clear Test Data</button>
+        </div>
+
+        <div class="data-section">
+            <h3>Current Data Status</h3>
+            <p>Clients: <span class="data-count" id="clientCount">0</span></p>
+            <p>Policies: <span class="data-count" id="policyCount">0</span></p>
+            <p>Leads: <span class="data-count" id="leadCount">0</span></p>
+            <p class="last-sync">Last sync: <span id="lastSync">Never</span></p>
+        </div>
+
+        <div class="data-section">
+            <h3>Sync Log</h3>
+            <div id="syncLog" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px;">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = `http://${window.location.hostname.split('.')[0]}:3001/api`;
+        let syncInterval;
+
+        function log(message) {
+            const logDiv = document.getElementById('syncLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML = `<div>[${timestamp}] ${message}</div>` + logDiv.innerHTML;
+        }
+
+        async function checkConnection() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                if (response.ok) {
+                    document.getElementById('connectionStatus').className = 'status connected';
+                    document.getElementById('connectionStatus').textContent = 'Connected to backend at ' + API_URL;
+                    log('Backend connection successful');
+                    return true;
+                }
+            } catch (error) {
+                document.getElementById('connectionStatus').className = 'status error';
+                document.getElementById('connectionStatus').textContent = 'Cannot connect to backend: ' + error.message;
+                log('Backend connection failed: ' + error.message);
+                return false;
+            }
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('clientCount').textContent = data.clients?.length || 0;
+                    document.getElementById('policyCount').textContent = data.policies?.length || 0;
+                    document.getElementById('leadCount').textContent = data.leads?.length || 0;
+                    document.getElementById('lastSync').textContent = new Date().toLocaleString();
+                    log(`Data loaded: ${data.clients?.length || 0} clients, ${data.policies?.length || 0} policies, ${data.leads?.length || 0} leads`);
+                }
+            } catch (error) {
+                log('Error loading data: ' + error.message);
+            }
+        }
+
+        async function addTestLead() {
+            const lead = {
+                id: 'test-lead-' + Date.now(),
+                businessName: 'Test Company ' + Math.floor(Math.random() * 1000),
+                contactName: 'Test Contact',
+                phone: '555-' + Math.floor(Math.random() * 10000),
+                email: 'test' + Date.now() + '@example.com',
+                status: 'new',
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/leads`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lead)
+                });
+
+                if (response.ok) {
+                    log('Test lead added: ' + lead.businessName);
+                    await loadData();
+                }
+            } catch (error) {
+                log('Error adding lead: ' + error.message);
+            }
+        }
+
+        async function addTestClient() {
+            const client = {
+                id: 'test-client-' + Date.now(),
+                name: 'Test Client ' + Math.floor(Math.random() * 1000),
+                email: 'client' + Date.now() + '@example.com',
+                phone: '555-' + Math.floor(Math.random() * 10000),
+                company: 'Test Company',
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/clients`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(client)
+                });
+
+                if (response.ok) {
+                    log('Test client added: ' + client.name);
+                    await loadData();
+                }
+            } catch (error) {
+                log('Error adding client: ' + error.message);
+            }
+        }
+
+        async function addTestPolicy() {
+            const policy = {
+                id: 'test-policy-' + Date.now(),
+                policyNumber: 'POL-' + Math.floor(Math.random() * 100000),
+                clientId: 'test-client-' + Date.now(),
+                carrier: 'Test Insurance Co',
+                type: 'General Liability',
+                premium: Math.floor(Math.random() * 10000),
+                effectiveDate: new Date().toISOString(),
+                expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/policies`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(policy)
+                });
+
+                if (response.ok) {
+                    log('Test policy added: ' + policy.policyNumber);
+                    await loadData();
+                }
+            } catch (error) {
+                log('Error adding policy: ' + error.message);
+            }
+        }
+
+        async function forceSync() {
+            log('Forcing sync...');
+            await loadData();
+        }
+
+        async function clearTestData() {
+            if (!confirm('This will delete all test data. Are you sure?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Delete test leads
+                    for (const lead of data.leads || []) {
+                        if (lead.id?.startsWith('test-')) {
+                            await fetch(`${API_URL}/leads/${lead.id}`, { method: 'DELETE' });
+                            log('Deleted test lead: ' + lead.id);
+                        }
+                    }
+
+                    // Delete test policies
+                    for (const policy of data.policies || []) {
+                        if (policy.id?.startsWith('test-')) {
+                            await fetch(`${API_URL}/policies/${policy.id}`, { method: 'DELETE' });
+                            log('Deleted test policy: ' + policy.id);
+                        }
+                    }
+
+                    // Delete test clients
+                    for (const client of data.clients || []) {
+                        if (client.id?.startsWith('test-')) {
+                            await fetch(`${API_URL}/clients/${client.id}`, { method: 'DELETE' });
+                            log('Deleted test client: ' + client.id);
+                        }
+                    }
+
+                    await loadData();
+                    log('Test data cleared');
+                }
+            } catch (error) {
+                log('Error clearing test data: ' + error.message);
+            }
+        }
+
+        // Initialize
+        async function init() {
+            const connected = await checkConnection();
+            if (connected) {
+                await loadData();
+
+                // Set up auto-refresh every 5 seconds
+                syncInterval = setInterval(loadData, 5000);
+                log('Auto-sync enabled (5 second interval)');
+            }
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>

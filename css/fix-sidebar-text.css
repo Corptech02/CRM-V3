@@ -1,0 +1,85 @@
+/* AGGRESSIVE FIX - Hide ALL sidebar text when not hovered */
+.sidebar {
+    overflow: hidden !important;
+    z-index: 1000 !important;
+}
+
+/* Hide ALL text in sidebar by default */
+.sidebar span:not(.count),
+.sidebar .sidebar-menu span:not(.count),
+.sidebar .sidebar-menu li span:not(.count),
+.sidebar .sidebar-menu li a span:not(.count),
+.sidebar .menu-section h3,
+.sidebar h3 {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    font-size: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+}
+
+/* Show text only on hover */
+.sidebar:hover span:not(.count),
+.sidebar:hover .sidebar-menu span:not(.count),
+.sidebar:hover .sidebar-menu li span:not(.count),
+.sidebar:hover .sidebar-menu li a span:not(.count),
+.sidebar:hover .menu-section h3,
+.sidebar:hover h3 {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    width: auto !important;
+    height: auto !important;
+    font-size: inherit !important;
+    position: static !important;
+    left: auto !important;
+}
+
+/* Ensure counts stay visible */
+.sidebar .count,
+.sidebar:hover .count {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    font-size: 11px !important;
+}
+
+/* Fix any overflow issues */
+.sidebar .sidebar-menu {
+    overflow: hidden !important;
+}
+
+.sidebar .sidebar-menu li {
+    overflow: hidden !important;
+}
+
+.sidebar .sidebar-menu li a {
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+}
+
+/* Hide mobile nav text if it's somehow visible on desktop */
+.mobile-nav {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .mobile-nav {
+        display: block !important;
+    }
+}
+
+/* Emergency fix - if text still shows, make it transparent */
+body > span,
+body > a,
+main > span,
+main > a {
+    display: none !important;
+}

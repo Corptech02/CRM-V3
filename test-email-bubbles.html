@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Email Bubbles</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; background: #f5f5f5;">
+
+    <div style="max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <h1>Email Bubble Component Test</h1>
+        <p>Test the Outlook-style email recipient bubbles. Type email addresses and press Enter to create bubbles.</p>
+
+        <!-- To Field -->
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; color: #374151; font-weight: 500; margin-bottom: 8px;">
+                To: <span style="color: #ef4444;">*</span>
+            </label>
+            <div id="testToContainer" class="email-bubble-container" style="width: 100%; min-height: 42px; padding: 5px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; background: white; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; cursor: text;">
+                <input type="email" id="testToInput" class="email-bubble-input"
+                       style="border: none; outline: none; flex: 1; min-width: 150px; padding: 5px; font-size: 14px; background: transparent;"
+                       placeholder="Enter email and press Enter">
+            </div>
+            <input type="hidden" id="testTo" required>
+            <small style="color: #6b7280; font-size: 12px;">Hidden field value: <span id="toFieldValue">empty</span></small>
+        </div>
+
+        <!-- CC Field -->
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; color: #374151; font-weight: 500; margin-bottom: 8px;">
+                CC (optional):
+            </label>
+            <div id="testCcContainer" class="email-bubble-container" style="width: 100%; min-height: 42px; padding: 5px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; background: white; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; cursor: text;">
+                <input type="text" id="testCcInput" class="email-bubble-input"
+                       style="border: none; outline: none; flex: 1; min-width: 150px; padding: 5px; font-size: 14px; background: transparent;"
+                       placeholder="Enter email and press Enter">
+            </div>
+            <input type="hidden" id="testCc">
+            <small style="color: #6b7280; font-size: 12px;">Hidden field value: <span id="ccFieldValue">empty</span></small>
+        </div>
+
+        <!-- Test Controls -->
+        <div style="margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 8px;">
+            <h3>Test Controls</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                <button onclick="testAddEmail('test@example.com')" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Add test@example.com
+                </button>
+                <button onclick="testAddEmail('another@test.com')" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Add another@test.com
+                </button>
+                <button onclick="testAddEmail('invalid-email')" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Add Invalid Email
+                </button>
+                <button onclick="clearAllBubbles()" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Clear All
+                </button>
+            </div>
+            <div style="color: #6b7280; font-size: 14px;">
+                <strong>Instructions:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Type email addresses and press Enter or comma to create bubbles</li>
+                    <li>Click the × on any bubble to remove it</li>
+                    <li>Paste multiple emails separated by commas</li>
+                    <li>Press Backspace when input is empty to remove last bubble</li>
+                    <li>Click anywhere in the field area to focus the input</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/coi-email-compose-titan.js"></script>
+    <script>
+        // Test functions
+        function testAddEmail(email) {
+            addEmailBubble(email, 'testToContainer');
+        }
+
+        function clearAllBubbles() {
+            document.querySelectorAll('.email-bubble').forEach(bubble => bubble.remove());
+            updateHiddenField('testToContainer');
+            updateHiddenField('testCcContainer');
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const toValue = document.getElementById('testTo').value;
+            const ccValue = document.getElementById('testCc').value;
+            document.getElementById('toFieldValue').textContent = toValue || 'empty';
+            document.getElementById('ccFieldValue').textContent = ccValue || 'empty';
+        }
+
+        // Override updateHiddenField to also update display
+        const originalUpdateHiddenField = updateHiddenField;
+        updateHiddenField = function(containerId) {
+            originalUpdateHiddenField(containerId);
+            updateDisplay();
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEmailBubbleField('testToContainer');
+            setupEmailBubbleField('testCcContainer');
+            updateDisplay();
+        });
+    </script>
+</body>
+</html>

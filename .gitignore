@@ -1,0 +1,39 @@
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+
+# Log files
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+
+# Session files
+sessions/
+
+# Upload directories
+uploads/
+temp/
+
+# API keys and credentials
+credentials.json
+token.json
+*.pem
+*.key
+
+# Submodules and embedded repos
+lead-transfer-integration/

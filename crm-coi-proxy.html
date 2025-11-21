@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CRM COI Proxy</title>
+    <!-- PDF.js and jsPDF will be injected by backend to avoid loading issues -->
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #f5f5f5; }
+        #policyViewer { width: 100%; height: 100%; }
+        .pdf-container { display: flex; justify-content: center; align-items: center; }
+        canvas { border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <div id="policyViewer"></div>
+
+    <script>
+        // Global variables that the CRM scripts expect
+        window.realPdfState = { canvas: null, ctx: null, pdfDoc: null };
+        window.insurance_policies = [];
+        window.currentCOIPolicy = null;
+        window.currentCOIPolicyId = null;
+
+        // Function to load policy data and prepare COI
+        window.loadPolicyAndPrepare = function(policyData, certificateHolder) {
+            console.log('📋 Loading policy data for CRM preparation:', policyData);
+
+            // Store policy data in the expected format
+            window.insurance_policies = [policyData];
+            window.currentCOIPolicy = policyData;
+            window.currentCOIPolicyId = policyData.policyNumber || policyData.id;
+
+            // CRITICAL: Store policy data in localStorage where createRealACORDViewer expects it
+            try {
+                localStorage.setItem('insurance_policies', JSON.stringify([policyData]));
+                console.log('✅ Policy data stored in localStorage for CRM scripts');
+            } catch (e) {
+                console.error('❌ Failed to store policy data in localStorage:', e);
+            }
+
+            // Store certificate holder if provided
+            if (certificateHolder) {
+                window.currentCertificateHolder = certificateHolder;
+                // Also store in sessionStorage where CRM expects it
+                try {
+                    sessionStorage.setItem('selected_certificate_holder', JSON.stringify(certificateHolder));
+                    console.log('✅ Certificate holder stored in sessionStorage');
+                } catch (e) {
+                    console.error('❌ Failed to store certificate holder:', e);
+                }
+            }
+
+            // Return promise that resolves when preparation is complete
+            return new Promise(async (resolve) => {
+                // Wait for CRM scripts to load
+                const waitForScripts = setInterval(() => {
+                    if (typeof window.createRealACORDViewer === 'function') {
+                        clearInterval(waitForScripts);
+
+                        // Call the REAL CRM preparation function
+                        console.log('🎯 Calling REAL CRM prepareCOI process...');
+                        window.createRealACORDViewer(window.currentCOIPolicyId).then(() => {
+                            console.log('✅ CRM COI preparation completed');
+
+                            // Wait for canvas and overlay to be ready
+                            const checkReady = setInterval(() => {
+                                const canvas = document.getElementById('realPdfCanvas');
+                                const overlay = document.getElementById('realFormOverlay');
+
+                                if (canvas && overlay && canvas.width > 0) {
+                                    console.log('🎨 Canvas and overlay ready for capture');
+                                    clearInterval(checkReady);
+                                    resolve({
+                                        canvas: canvas,
+                                        overlay: overlay,
+                                        ready: true
+                                    });
+                                }
+                            }, 100);
+                        });
+                    }
+                }, 100);
+            });
+        };
+
+        // Function to download the prepared COI (same as CRM)
+        window.downloadPreparedCOI = function() {
+            console.log('📥 Downloading prepared COI using REAL CRM method...');
+
+            if (typeof window.downloadACORD === 'function') {
+                return window.downloadACORD();
+            } else {
+                console.error('❌ downloadACORD function not available');
+                return false;
+            }
+        };
+
+        console.log('🚀 CRM COI Proxy page loaded and ready');
+    </script>
+</body>
+</html>

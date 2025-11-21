@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Policy Display</title>
+</head>
+<body>
+    <h1>Testing Policy API and Display</h1>
+    <div id="results" style="white-space: pre-wrap; font-family: monospace;"></div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        async function testPolicies() {
+            resultsDiv.innerHTML = 'Testing policy API...\n\n';
+
+            // Test with different URLs
+            const urls = [
+                'http://localhost:3001/api/policies',
+                'http://162-220-14-239.nip.io/api/policies',
+                window.location.origin + '/api/policies'
+            ];
+
+            for (const url of urls) {
+                resultsDiv.innerHTML += `Testing URL: ${url}\n`;
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Bypass-Tunnel-Reminder': 'true'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        resultsDiv.innerHTML += `  Error: HTTP ${response.status}\n`;
+                        continue;
+                    }
+
+                    const data = await response.json();
+                    resultsDiv.innerHTML += `  Success! Got ${data.length} policies\n`;
+
+                    if (data.length > 0) {
+                        resultsDiv.innerHTML += `  First policy structure:\n`;
+                        resultsDiv.innerHTML += `    Keys: ${Object.keys(data[0]).join(', ')}\n`;
+                        resultsDiv.innerHTML += `    Sample data:\n`;
+                        resultsDiv.innerHTML += `      ID: ${data[0].id}\n`;
+                        resultsDiv.innerHTML += `      Client: ${data[0].clientName || data[0].client_name || 'N/A'}\n`;
+                        resultsDiv.innerHTML += `      Policy #: ${data[0].policyNumber || data[0].policy_number || 'N/A'}\n`;
+                    }
+
+                } catch (error) {
+                    resultsDiv.innerHTML += `  Error: ${error.message}\n`;
+                }
+                resultsDiv.innerHTML += '\n';
+            }
+
+            // Also check window.VANGUARD_API_URL
+            resultsDiv.innerHTML += `\nwindow.VANGUARD_API_URL = ${window.VANGUARD_API_URL || 'undefined'}\n`;
+        }
+
+        testPolicies();
+    </script>
+</body>
+</html>

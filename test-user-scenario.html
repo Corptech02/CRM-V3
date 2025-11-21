@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Scenario Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>User Scenario Test</h1>
+    <p>This simulates exactly what the user reported:</p>
+    <ol>
+        <li>Clear browser data</li>
+        <li>Visit #policies page</li>
+        <li>Policies should still be visible (loaded from server)</li>
+    </ol>
+
+    <button onclick="runTest()">Run Test</button>
+    <div id="results"></div>
+
+    <script>
+        async function runTest() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Test Running...</h3>';
+
+            // Step 1: Clear localStorage (simulating browser data clear)
+            localStorage.clear();
+            results.innerHTML += '<p>✓ Step 1: Browser data cleared</p>';
+
+            // Step 2: Check if policies are in localStorage
+            let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            results.innerHTML += `<p>Step 2: Policies in localStorage after clear: ${policies.length}</p>`;
+
+            // Step 3: Load from server (what should happen when visiting #policies)
+            const API_URL = window.location.hostname.includes('nip.io')
+                ? `http://${window.location.hostname.split('.')[0]}:3001/api`
+                : window.location.hostname === 'localhost'
+                ? 'http://localhost:3001/api'
+                : 'http://192.168.40.232:3001/api';
+
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                const data = await response.json();
+                const serverPolicies = data.policies || [];
+
+                localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
+                results.innerHTML += `<p>✓ Step 3: Loaded ${serverPolicies.length} policies from server</p>`;
+
+                // Step 4: Verify policies are now in localStorage
+                policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                results.innerHTML += `<p>Step 4: Policies in localStorage after server load: ${policies.length}</p>`;
+
+                // Final result
+                if (policies.length === 8) {
+                    results.innerHTML += '<h2 class="success">✅ TEST PASSED - Policies persist after clearing browser data!</h2>';
+                    results.innerHTML += '<p>You can now <a href="/#policies">visit the policies page</a> and see all 8 policies.</p>';
+                } else {
+                    results.innerHTML += `<h2 class="error">❌ TEST FAILED - Expected 8 policies, got ${policies.length}</h2>`;
+                }
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error loading from server: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

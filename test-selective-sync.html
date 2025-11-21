@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Selective ViciDial Sync</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            color: #1f2937;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 30px;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .test-button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px auto;
+            transition: all 0.2s;
+        }
+
+        .test-button:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .instructions {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+            margin: 20px 0;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-list li:before {
+            content: "✅";
+            color: #10b981;
+        }
+
+        .current-leads {
+            margin-top: 30px;
+            padding: 20px;
+            background: #fef3c7;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .lead-count {
+            font-size: 18px;
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="header">
+            <h1>🔄 Selective ViciDial Sync Test</h1>
+            <p>Test the new lead selection popup interface</p>
+        </div>
+
+        <div class="content">
+            <div class="instructions">
+                <h3>📋 How to Test the Selective Sync:</h3>
+                <ol>
+                    <li>Click the "Test Sync Button" below</li>
+                    <li>A popup will appear showing available ViciDial leads</li>
+                    <li>Select which leads you want to import</li>
+                    <li>Click "Import Selected Leads"</li>
+                    <li>Watch the import progress</li>
+                </ol>
+            </div>
+
+            <h3>🆕 New Features:</h3>
+            <ul class="feature-list">
+                <li>Lead selection popup instead of auto-importing all leads</li>
+                <li>Preview lead details before importing</li>
+                <li>Select All / Deselect All options</li>
+                <li>Import progress tracking</li>
+                <li>Duplicate detection (skips existing leads)</li>
+                <li>Real-time selection counter</li>
+            </ul>
+
+            <center>
+                <button class="test-button" onclick="testSelectiveSync()">
+                    <i class="fas fa-sync"></i>
+                    Test Sync Button
+                </button>
+            </center>
+
+            <div class="current-leads" id="lead-info">
+                <div class="lead-count">Current leads in system: <span id="current-count">Loading...</span></div>
+                <p style="color: #78350f; margin: 0;">
+                    The selective sync will only add new leads that don't already exist
+                </p>
+            </div>
+
+            <div style="margin-top: 30px; padding: 20px; background: #e0f2fe; border-radius: 8px; border-left: 4px solid #0284c7;">
+                <h4 style="margin: 0 0 10px 0; color: #0c4a6e;">💡 Testing Notes:</h4>
+                <ul style="color: #0c4a6e; margin: 0; padding-left: 20px;">
+                    <li>This is using mock ViciDial data for testing</li>
+                    <li>8 sample SALE leads are available for selection</li>
+                    <li>The popup should load in ~1 second</li>
+                    <li>Selected leads get a blue highlight</li>
+                    <li>Import shows real-time progress</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include the selective sync script -->
+    <script src="js/selective-vicidial-sync-fixed.js"></script>
+
+    <script>
+        // Update current lead count
+        function updateLeadCount() {
+            const leads = JSON.parse(localStorage.getItem('leads') || '[]');
+            document.getElementById('current-count').textContent = leads.length;
+        }
+
+        // Test function that triggers the selective sync
+        function testSelectiveSync() {
+            console.log('🧪 Testing selective ViciDial sync...');
+
+            // Call the selective sync function
+            if (window.syncVicidialLeads) {
+                window.syncVicidialLeads();
+            } else {
+                alert('Selective sync not loaded yet. Please refresh and try again.');
+            }
+        }
+
+        // Mock notification function for testing
+        if (!window.showNotification) {
+            window.showNotification = function(message, type) {
+                console.log(`Notification (${type}):`, message);
+                alert(message);
+            };
+        }
+
+        // Mock loadLeads function for testing
+        if (!window.loadLeads) {
+            window.loadLeads = function() {
+                console.log('🔄 Refreshing leads display...');
+                updateLeadCount();
+            };
+        }
+
+        // Update count on page load
+        document.addEventListener('DOMContentLoaded', updateLeadCount);
+
+        // Update count every 2 seconds to show changes
+        setInterval(updateLeadCount, 2000);
+
+        console.log('🧪 Selective ViciDial Sync Test Page Ready');
+        console.log('Click the "Test Sync Button" to test the lead selection popup');
+    </script>
+</body>
+</html>

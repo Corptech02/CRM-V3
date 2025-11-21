@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Lead Persistence</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Test Lead Data Persistence</h1>
+
+    <div class="test">
+        <h2>1. Current Database Values</h2>
+        <button onclick="checkDatabase()">Check Database</button>
+        <div id="db-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>2. Update Lead via API</h2>
+        <input type="text" id="company-name" placeholder="Company Name" value="TEST COMPANY">
+        <input type="text" id="phone" placeholder="Phone" value="555-1234">
+        <button onclick="updateViaAPI()">Update via API</button>
+        <div id="api-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>3. Load Lead from API</h2>
+        <button onclick="loadFromAPI()">Load from API</button>
+        <div id="load-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>4. Check LocalStorage</h2>
+        <button onclick="checkLocalStorage()">Check LocalStorage</button>
+        <div id="storage-result"></div>
+    </div>
+
+    <script>
+        const leadId = '88571';
+        const apiUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:8897'
+            : `http://${window.location.hostname}:8897`;
+
+        async function checkDatabase() {
+            const result = document.getElementById('db-result');
+            result.innerHTML = 'Checking database...';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`);
+                const data = await response.json();
+
+                result.innerHTML = `
+                    <div class="success">Database contains:</div>
+                    <pre>${JSON.stringify({
+                        company_name: data.company_name,
+                        phone: data.phone,
+                        notes: data.notes,
+                        contact_name: data.contact_name
+                    }, null, 2)}</pre>
+                `;
+            } catch (error) {
+                result.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function updateViaAPI() {
+            const result = document.getElementById('api-result');
+            const company = document.getElementById('company-name').value;
+            const phone = document.getElementById('phone').value;
+            const timestamp = new Date().toLocaleString();
+
+            result.innerHTML = 'Updating...';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        company_name: company,
+                        phone: phone,
+                        notes: `Updated at ${timestamp}`
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">Update successful!</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+
+                    // Check database again
+                    setTimeout(checkDatabase, 1000);
+                } else {
+                    result.innerHTML = `<div class="error">Update failed: ${JSON.stringify(data)}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function loadFromAPI() {
+            const result = document.getElementById('load-result');
+            result.innerHTML = 'Loading...';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`);
+                const data = await response.json();
+
+                result.innerHTML = `
+                    <div class="success">Loaded from API:</div>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+
+                // Update localStorage with API data
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+                if (leadIndex !== -1) {
+                    Object.assign(leads[leadIndex], data);
+                } else {
+                    data.id = leadId;
+                    leads.push(data);
+                }
+
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                localStorage.setItem('leads', JSON.stringify(leads));
+
+                result.innerHTML += '<div class="success">✓ LocalStorage updated</div>';
+            } catch (error) {
+                result.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function checkLocalStorage() {
+            const result = document.getElementById('storage-result');
+
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const lead = leads.find(l => String(l.id) === String(leadId));
+
+            if (lead) {
+                result.innerHTML = `
+                    <div class="success">LocalStorage contains:</div>
+                    <pre>${JSON.stringify({
+                        id: lead.id,
+                        name: lead.name,
+                        company_name: lead.company_name,
+                        phone: lead.phone,
+                        contact: lead.contact,
+                        notes: lead.notes
+                    }, null, 2)}</pre>
+                `;
+            } else {
+                result.innerHTML = '<div class="error">Lead not found in localStorage</div>';
+            }
+        }
+
+        // Check on load
+        window.addEventListener('load', () => {
+            checkDatabase();
+            checkLocalStorage();
+        });
+    </script>
+</body>
+</html>

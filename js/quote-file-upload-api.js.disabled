@@ -1,0 +1,146 @@
+// QUOTE FILE UPLOAD API - Server endpoint for handling quote file uploads
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = path.join(__dirname, '../uploads/quotes');
+
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        // Generate unique filename
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const name = path.basename(file.originalname, ext);
+        cb(null, `${name}-${uniqueSuffix}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    },
+    fileFilter: function (req, file, cb) {
+        // Allow common document formats
+        const allowedTypes = /pdf|doc|docx|xls|xlsx|png|jpg|jpeg|gif|txt/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, JPEG, GIF, TXT'));
+        }
+    }
+});
+
+// Add to existing API router
+function addQuoteFileUploadEndpoint(app, db) {
+    // Endpoint for quote submission with file
+    app.post('/api/quote-submissions/with-file', upload.single('file'), async (req, res) => {
+        console.log('Quote submission with file received');
+
+        try {
+            // Parse the quote data from the request
+            const quoteData = JSON.parse(req.body.quote_data);
+
+            // Add file information to the quote data if file was uploaded
+            if (req.file) {
+                quoteData.form_data.quote_file_path = `/uploads/quotes/${req.file.filename}`;
+                quoteData.form_data.quote_file_original_name = req.file.originalname;
+                quoteData.form_data.quote_file_size = req.file.size;
+                console.log(`File uploaded: ${req.file.originalname} -> ${req.file.filename}`);
+            }
+
+            // Save to database
+            const stmt = db.prepare(`
+                INSERT INTO quote_submissions (
+                    lead_id, application_id, form_data, status, submitted_date
+                ) VALUES (?, ?, ?, ?, ?)
+            `);
+
+            stmt.run(
+                quoteData.lead_id,
+                quoteData.application_id,
+                JSON.stringify(quoteData.form_data),
+                quoteData.status,
+                quoteData.submitted_date,
+                function(err) {
+                    if (err) {
+                        console.error('Database error:', err);
+
+                        // If database save fails, delete the uploaded file
+                        if (req.file) {
+                            fs.unlink(req.file.path, (unlinkErr) => {
+                                if (unlinkErr) console.error('Error deleting file:', unlinkErr);
+                            });
+                        }
+
+                        return res.status(500).json({ error: 'Failed to save quote' });
+                    }
+
+                    console.log('Quote saved with ID:', this.lastID);
+                    res.json({
+                        success: true,
+                        id: this.lastID,
+                        file: req.file ? {
+                            name: req.file.originalname,
+                            size: req.file.size,
+                            path: quoteData.form_data.quote_file_path
+                        } : null
+                    });
+                }
+            );
+
+        } catch (error) {
+            console.error('Error processing quote with file:', error);
+
+            // Delete uploaded file if processing fails
+            if (req.file) {
+                fs.unlink(req.file.path, (unlinkErr) => {
+                    if (unlinkErr) console.error('Error deleting file:', unlinkErr);
+                });
+            }
+
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Endpoint to serve uploaded files
+    app.get('/uploads/quotes/:filename', (req, res) => {
+        const filename = req.params.filename;
+        const filepath = path.join(__dirname, '../uploads/quotes', filename);
+
+        // Check if file exists
+        if (!fs.existsSync(filepath)) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+
+        // Send the file
+        res.sendFile(filepath);
+    });
+
+    console.log('Quote file upload endpoints added');
+}
+
+// Export for use in server
+module.exports = { addQuoteFileUploadEndpoint };
+
+// If running standalone, add to existing server
+if (require.main === module) {
+    const existingServer = require('./server.js');
+    if (existingServer && existingServer.app && existingServer.db) {
+        addQuoteFileUploadEndpoint(existingServer.app, existingServer.db);
+        console.log('Quote file upload endpoints added to existing server');
+    }
+}

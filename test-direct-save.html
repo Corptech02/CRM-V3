@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Save Test</title>
+</head>
+<body>
+    <h1>Direct COI Save Test</h1>
+    <button onclick="testSave()">Test Save Function</button>
+    <div id="result"></div>
+
+    <script>
+    async function testSave() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Testing save...';
+
+        try {
+            // Direct test of the endpoint
+            const response = await fetch('/api/coi/upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    policy_number: 'test-direct-' + Date.now(),
+                    pdf_base64: 'dGVzdCBkYXRh',
+                    filename: 'test.pdf',
+                    uploaded_by: 'Direct Test'
+                })
+            });
+
+            const result = await response.json();
+            resultDiv.innerHTML = `<h3>Success!</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
+        } catch (error) {
+            resultDiv.innerHTML = `<h3>Error:</h3><pre>${error.message}</pre>`;
+        }
+    }
+    </script>
+</body>
+</html>

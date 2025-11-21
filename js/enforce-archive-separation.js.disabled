@@ -1,0 +1,147 @@
+// Enforce strict separation between active and archived leads
+(function() {
+    'use strict';
+
+    console.log('🔒 ENFORCE-ARCHIVE-SEPARATION: Ensuring archived leads stay archived...');
+
+    // Function to clean up leads
+    function enforceArchiveSeparation() {
+        // Get all leads and archived leads
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+        const permanentArchive = JSON.parse(localStorage.getItem('permanentArchive') || '[]');
+
+        // Create set of archived IDs
+        const archivedIds = new Set([
+            ...permanentArchive,
+            ...archivedLeads.map(l => String(l.id))
+        ]);
+
+        // Filter out archived leads from active
+        const activeOnly = leads.filter(lead => {
+            const leadId = String(lead.id);
+            if (archivedIds.has(leadId) || lead.archived) {
+                console.log(`🚫 Removing archived lead from active: ${lead.name} (${leadId})`);
+                return false;
+            }
+            return true;
+        });
+
+        // Update active leads
+        if (activeOnly.length !== leads.length) {
+            console.log(`✅ Cleaned ${leads.length - activeOnly.length} archived leads from active list`);
+            localStorage.setItem('insurance_leads', JSON.stringify(activeOnly));
+
+            // Trigger UI refresh if loadLeadsView exists
+            if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+        }
+    }
+
+    // Run immediately
+    enforceArchiveSeparation();
+
+    // Run periodically to catch any reappearing leads
+    setInterval(enforceArchiveSeparation, 5000);
+
+    // Override archiveLead to ensure proper handling
+    const originalArchiveLead = window.archiveLead;
+    window.archiveLead = function(leadId) {
+        console.log('📦 Archiving lead:', leadId);
+
+        // Convert to string
+        leadId = String(leadId);
+
+        // Get current leads
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+        let permanentArchive = JSON.parse(localStorage.getItem('permanentArchive') || '[]');
+
+        // Find the lead
+        const leadIndex = leads.findIndex(l => String(l.id) === leadId);
+        if (leadIndex !== -1) {
+            const lead = leads[leadIndex];
+
+            // Mark as archived
+            lead.archived = true;
+            lead.archivedDate = new Date().toISOString();
+            lead.archivedBy = 'User';
+
+            // Add to archived list if not already there
+            if (!archivedLeads.some(l => String(l.id) === leadId)) {
+                archivedLeads.push(lead);
+            }
+
+            // Add to permanent archive
+            if (!permanentArchive.includes(leadId)) {
+                permanentArchive.push(leadId);
+            }
+
+            // Remove from active leads
+            leads.splice(leadIndex, 1);
+
+            // Save all changes
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+            localStorage.setItem('permanentArchive', JSON.stringify(permanentArchive));
+
+            console.log('✅ Lead archived successfully');
+
+            // Refresh the view
+            if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+        }
+    };
+
+    // Override unarchiveLead to ensure proper handling
+    const originalUnarchiveLead = window.unarchiveLead;
+    window.unarchiveLead = function(leadId) {
+        console.log('📤 Unarchiving lead:', leadId);
+
+        // Convert to string
+        leadId = String(leadId);
+
+        // Get current leads
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+        let permanentArchive = JSON.parse(localStorage.getItem('permanentArchive') || '[]');
+
+        // Find in archived
+        const archivedIndex = archivedLeads.findIndex(l => String(l.id) === leadId);
+        if (archivedIndex !== -1) {
+            const lead = archivedLeads[archivedIndex];
+
+            // Remove archived flags
+            delete lead.archived;
+            delete lead.archivedDate;
+            delete lead.archivedBy;
+
+            // Add to active leads if not already there
+            if (!leads.some(l => String(l.id) === leadId)) {
+                leads.push(lead);
+            }
+
+            // Remove from archived
+            archivedLeads.splice(archivedIndex, 1);
+
+            // Remove from permanent archive
+            permanentArchive = permanentArchive.filter(id => id !== leadId);
+
+            // Save all changes
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+            localStorage.setItem('permanentArchive', JSON.stringify(permanentArchive));
+
+            console.log('✅ Lead unarchived successfully');
+
+            // Refresh the view
+            if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+        }
+    };
+
+    console.log('✅ ENFORCE-ARCHIVE-SEPARATION: Ready');
+})();

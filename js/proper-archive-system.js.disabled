@@ -1,0 +1,128 @@
+// Proper archive system that moves leads between tables
+(function() {
+    console.log('Proper archive system initializing...');
+
+    // Archive function that moves lead to archived table
+    window.archiveLead = async function(leadId) {
+        console.log('Archiving lead:', leadId);
+
+        try {
+            // Call the server to move lead to archived table
+            const response = await fetch(`http://162-220-14-239.nip.io:3001/api/archive-lead/${leadId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to archive lead: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('Archive result:', result);
+
+            // Also update localStorage
+            let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            let archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+
+            // Find the lead
+            const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+            if (leadIndex !== -1) {
+                const lead = leads[leadIndex];
+                lead.archived = true;
+
+                // Remove from active leads
+                leads.splice(leadIndex, 1);
+
+                // Add to archived leads
+                archivedLeads.push(lead);
+
+                // Save both
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                localStorage.setItem('leads', JSON.stringify(leads));
+                localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+            }
+
+            // Show notification
+            if (window.showNotification) {
+                window.showNotification('Lead archived successfully', 'success');
+            }
+
+            // Reload the leads view
+            if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+
+        } catch (error) {
+            console.error('Error archiving lead:', error);
+            if (window.showNotification) {
+                window.showNotification('Failed to archive lead', 'error');
+            }
+        }
+    };
+
+    // Unarchive function that moves lead back to active table
+    window.unarchiveLead = async function(leadId) {
+        console.log('Unarchiving lead:', leadId);
+
+        try {
+            // Call the server to move lead back to active table
+            const response = await fetch(`http://162-220-14-239.nip.io:3001/api/unarchive-lead/${leadId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to unarchive lead: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('Unarchive result:', result);
+
+            // Also update localStorage
+            let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            let archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+
+            // Find the archived lead
+            const archivedIndex = archivedLeads.findIndex(l => String(l.id) === String(leadId));
+            if (archivedIndex !== -1) {
+                const lead = archivedLeads[archivedIndex];
+                delete lead.archived;
+
+                // Remove from archived
+                archivedLeads.splice(archivedIndex, 1);
+
+                // Add back to active leads
+                leads.unshift(lead);
+
+                // Save both
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                localStorage.setItem('leads', JSON.stringify(leads));
+                localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+            }
+
+            // Show notification
+            if (window.showNotification) {
+                window.showNotification('Lead restored successfully', 'success');
+            }
+
+            // Reload the view
+            if (window.loadArchivedLeadsView) {
+                window.loadArchivedLeadsView();
+            } else if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+
+        } catch (error) {
+            console.error('Error unarchiving lead:', error);
+            if (window.showNotification) {
+                window.showNotification('Failed to restore lead', 'error');
+            }
+        }
+    };
+
+    console.log('Proper archive system ready');
+})();

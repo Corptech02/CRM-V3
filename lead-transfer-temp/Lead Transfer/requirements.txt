@@ -1,0 +1,5 @@
+selenium~=4.32.0
+requests~=2.32.3
+python-dotenv~=1.1.0
+openai~=1.77.0
+deepgram-sdk~=4.1.0

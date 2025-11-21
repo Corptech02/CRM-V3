@@ -1,0 +1,911 @@
+// Lead Stage Timestamp Feature
+(function() {
+    'use strict';
+
+    console.log('🕒 LEAD-STAGE-TIMESTAMP: Initializing...');
+
+    // Function to get days between two dates
+    function getDaysDifference(timestamp) {
+        if (!timestamp) return null;
+
+        const now = new Date();
+        const stageDate = new Date(timestamp);
+        const diffTime = Math.abs(now - stageDate);
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        return diffDays;
+    }
+
+    // Function to get the color class based on days
+    function getTimestampColor(daysDiff) {
+        if (daysDiff === null || daysDiff === undefined) return 'gray';
+
+        if (daysDiff === 0) return 'green';      // Today
+        if (daysDiff === 1) return 'yellow';     // Yesterday
+        if (daysDiff < 4) return 'orange';       // 2-3 days ago
+        return 'red';                            // 4+ days ago
+    }
+
+    // Function to format the timestamp display
+    function formatTimestampDisplay(timestamp) {
+        if (!timestamp) return 'No date';
+
+        const date = new Date(timestamp);
+        const now = new Date();
+        const daysDiff = getDaysDifference(timestamp);
+
+        if (daysDiff === 0) return 'Today';
+        if (daysDiff === 1) return 'Yesterday';
+
+        // For older dates, show the date
+        const options = { month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('en-US', options);
+    }
+
+    // Function to create the timestamp bubble
+    function createTimestampBubble(timestamp) {
+        const daysDiff = getDaysDifference(timestamp);
+        const colorClass = getTimestampColor(daysDiff);
+        const displayText = formatTimestampDisplay(timestamp);
+
+        const bubble = document.createElement('span');
+        bubble.className = 'stage-timestamp-bubble';
+        bubble.textContent = displayText;
+        bubble.title = timestamp ? new Date(timestamp).toLocaleString() : 'No timestamp available';
+
+        // Color styles
+        const colors = {
+            'green': { bg: '#10b981', text: '#ffffff' },
+            'yellow': { bg: '#f59e0b', text: '#ffffff' },
+            'orange': { bg: '#fb923c', text: '#ffffff' },
+            'red': { bg: '#ef4444', text: '#ffffff' },
+            'gray': { bg: '#6b7280', text: '#ffffff' }
+        };
+
+        const color = colors[colorClass];
+        bubble.style.cssText = `
+            background-color: ${color.bg};
+            color: ${color.text};
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+            white-space: nowrap;
+            display: inline-block;
+            cursor: help;
+        `;
+
+        return bubble;
+    }
+
+    // Function to update lead stage with timestamp
+    async function updateLeadStageWithTimestamp(leadId, newStage) {
+        console.log(`🕒 Updating stage for lead ${leadId} to ${newStage}`);
+
+        // Get current leads
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+        if (leadIndex === -1) {
+            leads = JSON.parse(localStorage.getItem('leads') || '[]');
+            leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+        }
+
+        if (leadIndex !== -1) {
+            const currentStage = leads[leadIndex].stage;
+
+            // Only update timestamp if stage actually changed
+            if (currentStage !== newStage) {
+                const timestamp = new Date().toISOString();
+
+                leads[leadIndex].stage = newStage;
+                leads[leadIndex].stage_updated_at = timestamp;
+
+                // Initialize stage history if it doesn't exist
+                if (!leads[leadIndex].stage_history) {
+                    leads[leadIndex].stage_history = [];
+                }
+
+                // Add to stage history
+                leads[leadIndex].stage_history.push({
+                    stage: newStage,
+                    timestamp: timestamp,
+                    previous_stage: currentStage
+                });
+
+                // Save to localStorage immediately
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                localStorage.setItem('leads', JSON.stringify(leads));
+
+                console.log(`✅ Stage updated from ${currentStage} to ${newStage} with timestamp`);
+
+                // Save timestamp to backend database
+                try {
+                    const apiUrl = window.location.hostname === 'localhost'
+                        ? 'http://localhost:8897'
+                        : `http://${window.location.hostname}:8897`;
+
+                    const updateData = {
+                        stage: newStage,
+                        stage_updated_at: timestamp,
+                        stage_history: leads[leadIndex].stage_history
+                    };
+
+                    console.log(`🗄️ Saving timestamp to database for lead ${leadId}...`);
+
+                    const response = await fetch(`${apiUrl}/api/leads/${leadId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updateData)
+                    });
+
+                    if (response.ok) {
+                        console.log(`✅ Timestamp successfully saved to database for lead ${leadId}`);
+                    } else {
+                        console.error(`❌ Failed to save timestamp to database for lead ${leadId}:`, response.statusText);
+                    }
+                } catch (error) {
+                    console.error(`❌ Error saving timestamp to database for lead ${leadId}:`, error);
+                }
+
+                // Update the timestamp bubble in the UI
+                updateTimestampBubbleInProfile(leadId);
+
+                // Update table row highlighting
+                setTimeout(highlightLeadRows, 100);
+            }
+        }
+
+        // Call the original updateLeadField function if it exists
+        if (window.originalUpdateLeadField) {
+            window.originalUpdateLeadField(leadId, 'stage', newStage);
+        }
+    }
+
+    // Function to update the timestamp bubble in the current profile
+    function updateTimestampBubbleInProfile(leadId) {
+        // Look for the specific lead stage dropdown using the ID pattern
+        const stageSelect = document.querySelector(`#lead-stage-${leadId}`) ||
+                           document.querySelector('select[onchange*="updateLeadStage"]') ||
+                           document.querySelector('select[onchange*="updateLeadField"][onchange*="stage"]');
+
+        if (!stageSelect) {
+            console.log(`⚠️ Could not find stage dropdown for lead ${leadId}`);
+            return;
+        }
+
+        // Remove existing bubble
+        const existingBubble = stageSelect.parentElement.querySelector('.stage-timestamp-bubble');
+        if (existingBubble) {
+            existingBubble.remove();
+        }
+
+        // Get lead data
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let lead = leads.find(l => String(l.id) === String(leadId));
+
+        if (!lead) {
+            leads = JSON.parse(localStorage.getItem('leads') || '[]');
+            lead = leads.find(l => String(l.id) === String(leadId));
+        }
+
+        if (lead) {
+            const bubble = createTimestampBubble(lead.stage_updated_at);
+
+            // Add the bubble right after the dropdown, in the same container
+            const container = stageSelect.parentElement;
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.gap = '8px';
+
+            container.appendChild(bubble);
+            console.log(`✅ Added timestamp bubble for lead ${leadId}: ${lead.stage_updated_at}`);
+        }
+    }
+
+    // Function to setup the updateLeadStage override
+    function setupUpdateLeadStageOverride() {
+        if (window.updateLeadStage && !window.originalUpdateLeadStage) {
+            console.log('🕒 Setting up updateLeadStage override...');
+            window.originalUpdateLeadStage = window.updateLeadStage;
+
+            window.updateLeadStage = function(leadId, newStage) {
+                console.log(`🕒 Stage change intercepted: ${leadId} -> ${newStage}`);
+
+                // Call our timestamp function first
+                updateLeadStageWithTimestamp(leadId, newStage);
+
+                // Call the original function
+                if (window.originalUpdateLeadStage) {
+                    return window.originalUpdateLeadStage(leadId, newStage);
+                }
+            };
+
+            console.log('✅ updateLeadStage override installed');
+        } else if (!window.updateLeadStage) {
+            // Function doesn't exist yet, try again later
+            setTimeout(setupUpdateLeadStageOverride, 100);
+        }
+    }
+
+    // Try to setup the override immediately and also after a delay
+    setupUpdateLeadStageOverride();
+    setTimeout(setupUpdateLeadStageOverride, 500);
+    setTimeout(setupUpdateLeadStageOverride, 1000);
+
+    // Also override updateLeadField as a fallback for other integrations
+    if (window.updateLeadField && !window.originalUpdateLeadField) {
+        window.originalUpdateLeadField = window.updateLeadField;
+
+        window.updateLeadField = function(leadId, field, value) {
+            if (field === 'stage') {
+                updateLeadStageWithTimestamp(leadId, value);
+            } else {
+                // For non-stage fields, just call the original function
+                if (window.originalUpdateLeadField) {
+                    window.originalUpdateLeadField(leadId, field, value);
+                }
+            }
+        };
+    }
+
+    // Function to setup the createEnhancedProfile override
+    function setupCreateEnhancedProfileOverride() {
+        if (window.createEnhancedProfile && !window.originalCreateEnhancedProfile) {
+            console.log('🕒 Setting up createEnhancedProfile override...');
+            window.originalCreateEnhancedProfile = window.createEnhancedProfile;
+
+            window.createEnhancedProfile = function(lead) {
+                console.log(`🕒 Enhanced profile opening for lead: ${lead.id}`);
+
+                // Sync timestamps from database before opening
+                syncTimestampsFromDatabase().then(() => {
+                    // Call original function first
+                    if (window.originalCreateEnhancedProfile) {
+                        window.originalCreateEnhancedProfile.apply(this, arguments);
+                    }
+
+                    // Wait a moment for the profile to render, then add timestamp bubble
+                    setTimeout(() => {
+                        updateTimestampBubbleInProfile(lead.id);
+                    }, 300);
+                }).catch(error => {
+                    console.error('Error syncing timestamps before opening profile:', error);
+
+                    // Still open the profile even if sync fails
+                    if (window.originalCreateEnhancedProfile) {
+                        window.originalCreateEnhancedProfile.apply(this, arguments);
+                    }
+
+                    setTimeout(() => {
+                        updateTimestampBubbleInProfile(lead.id);
+                    }, 300);
+                });
+            };
+
+            console.log('✅ createEnhancedProfile override installed');
+        } else if (!window.createEnhancedProfile) {
+            // Function doesn't exist yet, try again later
+            setTimeout(setupCreateEnhancedProfileOverride, 100);
+        }
+    }
+
+    // Try to setup the override immediately and also after delays
+    setupCreateEnhancedProfileOverride();
+    setTimeout(setupCreateEnhancedProfileOverride, 500);
+    setTimeout(setupCreateEnhancedProfileOverride, 1500);
+
+    // Also override showLeadProfile as a fallback
+    if (window.showLeadProfile && !window.originalShowLeadProfile) {
+        window.originalShowLeadProfile = window.showLeadProfile;
+
+        window.showLeadProfile = function(leadId) {
+            // Call original function first
+            if (window.originalShowLeadProfile) {
+                window.originalShowLeadProfile.apply(this, arguments);
+            }
+
+            // Wait a moment for the profile to render, then add timestamp bubble
+            setTimeout(() => {
+                updateTimestampBubbleInProfile(leadId);
+            }, 200);
+        };
+    }
+
+    // Function to get light background colors for table rows
+    function getLightBackgroundColor(daysDiff) {
+        if (daysDiff === null || daysDiff === undefined) return 'rgba(107, 114, 128, 0.2)'; // Light gray
+
+        if (daysDiff === 0) return null;                         // No highlight for today (green)
+        if (daysDiff === 1) return 'rgba(245, 158, 11, 0.2)';    // Light yellow - Yesterday
+        if (daysDiff < 4) return 'rgba(251, 146, 60, 0.2)';      // Light orange - 2-3 days ago
+        return 'rgba(239, 68, 68, 0.2)';                         // Light red - 4+ days ago
+    }
+
+    // Function to highlight lead rows in the table based on stage timestamps
+    function highlightLeadRows() {
+        console.log('🎨 Highlighting lead rows based on stage timestamps...');
+
+        const tableBody = document.getElementById('leadsTableBody');
+        if (!tableBody) {
+            console.log('⚠️ Lead table not found');
+            return;
+        }
+
+        // Get all leads data from both localStorage locations
+        let allLeads = [];
+        const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+        // Combine and dedupe leads
+        allLeads = [...insuranceLeads];
+        regularLeads.forEach(lead => {
+            if (!allLeads.find(l => String(l.id) === String(lead.id))) {
+                allLeads.push(lead);
+            }
+        });
+
+        console.log(`🔍 Found ${allLeads.length} total leads (${insuranceLeads.length} insurance + ${regularLeads.length} regular)`);
+
+        // Get all table rows
+        const rows = tableBody.querySelectorAll('tr');
+        console.log(`🔍 Found ${rows.length} table rows`);
+
+        let highlightedCount = 0;
+        let processedCount = 0;
+
+        rows.forEach((row, index) => {
+            processedCount++;
+
+            // Find the lead ID from the checkbox in the row
+            const checkbox = row.querySelector('.lead-checkbox');
+            if (!checkbox) {
+                console.log(`⚠️ Row ${index} has no checkbox`);
+
+                // Try alternative methods to find lead ID
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    console.log(`  Row content: "${cells[0]?.textContent?.trim()?.substring(0, 50)}..."`);
+                }
+                return;
+            }
+
+            const leadId = checkbox.value;
+            if (!leadId) {
+                console.log(`⚠️ Row ${index} checkbox has no value`);
+                return;
+            }
+
+            // Try to find the lead in our data
+            const lead = allLeads.find(l => String(l.id) === String(leadId));
+
+            // Also try to get lead data from checkbox data attribute
+            let checkboxLeadData = null;
+            const leadDataAttr = checkbox.getAttribute('data-lead');
+            if (leadDataAttr) {
+                try {
+                    checkboxLeadData = JSON.parse(leadDataAttr.replace(/&apos;/g, "'"));
+                } catch (e) {
+                    console.log(`⚠️ Error parsing checkbox lead data: ${e.message}`);
+                }
+            }
+
+            // Use the best available lead data
+            const leadData = lead || checkboxLeadData;
+
+            // Check if reach out is complete - if so, skip timestamp highlighting
+            let isReachOutComplete = false;
+            if (leadData && leadData.reachOut) {
+                const reachOut = leadData.reachOut;
+                const stage = leadData.stage || 'new';
+
+                // Check if stage requires reach out (NOT info_received - that needs quote preparation)
+                if (stage === 'quoted' || stage === 'info_requested' ||
+                    stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
+                    stage === 'interested') {
+
+                    // If connected call was made or all methods attempted, reach out is complete
+                    if (reachOut.callsConnected > 0 ||
+                        (reachOut.callAttempts > 0 && reachOut.emailCount > 0 && reachOut.textCount > 0)) {
+                        isReachOutComplete = true;
+                    }
+                }
+            }
+
+            // Skip timestamp highlighting if reach out is complete (already green)
+            if (isReachOutComplete) {
+                // Apply green highlighting for reach out complete
+                row.style.setProperty('background-color', 'rgba(16, 185, 129, 0.2)', 'important');
+                row.style.setProperty('background', 'rgba(16, 185, 129, 0.2)', 'important');
+                row.style.setProperty('border-left', '4px solid #10b981', 'important');
+                row.style.setProperty('border-right', '2px solid #10b981', 'important');
+                row.classList.add('reach-out-complete');
+                // Remove any timestamp classes
+                row.classList.remove('timestamp-highlighted', 'timestamp-green', 'timestamp-yellow', 'timestamp-orange', 'timestamp-red');
+                console.log(`✅ Lead ${leadId} (${leadData.name || 'Unknown'}) - Reach out complete, applied green highlighting`);
+            } else if (leadData && leadData.stage_updated_at) {
+                const daysDiff = getDaysDifference(leadData.stage_updated_at);
+                const backgroundColor = getLightBackgroundColor(daysDiff);
+                const colorName = getTimestampColor(daysDiff);
+
+                // Only apply highlighting if not today (green)
+                if (backgroundColor !== null) {
+                    // Apply background color with multiple properties
+                    row.style.setProperty('background-color', backgroundColor, 'important');
+                    row.style.setProperty('background', backgroundColor, 'important');
+                    row.style.transition = 'background-color 0.3s ease';
+
+                    // Add elegant side borders only
+                    const borderColor = colorName === 'yellow' ? '#f59e0b' :
+                                       colorName === 'orange' ? '#fb923c' :
+                                       colorName === 'red' ? '#ef4444' : '#6b7280';
+
+                    row.style.setProperty('border-left', `4px solid ${borderColor}`, 'important');
+                    row.style.setProperty('border-right', `2px solid ${borderColor}`, 'important');
+
+                    // Also add a class for CSS-based styling
+                    row.classList.add('timestamp-highlighted', `timestamp-${colorName}`);
+                    row.setAttribute('data-timestamp-color', colorName);
+                    row.setAttribute('data-days-diff', daysDiff.toString());
+
+                    console.log(`✅ Highlighted lead ${leadId} (${leadData.name || 'Unknown'}) with ${colorName} background (${daysDiff} days ago) - Source: ${lead ? 'localStorage' : 'checkbox'}`);
+                    console.log(`   Applied styles: background=${backgroundColor}, border=${borderColor}, class=timestamp-${colorName}`);
+                    highlightedCount++;
+                } else {
+                    // Reset styling for today's leads (green)
+                    row.style.removeProperty('background-color');
+                    row.style.removeProperty('background');
+                    row.style.removeProperty('border-left');
+                    row.style.removeProperty('border-right');
+                    row.classList.remove('timestamp-highlighted', 'timestamp-green', 'timestamp-yellow', 'timestamp-orange', 'timestamp-red');
+                    console.log(`✅ Lead ${leadId} (${leadData.name || 'Unknown'}) updated today - no highlighting applied`);
+                }
+            } else if (leadData) {
+                // Reset styling for leads without timestamps
+                row.style.removeProperty('background-color');
+                row.style.removeProperty('border-left');
+                row.style.removeProperty('border-right');
+                row.classList.remove('timestamp-highlighted', 'timestamp-green', 'timestamp-yellow', 'timestamp-orange', 'timestamp-red');
+                console.log(`⚠️ Lead ${leadId} (${leadData.name || 'Unknown'}) has no timestamp - Source: ${lead ? 'localStorage' : 'checkbox'}`);
+            } else {
+                console.log(`⚠️ Lead ${leadId} not found in any data source`);
+                // Still reset styling
+                row.style.removeProperty('background-color');
+                row.style.removeProperty('border-left');
+                row.style.removeProperty('border-right');
+                row.classList.remove('timestamp-highlighted', 'timestamp-green', 'timestamp-yellow', 'timestamp-orange', 'timestamp-red');
+            }
+        });
+
+        console.log(`🎨 Processed ${processedCount} rows, highlighted ${highlightedCount} successfully`);
+
+        // Force a repaint
+        if (highlightedCount > 0) {
+            tableBody.style.display = 'none';
+            tableBody.offsetHeight; // Trigger reflow
+            tableBody.style.display = '';
+        }
+    }
+
+    // Global function to manually trigger highlighting (for debugging)
+    window.highlightLeadRowsManually = function() {
+        console.log('🔧 Manual highlighting triggered...');
+        highlightLeadRows();
+    };
+
+    // Comprehensive debug function to inspect table and data
+    window.debugTableHighlighting = function() {
+        console.log('🔍 === TABLE HIGHLIGHTING DEBUG ===');
+
+        // Check if table exists
+        const tableBody = document.getElementById('leadsTableBody');
+        console.log('Table body found:', !!tableBody);
+
+        if (!tableBody) {
+            console.log('❌ No table body found with ID "leadsTableBody"');
+
+            // Look for alternative table structures
+            const allTables = document.querySelectorAll('table');
+            console.log(`Found ${allTables.length} table elements total`);
+
+            allTables.forEach((table, index) => {
+                console.log(`Table ${index}:`, table.id || 'no ID', table.className || 'no class');
+            });
+
+            return;
+        }
+
+        // Check rows
+        const rows = tableBody.querySelectorAll('tr');
+        console.log(`Found ${rows.length} rows in table`);
+
+        rows.forEach((row, index) => {
+            console.log(`--- Row ${index} ---`);
+
+            // Look for checkbox
+            const checkbox = row.querySelector('.lead-checkbox');
+            console.log(`  Checkbox found: ${!!checkbox}`);
+
+            if (checkbox) {
+                const leadId = checkbox.value;
+                console.log(`  Lead ID: ${leadId}`);
+
+                // Check if checkbox has data attribute
+                const leadDataAttr = checkbox.getAttribute('data-lead');
+                if (leadDataAttr) {
+                    try {
+                        const leadData = JSON.parse(leadDataAttr.replace(/&apos;/g, "'"));
+                        console.log(`  Lead data from checkbox: ${leadData.name}, stage: ${leadData.stage}, timestamp: ${leadData.stage_updated_at}`);
+                    } catch (e) {
+                        console.log(`  Error parsing lead data: ${e.message}`);
+                    }
+                }
+            }
+
+            // Check row structure
+            const cells = row.querySelectorAll('td');
+            console.log(`  Cells: ${cells.length}`);
+            cells.forEach((cell, cellIndex) => {
+                console.log(`    Cell ${cellIndex}: "${cell.textContent.trim().substring(0, 30)}..."`);
+            });
+        });
+
+        // Check localStorage
+        console.log('--- LOCALSTORAGE DATA ---');
+        const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+        console.log(`Insurance leads: ${insuranceLeads.length}`);
+        console.log(`Regular leads: ${regularLeads.length}`);
+
+        insuranceLeads.slice(0, 3).forEach((lead, index) => {
+            console.log(`Lead ${index}: ID=${lead.id}, Name="${lead.name}", Stage="${lead.stage}", Timestamp="${lead.stage_updated_at}"`);
+        });
+
+        if (regularLeads.length > 0 && regularLeads !== insuranceLeads) {
+            regularLeads.slice(0, 3).forEach((lead, index) => {
+                console.log(`Regular Lead ${index}: ID=${lead.id}, Name="${lead.name}", Stage="${lead.stage}", Timestamp="${lead.stage_updated_at}"`);
+            });
+        }
+
+        console.log('=== END DEBUG ===');
+    };
+
+    // Function to observe table changes and apply highlighting
+    function setupTableObserver() {
+        const tableBody = document.getElementById('leadsTableBody');
+        if (!tableBody) {
+            // Table doesn't exist yet, try again later
+            setTimeout(setupTableObserver, 1000);
+            return;
+        }
+
+        console.log('🔍 Setting up table observer for lead highlighting...');
+
+        // Create a mutation observer to watch for table changes
+        const observer = new MutationObserver((mutations) => {
+            let shouldHighlight = false;
+
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    // Check if new rows were added
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === 1 && (node.tagName === 'TR' || node.querySelector('tr'))) {
+                            shouldHighlight = true;
+                        }
+                    });
+                }
+            });
+
+            if (shouldHighlight) {
+                console.log('🔄 Table content changed, re-highlighting rows...');
+                setTimeout(highlightLeadRows, 100); // Small delay to ensure DOM is ready
+            }
+        });
+
+        // Start observing
+        observer.observe(tableBody, {
+            childList: true,
+            subtree: true
+        });
+
+        // Also highlight immediately
+        highlightLeadRows();
+    }
+
+    // Override functions that load/update the leads table
+    function setupTableHighlightingHooks() {
+        // Hook into generateSimpleLeadRows if it exists
+        if (window.generateSimpleLeadRows && !window.originalGenerateSimpleLeadRows) {
+            console.log('🎨 Setting up generateSimpleLeadRows override for highlighting...');
+            window.originalGenerateSimpleLeadRows = window.generateSimpleLeadRows;
+
+            window.generateSimpleLeadRows = function(leads) {
+                const result = window.originalGenerateSimpleLeadRows.apply(this, arguments);
+
+                // Schedule highlighting after the table is rendered
+                setTimeout(highlightLeadRows, 200);
+
+                return result;
+            };
+        }
+
+        // Hook into loadLeadsView if it exists
+        if (window.loadLeadsView && !window.originalLoadLeadsView) {
+            console.log('🎨 Setting up loadLeadsView override for highlighting...');
+            window.originalLoadLeadsView = window.loadLeadsView;
+
+            window.loadLeadsView = function() {
+                const result = window.originalLoadLeadsView.apply(this, arguments);
+
+                // Schedule highlighting after the view loads
+                setTimeout(() => {
+                    setupTableObserver();
+                    highlightLeadRows();
+                }, 500);
+
+                return result;
+            };
+        }
+
+        // Hook into renderLeadsList if it exists
+        if (window.renderLeadsList && !window.originalRenderLeadsList) {
+            console.log('🎨 Setting up renderLeadsList override for highlighting...');
+            window.originalRenderLeadsList = window.renderLeadsList;
+
+            window.renderLeadsList = function(leads) {
+                const result = window.originalRenderLeadsList.apply(this, arguments);
+
+                // Schedule highlighting after the list is rendered
+                setTimeout(highlightLeadRows, 200);
+
+                return result;
+            };
+        }
+    }
+
+    // Add CSS styles for the timestamp bubble and table highlighting
+    const style = document.createElement('style');
+    style.textContent = `
+        .stage-timestamp-bubble {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .stage-timestamp-bubble:hover {
+            transform: scale(1.05);
+            transition: transform 0.2s ease;
+        }
+
+        /* STRONG table row styling that overrides everything */
+        .timestamp-highlighted {
+            transition: background-color 0.3s ease, border-left 0.3s ease !important;
+        }
+
+        /* No highlighting for green (today) */
+
+        .timestamp-highlighted.timestamp-yellow {
+            background-color: rgba(245, 158, 11, 0.2) !important;
+            background: rgba(245, 158, 11, 0.2) !important;
+            border-left: 4px solid #f59e0b !important;
+            border-right: 2px solid #f59e0b !important;
+        }
+
+        .timestamp-highlighted.timestamp-orange {
+            background-color: rgba(251, 146, 60, 0.2) !important;
+            background: rgba(251, 146, 60, 0.2) !important;
+            border-left: 4px solid #fb923c !important;
+            border-right: 2px solid #fb923c !important;
+        }
+
+        .timestamp-highlighted.timestamp-red {
+            background-color: rgba(239, 68, 68, 0.2) !important;
+            background: rgba(239, 68, 68, 0.2) !important;
+            border-left: 4px solid #ef4444 !important;
+            border-right: 2px solid #ef4444 !important;
+        }
+
+        /* Enhanced table row styling for better visibility */
+        #leadsTableBody tr {
+            transition: background-color 0.3s ease, border-left 0.3s ease;
+        }
+
+        #leadsTableBody tr:hover {
+            filter: brightness(0.95);
+        }
+
+        /* Ensure text remains readable on colored backgrounds */
+        #leadsTableBody tr td {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Force highlighting to show even with conflicting styles */
+        #leadsTableBody .timestamp-highlighted td {
+            background: inherit !important;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Function to sync timestamps from database
+    async function syncTimestampsFromDatabase() {
+        console.log('🔄 Syncing timestamps from database...');
+
+        try {
+            const apiUrl = window.location.hostname === 'localhost'
+                ? 'http://localhost:8897'
+                : `http://${window.location.hostname}:8897`;
+
+            const response = await fetch(`${apiUrl}/api/leads`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const dbLeads = await response.json();
+                const leads = dbLeads.leads || dbLeads || [];
+
+                console.log(`🗄️ Retrieved ${leads.length} leads from database`);
+
+                // Update localStorage with database timestamps
+                let localLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                let syncCount = 0;
+
+                leads.forEach(dbLead => {
+                    if (dbLead.stage_updated_at) {
+                        const localIndex = localLeads.findIndex(l => String(l.id) === String(dbLead.id));
+                        if (localIndex !== -1) {
+                            localLeads[localIndex].stage_updated_at = dbLead.stage_updated_at;
+                            localLeads[localIndex].stage_history = dbLead.stage_history || [];
+                            syncCount++;
+                        } else {
+                            // Add lead if it doesn't exist locally
+                            localLeads.push(dbLead);
+                            syncCount++;
+                        }
+                    }
+                });
+
+                if (syncCount > 0) {
+                    localStorage.setItem('insurance_leads', JSON.stringify(localLeads));
+                    localStorage.setItem('leads', JSON.stringify(localLeads));
+                    console.log(`✅ Synced ${syncCount} lead timestamps from database`);
+                }
+
+            } else {
+                console.warn('Failed to fetch leads from database for timestamp sync');
+            }
+        } catch (error) {
+            console.error('Error syncing timestamps from database:', error);
+        }
+    }
+
+    // Initialize timestamps for existing leads that don't have them
+    function initializeExistingLeadTimestamps() {
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let updated = false;
+
+        leads.forEach(lead => {
+            if (!lead.stage_updated_at && lead.stage) {
+                // Set a default timestamp (today) for existing leads
+                lead.stage_updated_at = new Date().toISOString();
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            localStorage.setItem('leads', JSON.stringify(leads));
+            console.log('✅ Initialized timestamps for existing leads');
+        }
+    }
+
+    // Add navigation listener to trigger highlighting when leads view loads
+    function setupNavigationListener() {
+        // Listen for navigation changes
+        if (typeof window.navigation !== 'undefined') {
+            window.navigation.addEventListener('navigate', function(event) {
+                if (event.destination.url.includes('#leads')) {
+                    console.log('🔄 Navigation to leads detected, scheduling highlighting...');
+                    setTimeout(highlightLeadRows, 1000);
+                }
+            });
+        }
+
+        // Also listen for hash changes
+        window.addEventListener('hashchange', function() {
+            if (window.location.hash === '#leads') {
+                console.log('🔄 Hash change to leads detected, scheduling highlighting...');
+                setTimeout(highlightLeadRows, 1000);
+                setTimeout(highlightLeadRows, 2000); // Backup
+            }
+        });
+
+        // Listen for popstate events
+        window.addEventListener('popstate', function() {
+            if (window.location.hash === '#leads') {
+                console.log('🔄 Popstate to leads detected, scheduling highlighting...');
+                setTimeout(highlightLeadRows, 1000);
+            }
+        });
+    }
+
+    // Override the showSection function if it exists to trigger highlighting
+    function setupShowSectionHook() {
+        if (window.showSection && !window.originalShowSection) {
+            console.log('🎨 Setting up showSection override for highlighting...');
+            window.originalShowSection = window.showSection;
+
+            window.showSection = function(sectionName) {
+                console.log(`🔄 Section changing to: ${sectionName}`);
+
+                // Call original function
+                const result = window.originalShowSection.apply(this, arguments);
+
+                // If switching to leads, trigger highlighting
+                if (sectionName === 'leads') {
+                    console.log('🎨 Leads section loaded, scheduling highlighting...');
+                    setTimeout(highlightLeadRows, 500);
+                    setTimeout(highlightLeadRows, 1500);
+                    setTimeout(highlightLeadRows, 3000); // Extra backup
+                }
+
+                return result;
+            };
+
+            console.log('✅ showSection override installed');
+        } else if (!window.showSection) {
+            // Function doesn't exist yet, try again later
+            setTimeout(setupShowSectionHook, 1000);
+        }
+    }
+
+    // Initialize on page load
+    setTimeout(async () => {
+        await syncTimestampsFromDatabase();
+        initializeExistingLeadTimestamps();
+    }, 1000);
+
+    // Setup all hooks and observers
+    setTimeout(setupTableHighlightingHooks, 500);
+    setTimeout(setupShowSectionHook, 500);
+    setTimeout(setupNavigationListener, 100);
+    setTimeout(setupTableObserver, 2000);
+
+    // Multiple attempts to highlight immediately
+    setTimeout(highlightLeadRows, 1500);
+    setTimeout(highlightLeadRows, 3000);
+    setTimeout(highlightLeadRows, 5000);
+
+    // Sync timestamps from database periodically
+    setInterval(async () => {
+        await syncTimestampsFromDatabase();
+        if (document.getElementById('leadsTableBody')) {
+            highlightLeadRows();
+        }
+    }, 60000); // Every 60 seconds
+
+    // Set up interval to periodically re-highlight in case of dynamic updates
+    setInterval(() => {
+        if (document.getElementById('leadsTableBody')) {
+            highlightLeadRows();
+        }
+    }, 15000); // Every 15 seconds (more frequent)
+
+    // Add manual trigger for leads view load
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(() => {
+            if (window.location.hash === '#leads' || !window.location.hash) {
+                console.log('🎨 DOM loaded with leads section, highlighting...');
+                setTimeout(highlightLeadRows, 1000);
+            }
+        }, 2000);
+    });
+
+    console.log('✅ LEAD-STAGE-TIMESTAMP: Ready with enhanced table highlighting and navigation detection');
+})();

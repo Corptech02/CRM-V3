@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Save Button</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .test-button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f3f4f6;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Save Button Test</h1>
+
+    <div class="status">
+        <h3>Test Status:</h3>
+        <ul id="status-list">
+            <li>Page loaded</li>
+        </ul>
+    </div>
+
+    <button class="test-button" onclick="checkFunctions()">Check Functions</button>
+    <button class="test-button" onclick="testSaveButton()">Test Save Button</button>
+
+    <script>
+        function addStatus(message) {
+            const li = document.createElement('li');
+            li.textContent = message;
+            document.getElementById('status-list').appendChild(li);
+        }
+
+        function checkFunctions() {
+            addStatus('Checking functions...');
+
+            if (typeof window.saveLeadProfile === 'function') {
+                addStatus('✓ saveLeadProfile function is available');
+            } else {
+                addStatus('✗ saveLeadProfile function NOT found');
+            }
+
+            if (typeof window.ensureSaveButton === 'function') {
+                addStatus('✓ ensureSaveButton function is available');
+            } else {
+                addStatus('✗ ensureSaveButton function NOT found');
+            }
+
+            if (typeof window.trackLeadFieldChange === 'function') {
+                addStatus('✓ trackLeadFieldChange function is available');
+            } else {
+                addStatus('✗ trackLeadFieldChange function NOT found');
+            }
+        }
+
+        function testSaveButton() {
+            addStatus('Testing save button creation...');
+
+            // Create a mock lead profile modal
+            const modal = document.createElement('div');
+            modal.className = 'modal-content lead-profile-modal';
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h2>Test Lead Profile</h2>
+                </div>
+                <div class="lead-profile-content">
+                    <h3>Company Information</h3>
+                    <input type="text" onchange="updateLeadField('test123', 'name', this.value)" value="Test Company">
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            addStatus('Mock lead profile created');
+
+            // Try to add save button
+            if (window.ensureSaveButton) {
+                window.ensureSaveButton('test123');
+                addStatus('ensureSaveButton called');
+            } else {
+                addStatus('ensureSaveButton not available');
+            }
+
+            // Check if button was added
+            setTimeout(() => {
+                const saveButton = document.getElementById('save-lead-profile-btn');
+                if (saveButton) {
+                    addStatus('✓ Save button successfully added!');
+                    addStatus('Button text: ' + saveButton.textContent);
+                } else {
+                    addStatus('✗ Save button was NOT added');
+                }
+            }, 1000);
+        }
+
+        // Auto-check on load
+        setTimeout(() => {
+            addStatus('Auto-checking after page load...');
+            checkFunctions();
+        }, 1000);
+    </script>
+
+    <!-- Include the save button scripts -->
+    <script src="js/lead-profile-save-fix.js"></script>
+    <script src="js/lead-save-button-fix.js"></script>
+</body>
+</html>

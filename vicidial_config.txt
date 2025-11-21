@@ -1,0 +1,48 @@
+VICIDIAL CONFIGURATION GUIDE
+=============================
+
+To connect your Vanguard system to ViciBox, you need to:
+
+1. ENABLE API ACCESS ON VICIDIAL:
+   - Log into ViciBox admin interface at http://204.13.233.29/vicidial/admin.php
+   - Go to "System Settings"
+   - Enable "Non-Agent API" if not already enabled
+   - Note the API version
+
+2. CREATE API USER:
+   - Go to "Users" in ViciBox admin
+   - Create a new user or use existing one
+   - Set user level to at least 7 (for API access)
+   - Enable "Non-Agent API Access"
+   - Note the username and password
+
+3. CHECK FIREWALL:
+   The ViciBox server (204.13.233.29) appears to be blocking connections from this VPS.
+   You need to:
+   - Allow incoming connections from this VPS IP: 162.220.14.239
+   - Open port 80 (HTTP) or 443 (HTTPS) for web traffic
+   - Or whitelist this IP in ViciBox firewall
+
+4. UPDATE CONFIGURATION:
+   Edit /var/www/vanguard/api_complete.py and update:
+   - VICIDIAL_USERNAME = "your_api_username"
+   - VICIDIAL_PASSWORD = "your_api_password"
+
+   Then restart the API:
+   pm2 restart vanguard-api
+
+5. TEST CONNECTION:
+   Once firewall is open, test at:
+   http://162.220.14.239/
+   Click "Generate Leads" then "Upload to Vicidial"
+
+COMMON VICIDIAL API USERS:
+- 6666 (default API user)
+- VDAD
+- VDCL
+
+TROUBLESHOOTING:
+- Check ViciBox logs at /var/log/apache2/access_log
+- Verify API is enabled in System Settings
+- Check user has proper permissions
+- Ensure firewall allows connection from 162.220.14.239

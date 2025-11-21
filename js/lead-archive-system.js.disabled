@@ -1,0 +1,443 @@
+/**
+ * Lead Archive System
+ * Allows archiving leads instead of deleting them
+ * Provides separate view for archived leads with restore and permanent delete options
+ */
+
+(function() {
+    console.log('📦 Lead Archive System initializing...');
+    
+    // Create permanent archive storage that cannot be overwritten
+    function addToPermanentArchive(leadId) {
+        const permanentArchive = JSON.parse(localStorage.getItem('PERMANENT_ARCHIVED_IDS') || '[]');
+        if (!permanentArchive.includes(String(leadId))) {
+            permanentArchive.push(String(leadId));
+            localStorage.setItem('PERMANENT_ARCHIVED_IDS', JSON.stringify(permanentArchive));
+            console.log(`Added ${leadId} to permanent archive. Total: ${permanentArchive.length}`);
+        }
+    }
+
+    // Check if a lead is permanently archived
+    window.isPermanentlyArchived = function(leadId) {
+        const permanentArchive = JSON.parse(localStorage.getItem('PERMANENT_ARCHIVED_IDS') || '[]');
+        return permanentArchive.includes(String(leadId));
+    };
+
+    // Archive a lead (move from active to archived)
+    window.archiveLead = function(leadId) {
+        console.log('Archiving lead:', leadId);
+
+        // Add to permanent archive immediately
+        addToPermanentArchive(leadId);
+
+        // Get current leads - using correct key 'insurance_leads'
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        console.log('Total leads before archive:', leads.length);
+        console.log('Lead IDs:', leads.map(l => l.id));
+
+        const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+        console.log('Found lead at index:', leadIndex);
+
+        if (leadIndex === -1) {
+            console.error('Lead not found with ID:', leadId);
+            showNotification('Lead not found', 'error');
+            return;
+        }
+
+        const lead = leads[leadIndex];
+        console.log('Lead to archive:', lead);
+
+        // Don't archive if already archived
+        if (lead.archived) {
+            console.log('Lead is already archived, removing from view');
+            showNotification('Lead is already archived', 'info');
+
+            // Remove the row from the table since it shouldn't be visible
+            const leadsTableBody = document.getElementById('leadsTableBody');
+            if (leadsTableBody) {
+                const leadRows = leadsTableBody.querySelectorAll('tr');
+                leadRows.forEach(row => {
+                    const checkbox = row.querySelector('.lead-checkbox');
+                    if (checkbox && checkbox.value === String(leadId)) {
+                        row.remove();
+                        console.log('Removed already-archived lead from view:', leadId);
+                    }
+                });
+            }
+
+            // Reload the view to ensure consistency
+            setTimeout(() => {
+                if (typeof loadLeadsView === 'function') {
+                    loadLeadsView();
+                }
+            }, 100);
+            return;
+        }
+
+        // Create archived version of the lead
+        const archivedLead = { ...leads[leadIndex] };
+        archivedLead.archived = true;
+        archivedLead.archivedDate = new Date().toISOString();
+        archivedLead.archivedBy = localStorage.getItem('currentUser') || 'Admin';
+
+        // Get archived leads
+        let archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+
+        // Add to archived leads
+        archivedLeads.push(archivedLead);
+        localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+
+        // CRITICAL: Remove archived lead from insurance_leads COMPLETELY
+        // Don't just mark it - REMOVE it from the active list
+        leads.splice(leadIndex, 1);
+
+        // Save the updated leads array (WITHOUT the archived lead)
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log('Lead removed from active list, total active leads remaining:', leads.length);
+
+        // IMPORTANT: Save to server to persist the archive status
+        // Save the archived lead to our archived_leads table
+        fetch('http://162-220-14-239.nip.io:3001/api/archived-leads', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Bypass-Tunnel-Reminder': 'true'
+            },
+            body: JSON.stringify({
+                leadId: String(leadId),
+                leadData: archivedLead,
+                archivedBy: archivedLead.archivedBy
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Lead archive status saved to server:', data);
+        })
+        .catch(error => {
+            console.error('Failed to save archive status to server:', error);
+        });
+        
+        showNotification(`Lead "${lead.name}" archived successfully`, 'success');
+
+        // Update the table directly without full reload for better UX
+        const leadsTableBody = document.getElementById('leadsTableBody');
+        if (leadsTableBody) {
+            // Get updated leads (excluding archived ones)
+            const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]')
+                .filter(l => !l.archived);
+
+            // Regenerate the table rows
+            if (typeof generateSimpleLeadRows === 'function') {
+                leadsTableBody.innerHTML = generateSimpleLeadRows(updatedLeads);
+                console.log('Table updated with', updatedLeads.length, 'active leads');
+            }
+        }
+
+        // Also reload the full view to update stats
+        setTimeout(() => {
+            if (typeof loadLeadsView === 'function') {
+                loadLeadsView();
+            } else {
+                // Fallback: reload the page section
+                const currentHash = window.location.hash;
+                if (currentHash === '#leads' || currentHash === '#leads-management') {
+                    window.location.reload();
+                }
+            }
+        }, 100);
+    };
+    
+    // Restore a lead from archive
+    window.restoreArchivedLead = function(leadId) {
+        console.log('Restoring lead:', leadId);
+
+        // Get archived leads
+        const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+        const leadIndex = archivedLeads.findIndex(l => l.id === leadId || l.id == leadId);
+
+        if (leadIndex === -1) {
+            showNotification('Archived lead not found', 'error');
+            return;
+        }
+
+        const lead = archivedLeads[leadIndex];
+
+        // Remove archive metadata
+        delete lead.archived;
+        delete lead.archivedDate;
+        delete lead.archivedBy;
+        lead.restoredDate = new Date().toISOString();
+
+        // Get active leads - using correct key 'insurance_leads'
+        let activeLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+        // Add back to active leads
+        activeLeads.push(lead);
+        localStorage.setItem('insurance_leads', JSON.stringify(activeLeads));
+
+        // Remove from archived leads
+        archivedLeads.splice(leadIndex, 1);
+        localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+
+        // Remove from permanent archive
+        const permanentArchive = JSON.parse(localStorage.getItem('PERMANENT_ARCHIVED_IDS') || '[]');
+        const index = permanentArchive.indexOf(String(leadId));
+        if (index > -1) {
+            permanentArchive.splice(index, 1);
+            localStorage.setItem('PERMANENT_ARCHIVED_IDS', JSON.stringify(permanentArchive));
+            console.log(`Removed ${leadId} from permanent archive`);
+        }
+
+        // IMPORTANT: Remove from server archived leads
+        fetch('http://162-220-14-239.nip.io:3001/api/archived-leads/' + leadId, {
+            method: 'DELETE',
+            headers: {
+                'Bypass-Tunnel-Reminder': 'true'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Lead removed from server archive:', data);
+        })
+        .catch(error => {
+            console.error('Failed to remove from server archive:', error);
+        });
+
+        showNotification(`Lead "${lead.name}" restored successfully`, 'success');
+        
+        // Reload the view
+        loadArchivedLeadsView();
+    };
+    
+    // Permanently delete a lead from archive
+    window.permanentlyDeleteLead = function(leadId) {
+        if (!confirm('Are you sure you want to permanently delete this lead? This action cannot be undone.')) {
+            return;
+        }
+        
+        console.log('Permanently deleting lead:', leadId);
+        
+        // Get archived leads
+        const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+        const leadIndex = archivedLeads.findIndex(l => l.id === leadId || l.id == leadId);
+        
+        if (leadIndex === -1) {
+            showNotification('Archived lead not found', 'error');
+            return;
+        }
+        
+        const lead = archivedLeads[leadIndex];
+        
+        // Remove from archived leads
+        archivedLeads.splice(leadIndex, 1);
+        localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+        
+        showNotification(`Lead "${lead.name}" permanently deleted`, 'success');
+        
+        // Reload the view
+        loadArchivedLeadsView();
+    };
+    
+    // Load archived leads view
+    window.loadArchivedLeadsView = async function() {
+        const dashboardContent = document.querySelector('.dashboard-content');
+        if (!dashboardContent) return;
+
+        let archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+
+        // Also load from server and merge
+        try {
+            const response = await fetch('http://162-220-14-239.nip.io:3001/api/archived-leads', {
+                headers: {
+                    'Bypass-Tunnel-Reminder': 'true'
+                }
+            });
+            if (response.ok) {
+                const serverArchivedLeads = await response.json();
+                console.log(`Loaded ${serverArchivedLeads.length} archived leads from server`);
+
+                // Merge server leads with local, avoiding duplicates
+                const existingIds = new Set(archivedLeads.map(l => String(l.id)));
+                serverArchivedLeads.forEach(lead => {
+                    if (!existingIds.has(String(lead.id))) {
+                        archivedLeads.push(lead);
+                    }
+                });
+
+                // Update localStorage with merged data
+                localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
+            }
+        } catch (error) {
+            console.log('Could not fetch archived leads from server:', error);
+        }
+        
+        dashboardContent.innerHTML = `
+            <div class="leads-view">
+                <header class="content-header">
+                    <h1>Archived Leads</h1>
+                    <div class="header-actions">
+                        <button class="btn-secondary" onclick="loadLeadsView()">
+                            <i class="fas fa-arrow-left"></i> Back to Active Leads
+                        </button>
+                        <span style="margin-left: 10px; color: #6b7280;">
+                            ${archivedLeads.length} archived lead${archivedLeads.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                </header>
+                
+                <!-- Tabs for Active/Archived -->
+                <div class="lead-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0;">
+                    <button class="tab-btn" onclick="loadLeadsView()" style="padding: 12px 24px; background: transparent; border: none; cursor: pointer; font-size: 16px; color: #6b7280;">
+                        <i class="fas fa-users"></i> Active Leads
+                    </button>
+                    <button class="tab-btn active" style="padding: 12px 24px; background: transparent; border: none; border-bottom: 3px solid #3b82f6; cursor: pointer; font-size: 16px; color: #3b82f6; font-weight: 600;">
+                        <i class="fas fa-archive"></i> Archived Leads
+                    </button>
+                </div>
+                
+                ${archivedLeads.length === 0 ? `
+                    <div style="text-align: center; padding: 60px 20px; background: #f9fafb; border-radius: 8px;">
+                        <i class="fas fa-archive" style="font-size: 48px; color: #d1d5db; margin-bottom: 20px;"></i>
+                        <h3 style="color: #6b7280; margin-bottom: 10px;">No Archived Leads</h3>
+                        <p style="color: #9ca3af;">Archived leads will appear here</p>
+                    </div>
+                ` : `
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Lead Name</th>
+                                    <th>Contact</th>
+                                    <th>Product</th>
+                                    <th>Premium</th>
+                                    <th>Archived Date</th>
+                                    <th>Archived By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${archivedLeads.map(lead => `
+                                    <tr>
+                                        <td>
+                                            <div class="lead-name">
+                                                <strong>${lead.name}</strong>
+                                                ${lead.company ? `<br><small style="color: #6b7280;">${lead.company}</small>` : ''}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="contact-info">
+                                                ${lead.email ? `<div><i class="fas fa-envelope" style="color: #6b7280; margin-right: 5px;"></i> ${lead.email}</div>` : ''}
+                                                ${lead.phone ? `<div><i class="fas fa-phone" style="color: #6b7280; margin-right: 5px;"></i> ${lead.phone}</div>` : ''}
+                                            </div>
+                                        </td>
+                                        <td>${lead.product || 'N/A'}</td>
+                                        <td>$${(lead.premium || 0).toLocaleString()}</td>
+                                        <td>${new Date(lead.archivedDate).toLocaleDateString()}</td>
+                                        <td>${lead.archivedBy || 'Admin'}</td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn-icon" onclick="viewArchivedLead('${lead.id}')" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn-icon" onclick="restoreArchivedLead('${lead.id}')" title="Restore Lead" style="color: #10b981;">
+                                                    <i class="fas fa-undo"></i>
+                                                </button>
+                                                <button class="btn-icon btn-icon-danger" onclick="permanentlyDeleteLead('${lead.id}')" title="Delete Permanently">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
+    };
+    
+    // View archived lead details
+    window.viewArchivedLead = function(leadId) {
+        const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+        const lead = archivedLeads.find(l => l.id === leadId || l.id == leadId);
+        
+        if (!lead) {
+            showNotification('Archived lead not found', 'error');
+            return;
+        }
+        
+        // Use existing viewLead function if available, or create a modal
+        if (typeof viewLead === 'function') {
+            // Temporarily add to leads for viewing - using correct key 'insurance_leads'
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            leads.push(lead);
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+            viewLead(leadId);
+
+            // Remove after viewing
+            setTimeout(() => {
+                const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const index = updatedLeads.findIndex(l => l.id === leadId);
+                if (index !== -1) {
+                    updatedLeads.splice(index, 1);
+                    localStorage.setItem('insurance_leads', JSON.stringify(updatedLeads));
+                }
+            }, 100);
+        }
+    };
+    
+    // Override the original loadLeadsView to add archive tab
+    const originalLoadLeadsView = window.loadLeadsView;
+    window.loadLeadsView = function() {
+        // Call original function first
+        if (originalLoadLeadsView) {
+            originalLoadLeadsView();
+        }
+        
+        // Add tabs if not already present
+        setTimeout(() => {
+            const leadsView = document.querySelector('.leads-view');
+            if (leadsView && !leadsView.querySelector('.lead-tabs')) {
+                const header = leadsView.querySelector('.content-header');
+                if (header) {
+                    const archivedCount = JSON.parse(localStorage.getItem('archivedLeads') || '[]').length;
+                    
+                    const tabsHTML = `
+                        <div class="lead-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0;">
+                            <button class="tab-btn active" style="padding: 12px 24px; background: transparent; border: none; border-bottom: 3px solid #3b82f6; cursor: pointer; font-size: 16px; color: #3b82f6; font-weight: 600;">
+                                <i class="fas fa-users"></i> Active Leads
+                            </button>
+                            <button class="tab-btn" onclick="loadArchivedLeadsView()" style="padding: 12px 24px; background: transparent; border: none; cursor: pointer; font-size: 16px; color: #6b7280;">
+                                <i class="fas fa-archive"></i> Archived Leads ${archivedCount > 0 ? `(${archivedCount})` : ''}
+                            </button>
+                        </div>
+                    `;
+                    
+                    header.insertAdjacentHTML('afterend', tabsHTML);
+                }
+            }
+            
+            // Replace delete buttons with archive buttons
+            const deleteButtons = document.querySelectorAll('.leads-view .btn-icon-danger');
+            deleteButtons.forEach(btn => {
+                const onclickAttr = btn.getAttribute('onclick');
+                if (onclickAttr && onclickAttr.includes('deleteLead')) {
+                    // Extract lead ID
+                    const leadIdMatch = onclickAttr.match(/deleteLead\(['"]([^'"]+)['"]\)/);
+                    if (leadIdMatch) {
+                        const leadId = leadIdMatch[1];
+                        btn.setAttribute('onclick', `archiveLead('${leadId}')`);
+                        btn.setAttribute('title', 'Archive Lead');
+                        btn.style.color = '#f59e0b'; // Orange color for archive
+                        btn.innerHTML = '<i class="fas fa-archive"></i>';
+                    }
+                }
+            });
+        }, 100);
+    };
+    
+    console.log('✅ Lead Archive System loaded');
+    console.log('Use archiveLead(id) to archive, restoreArchivedLead(id) to restore');
+})();

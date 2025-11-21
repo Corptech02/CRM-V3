@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Vicidial Upload</title>
+    <script src="js/api-config.js"></script>
+</head>
+<body>
+    <h1>Vicidial Upload Test</h1>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testLists()">Get Lists</button>
+    <button onclick="testFullFlow()">Test Full Flow</button>
+    <div id="result"></div>
+
+    <script>
+    async function testConnection() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Testing connection...';
+
+        try {
+            const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
+            console.log('Using API URL:', API_URL);
+
+            const response = await fetch(`${API_URL}/api/vicidial/test`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('Response:', response);
+            const data = await response.json();
+            console.log('Data:', data);
+
+            resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        } catch (error) {
+            console.error('Error:', error);
+            resultDiv.innerHTML = `<h2>Error</h2><p>${error.message}</p>`;
+        }
+    }
+
+    async function testLists() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Getting lists...';
+
+        try {
+            const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
+            const response = await fetch(`${API_URL}/api/vicidial/lists`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        } catch (error) {
+            resultDiv.innerHTML = `<h2>Error</h2><p>${error.message}</p>`;
+        }
+    }
+
+    async function testFullFlow() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Testing full flow...';
+
+        try {
+            // Load the vicidial uploader script
+            const script = document.createElement('script');
+            script.src = 'js/vicidial-uploader.js';
+            document.head.appendChild(script);
+
+            // Wait for script to load
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Test connection
+            const connectionResult = await window.vicidialUploader.testConnection();
+            console.log('Connection result:', connectionResult);
+
+            resultDiv.innerHTML = `
+                <h2>Connection Test:</h2>
+                <pre>${JSON.stringify(connectionResult, null, 2)}</pre>
+            `;
+
+            // Get lists
+            const lists = await window.vicidialUploader.getVicidialLists();
+            console.log('Lists:', lists);
+
+            resultDiv.innerHTML += `
+                <h2>Lists:</h2>
+                <pre>${JSON.stringify(lists, null, 2)}</pre>
+            `;
+        } catch (error) {
+            console.error('Full error:', error);
+            resultDiv.innerHTML = `<h2>Error</h2><p>${error.message}</p><p>${error.stack}</p>`;
+        }
+    }
+    </script>
+</body>
+</html>

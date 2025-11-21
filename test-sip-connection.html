@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SIP Connection Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/jssip@3.10.1/dist/jssip.min.js"></script>
+</head>
+<body>
+    <h1>Testing Twilio SIP Connection</h1>
+    <div id="status">Initializing...</div>
+    <pre id="log"></pre>
+
+    <script>
+        const log = (message) => {
+            console.log(message);
+            document.getElementById('log').innerText += message + '\n';
+        };
+
+        const updateStatus = (status, color = 'black') => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerText = status;
+            statusDiv.style.color = color;
+        };
+
+        async function testSIPConnection() {
+            try {
+                log('Starting SIP connection test...');
+                log('Configuration:');
+                log('  Domain: vanguard1.sip.us1.twilio.com');
+                log('  Username: Grant');
+                log('  Password: GrantCorp2006@');
+                log('');
+
+                // Test WebSocket connectivity first
+                log('Testing WebSocket connection...');
+                const ws = new WebSocket('wss://vanguard1.sip.us1.twilio.com:443');
+
+                ws.onopen = () => {
+                    log('✅ WebSocket connected successfully!');
+                    ws.close();
+
+                    // Now test SIP
+                    testSIPRegistration();
+                };
+
+                ws.onerror = (error) => {
+                    log('❌ WebSocket connection failed!');
+                    log('Error: ' + error);
+                    updateStatus('WebSocket connection failed - check domain', 'red');
+                };
+
+                ws.onclose = () => {
+                    log('WebSocket connection closed');
+                };
+
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.CONNECTING) {
+                        log('⏱️ WebSocket connection timeout - domain might be incorrect');
+                        updateStatus('Connection timeout - trying alternative domain...', 'orange');
+                        ws.close();
+                        testAlternativeDomain();
+                    }
+                }, 5000);
+
+            } catch (error) {
+                log('Error during test: ' + error.message);
+                updateStatus('Test failed: ' + error.message, 'red');
+            }
+        }
+
+        function testSIPRegistration() {
+            log('\nTesting SIP registration...');
+
+            const sipConfig = {
+                uri: 'sip:Grant@vanguard1.sip.us1.twilio.com',
+                password: 'GrantCorp2006@',
+                ws_servers: ['wss://vanguard1.sip.us1.twilio.com:443'],
+                display_name: 'Grant',
+                register: true,
+                register_expires: 300,
+                session_timers: false,
+                connection_recovery_min_interval: 2,
+                connection_recovery_max_interval: 30
+            };
+
+            try {
+                const ua = new JsSIP.UA(sipConfig);
+
+                ua.on('connected', () => {
+                    log('✅ SIP WebSocket connected!');
+                });
+
+                ua.on('disconnected', () => {
+                    log('❌ SIP WebSocket disconnected');
+                });
+
+                ua.on('registered', () => {
+                    log('✅ SIP REGISTERED SUCCESSFULLY!');
+                    updateStatus('SIP is working! Registration successful', 'green');
+                });
+
+                ua.on('unregistered', () => {
+                    log('⚠️ SIP unregistered');
+                });
+
+                ua.on('registrationFailed', (e) => {
+                    log('❌ SIP Registration failed!');
+                    log('  Cause: ' + e.cause);
+                    if (e.response) {
+                        log('  Response status: ' + e.response.status_code);
+                        log('  Response reason: ' + e.response.reason_phrase);
+                    }
+                    updateStatus('SIP registration failed - check credentials', 'red');
+                });
+
+                log('Starting SIP UA...');
+                ua.start();
+
+            } catch (error) {
+                log('❌ Failed to create SIP UA: ' + error.message);
+                updateStatus('Failed to initialize SIP: ' + error.message, 'red');
+            }
+        }
+
+        function testAlternativeDomain() {
+            log('\n\nTrying alternative domain: vanguard1.sip.twilio.com');
+
+            const ws2 = new WebSocket('wss://vanguard1.sip.twilio.com:443');
+
+            ws2.onopen = () => {
+                log('✅ Alternative domain WebSocket connected!');
+                ws2.close();
+                testSIPWithAlternativeDomain();
+            };
+
+            ws2.onerror = (error) => {
+                log('❌ Alternative domain also failed');
+                updateStatus('Both domains failed - check Twilio SIP configuration', 'red');
+            };
+
+            setTimeout(() => {
+                if (ws2.readyState === WebSocket.CONNECTING) {
+                    log('⏱️ Alternative domain also timed out');
+                    updateStatus('Unable to connect to Twilio SIP', 'red');
+                    ws2.close();
+                }
+            }, 5000);
+        }
+
+        function testSIPWithAlternativeDomain() {
+            log('\nTesting SIP with alternative domain...');
+
+            const sipConfig = {
+                uri: 'sip:Grant@vanguard1.sip.twilio.com',
+                password: 'GrantCorp2006@',
+                ws_servers: ['wss://vanguard1.sip.twilio.com:443'],
+                display_name: 'Grant',
+                register: true
+            };
+
+            try {
+                const ua = new JsSIP.UA(sipConfig);
+
+                ua.on('registered', () => {
+                    log('✅ SIP REGISTERED WITH ALTERNATIVE DOMAIN!');
+                    updateStatus('SIP working with domain: vanguard1.sip.twilio.com', 'green');
+                    log('\n⚠️ Update your configuration to use: vanguard1.sip.twilio.com');
+                });
+
+                ua.on('registrationFailed', (e) => {
+                    log('❌ Alternative domain registration also failed');
+                    log('  Cause: ' + e.cause);
+                    updateStatus('SIP registration failed on both domains', 'red');
+                });
+
+                ua.start();
+
+            } catch (error) {
+                log('❌ Failed with alternative domain: ' + error.message);
+            }
+        }
+
+        // Start the test
+        testSIPConnection();
+    </script>
+</body>
+</html>

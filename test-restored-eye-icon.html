@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Restored Eye Icon Functionality</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-box {
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        .status-info { background: #d1ecf1; color: #0c5460; }
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-primary:hover { background: #45a049; }
+        .btn-secondary { background: #2196F3; color: white; }
+        .btn-secondary:hover { background: #0b7dda; }
+        .script-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .script-item {
+            padding: 5px;
+            margin: 3px 0;
+            border-left: 3px solid transparent;
+        }
+        .script-loaded {
+            color: green;
+            border-left-color: #4CAF50;
+        }
+        .script-missing {
+            color: red;
+            border-left-color: #f44336;
+        }
+        .lead-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test Restored Eye Icon Functionality</h1>
+
+    <div class="test-section">
+        <h2>1. Script Loading Status</h2>
+        <button class="btn btn-primary" onclick="checkScripts()">Check All Scripts</button>
+        <div id="script-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. API Configuration</h2>
+        <button class="btn btn-primary" onclick="checkAPIConfig()">Check API Config</button>
+        <div id="api-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Lead Data Status</h2>
+        <button class="btn btn-primary" onclick="checkLeadData()">Check Lead Data</button>
+        <div id="lead-data-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Test Eye Icon Function</h2>
+        <p>These simulate the eye icon clicks from the leads table:</p>
+        <div class="lead-buttons">
+            <button class="btn btn-secondary" onclick="if(window.viewLead) viewLead('90037'); else alert('viewLead not defined!')">
+                <i class="fas fa-eye"></i> View Lead 90037
+            </button>
+            <button class="btn btn-secondary" onclick="if(window.viewLead) viewLead('88571'); else alert('viewLead not defined!')">
+                <i class="fas fa-eye"></i> View Lead 88571
+            </button>
+            <button class="btn btn-secondary" onclick="if(window.viewLead) viewLead('85521'); else alert('viewLead not defined!')">
+                <i class="fas fa-eye"></i> View Lead 85521
+            </button>
+        </div>
+        <div id="eye-test-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Console Output</h2>
+        <button class="btn btn-primary" onclick="clearConsole()">Clear Console</button>
+        <pre id="console-output"></pre>
+    </div>
+
+    <script>
+        // Console capture
+        const logs = [];
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        console.log = function() {
+            originalLog.apply(console, arguments);
+            logs.push('[LOG] ' + Array.from(arguments).map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' '));
+            updateConsoleOutput();
+        };
+
+        console.error = function() {
+            originalError.apply(console, arguments);
+            logs.push('[ERROR] ' + Array.from(arguments).map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' '));
+            updateConsoleOutput();
+        };
+
+        console.warn = function() {
+            originalWarn.apply(console, arguments);
+            logs.push('[WARN] ' + Array.from(arguments).map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' '));
+            updateConsoleOutput();
+        };
+
+        function updateConsoleOutput() {
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.textContent = logs.slice(-30).join('\n');
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+
+        function clearConsole() {
+            logs.length = 0;
+            updateConsoleOutput();
+        }
+
+        // Check scripts
+        function checkScripts() {
+            const statusDiv = document.getElementById('script-status');
+
+            // Critical scripts from working system
+            const criticalScripts = [
+                'js/api-config.js',
+                'js/app.js',
+                'js/final-profile-fix.js',
+                'js/fix-lead-table-eye-icon-only.js',
+                'js/fix-profile-quotes.js',
+                'js/fix-add-quote-direct.js',
+                'js/load-display-quotes.js',
+                'js/load-lead-from-api.js',
+                'js/force-save-button-v2.js',
+                'js/block-demo-data-import.js',
+                'js/connect-eye-icon-properly.js',
+                'js/fix-archive-persistence.js',
+                'js/fix-aggressive-lead-restore.js'
+            ];
+
+            let html = '<div class="script-list">';
+            let allLoaded = true;
+
+            // Check each script
+            const scripts = Array.from(document.scripts);
+            criticalScripts.forEach(scriptSrc => {
+                const loaded = scripts.some(s => s.src && s.src.includes(scriptSrc.replace('js/', '')));
+                html += `<div class="script-item ${loaded ? 'script-loaded' : 'script-missing'}">
+                    ${loaded ? '✓' : '✗'} ${scriptSrc}
+                </div>`;
+                if (!loaded) allLoaded = false;
+            });
+
+            html += '</div>';
+
+            if (allLoaded) {
+                html = '<div class="status-box status-success">✓ All critical scripts are loaded!</div>' + html;
+            } else {
+                html = '<div class="status-box status-error">✗ Some critical scripts are missing</div>' + html;
+            }
+
+            statusDiv.innerHTML = html;
+
+            // Also check key functions
+            const functions = ['viewLead', 'showLeadProfile', 'createEnhancedProfile'];
+            html += '<div class="status-box status-info"><strong>Function Status:</strong><br>';
+            functions.forEach(func => {
+                const exists = typeof window[func] === 'function';
+                html += `${exists ? '✓' : '✗'} ${func}<br>`;
+            });
+            html += '</div>';
+
+            statusDiv.innerHTML = html;
+        }
+
+        // Check API config
+        function checkAPIConfig() {
+            const statusDiv = document.getElementById('api-status');
+            let html = '<div class="status-box status-info">';
+
+            if (window.VANGUARD_API_URL) {
+                html += `<strong>VANGUARD_API_URL:</strong> ${window.VANGUARD_API_URL}<br>`;
+
+                // Test API connection
+                fetch(window.VANGUARD_API_URL + '/api/health')
+                    .then(response => {
+                        if (response.ok) {
+                            statusDiv.innerHTML += '<div class="status-box status-success">✓ API is responding</div>';
+                        } else {
+                            statusDiv.innerHTML += '<div class="status-box status-warning">⚠ API returned status: ' + response.status + '</div>';
+                        }
+                    })
+                    .catch(error => {
+                        statusDiv.innerHTML += '<div class="status-box status-error">✗ API connection failed: ' + error.message + '</div>';
+                    });
+            } else {
+                html += '<strong>VANGUARD_API_URL not defined!</strong>';
+            }
+
+            html += '</div>';
+            statusDiv.innerHTML = html;
+        }
+
+        // Check lead data
+        function checkLeadData() {
+            const statusDiv = document.getElementById('lead-data-status');
+            let html = '';
+
+            const sources = ['insurance_leads', 'leads', 'clients', 'archived_leads'];
+            sources.forEach(source => {
+                const data = JSON.parse(localStorage.getItem(source) || '[]');
+                html += `<div class="status-box status-info">
+                    <strong>${source}:</strong> ${data.length} items
+                    ${data.length > 0 ? '<br>Sample IDs: ' + data.slice(0, 3).map(item => item.id).join(', ') : ''}
+                </div>`;
+            });
+
+            statusDiv.innerHTML = html;
+        }
+
+        // Monitor for profile modals
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) {
+                        const isProfile = node.id === 'lead-profile-container' ||
+                                        node.id === 'lead-profile-modal' ||
+                                        node.className === 'modal-overlay' ||
+                                        (node.className && node.className.includes && node.className.includes('profile'));
+
+                        if (isProfile) {
+                            console.log('✅ Lead profile modal detected!');
+                            const status = document.getElementById('eye-test-status');
+                            if (status) {
+                                status.innerHTML = '<div class="status-box status-success">✅ Lead profile opened successfully!</div>';
+                            }
+                        }
+                    }
+                });
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        // Load all scripts from main index.html
+        function loadMainScripts() {
+            console.log('Loading scripts from main application...');
+
+            // Load API config first
+            const apiScript = document.createElement('script');
+            apiScript.src = '/js/api-config.js?t=' + Date.now();
+            document.head.appendChild(apiScript);
+
+            // Then load other critical scripts with a delay
+            setTimeout(() => {
+                const scripts = [
+                    '/js/app.js',
+                    '/js/final-profile-fix.js',
+                    '/js/fix-lead-table-eye-icon-only.js',
+                    '/js/connect-eye-icon-properly.js'
+                ];
+
+                scripts.forEach((src, index) => {
+                    setTimeout(() => {
+                        const script = document.createElement('script');
+                        script.src = src + '?t=' + Date.now();
+                        script.onload = () => console.log('Loaded:', src);
+                        script.onerror = () => console.error('Failed to load:', src);
+                        document.body.appendChild(script);
+                    }, index * 200);
+                });
+
+                // Check status after all scripts should be loaded
+                setTimeout(() => {
+                    console.log('All scripts should be loaded, checking status...');
+                    checkScripts();
+                }, scripts.length * 200 + 500);
+            }, 500);
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Test page initialized');
+            loadMainScripts();
+        });
+    </script>
+</body>
+</html>

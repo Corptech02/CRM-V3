@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>Check Vehicles</title></head>
+<body>
+<script>
+const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+policies.forEach((policy, index) => {
+    if (policy.vehicles && policy.vehicles.length > 0) {
+        document.write('<h3>Policy ' + (index + 1) + ' - ' + policy.policyNumber + '</h3>');
+        document.write('<p>Total vehicles/trailers: ' + policy.vehicles.length + '</p>');
+        document.write('<pre>' + JSON.stringify(policy.vehicles, null, 2) + '</pre>');
+        document.write('<hr>');
+    }
+});
+</script>
+</body>
+</html>

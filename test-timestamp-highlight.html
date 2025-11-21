@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Timestamp Highlighting</title>
+</head>
+<body>
+    <h3>Test Timestamp Highlighting</h3>
+    <button onclick="testHighlight()">Test Timestamp Highlight</button>
+    <button onclick="window.forceTimestampHighlight()">Force Timestamp Highlight</button>
+    <div id="result"></div>
+
+    <script>
+        function testHighlight() {
+            console.log('Testing timestamp highlighting...');
+
+            // Get all leads
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.innerHTML = '<h4>Leads with TO DO and Old Timestamps:</h4>';
+
+            leads.forEach(lead => {
+                // Check if lead has stage timestamp
+                if (lead.stageTimestamps && lead.stageTimestamps[lead.stage]) {
+                    const timestamp = lead.stageTimestamps[lead.stage];
+                    const stageDate = new Date(timestamp);
+                    const now = new Date();
+
+                    // Calculate days old
+                    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const compareDate = new Date(stageDate.getFullYear(), stageDate.getMonth(), stageDate.getDate());
+                    const diffTime = nowDate - compareDate;
+                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+                    // Check TO DO field (might be in different places)
+                    const hasTodo = lead.todo || lead.toDo || lead.to_do || lead.notes;
+
+                    if (diffDays > 0 && hasTodo) {
+                        let color = 'green';
+                        if (diffDays === 1) color = 'yellow';
+                        else if (diffDays < 7) color = 'orange';
+                        else color = 'red';
+
+                        resultDiv.innerHTML += `<p style="color: ${color};">
+                            ${lead.name}: ${diffDays} days old,
+                            TO DO: "${hasTodo}"
+                        </p>`;
+                    }
+                }
+            });
+
+            // Now try to highlight
+            if (window.forceTimestampHighlight) {
+                console.log('Calling forceTimestampHighlight...');
+                window.forceTimestampHighlight();
+            } else {
+                console.log('forceTimestampHighlight not found!');
+            }
+        }
+    </script>
+</body>
+</html>

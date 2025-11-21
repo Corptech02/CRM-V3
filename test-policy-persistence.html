@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Policy Persistence Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #policy-list {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Policy Persistence Test</h1>
+
+    <div class="test-section">
+        <h2>Step 1: Clear Browser Data Simulation</h2>
+        <button onclick="clearLocalStorage()">Clear localStorage (Simulate Clear Browser Data)</button>
+        <div id="clear-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 2: Load Policies from Server</h2>
+        <button onclick="loadPoliciesFromServer()">Load Policies from Server</button>
+        <div id="load-status"></div>
+        <div id="policy-list"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 3: Verify localStorage</h2>
+        <button onclick="checkLocalStorage()">Check localStorage</button>
+        <div id="local-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 4: Full Test Sequence</h2>
+        <button onclick="runFullTest()">Run Full Test (Clear + Load + Verify)</button>
+        <div id="full-test-status"></div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname.includes('nip.io')
+            ? `http://${window.location.hostname.split('.')[0]}:3001/api`
+            : window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : 'http://192.168.40.232:3001/api';
+
+        function clearLocalStorage() {
+            localStorage.clear();
+            document.getElementById('clear-status').innerHTML = '<span class="success">✓ localStorage cleared - simulating browser data clear</span>';
+            document.getElementById('policy-list').innerHTML = '';
+            document.getElementById('local-status').innerHTML = '';
+        }
+
+        async function loadPoliciesFromServer() {
+            const statusDiv = document.getElementById('load-status');
+            const listDiv = document.getElementById('policy-list');
+
+            statusDiv.innerHTML = 'Loading policies from server...';
+
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const serverPolicies = data.policies || [];
+
+                    // Update localStorage like the app does
+                    localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
+
+                    statusDiv.innerHTML = `<span class="success">✓ Loaded ${serverPolicies.length} policies from server</span>`;
+
+                    listDiv.innerHTML = '<h3>Policies:</h3><ul>' +
+                        serverPolicies.map(p => `<li>${p.policyNumber} - ${p.clientName}</li>`).join('') +
+                        '</ul>';
+                } else {
+                    statusDiv.innerHTML = `<span class="error">✗ Server error: ${response.status}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+            }
+        }
+
+        function checkLocalStorage() {
+            const statusDiv = document.getElementById('local-status');
+            const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+            if (policies.length > 0) {
+                statusDiv.innerHTML = `<span class="success">✓ localStorage has ${policies.length} policies</span>`;
+            } else {
+                statusDiv.innerHTML = '<span class="error">✗ localStorage has 0 policies</span>';
+            }
+        }
+
+        async function runFullTest() {
+            const statusDiv = document.getElementById('full-test-status');
+            statusDiv.innerHTML = '<h3>Running Full Test...</h3>';
+
+            // Step 1: Clear
+            clearLocalStorage();
+            await new Promise(r => setTimeout(r, 500));
+
+            // Step 2: Check it's empty
+            const beforePolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            statusDiv.innerHTML += `<p>After clear: ${beforePolicies.length} policies in localStorage</p>`;
+
+            // Step 3: Load from server
+            await loadPoliciesFromServer();
+            await new Promise(r => setTimeout(r, 500));
+
+            // Step 4: Verify
+            const afterPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            statusDiv.innerHTML += `<p>After server load: ${afterPolicies.length} policies in localStorage</p>`;
+
+            if (afterPolicies.length === 8) {
+                statusDiv.innerHTML += '<p class="success">✓ TEST PASSED: Policies persist after clearing browser data!</p>';
+            } else {
+                statusDiv.innerHTML += '<p class="error">✗ TEST FAILED: Expected 8 policies, got ' + afterPolicies.length + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

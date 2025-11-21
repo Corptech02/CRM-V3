@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vanguard Mobile Demo - Responsive Features</title>
+    <link rel="stylesheet" href="css/styles.css?v=33">
+    <link rel="stylesheet" href="css/carrier-profile.css?v=2">
+    <link rel="stylesheet" href="css/policy-modal.css?v=3">
+    <link rel="stylesheet" href="css/mobile.css?v=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Skip to Content Link -->
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+    <!-- Header -->
+    <header class="header">
+        <nav class="navbar">
+            <div class="nav-container">
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="nav-brand">
+                    <img src="images/vanguard-logo.png" alt="Vanguard Insurance Group" class="logo">
+                    <div class="brand-text">
+                        <h1>Vanguard Mobile</h1>
+                        <span>Responsive Demo</span>
+                    </div>
+                </div>
+                <ul class="nav-menu">
+                    <li><a href="#dashboard" class="nav-link active">Dashboard</a></li>
+                    <li><a href="#leads" class="nav-link">Leads</a></li>
+                    <li><a href="#policies" class="nav-link">Policies</a></li>
+                    <li><a href="#reports" class="nav-link">Reports</a></li>
+                </ul>
+                <div class="nav-actions">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge">3</span>
+                    </button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Mobile Navigation Menu -->
+    <nav class="mobile-nav" id="mobileNav">
+        <ul class="mobile-nav-list">
+            <li class="mobile-nav-item">
+                <a href="#dashboard" class="mobile-nav-link active" onclick="closeMobileMenu()">
+                    <i class="fas fa-home"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#leads" class="mobile-nav-link" onclick="closeMobileMenu()">
+                    <i class="fas fa-users"></i>
+                    Leads
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#policies" class="mobile-nav-link" onclick="closeMobileMenu()">
+                    <i class="fas fa-file-contract"></i>
+                    Policies
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#clients" class="mobile-nav-link" onclick="closeMobileMenu()">
+                    <i class="fas fa-user-tie"></i>
+                    Clients
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#reports" class="mobile-nav-link" onclick="closeMobileMenu()">
+                    <i class="fas fa-chart-bar"></i>
+                    Reports
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+        <div class="dashboard-content" style="margin-left: 0;">
+
+            <!-- Page Header -->
+            <div class="page-header" style="padding: 20px;">
+                <h1>Mobile Responsive Demo</h1>
+                <p>Test the mobile features by resizing your browser or viewing on a mobile device</p>
+            </div>
+
+            <!-- Stats Grid (Responsive) -->
+            <div class="stats-grid" style="padding: 0 20px; margin-bottom: 30px;">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Total Leads</h3>
+                        <p class="stat-value">1,234</p>
+                        <span class="stat-change positive">+12% this month</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="fas fa-file-contract"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Active Policies</h3>
+                        <p class="stat-value">856</p>
+                        <span class="stat-change positive">+8% this month</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Monthly Premium</h3>
+                        <p class="stat-value">$45,678</p>
+                        <span class="stat-change positive">+15% this month</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Conversion Rate</h3>
+                        <p class="stat-value">24.5%</p>
+                        <span class="stat-change negative">-2% this month</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Table Demo -->
+            <div class="section" style="padding: 0 20px; margin-bottom: 30px;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Recent Leads</h2>
+                    <button class="btn btn-sm" onclick="toggleTableView('leadsTable')" style="padding: 8px 16px; font-size: 14px;">
+                        <i class="fas fa-th-list"></i> Toggle View
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-responsive">
+                        <table class="data-table" id="leadsTable">
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><input type="checkbox"></td>
+                                    <td><strong>John Smith</strong></td>
+                                    <td>
+                                        <div class="contact-info">
+                                            <a href="tel:555-0123"><i class="fas fa-phone"></i></a>
+                                            <a href="mailto:john@example.com"><i class="fas fa-envelope"></i></a>
+                                        </div>
+                                    </td>
+                                    <td><span class="status-badge status-active">Active</span></td>
+                                    <td>2024-01-15</td>
+                                    <td class="actions">
+                                        <button class="btn btn-sm"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm"><i class="fas fa-eye"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><input type="checkbox"></td>
+                                    <td><strong>Jane Doe</strong></td>
+                                    <td>
+                                        <div class="contact-info">
+                                            <a href="tel:555-0124"><i class="fas fa-phone"></i></a>
+                                            <a href="mailto:jane@example.com"><i class="fas fa-envelope"></i></a>
+                                        </div>
+                                    </td>
+                                    <td><span class="status-badge status-pending">Pending</span></td>
+                                    <td>2024-01-14</td>
+                                    <td class="actions">
+                                        <button class="btn btn-sm"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm"><i class="fas fa-eye"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><input type="checkbox"></td>
+                                    <td><strong>Mike Johnson</strong></td>
+                                    <td>
+                                        <div class="contact-info">
+                                            <a href="tel:555-0125"><i class="fas fa-phone"></i></a>
+                                            <a href="mailto:mike@example.com"><i class="fas fa-envelope"></i></a>
+                                        </div>
+                                    </td>
+                                    <td><span class="status-badge status-active">Active</span></td>
+                                    <td>2024-01-13</td>
+                                    <td class="actions">
+                                        <button class="btn btn-sm"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm"><i class="fas fa-eye"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Form Demo -->
+            <div class="section" style="padding: 0 20px; margin-bottom: 30px;">
+                <h2 style="margin-bottom: 20px;">Quick Add Lead</h2>
+                <form class="mobile-form">
+                    <div class="form-group">
+                        <label for="leadName">Full Name</label>
+                        <input type="text" id="leadName" class="form-control" placeholder="Enter full name">
+                    </div>
+                    <div class="form-group">
+                        <label for="leadEmail">Email Address</label>
+                        <input type="email" id="leadEmail" class="form-control" placeholder="Enter email">
+                    </div>
+                    <div class="form-group">
+                        <label for="leadPhone">Phone Number</label>
+                        <input type="tel" id="leadPhone" class="form-control" placeholder="(555) 123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label for="leadStatus">Status</label>
+                        <select id="leadStatus" class="form-select">
+                            <option>Select Status</option>
+                            <option>New Lead</option>
+                            <option>Contacted</option>
+                            <option>Qualified</option>
+                            <option>Proposal Sent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="leadNotes">Notes</label>
+                        <textarea id="leadNotes" class="form-control" rows="3" placeholder="Add any notes..."></textarea>
+                    </div>
+                    <div class="btn-group" style="margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Lead
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Mobile Cards Demo -->
+            <div class="section" style="padding: 0 20px; margin-bottom: 80px;">
+                <h2 style="margin-bottom: 20px;">Policy Cards (Mobile View)</h2>
+
+                <div class="mobile-card swipeable-card">
+                    <div class="mobile-card-header">
+                        <div class="mobile-card-title">Commercial Auto Policy</div>
+                        <div class="mobile-card-status status-active">Active</div>
+                    </div>
+                    <div class="mobile-card-body">
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Policy Number</span>
+                            <span class="mobile-card-value">CA-2024-001</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Client</span>
+                            <span class="mobile-card-value">ABC Transport LLC</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Premium</span>
+                            <span class="mobile-card-value">$2,450/mo</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Renewal Date</span>
+                            <span class="mobile-card-value">03/15/2024</span>
+                        </div>
+                    </div>
+                    <div class="mobile-card-actions">
+                        <a href="#" class="mobile-card-action">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        <a href="#" class="mobile-card-action">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="#" class="mobile-card-action">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                    <div class="swipe-actions">
+                        <div class="swipe-action edit">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <div class="swipe-action delete">
+                            <i class="fas fa-trash"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mobile-card">
+                    <div class="mobile-card-header">
+                        <div class="mobile-card-title">General Liability</div>
+                        <div class="mobile-card-status status-pending">Pending</div>
+                    </div>
+                    <div class="mobile-card-body">
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Policy Number</span>
+                            <span class="mobile-card-value">GL-2024-002</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Client</span>
+                            <span class="mobile-card-value">XYZ Construction</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Premium</span>
+                            <span class="mobile-card-value">$1,850/mo</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">Effective Date</span>
+                            <span class="mobile-card-value">02/01/2024</span>
+                        </div>
+                    </div>
+                    <div class="mobile-card-actions">
+                        <a href="#" class="mobile-card-action">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        <a href="#" class="mobile-card-action">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="#" class="mobile-card-action">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Empty State -->
+            <div class="mobile-empty-state" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <h3>No Data Found</h3>
+                <p>There are no items to display at this time.</p>
+                <button class="btn btn-primary">Add New Item</button>
+            </div>
+
+            <!-- Mobile Loading State -->
+            <div class="mobile-loading" style="display: none;">
+                <div class="mobile-loading-spinner"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation Bar (Mobile) -->
+    <nav class="bottom-nav">
+        <a href="#dashboard" class="bottom-nav-item active" data-page="dashboard">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </a>
+        <a href="#leads" class="bottom-nav-item" data-page="leads">
+            <i class="fas fa-users"></i>
+            <span>Leads</span>
+        </a>
+        <a href="#" class="bottom-nav-item" onclick="openQuickAddMenu(); return false;">
+            <i class="fas fa-plus-circle"></i>
+            <span>Add</span>
+        </a>
+        <a href="#reports" class="bottom-nav-item" data-page="reports">
+            <i class="fas fa-chart-bar"></i>
+            <span>Reports</span>
+        </a>
+        <a href="#settings" class="bottom-nav-item" data-page="settings">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </a>
+    </nav>
+
+    <!-- Mobile JavaScript -->
+    <script src="js/mobile.js?v=1"></script>
+    <script>
+        // Demo-specific scripts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize mobile features
+            if (window.innerWidth <= 768) {
+                // Create mobile cards for the demo table
+                createMobileCards('leadsTable');
+
+                // Initialize swipeable cards
+                initSwipeableCards();
+            }
+
+            // Handle bottom nav clicks
+            document.querySelectorAll('.bottom-nav-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    if (this.getAttribute('data-page')) {
+                        e.preventDefault();
+                        document.querySelectorAll('.bottom-nav-item').forEach(i => i.classList.remove('active'));
+                        this.classList.add('active');
+                    }
+                });
+            });
+
+            // Demo notification
+            setTimeout(() => {
+                const notification = document.createElement('div');
+                notification.className = 'notification success';
+                notification.innerHTML = '<i class="fas fa-check-circle"></i> Mobile features loaded successfully!';
+                notification.style.cssText = `
+                    position: fixed;
+                    bottom: 90px;
+                    left: 20px;
+                    right: 20px;
+                    padding: 15px;
+                    background: #10b981;
+                    color: white;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 999;
+                    animation: slideUp 0.3s ease;
+                `;
+                document.body.appendChild(notification);
+
+                setTimeout(() => {
+                    notification.style.animation = 'slideDown 0.3s ease';
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }, 1000);
+        });
+
+        // Animation styles
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideUp {
+                from { transform: translateY(100%); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes slideDown {
+                from { transform: translateY(0); opacity: 1; }
+                to { transform: translateY(100%); opacity: 0; }
+            }
+            .status-active { background: #10b981; color: white; }
+            .status-pending { background: #f59e0b; color: white; }
+            .status-badge {
+                padding: 4px 12px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 600;
+                text-transform: uppercase;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Quick Add Menu function
+        function openQuickAddMenu() {
+            alert('Quick Add Menu - This would open a menu with options to add:\n- New Lead\n- New Policy\n- New Quote\n- New Task');
+        }
+    </script>
+</body>
+</html>

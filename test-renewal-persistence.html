@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Renewal Persistence</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .info { color: blue; }
+        #log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Renewal Completion Persistence</h1>
+
+    <div class="test-section">
+        <h2>1. Save Test Completion</h2>
+        <button onclick="saveTestCompletion()">Save Test Policy Completion</button>
+        <div id="save-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Load All Completions</h2>
+        <button onclick="loadAllCompletions()">Load from Server</button>
+        <div id="load-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Clear Browser Data</h2>
+        <button onclick="clearBrowserData()">Clear LocalStorage & Session</button>
+        <button onclick="loadAllCompletions()">Reload After Clear</button>
+        <div id="clear-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Delete Test Completion</h2>
+        <button onclick="deleteTestCompletion()">Delete Test Policy</button>
+        <div id="delete-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Log</h2>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001'
+            : `http://${window.location.hostname}:3001`;
+
+        const TEST_POLICY = {
+            policyKey: 'TEST-POL-123_2025-12-31',
+            policyNumber: 'TEST-POL-123',
+            expirationDate: '2025-12-31',
+            completed: true
+        };
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const colorMap = {
+                'success': '#0f0',
+                'error': '#f00',
+                'info': '#0ff',
+                'warn': '#ff0'
+            };
+            logDiv.innerHTML += `<span style="color: ${colorMap[type] || '#0f0'}">[${timestamp}] ${message}</span><br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function saveTestCompletion() {
+            const resultDiv = document.getElementById('save-result');
+            resultDiv.innerHTML = '<span class="info">Saving...</span>';
+            log(`Sending POST to ${API_BASE}/api/renewal-completions`, 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/renewal-completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(TEST_POLICY)
+                });
+
+                const data = await response.json();
+                log(`Response: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `<span class="success">✅ Saved: ${TEST_POLICY.policyKey}</span>`;
+                    // Also save to localStorage for comparison
+                    localStorage.setItem('test_renewal_backup', JSON.stringify(TEST_POLICY));
+                } else {
+                    resultDiv.innerHTML = `<span class="error">❌ Error: ${data.error || 'Unknown error'}</span>`;
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        async function loadAllCompletions() {
+            const resultDiv = document.getElementById('load-result');
+            resultDiv.innerHTML = '<span class="info">Loading...</span>';
+            log(`Sending GET to ${API_BASE}/api/renewal-completions`, 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/renewal-completions`);
+                const data = await response.json();
+
+                const count = Object.keys(data).length;
+                log(`Loaded ${count} completions from server`, 'success');
+
+                if (count > 0) {
+                    resultDiv.innerHTML = `<span class="success">✅ Found ${count} completions:</span><br>`;
+                    for (const [key, value] of Object.entries(data)) {
+                        resultDiv.innerHTML += `<div style="margin-left: 20px">• ${key}: ${value.completedAt || 'N/A'}</div>`;
+                    }
+                } else {
+                    resultDiv.innerHTML = '<span class="info">No completions found on server</span>';
+                }
+
+                // Check localStorage comparison
+                const localBackup = localStorage.getItem('test_renewal_backup');
+                if (localBackup) {
+                    log('LocalStorage backup found: ' + localBackup, 'info');
+                } else {
+                    log('No localStorage backup (cleared)', 'warn');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        function clearBrowserData() {
+            const resultDiv = document.getElementById('clear-result');
+
+            // Clear localStorage
+            const hadData = localStorage.length > 0;
+            localStorage.clear();
+
+            // Clear sessionStorage
+            sessionStorage.clear();
+
+            log('Cleared localStorage and sessionStorage', 'warn');
+            resultDiv.innerHTML = `<span class="success">✅ Browser data cleared (had ${hadData ? 'data' : 'no data'})</span>`;
+        }
+
+        async function deleteTestCompletion() {
+            const resultDiv = document.getElementById('delete-result');
+            resultDiv.innerHTML = '<span class="info">Deleting...</span>';
+            log(`Sending DELETE to ${API_BASE}/api/renewal-completions/${TEST_POLICY.policyKey}`, 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/renewal-completions/${TEST_POLICY.policyKey}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+                log(`Response: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `<span class="success">✅ Deleted: ${TEST_POLICY.policyKey}</span>`;
+                } else {
+                    resultDiv.innerHTML = `<span class="error">❌ Error: ${data.error || 'Unknown error'}</span>`;
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Auto-load on page load
+        window.addEventListener('load', () => {
+            log('Page loaded, API base: ' + API_BASE, 'info');
+            loadAllCompletions();
+        });
+    </script>
+</body>
+</html>

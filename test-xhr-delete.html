@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test XHR Delete</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Test XMLHttpRequest Delete</h1>
+
+    <button onclick="testXHR()">Test XHR Delete</button>
+    <button onclick="testFetch()">Test Fetch Delete</button>
+
+    <div id="result"></div>
+
+    <script>
+        function testXHR() {
+            const resultDiv = document.getElementById('result');
+            const testId = 'xhr_test_' + Date.now();
+
+            // First create a lead
+            const xhr1 = new XMLHttpRequest();
+            xhr1.open('POST', 'http://localhost:3001/api/leads', true);
+            xhr1.setRequestHeader('Content-Type', 'application/json');
+            xhr1.onload = function() {
+                if (xhr1.status === 200) {
+                    resultDiv.innerHTML += '<p class="success">✅ Created lead: ' + testId + '</p>';
+
+                    // Now delete it
+                    const xhr2 = new XMLHttpRequest();
+                    xhr2.open('DELETE', 'http://localhost:3001/api/leads/' + testId, true);
+                    xhr2.onload = function() {
+                        if (xhr2.status === 200) {
+                            resultDiv.innerHTML += '<p class="success">✅ Deleted lead via XHR: ' + testId + '</p>';
+                        } else {
+                            resultDiv.innerHTML += '<p class="error">❌ Failed to delete: ' + xhr2.status + '</p>';
+                        }
+                    };
+                    xhr2.onerror = function() {
+                        resultDiv.innerHTML += '<p class="error">❌ XHR Network error</p>';
+                    };
+                    xhr2.send();
+                }
+            };
+            xhr1.send(JSON.stringify({
+                id: testId,
+                name: 'XHR Test Lead',
+                phone: '555-0000',
+                stage: 'new'
+            }));
+        }
+
+        function testFetch() {
+            const resultDiv = document.getElementById('result');
+            const testId = 'fetch_test_' + Date.now();
+
+            // Create then delete
+            fetch('http://localhost:3001/api/leads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: testId,
+                    name: 'Fetch Test Lead',
+                    phone: '555-1111',
+                    stage: 'new'
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    resultDiv.innerHTML += '<p class="success">✅ Created lead: ' + testId + '</p>';
+                    return fetch('http://localhost:3001/api/leads/' + testId, {
+                        method: 'DELETE'
+                    });
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    resultDiv.innerHTML += '<p class="success">✅ Deleted lead via Fetch: ' + testId + '</p>';
+                } else {
+                    resultDiv.innerHTML += '<p class="error">❌ Failed to delete</p>';
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML += '<p class="error">❌ Fetch error: ' + error.message + '</p>';
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+================================================================================
+        FMCSA DATABASE INSURANCE EXPIRATION ANALYSIS - OHIO
+================================================================================
+
+DATABASE OVERVIEW:
+------------------
+Total Ohio Carriers in Database:        51,296
+Carriers with Insurance Information:    36,399
+Active Carriers with Insurance:         35,951
+
+================================================================================
+            MONTHLY INSURANCE EXPIRATION DISTRIBUTION
+================================================================================
+
+ALL POLICIES BY MONTH (Regardless of Year):
+--------------------------------------------
+January        :  1,697 leads
+February       :  1,342 leads
+March          :  1,716 leads
+April          :  1,697 leads
+May            :  1,658 leads
+June           :  1,821 leads
+July           :  1,893 leads
+August         :  1,938 leads
+September      :  5,226 leads  ← PEAK MONTH
+October        :  5,973 leads  ← HIGHEST
+November       :  5,475 leads  ← HIGH SEASON
+December       :  5,515 leads  ← HIGH SEASON
+
+TOTAL ACTIVE   : 35,951 leads with expiration dates
+
+================================================================================
+            UPCOMING EXPIRATIONS (Next 12 Months from Oct 2025)
+================================================================================
+
+October 2025   :  3,535 leads expiring
+November 2025  :  4,232 leads expiring
+December 2025  :  4,311 leads expiring
+January 2026   :    281 leads expiring
+February 2026  :  [Data continues beyond current dataset]
+
+================================================================================
+                TOP INSURANCE CARRIERS IN DATABASE
+================================================================================
+
+1.  Other/Independent Carriers  : 16,443 policies (45.7%)
+2.  Progressive                  :  6,334 policies (17.6%)
+3.  GEICO                       :  3,505 policies (9.7%)
+4.  Great West                  :  2,182 policies (6.1%)
+5.  Berkshire Hathaway/GUARD    :  1,133 policies (3.2%)
+6.  Sentry Insurance            :  1,077 policies (3.0%)
+7.  Travelers                   :    969 policies (2.7%)
+8.  National Interstate         :    929 policies (2.6%)
+9.  The Hartford                :    879 policies (2.4%)
+10. Allstate                    :    863 policies (2.4%)
+11. CNA Insurance               :    846 policies (2.4%)
+12. State Farm                  :    791 policies (2.2%)
+
+================================================================================
+                        KEY INSIGHTS
+================================================================================
+
+SEASONALITY PATTERNS:
+- Q4 (Oct-Nov-Dec) has the HIGHEST concentration: 16,963 leads (47%)
+- Q3 (Jul-Aug-Sep) is second highest: 9,057 leads (25%)
+- Q1 (Jan-Feb-Mar) has moderate volume: 4,755 leads (13%)
+- Q2 (Apr-May-Jun) is the lowest: 5,176 leads (14%)
+
+PEAK RENEWAL MONTHS:
+1. October     - 5,973 leads (16.6% of total)
+2. December    - 5,515 leads (15.3% of total)
+3. November    - 5,475 leads (15.2% of total)
+4. September   - 5,226 leads (14.5% of total)
+
+LEAD GENERATION OPPORTUNITIES:
+- Focus efforts 30-60 days before peak months (Aug-Sep for Oct-Nov renewals)
+- October-December represents 47% of all annual renewals
+- Progressive, GEICO, and Great West represent 33% of the market
+- 16,443 policies with independent/smaller carriers offer diverse opportunities
+
+================================================================================
+                    RECOMMENDED ACTION PLAN
+================================================================================
+
+IMMEDIATE (October 2025):
+- 3,535 policies expiring THIS MONTH
+- Focus on Progressive (approx. 622 policies)
+- Target GEICO carriers (approx. 344 policies)
+
+30-DAY OUTLOOK (November 2025):
+- 4,232 policies expiring
+- Begin outreach now for November renewals
+
+60-DAY OUTLOOK (December 2025):
+- 4,311 policies expiring
+- Largest opportunity for Q4
+
+ANNUAL OPPORTUNITY:
+- 35,951 total renewable policies per year
+- Average 2,996 policies per month
+- Peak season (Sep-Dec): 21,189 policies (59% of annual)
+
+================================================================================

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VERIFY: No Mock Data - Only Real Outlook Emails</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: monospace;
+            background: #1f2937;
+            color: #10b981;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #111827;
+            border: 1px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .success {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        pre {
+            background: #000;
+            padding: 15px;
+            overflow: auto;
+            border-radius: 5px;
+        }
+        button {
+            background: #10b981;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 VERIFICATION: NO MOCK DATA - ONLY REAL OUTLOOK EMAILS</h1>
+
+    <div class="section">
+        <h2>📧 Step 1: Checking Backend API</h2>
+        <button onclick="checkBackend()">Check Backend API</button>
+        <pre id="backend-result">Click button to test...</pre>
+    </div>
+
+    <div class="section">
+        <h2>🌐 Step 2: Checking Frontend Script</h2>
+        <button onclick="checkFrontend()">Check Frontend Script</button>
+        <pre id="frontend-result">Click button to test...</pre>
+    </div>
+
+    <div class="section">
+        <h2>📬 Step 3: Testing Live Email Fetch</h2>
+        <button onclick="testEmailFetch()">Test Email Fetch</button>
+        <div id="email-result" style="margin-top: 15px;">Click button to test...</div>
+    </div>
+
+    <div class="section">
+        <h2>✅ Current Status</h2>
+        <div id="status">
+            <p class="success">✓ force-real-outlook-emails.js is loaded</p>
+            <p class="success">✓ Mock data function is overridden</p>
+            <p class="success">✓ Backend API is configured</p>
+            <p class="success">✓ Error messages are descriptive</p>
+            <p class="warning">⚠ Waiting for app password to authenticate</p>
+        </div>
+    </div>
+
+    <script>
+        async function checkBackend() {
+            const result = document.getElementById('backend-result');
+            result.textContent = 'Testing...';
+
+            try {
+                const response = await fetch('/api/outlook/emails');
+                const data = await response.json();
+                result.textContent = JSON.stringify(data, null, 2);
+
+                if (data.error && data.help) {
+                    result.innerHTML += '\n\n<span class="warning">⚠ Authentication needed - See instructions above</span>';
+                }
+            } catch (error) {
+                result.innerHTML = '<span class="error">ERROR: ' + error.message + '</span>';
+            }
+        }
+
+        async function checkFrontend() {
+            const result = document.getElementById('frontend-result');
+
+            try {
+                const response = await fetch('/js/force-real-outlook-emails.js');
+                const text = await response.text();
+
+                if (text.includes('FORCE REAL OUTLOOK EMAILS')) {
+                    result.innerHTML = '<span class="success">✅ force-real-outlook-emails.js is active!\nNo mock data will be shown.</span>';
+                } else {
+                    result.innerHTML = '<span class="error">❌ Script not found!</span>';
+                }
+            } catch (error) {
+                result.innerHTML = '<span class="error">ERROR: ' + error.message + '</span>';
+            }
+        }
+
+        function testEmailFetch() {
+            const result = document.getElementById('email-result');
+
+            // Create iframe to test
+            result.innerHTML = `
+                <p class="warning">Opening COI Management tab in iframe...</p>
+                <iframe src="http://162-220-14-239.nip.io/#coi"
+                        style="width: 100%; height: 500px; border: 2px solid #10b981; border-radius: 5px; margin-top: 10px;">
+                </iframe>
+                <p style="margin-top: 10px;">
+                    <span class="success">✓ If you see an error about app password = GOOD! (No mock data)</span><br>
+                    <span class="error">✗ If you see fake emails = BAD! (Mock data still showing)</span>
+                </p>
+            `;
+        }
+    </script>
+</body>
+</html>

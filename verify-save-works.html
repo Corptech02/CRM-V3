@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Save Functionality</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        pre {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Save Functionality Verification</h1>
+
+    <div class="test-section">
+        <h2>1. API Connection Test</h2>
+        <button onclick="testAPIConnection()">Test API Connection</button>
+        <div id="api-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Save Lead Test</h2>
+        <button onclick="testSaveLead()">Test Save Lead</button>
+        <div id="save-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Complete Integration Test</h2>
+        <button onclick="runIntegrationTest()">Run Integration Test</button>
+        <div id="integration-result"></div>
+    </div>
+
+    <script>
+        // Determine API URL based on hostname
+        const apiUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:8897'
+            : `http://${window.location.hostname}:8897`;
+
+        console.log('Using API URL:', apiUrl);
+
+        async function testAPIConnection() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.innerHTML = 'Testing connection...';
+
+            try {
+                // Test if API is reachable
+                const response = await fetch(`${apiUrl}/api/leads/test`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ test: true })
+                });
+
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    data = { raw: text };
+                }
+
+                if (response.ok || response.status === 400 || response.status === 500) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✓ API is reachable at ${apiUrl}</p>
+                        <p>Response Status: ${response.status}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">✗ API returned unexpected status: ${response.status}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">✗ Failed to connect to API</p>
+                    <p>Error: ${error.message}</p>
+                    <p>Make sure the API is running at ${apiUrl}</p>
+                `;
+            }
+        }
+
+        async function testSaveLead() {
+            const resultDiv = document.getElementById('save-result');
+            resultDiv.innerHTML = 'Testing save functionality...';
+
+            const testLeadId = '88571';
+            const testData = {
+                company_name: 'Test Company ' + new Date().toISOString(),
+                contact_name: 'Test Contact',
+                phone: '555-0123',
+                email: 'test@example.com',
+                notes: 'Updated at ' + new Date().toLocaleString()
+            };
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${testLeadId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✓ Lead save successful!</p>
+                        <p>Lead ID: ${testLeadId}</p>
+                        <p>Test Data Sent:</p>
+                        <pre>${JSON.stringify(testData, null, 2)}</pre>
+                        <p>API Response:</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">✗ Lead save failed</p>
+                        <p>Status: ${response.status}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">✗ Failed to save lead</p>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function runIntegrationTest() {
+            const resultDiv = document.getElementById('integration-result');
+            resultDiv.innerHTML = 'Running integration test...';
+
+            const results = [];
+
+            // Test 1: API Connection
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/test`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ test: true })
+                });
+                results.push({
+                    test: 'API Connection',
+                    success: response.status > 0,
+                    details: `Status ${response.status}`
+                });
+            } catch (error) {
+                results.push({
+                    test: 'API Connection',
+                    success: false,
+                    details: error.message
+                });
+            }
+
+            // Test 2: Save Lead
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/88571`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        company_name: 'Integration Test ' + Date.now()
+                    })
+                });
+                const data = await response.json();
+                results.push({
+                    test: 'Save Lead',
+                    success: response.ok,
+                    details: data.message || 'Success'
+                });
+            } catch (error) {
+                results.push({
+                    test: 'Save Lead',
+                    success: false,
+                    details: error.message
+                });
+            }
+
+            // Test 3: Quote Submission
+            try {
+                const response = await fetch(`${apiUrl}/api/quote-submissions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lead_id: '88571',
+                        carrier_name: 'Test Carrier',
+                        premium: '1000',
+                        effective_date: new Date().toISOString().split('T')[0],
+                        notes: 'Integration test'
+                    })
+                });
+                const data = await response.json();
+                results.push({
+                    test: 'Quote Submission',
+                    success: response.ok || response.status === 200,
+                    details: data.message || 'Success'
+                });
+            } catch (error) {
+                results.push({
+                    test: 'Quote Submission',
+                    success: false,
+                    details: error.message
+                });
+            }
+
+            // Display results
+            let html = '<h3>Integration Test Results</h3>';
+            let allPassed = true;
+
+            results.forEach(result => {
+                const icon = result.success ? '✓' : '✗';
+                const className = result.success ? 'success' : 'error';
+                html += `<p class="${className}">${icon} ${result.test}: ${result.details}</p>`;
+                if (!result.success) allPassed = false;
+            });
+
+            if (allPassed) {
+                html += '<hr><p class="success">All tests passed! The save functionality is working correctly.</p>';
+            } else {
+                html += '<hr><p class="error">Some tests failed. Please check the API configuration.</p>';
+            }
+
+            resultDiv.innerHTML = html;
+        }
+
+        // Run API test on page load
+        window.addEventListener('load', () => {
+            console.log('Page loaded. API URL configured as:', apiUrl);
+            console.log('Current hostname:', window.location.hostname);
+        });
+    </script>
+</body>
+</html>

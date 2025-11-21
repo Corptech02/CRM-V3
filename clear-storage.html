@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Storage</title>
+</head>
+<body>
+    <h1>Clearing localStorage...</h1>
+    <script>
+        // Clear all localStorage
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Remove specific problematic keys
+        localStorage.removeItem('insurance_leads');
+        localStorage.removeItem('leads');
+        localStorage.removeItem('archivedLeads');
+        localStorage.removeItem('archived_leads');
+        localStorage.removeItem('PERMANENT_ARCHIVED_IDS');
+
+        document.body.innerHTML = '<h1>Storage cleared successfully!</h1><p>You can now <a href="/">return to the main app</a></p>';
+    </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Vehicle Buttons</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-btn { background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; margin: 10px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-container { background: white; margin: 50px auto; width: 90%; max-width: 1200px; border-radius: 8px; }
+        .modal-header { padding: 20px; border-bottom: 1px solid #ddd; }
+        .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
+        .policy-tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
+        .tab-btn { background: none; border: none; padding: 12px 24px; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab-btn.active { border-bottom-color: #3b82f6; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-section { margin-bottom: 30px; }
+        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Test Vehicle Buttons Visibility</h1>
+    <button class="test-btn" onclick="testCommercialAutoModal()">Test Commercial Auto Policy Modal</button>
+    <button class="test-btn" onclick="testPersonalAutoModal()">Test Personal Auto Policy Modal</button>
+    <button class="test-btn" onclick="testOtherPolicyModal()">Test Homeowners Policy Modal</button>
+
+    <script src="js/policy-modal.js"></script>
+    <script>
+        function testCommercialAutoModal() {
+            console.log('Testing commercial auto modal...');
+            const testPolicy = {
+                id: 'test-123',
+                policyNumber: 'TEST-CA-001',
+                policyType: 'commercial-auto',
+                carrier: 'Test Insurance'
+            };
+            showPolicyModal(testPolicy);
+        }
+
+        function testPersonalAutoModal() {
+            console.log('Testing personal auto modal...');
+            const testPolicy = {
+                id: 'test-456',
+                policyNumber: 'TEST-PA-001',
+                policyType: 'personal-auto',
+                carrier: 'Test Insurance'
+            };
+            showPolicyModal(testPolicy);
+        }
+
+        function testOtherPolicyModal() {
+            console.log('Testing homeowners modal...');
+            const testPolicy = {
+                id: 'test-789',
+                policyNumber: 'TEST-HO-001',
+                policyType: 'homeowners',
+                carrier: 'Test Insurance'
+            };
+            showPolicyModal(testPolicy);
+        }
+
+        function closePolicyModal() {
+            const modal = document.getElementById('policyModal');
+            if (modal) modal.remove();
+        }
+    </script>
+</body>
+</html>

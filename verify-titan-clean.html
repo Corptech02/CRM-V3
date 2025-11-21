@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Titan Email - Clean Verification</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .warning { color: #ffff00; }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 5px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        button:hover { background: #00cc00; }
+        pre {
+            background: #0a0a0a;
+            padding: 15px;
+            overflow: auto;
+            border: 1px solid #00ff00;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #00ff00;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 TITAN EMAIL VERIFICATION - NO MOCK DATA</h1>
+
+    <div class="section">
+        <h2 class="success">✅ WHAT WAS FIXED:</h2>
+        <ul>
+            <li class="success">✓ Disabled force-outlook-only.js (was adding mock emails)</li>
+            <li class="success">✓ Disabled coi-use-outlook.js (had mock data)</li>
+            <li class="success">✓ Disabled display-real-outlook-emails.js (cached mock data)</li>
+            <li class="success">✓ Disabled disable-all-gmail.js (was interfering)</li>
+            <li class="success">✓ Created titan-emails-only.js as the ONLY email handler</li>
+            <li class="success">✓ Made loadCOIInbox non-writable (can't be overridden)</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2 class="warning">⚠️ MOCK EMAILS REMOVED:</h2>
+        <ul>
+            <li class="error">✗ client@example.com (FAKE - removed)</li>
+            <li class="error">✗ underwriter@insurance.com (FAKE - removed)</li>
+            <li class="error">✗ dispatch@walmart.com (FAKE from app.js - overridden)</li>
+            <li class="error">✗ broker@chrobinson.com (FAKE from app.js - overridden)</li>
+            <li class="error">✗ compliance@amazon.com (FAKE from app.js - overridden)</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>📧 TEST TITAN API:</h2>
+        <button onclick="testAPI()">Test Titan Connection</button>
+        <button onclick="clearBrowserCache()">Clear Browser Cache</button>
+        <button onclick="refreshFrame()">Refresh COI Tab</button>
+        <pre id="api-result">Click "Test Titan Connection" to verify...</pre>
+    </div>
+
+    <div class="section">
+        <h2>🖥️ LIVE COI TAB (should show TITAN EMAIL CONNECTED):</h2>
+        <p class="warning">If you still see mock emails, press Ctrl+F5 (or Cmd+Shift+R on Mac) to clear cache!</p>
+        <iframe id="coi-frame" src="http://162-220-14-239.nip.io/#coi"></iframe>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const result = document.getElementById('api-result');
+            result.innerHTML = '<span class="warning">Testing Titan API...</span>';
+
+            try {
+                const response = await fetch('/api/outlook/emails?_=' + Date.now());
+                const data = await response.json();
+
+                if (data.success) {
+                    result.innerHTML = '<span class="success">✅ TITAN API WORKING!\n\n' +
+                                     'Emails found: ' + data.count + '\n' +
+                                     JSON.stringify(data.emails, null, 2) + '</span>';
+                } else {
+                    result.innerHTML = '<span class="error">❌ Error: ' + (data.error || 'Unknown') + '</span>';
+                }
+            } catch (error) {
+                result.innerHTML = '<span class="error">❌ Connection Error: ' + error.message + '</span>';
+            }
+        }
+
+        function clearBrowserCache() {
+            // Force reload all cached scripts
+            localStorage.clear();
+            sessionStorage.clear();
+            alert('Cache cleared! Press Ctrl+F5 (or Cmd+Shift+R on Mac) to fully refresh the page.');
+        }
+
+        function refreshFrame() {
+            const iframe = document.getElementById('coi-frame');
+            iframe.src = iframe.src.split('?')[0] + '?_=' + Date.now() + '#coi';
+        }
+
+        // Auto-test on load
+        setTimeout(testAPI, 500);
+    </script>
+</body>
+</html>

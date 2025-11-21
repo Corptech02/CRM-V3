@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Company Fields Persistence</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .lead-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-weight: 600;
+            font-size: 12px;
+            color: #495057;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        .form-group input {
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+        }
+        button.success {
+            background: #28a745;
+        }
+        button.success:hover {
+            background: #218838;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .lead-display {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .field-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .field-row:last-child {
+            border-bottom: none;
+        }
+        .field-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .field-value {
+            color: #212529;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏢 Test Company Fields Persistence</h1>
+
+        <div class="test-section">
+            <h2>Instructions</h2>
+            <ol>
+                <li>Create a test lead or select an existing one</li>
+                <li>Modify any company information field</li>
+                <li>Click "Save & Reload" to verify persistence</li>
+                <li>Or refresh the page to test full persistence</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Lead Form</h2>
+            <div class="lead-form">
+                <div class="form-group">
+                    <label>Lead ID</label>
+                    <input type="text" id="leadId" placeholder="Auto-generated" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Company Name</label>
+                    <input type="text" id="companyName" placeholder="Enter company name">
+                </div>
+                <div class="form-group">
+                    <label>Contact</label>
+                    <input type="text" id="contact" placeholder="Enter contact name">
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" id="phone" placeholder="Enter phone number">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="Enter email address">
+                </div>
+                <div class="form-group">
+                    <label>DOT Number</label>
+                    <input type="text" id="dotNumber" placeholder="Enter DOT number">
+                </div>
+                <div class="form-group">
+                    <label>MC Number</label>
+                    <input type="text" id="mcNumber" placeholder="Enter MC number">
+                </div>
+                <div class="form-group">
+                    <label>Years in Business</label>
+                    <input type="text" id="yearsInBusiness" placeholder="Enter years">
+                </div>
+                <div class="form-group">
+                    <label>Fleet Size</label>
+                    <input type="text" id="fleetSize" placeholder="Enter fleet size">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="createTestLead()">Create New Test Lead</button>
+                <button onclick="saveAllFields()" class="success">Save All Fields</button>
+                <button onclick="saveAndReload()" class="success">Save & Reload from Server</button>
+            </div>
+            <div id="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Current Lead Data (from Server)</h2>
+            <div id="leadDisplay"></div>
+            <button onclick="loadFromServer()">🔄 Reload from Server</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001'
+            : `http://${window.location.hostname}:3001`;
+
+        let currentLeadId = null;
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = 'status';
+            }, 3000);
+        }
+
+        async function createTestLead() {
+            const timestamp = Date.now();
+            currentLeadId = `company_test_${timestamp}`;
+
+            const testLead = {
+                id: currentLeadId,
+                name: `Test Company ${timestamp}`,
+                contact: 'John Doe',
+                phone: '555-' + Math.floor(Math.random() * 9000 + 1000),
+                email: `test${timestamp}@example.com`,
+                dotNumber: 'DOT' + Math.floor(Math.random() * 999999),
+                mcNumber: 'MC' + Math.floor(Math.random() * 999999),
+                yearsInBusiness: Math.floor(Math.random() * 20) + 1,
+                fleetSize: Math.floor(Math.random() * 50) + 1,
+                stage: 'new',
+                product: 'Commercial Auto'
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/leads`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testLead)
+                });
+
+                if (response.ok) {
+                    // Populate form with created lead
+                    document.getElementById('leadId').value = testLead.id;
+                    document.getElementById('companyName').value = testLead.name;
+                    document.getElementById('contact').value = testLead.contact;
+                    document.getElementById('phone').value = testLead.phone;
+                    document.getElementById('email').value = testLead.email;
+                    document.getElementById('dotNumber').value = testLead.dotNumber;
+                    document.getElementById('mcNumber').value = testLead.mcNumber;
+                    document.getElementById('yearsInBusiness').value = testLead.yearsInBusiness;
+                    document.getElementById('fleetSize').value = testLead.fleetSize;
+
+                    showStatus(`✅ Created test lead: ${testLead.name}`, 'success');
+                    loadFromServer();
+                }
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function saveField(fieldName, value) {
+            if (!currentLeadId) {
+                showStatus('Please create a test lead first', 'error');
+                return;
+            }
+
+            try {
+                // Get the full lead object first
+                const getResponse = await fetch(`${API_URL}/api/leads`);
+                const allLeads = await getResponse.json();
+                const lead = allLeads.find(l => l.id === currentLeadId);
+
+                if (!lead) {
+                    showStatus('Lead not found', 'error');
+                    return;
+                }
+
+                // Update the field
+                lead[fieldName] = value;
+                lead.updatedAt = new Date().toISOString();
+
+                // Save back to server
+                const response = await fetch(`${API_URL}/api/leads`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lead)
+                });
+
+                if (response.ok) {
+                    console.log(`✅ ${fieldName} saved to server`);
+                    return true;
+                }
+            } catch (error) {
+                console.error(`Error saving ${fieldName}:`, error);
+                return false;
+            }
+        }
+
+        async function saveAllFields() {
+            if (!currentLeadId) {
+                showStatus('Please create a test lead first', 'error');
+                return;
+            }
+
+            const fields = {
+                name: document.getElementById('companyName').value,
+                contact: document.getElementById('contact').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                dotNumber: document.getElementById('dotNumber').value,
+                mcNumber: document.getElementById('mcNumber').value,
+                yearsInBusiness: document.getElementById('yearsInBusiness').value,
+                fleetSize: document.getElementById('fleetSize').value
+            };
+
+            try {
+                // Get current lead from server
+                const getResponse = await fetch(`${API_URL}/api/leads`);
+                const allLeads = await getResponse.json();
+                const lead = allLeads.find(l => l.id === currentLeadId);
+
+                if (!lead) {
+                    showStatus('Lead not found', 'error');
+                    return;
+                }
+
+                // Update all fields
+                Object.assign(lead, fields);
+                lead.updatedAt = new Date().toISOString();
+
+                // Save to server
+                const response = await fetch(`${API_URL}/api/leads`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lead)
+                });
+
+                if (response.ok) {
+                    showStatus('✅ All fields saved to server!', 'success');
+                    loadFromServer();
+                }
+            } catch (error) {
+                showStatus(`❌ Error saving: ${error.message}`, 'error');
+            }
+        }
+
+        async function saveAndReload() {
+            await saveAllFields();
+            setTimeout(() => loadFromServer(), 500);
+        }
+
+        async function loadFromServer() {
+            if (!currentLeadId) {
+                document.getElementById('leadDisplay').innerHTML =
+                    '<p style="color: #6c757d;">No lead selected. Create a test lead first.</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/leads`);
+                const leads = await response.json();
+                const lead = leads.find(l => l.id === currentLeadId);
+
+                if (lead) {
+                    const displayHtml = `
+                        <div class="lead-display">
+                            <div class="field-row">
+                                <span class="field-label">Lead ID:</span>
+                                <span class="field-value">${lead.id}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Company Name:</span>
+                                <span class="field-value">${lead.name || 'Not set'}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Contact:</span>
+                                <span class="field-value">${lead.contact || 'Not set'}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Phone:</span>
+                                <span class="field-value">${lead.phone || 'Not set'}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Email:</span>
+                                <span class="field-value">${lead.email || 'Not set'}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">DOT Number:</span>
+                                <span class="field-value">${lead.dotNumber || 'Not set'}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">MC Number:</span>
+                                <span class="field-value">${lead.mcNumber || 'Not set'}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Years in Business:</span>
+                                <span class="field-value">${lead.yearsInBusiness || 'Not set'}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Fleet Size:</span>
+                                <span class="field-value">${lead.fleetSize || 'Not set'}</span>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('leadDisplay').innerHTML = displayHtml;
+                    showStatus('✅ Loaded from server', 'info');
+                } else {
+                    document.getElementById('leadDisplay').innerHTML =
+                        '<p style="color: #dc3545;">Lead not found on server</p>';
+                }
+            } catch (error) {
+                showStatus(`❌ Error loading: ${error.message}`, 'error');
+            }
+        }
+
+        // Add change listeners to all fields
+        document.addEventListener('DOMContentLoaded', () => {
+            const fields = ['companyName', 'contact', 'phone', 'email',
+                          'dotNumber', 'mcNumber', 'yearsInBusiness', 'fleetSize'];
+
+            fields.forEach(fieldId => {
+                const input = document.getElementById(fieldId);
+                if (input) {
+                    input.addEventListener('change', async () => {
+                        if (currentLeadId) {
+                            // Map field IDs to field names
+                            const fieldMap = {
+                                'companyName': 'name',
+                                'contact': 'contact',
+                                'phone': 'phone',
+                                'email': 'email',
+                                'dotNumber': 'dotNumber',
+                                'mcNumber': 'mcNumber',
+                                'yearsInBusiness': 'yearsInBusiness',
+                                'fleetSize': 'fleetSize'
+                            };
+
+                            const fieldName = fieldMap[fieldId];
+                            const saved = await saveField(fieldName, input.value);
+                            if (saved) {
+                                showStatus(`✅ ${fieldName} updated`, 'success');
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

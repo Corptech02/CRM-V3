@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Timestamp Update</title>
+</head>
+<body>
+    <h3>Timestamp Update Test</h3>
+    <button onclick="testUpdate()">Test Stage Update</button>
+    <div id="result"></div>
+
+    <script>
+        function testUpdate() {
+            // Get first lead
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            if (leads.length > 0) {
+                const lead = leads[0];
+                const resultDiv = document.getElementById('result');
+
+                // Show before state
+                resultDiv.innerHTML = '<h4>Before Update:</h4>';
+                resultDiv.innerHTML += `<p>Lead: ${lead.name}</p>`;
+                resultDiv.innerHTML += `<p>Stage: ${lead.stage}</p>`;
+                resultDiv.innerHTML += `<p>Timestamps: ${JSON.stringify(lead.stageTimestamps)}</p>`;
+
+                // Simulate stage update
+                const newStage = lead.stage === 'new' ? 'contacted' : 'new';
+
+                // Call updateLeadStage if available
+                if (window.updateLeadStage) {
+                    window.updateLeadStage(lead.id, newStage);
+
+                    // Check after update
+                    setTimeout(() => {
+                        const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                        const updatedLead = updatedLeads.find(l => l.id === lead.id);
+
+                        resultDiv.innerHTML += '<h4>After Update:</h4>';
+                        resultDiv.innerHTML += `<p>Stage: ${updatedLead.stage}</p>`;
+                        resultDiv.innerHTML += `<p>Timestamps: ${JSON.stringify(updatedLead.stageTimestamps)}</p>`;
+
+                        if (updatedLead.stageTimestamps && updatedLead.stageTimestamps[newStage]) {
+                            const timestamp = new Date(updatedLead.stageTimestamps[newStage]);
+                            resultDiv.innerHTML += `<p style="color: green;">✅ Timestamp updated to: ${timestamp.toLocaleString()}</p>`;
+                        } else {
+                            resultDiv.innerHTML += `<p style="color: red;">❌ Timestamp not updated!</p>`;
+                        }
+                    }, 500);
+                } else {
+                    resultDiv.innerHTML += '<p style="color: red;">updateLeadStage function not found!</p>';
+                }
+            } else {
+                document.getElementById('result').innerHTML = '<p>No leads found in localStorage</p>';
+            }
+        }
+    </script>
+</body>
+</html>

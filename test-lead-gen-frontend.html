@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Lead Generation Frontend Issue</title>
+    <script src="js/api-service.js"></script>
+    <script src="js/fcsma-api-override-v5.js"></script>
+</head>
+<body>
+    <h1>Test Lead Generation</h1>
+    <button onclick="testGenerateLeads()">Test Generate Leads</button>
+    <div id="results"></div>
+
+    <script>
+    async function testGenerateLeads() {
+        console.log('Testing lead generation...');
+        const resultsDiv = document.getElementById('results');
+
+        try {
+            const criteria = {
+                state: 'OH',
+                expiryDays: 60,
+                skipDays: 0,
+                insuranceCompanies: [],
+                limit: 10
+            };
+
+            console.log('Calling apiService.generateLeads with:', criteria);
+            const data = await apiService.generateLeads(criteria);
+
+            console.log('Received data:', data);
+            resultsDiv.innerHTML = `
+                <h2>Success!</h2>
+                <p>Total leads: ${data.total}</p>
+                <p>First lead: ${data.leads && data.leads[0] ? JSON.stringify(data.leads[0], null, 2) : 'None'}</p>
+            `;
+
+        } catch (error) {
+            console.error('Error:', error);
+            resultsDiv.innerHTML = `
+                <h2>Error!</h2>
+                <p>${error.message}</p>
+            `;
+        }
+    }
+    </script>
+</body>
+</html>

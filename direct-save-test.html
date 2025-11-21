@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Save Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Direct Save Test for Lead 88571</h1>
+
+    <div class="section">
+        <h2>Step 1: Check Current Database Values</h2>
+        <button onclick="checkDatabase()">Check Database</button>
+        <div id="db-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 2: Update Values Directly</h2>
+        <input type="text" id="company" placeholder="Company Name" value="TEST SAVE COMPANY">
+        <input type="text" id="phone" placeholder="Phone" value="111-2222">
+        <input type="text" id="contact" placeholder="Contact Name" value="John Doe">
+        <br>
+        <button onclick="saveDirectly()">Save Directly to API</button>
+        <div id="save-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Verify Save</h2>
+        <button onclick="verifySave()">Verify in Database</button>
+        <div id="verify-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 4: Check What Frontend Shows</h2>
+        <button onclick="checkFrontend()">Check LocalStorage</button>
+        <div id="frontend-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 5: Force Sync</h2>
+        <button onclick="forceSync()">Force Sync from Database</button>
+        <div id="sync-status"></div>
+    </div>
+
+    <script>
+        const leadId = '88571';
+        const apiUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:8897'
+            : `http://${window.location.hostname}:8897`;
+
+        console.log('Using API URL:', apiUrl);
+
+        async function checkDatabase() {
+            const status = document.getElementById('db-status');
+            status.innerHTML = '<div class="status">Checking database...</div>';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+
+                status.innerHTML = `
+                    <div class="status success">✓ Database contains:</div>
+                    <pre>${JSON.stringify({
+                        company_name: data.company_name,
+                        contact_name: data.contact_name,
+                        phone: data.phone,
+                        email: data.email,
+                        notes: data.notes
+                    }, null, 2)}</pre>
+                `;
+            } catch (error) {
+                status.innerHTML = `<div class="status error">✗ Error: ${error.message}</div>`;
+                console.error('Database check error:', error);
+            }
+        }
+
+        async function saveDirectly() {
+            const status = document.getElementById('save-status');
+            const company = document.getElementById('company').value;
+            const phone = document.getElementById('phone').value;
+            const contact = document.getElementById('contact').value;
+            const timestamp = new Date().toISOString();
+
+            status.innerHTML = '<div class="status">Saving to API...</div>';
+
+            const payload = {
+                company_name: company,
+                contact_name: contact,
+                phone: phone,
+                notes: `Direct save test at ${timestamp}`
+            };
+
+            console.log('Sending payload:', payload);
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                console.log('API response:', data);
+
+                if (response.ok) {
+                    status.innerHTML = `
+                        <div class="status success">✓ API returned success:</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    status.innerHTML = `
+                        <div class="status error">✗ API error:</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="status error">✗ Network error: ${error.message}</div>`;
+                console.error('Save error:', error);
+            }
+        }
+
+        async function verifySave() {
+            const status = document.getElementById('verify-status');
+            status.innerHTML = '<div class="status">Verifying in database...</div>';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+
+                const expected = {
+                    company: document.getElementById('company').value,
+                    phone: document.getElementById('phone').value,
+                    contact: document.getElementById('contact').value
+                };
+
+                const matches =
+                    data.company_name === expected.company &&
+                    data.phone === expected.phone &&
+                    data.contact_name === expected.contact;
+
+                if (matches) {
+                    status.innerHTML = `
+                        <div class="status success">✓ Database updated correctly!</div>
+                        <pre>${JSON.stringify({
+                            company_name: data.company_name,
+                            contact_name: data.contact_name,
+                            phone: data.phone
+                        }, null, 2)}</pre>
+                    `;
+                } else {
+                    status.innerHTML = `
+                        <div class="status error">✗ Database values don't match!</div>
+                        <div>Expected:</div>
+                        <pre>${JSON.stringify(expected, null, 2)}</pre>
+                        <div>Got:</div>
+                        <pre>${JSON.stringify({
+                            company_name: data.company_name,
+                            contact_name: data.contact_name,
+                            phone: data.phone
+                        }, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="status error">✗ Error: ${error.message}</div>`;
+                console.error('Verify error:', error);
+            }
+        }
+
+        function checkFrontend() {
+            const status = document.getElementById('frontend-status');
+
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const lead = leads.find(l => String(l.id) === String(leadId));
+
+            if (lead) {
+                status.innerHTML = `
+                    <div class="status success">✓ LocalStorage contains:</div>
+                    <pre>${JSON.stringify({
+                        id: lead.id,
+                        name: lead.name,
+                        company_name: lead.company_name,
+                        contact: lead.contact,
+                        contact_name: lead.contact_name,
+                        phone: lead.phone
+                    }, null, 2)}</pre>
+                `;
+            } else {
+                status.innerHTML = '<div class="status error">✗ Lead not found in localStorage</div>';
+            }
+        }
+
+        async function forceSync() {
+            const status = document.getElementById('sync-status');
+            status.innerHTML = '<div class="status">Syncing from database...</div>';
+
+            try {
+                // Get from API
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const apiData = await response.json();
+
+                // Update localStorage
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+                const updatedLead = {
+                    id: leadId,
+                    name: apiData.company_name,
+                    company_name: apiData.company_name,
+                    contact: apiData.contact_name,
+                    contact_name: apiData.contact_name,
+                    phone: apiData.phone,
+                    email: apiData.email,
+                    dotNumber: apiData.dot_number,
+                    mcNumber: apiData.mc_number,
+                    notes: apiData.notes
+                };
+
+                if (leadIndex !== -1) {
+                    leads[leadIndex] = { ...leads[leadIndex], ...updatedLead };
+                } else {
+                    leads.push(updatedLead);
+                }
+
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                localStorage.setItem('leads', JSON.stringify(leads));
+
+                status.innerHTML = `
+                    <div class="status success">✓ Synced! LocalStorage now has:</div>
+                    <pre>${JSON.stringify(updatedLead, null, 2)}</pre>
+                `;
+
+                // Re-check frontend
+                checkFrontend();
+            } catch (error) {
+                status.innerHTML = `<div class="status error">✗ Sync error: ${error.message}</div>`;
+                console.error('Sync error:', error);
+            }
+        }
+
+        // Check everything on load
+        window.addEventListener('load', () => {
+            console.log('Page loaded, checking initial state...');
+            checkDatabase();
+            checkFrontend();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Authentication - Vanguard Insurance</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .auth-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .auth-header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .auth-header p {
+            color: #666;
+            font-size: 14px;
+        }
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .status-message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+        .auth-steps {
+            margin: 30px 0;
+        }
+        .step {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            margin: 10px 0;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #38a169;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .loading.active {
+            display: block;
+        }
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1><i class="fab fa-google" style="color: #4285f4;"></i> Gmail Integration Setup</h1>
+            <p>Connect your Gmail account to manage COI emails directly from Vanguard</p>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="auth-steps">
+            <div class="step">
+                <h3>
+                    <span class="step-number">1</span>
+                    Check Server Connection
+                </h3>
+                <p>First, let's make sure the backend server is running and accessible.</p>
+                <button class="btn btn-primary" onclick="checkServerConnection()">
+                    <i class="fas fa-server"></i> Check Connection
+                </button>
+                <div id="serverStatus"></div>
+            </div>
+
+            <div class="step">
+                <h3>
+                    <span class="step-number">2</span>
+                    Authorize Gmail Access
+                </h3>
+                <p>Click the button below to authorize Vanguard to access your Gmail account.</p>
+                <button class="btn btn-primary" onclick="startGmailAuth()" id="authButton" disabled>
+                    <i class="fab fa-google"></i> Connect Gmail Account
+                </button>
+                <div id="authStatus"></div>
+            </div>
+
+            <div class="step">
+                <h3>
+                    <span class="step-number">3</span>
+                    Test Connection
+                </h3>
+                <p>Once authorized, test that emails can be fetched successfully.</p>
+                <button class="btn btn-primary" onclick="testGmailConnection()" id="testButton" disabled>
+                    <i class="fas fa-envelope"></i> Test Email Access
+                </button>
+                <div id="testStatus"></div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <i class="fas fa-spinner spinner" style="font-size: 32px; color: #667eea;"></i>
+            <p>Processing...</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/#dashboard" class="btn btn-success">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Backend API URL
+        const API_URL = window.location.hostname.includes('nip.io')
+            ? `http://${window.location.hostname.split('.')[0]}:3001/api`
+            : 'http://localhost:3001/api';
+
+        // Check if we're returning from OAuth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const authCode = urlParams.get('code');
+        const authError = urlParams.get('error');
+
+        if (authCode) {
+            handleOAuthCallback(authCode);
+        } else if (authError) {
+            showStatus('error', 'Authorization failed: ' + authError);
+        }
+
+        async function checkServerConnection() {
+            showLoading(true);
+            const serverStatusDiv = document.getElementById('serverStatus');
+
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    serverStatusDiv.innerHTML = `
+                        <div style="margin-top: 10px; padding: 10px; background: #d4edda; color: #155724; border-radius: 5px;">
+                            <i class="fas fa-check-circle"></i> Server is running
+                            <br><small>Status: ${data.status} | Service: ${data.service}</small>
+                        </div>
+                    `;
+                    document.getElementById('authButton').disabled = false;
+
+                    // Check if already authenticated
+                    checkExistingAuth();
+                } else {
+                    throw new Error('Server not responding');
+                }
+            } catch (error) {
+                serverStatusDiv.innerHTML = `
+                    <div style="margin-top: 10px; padding: 10px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                        <i class="fas fa-exclamation-circle"></i> Cannot connect to server
+                        <br><small>${error.message}</small>
+                    </div>
+                `;
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function checkExistingAuth() {
+            try {
+                const response = await fetch(`${API_URL}/gmail/auth/status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.authenticated) {
+                        document.getElementById('authStatus').innerHTML = `
+                            <div style="margin-top: 10px; padding: 10px; background: #d4edda; color: #155724; border-radius: 5px;">
+                                <i class="fas fa-check-circle"></i> Already authenticated
+                                <br><small>Email: ${data.email || 'Connected'}</small>
+                            </div>
+                        `;
+                        document.getElementById('testButton').disabled = false;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+            }
+        }
+
+        async function startGmailAuth() {
+            showLoading(true);
+            const authStatusDiv = document.getElementById('authStatus');
+
+            try {
+                // First, set up OAuth credentials
+                const credentials = {
+                    client_id: "YOUR_CLIENT_ID",
+                    client_secret: "YOUR_CLIENT_SECRET",
+                    redirect_uri: `http://${window.location.host}/gmail-auth.html`
+                };
+
+                // Get auth URL from backend
+                const response = await fetch(`${API_URL}/gmail/auth/url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(credentials)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    authStatusDiv.innerHTML = `
+                        <div style="margin-top: 10px; padding: 10px; background: #d1ecf1; color: #0c5460; border-radius: 5px;">
+                            <i class="fas fa-info-circle"></i> Redirecting to Google for authorization...
+                        </div>
+                    `;
+
+                    // Redirect to Google OAuth
+                    setTimeout(() => {
+                        window.location.href = data.authUrl;
+                    }, 1500);
+                } else {
+                    // If no OAuth credentials set, show manual setup
+                    authStatusDiv.innerHTML = `
+                        <div style="margin-top: 10px; padding: 15px; background: #fff3cd; color: #856404; border-radius: 5px;">
+                            <i class="fas fa-exclamation-triangle"></i> OAuth credentials not configured
+                            <br><br>
+                            <strong>To set up Gmail integration:</strong>
+                            <ol style="text-align: left; margin: 10px 0;">
+                                <li>Go to <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
+                                <li>Create a new project or select existing</li>
+                                <li>Enable Gmail API</li>
+                                <li>Create OAuth 2.0 credentials</li>
+                                <li>Add redirect URI: <code>http://${window.location.host}/gmail-auth.html</code></li>
+                            </ol>
+                            <p>Once you have the credentials, update the backend configuration.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                authStatusDiv.innerHTML = `
+                    <div style="margin-top: 10px; padding: 10px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                        <i class="fas fa-exclamation-circle"></i> Error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function handleOAuthCallback(code) {
+            showStatus('info', 'Processing authorization...');
+            showLoading(true);
+
+            try {
+                const response = await fetch(`${API_URL}/gmail/auth/callback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus('success', 'Gmail successfully connected!');
+                    document.getElementById('testButton').disabled = false;
+
+                    // Clear URL parameters
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    throw new Error('Failed to complete authorization');
+                }
+            } catch (error) {
+                showStatus('error', 'Authorization failed: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function testGmailConnection() {
+            showLoading(true);
+            const testStatusDiv = document.getElementById('testStatus');
+
+            try {
+                const response = await fetch(`${API_URL}/gmail/emails/list?maxResults=5`);
+                if (response.ok) {
+                    const data = await response.json();
+                    testStatusDiv.innerHTML = `
+                        <div style="margin-top: 10px; padding: 10px; background: #d4edda; color: #155724; border-radius: 5px;">
+                            <i class="fas fa-check-circle"></i> Connection successful!
+                            <br><small>Found ${data.messages?.length || 0} recent emails</small>
+                        </div>
+                    `;
+
+                    // Store auth status
+                    localStorage.setItem('gmail_connected', 'true');
+
+                    showStatus('success', 'Gmail integration is working! You can now return to the dashboard.');
+                } else {
+                    throw new Error('Failed to fetch emails');
+                }
+            } catch (error) {
+                testStatusDiv.innerHTML = `
+                    <div style="margin-top: 10px; padding: 10px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                        <i class="fas fa-exclamation-circle"></i> Test failed: ${error.message}
+                    </div>
+                `;
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.className = `status-message ${type}`;
+            statusDiv.innerHTML = `<i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : 'info'}-circle"></i> ${message}`;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').className = show ? 'loading active' : 'loading';
+        }
+
+        // Check server connection on load
+        window.addEventListener('load', () => {
+            checkServerConnection();
+        });
+    </script>
+</body>
+</html>

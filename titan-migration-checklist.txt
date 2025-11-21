@@ -1,0 +1,37 @@
+================================================
+TITAN EMAIL MIGRATION CHECKLIST
+Ask GoDaddy Support These Questions:
+================================================
+
+BEFORE MIGRATION:
+□ Will IMAP be automatically enabled on Titan?
+□ Will my current password (25nickc124) work or will I get a new one?
+□ How long will email be down during migration?
+□ Will my existing emails transfer over?
+□ Can I create app passwords in Titan?
+□ Is there a trial period if it doesn't work?
+□ Confirm username format: "contact@vigagency.com" or just "contact"?
+
+CONFIRM THESE SETTINGS:
+□ IMAP Server: imap.secureserver.net
+□ IMAP Port: 993 with SSL
+□ SMTP Server: smtpout.secureserver.net
+□ SMTP Port: 587 with TLS
+□ Authentication: Basic auth or app password?
+
+GET IN WRITING:
+□ "Titan Email includes full IMAP support"
+□ "IMAP will work immediately after migration"
+□ "No additional configuration needed for IMAP"
+
+AFTER MIGRATION:
+□ Test login to webmail first
+□ Note down any new password
+□ Test IMAP connection immediately
+□ Keep support ticket open until confirmed working
+
+================================================
+IMPORTANT: Get them to confirm IMAP will work
+BEFORE you migrate. Don't migrate until they
+guarantee IMAP access!
+================================================

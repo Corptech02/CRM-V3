@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Override Script Debug</title>
+</head>
+<body>
+    <h1>Testing Override Script Debug</h1>
+    <button onclick="testOverride()">Test Override Script</button>
+    <div id="results"></div>
+
+    <script src="js/fcsma-api-override.js?v=20251010_0602"></script>
+    <script>
+        async function testOverride() {
+            console.log('🧪 Starting override test...');
+
+            const criteria = {
+                state: 'OH',
+                daysUntilExpiry: 30,
+                limit: 10,
+                skipDays: 0,
+                insuranceCompanies: ['Progressive']
+            };
+
+            console.log('🧪 Test criteria:', criteria);
+
+            try {
+                // Wait for API_SERVICE to be available
+                if (typeof window.API_SERVICE !== 'undefined' && window.API_SERVICE.generateLeads) {
+                    console.log('✅ API_SERVICE found, calling generateLeads...');
+                    const result = await window.API_SERVICE.generateLeads(criteria);
+                    console.log('🧪 generateLeads result:', result);
+                    document.getElementById('results').innerHTML =
+                        `<h3>Success!</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                } else {
+                    console.log('❌ API_SERVICE not found');
+                    document.getElementById('results').innerHTML =
+                        `<h3>Error: API_SERVICE not available</h3>`;
+                }
+            } catch (error) {
+                console.error('🧪 Test error:', error);
+                document.getElementById('results').innerHTML =
+                    `<h3>Error:</h3><pre>${error.message}</pre>`;
+            }
+        }
+
+        // Also test direct fetch call
+        async function testDirectFetch() {
+            console.log('🧪 Testing direct fetch...');
+
+            try {
+                const url = '/api/matched-carriers-leads?state=OH&days=30&insurance_companies=Progressive&limit=5';
+                console.log('🧪 Direct fetch URL:', url);
+
+                const response = await fetch(url);
+                console.log('🧪 Direct fetch response:', response.status, response.statusText);
+
+                const data = await response.json();
+                console.log('🧪 Direct fetch data:', data);
+
+            } catch (error) {
+                console.error('🧪 Direct fetch error:', error);
+            }
+        }
+
+        // Test both
+        setTimeout(() => {
+            testDirectFetch();
+        }, 2000);
+    </script>
+</body>
+</html>

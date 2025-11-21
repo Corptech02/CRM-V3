@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Policy Sync Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .policy-list {
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .policy-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .policy-item:hover {
+            background: #f8f9fa;
+        }
+        .counts {
+            display: flex;
+            gap: 30px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .count-item {
+            text-align: center;
+        }
+        .count-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .count-label {
+            font-size: 14px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Policy Synchronization Test</h1>
+
+        <div class="counts">
+            <div class="count-item">
+                <div class="count-value" id="serverCount">0</div>
+                <div class="count-label">Server Policies</div>
+            </div>
+            <div class="count-item">
+                <div class="count-value" id="localCount">0</div>
+                <div class="count-label">Local Policies</div>
+            </div>
+            <div class="count-item">
+                <div class="count-value" id="syncStatus">❌</div>
+                <div class="count-label">Sync Status</div>
+            </div>
+        </div>
+
+        <div class="status info" id="statusMessage">
+            Initializing...
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button onclick="loadFromServer()">Load From Server</button>
+            <button onclick="addTestPolicy()">Add Test Policy</button>
+            <button onclick="clearLocalStorage()">Clear Local Storage</button>
+            <button onclick="checkSync()">Check Sync</button>
+        </div>
+
+        <h3>Policies in Database:</h3>
+        <div class="policy-list" id="policyList">
+            Loading...
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname.includes('nip.io')
+            ? `http://${window.location.hostname.split('.')[0]}:3001/api`
+            : 'http://localhost:3001/api';
+
+        async function loadFromServer() {
+            try {
+                updateStatus('info', 'Loading policies from server...');
+
+                const response = await fetch(`${API_URL}/all-data`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const serverPolicies = data.policies || [];
+
+                    // Update localStorage
+                    localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
+
+                    updateStatus('success', `Loaded ${serverPolicies.length} policies from server`);
+                    updateCounts();
+                    displayPolicies(serverPolicies);
+                } else {
+                    updateStatus('error', 'Failed to load from server');
+                }
+            } catch (error) {
+                updateStatus('error', 'Error: ' + error.message);
+            }
+        }
+
+        async function addTestPolicy() {
+            const testPolicy = {
+                id: 'TEST-' + Date.now(),
+                policyNumber: 'POL-TEST-' + Math.floor(Math.random() * 1000),
+                clientName: 'Test Client ' + new Date().toLocaleTimeString(),
+                carrier: 'Test Carrier',
+                policyType: 'commercial-auto',
+                effectiveDate: new Date().toISOString().split('T')[0],
+                expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                premium: Math.floor(Math.random() * 10000),
+                policyStatus: 'active',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                updateStatus('info', 'Saving test policy to server...');
+
+                const response = await fetch(`${API_URL}/policies`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testPolicy)
+                });
+
+                if (response.ok) {
+                    updateStatus('success', `Test policy ${testPolicy.policyNumber} saved to server!`);
+
+                    // Also update localStorage
+                    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                    policies.push(testPolicy);
+                    localStorage.setItem('insurance_policies', JSON.stringify(policies));
+
+                    // Reload to show new policy
+                    await loadFromServer();
+                } else {
+                    updateStatus('error', 'Failed to save policy to server');
+                }
+            } catch (error) {
+                updateStatus('error', 'Error saving: ' + error.message);
+            }
+        }
+
+        function clearLocalStorage() {
+            localStorage.removeItem('insurance_policies');
+            updateStatus('info', 'Local storage cleared - refresh to see if policies persist from server');
+            updateCounts();
+        }
+
+        async function checkSync() {
+            await loadFromServer();
+            updateCounts();
+        }
+
+        function updateCounts() {
+            // Get server count (from last load)
+            const serverPolicies = JSON.parse(localStorage.getItem('last_server_load') || '[]');
+            const localPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+            document.getElementById('serverCount').textContent = serverPolicies.length;
+            document.getElementById('localCount').textContent = localPolicies.length;
+
+            // Check if in sync
+            const inSync = serverPolicies.length === localPolicies.length;
+            document.getElementById('syncStatus').textContent = inSync ? '✅' : '❌';
+        }
+
+        function displayPolicies(policies) {
+            const listDiv = document.getElementById('policyList');
+
+            // Store for count comparison
+            localStorage.setItem('last_server_load', JSON.stringify(policies));
+
+            if (policies.length === 0) {
+                listDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #6c757d;">No policies found</div>';
+                return;
+            }
+
+            listDiv.innerHTML = policies.map(policy => `
+                <div class="policy-item">
+                    <div>
+                        <strong>${policy.policyNumber || 'No Number'}</strong><br>
+                        <small>Client: ${policy.clientName || 'N/A'} | Carrier: ${policy.carrier || 'N/A'}</small>
+                    </div>
+                    <div>
+                        <small>${policy.policyStatus || 'Unknown'}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateStatus(type, message) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(async () => {
+            await checkSync();
+        }, 5000);
+
+        // Initial load
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadFromServer();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Titan Inbox Test - REAL EMAILS ONLY</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            border: 2px solid #0891b2;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .success {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        button {
+            background: #0891b2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0e7490;
+        }
+        pre {
+            background: #1e293b;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            overflow: auto;
+            font-size: 12px;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #0891b2;
+            border-radius: 8px;
+        }
+        .email-item {
+            background: #f0f9ff;
+            border-left: 4px solid #0891b2;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .big-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0891b2;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 TITAN EMAIL INBOX TEST</h1>
+
+    <div class="stats">
+        <div class="stat-box">
+            <div class="big-number" id="total-emails">0</div>
+            <div>Total Emails</div>
+        </div>
+        <div class="stat-box">
+            <div class="big-number" id="coi-emails">0</div>
+            <div>COI Related</div>
+        </div>
+        <div class="stat-box">
+            <div class="big-number success" id="api-status">?</div>
+            <div>API Status</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>📧 Direct API Test</h2>
+            <button onclick="testAPI()">Test Titan API</button>
+            <button onclick="testAPIAll()">Get ALL Emails</button>
+            <button onclick="sendTestEmail()">Send Test COI Email</button>
+            <button onclick="clearCache()">Clear Cache</button>
+
+            <h3>API Response:</h3>
+            <pre id="api-result">Click "Test Titan API" to begin...</pre>
+
+            <h3>Emails Found:</h3>
+            <div id="email-list"></div>
+        </div>
+
+        <div class="panel">
+            <h2>🖥️ Live COI Management Tab</h2>
+            <p class="warning">If you see "No COI requests found", press Ctrl+F5 to clear browser cache!</p>
+            <button onclick="refreshFrame()">Refresh COI Tab</button>
+            <button onclick="forceReload()">Force Full Reload</button>
+            <iframe id="coi-frame" src="about:blank"></iframe>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 20px;">
+        <h2>✅ What Should Be Working:</h2>
+        <ul>
+            <li class="success">Titan Email API connected to contact@vigagency.com</li>
+            <li class="success">Fetching ALL emails (not just unread)</li>
+            <li class="success">Filtering for COI-related keywords (COI, certificate, insurance)</li>
+            <li class="success">Real emails only - NO mock data</li>
+        </ul>
+
+        <h2>❌ Scripts Disabled:</h2>
+        <ul>
+            <li class="error">coi-email-integration.js - DISABLED</li>
+            <li class="error">coi-email-fix.js - DISABLED</li>
+            <li class="error">coi-email-read-status.js - DISABLED</li>
+            <li class="error">coi-email-with-pdf.js - DISABLED</li>
+            <li class="error">coi-email-final-override.js - DISABLED</li>
+            <li class="error">force-outlook-only.js - DISABLED</li>
+            <li class="error">coi-use-outlook.js - DISABLED</li>
+        </ul>
+    </div>
+
+    <script>
+        let emailCount = 0;
+
+        async function testAPI() {
+            const result = document.getElementById('api-result');
+            const emailList = document.getElementById('email-list');
+            result.textContent = 'Testing Titan API...';
+
+            try {
+                const response = await fetch('/api/outlook/emails?filter=ALL&_=' + Date.now());
+                const data = await response.json();
+
+                result.textContent = JSON.stringify(data, null, 2);
+
+                if (data.success) {
+                    document.getElementById('api-status').textContent = '✅';
+                    document.getElementById('total-emails').textContent = data.count || 0;
+
+                    // Count COI emails
+                    const coiCount = data.emails ? data.emails.filter(e =>
+                        e.subject && (
+                            e.subject.toLowerCase().includes('coi') ||
+                            e.subject.toLowerCase().includes('certificate') ||
+                            e.subject.toLowerCase().includes('insurance')
+                        )
+                    ).length : 0;
+
+                    document.getElementById('coi-emails').textContent = coiCount;
+
+                    // Display emails
+                    emailList.innerHTML = '';
+                    if (data.emails && data.emails.length > 0) {
+                        data.emails.forEach(email => {
+                            emailList.innerHTML += `
+                                <div class="email-item">
+                                    <strong>${email.subject}</strong><br>
+                                    From: ${email.from}<br>
+                                    Date: ${email.date}<br>
+                                    Read: ${email.isRead ? 'Yes' : 'No'}
+                                </div>
+                            `;
+                        });
+                    } else {
+                        emailList.innerHTML = '<p class="warning">No emails found in inbox</p>';
+                    }
+                } else {
+                    document.getElementById('api-status').textContent = '❌';
+                    emailList.innerHTML = '<p class="error">API Error: ' + (data.error || 'Unknown') + '</p>';
+                }
+            } catch (error) {
+                document.getElementById('api-status').textContent = '❌';
+                result.textContent = 'Error: ' + error.message;
+                emailList.innerHTML = '<p class="error">Connection failed</p>';
+            }
+        }
+
+        async function testAPIAll() {
+            await testAPI();
+        }
+
+        async function sendTestEmail() {
+            const timestamp = new Date().toLocaleTimeString();
+            const emailData = {
+                to: 'contact@vigagency.com',
+                subject: 'COI Request - Test at ' + timestamp,
+                body: '<h2>Test COI Request</h2><p>This is a test certificate of insurance request sent at ' + timestamp + '</p>'
+            };
+
+            try {
+                const response = await fetch('/api/outlook/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(emailData)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Test email sent! Wait 5 seconds then click "Test Titan API" to see it.');
+                    setTimeout(testAPI, 5000);
+                } else {
+                    alert('Failed to send: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error sending email: ' + error.message);
+            }
+        }
+
+        function clearCache() {
+            localStorage.clear();
+            sessionStorage.clear();
+            alert('Cache cleared! Now press Ctrl+F5 (or Cmd+Shift+R on Mac) to fully refresh.');
+        }
+
+        function refreshFrame() {
+            const iframe = document.getElementById('coi-frame');
+            iframe.src = 'http://162-220-14-239.nip.io/#coi?_=' + Date.now();
+        }
+
+        function forceReload() {
+            location.reload(true);
+        }
+
+        // Auto-test on load
+        setTimeout(testAPI, 500);
+        setTimeout(refreshFrame, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "policyId": "test_john_smith",
+  "formData": {
+    "producerName": "VANGUARD INSURANCE GROUP LLC",
+    "authRep": "John Smith",
+    "policyNumber": "TEST-JohnSmith"
+  },
+  "savedAt": "2025-10-22T18:03:32.548Z",
+  "version": "1.0"
+}

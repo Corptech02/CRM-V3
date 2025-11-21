@@ -1,0 +1,263 @@
+// ABSOLUTE FINAL: Only allow emails with check/X buttons - SERVER STORAGE ONLY
+console.log('🎯 ENFORCING CHECK/X BUTTONS WITH SERVER STORAGE');
+
+// API URL base
+const API_BASE = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
+
+// Wait for DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', enforceCheckXButtons);
+} else {
+    enforceCheckXButtons();
+}
+
+function enforceCheckXButtons() {
+    console.log('🔒 Enforcing check/X button layout with server storage...');
+
+    // Server storage functions - NO RELOAD, just update UI
+    window.markEmailHandled = async function(emailId, isHandled) {
+        const emailElement = document.querySelector(`[data-email-id="${emailId}"], [onclick*="${emailId}"]`);
+        if (!emailElement) return;
+
+        try {
+            if (isHandled) {
+                // Save to server
+                await fetch(`${API_BASE}/api/coi-email-status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Bypass-Tunnel-Reminder': 'true'
+                    },
+                    body: JSON.stringify({
+                        emailId: emailId,
+                        status: 'handled',
+                        updatedBy: 'User'
+                    })
+                });
+
+                // Update UI immediately without reload
+                emailElement.style.background = 'linear-gradient(to right, #d1fae5 0%, #ecfdf5 100%)';
+                emailElement.style.borderLeft = '4px solid #10b981';
+                const checkBtn = emailElement.querySelector('.check-btn');
+                if (checkBtn) {
+                    checkBtn.innerHTML = '<i class="fas fa-check-circle" style="color: #10b981;"></i>';
+                }
+            } else {
+                // Remove from server
+                await fetch(`${API_BASE}/api/coi-email-status/${emailId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Bypass-Tunnel-Reminder': 'true'
+                    }
+                });
+
+                // Update UI immediately without reload
+                emailElement.style.background = 'white';
+                emailElement.style.borderLeft = '';
+                const checkBtn = emailElement.querySelector('.check-btn');
+                if (checkBtn) {
+                    checkBtn.innerHTML = '<i class="far fa-check-circle" style="color: #9ca3af;"></i>';
+                }
+            }
+        } catch (error) {
+            console.error('Failed to update server:', error);
+        }
+    };
+
+    window.markEmailUnimportant = async function(emailId) {
+        const emailElement = document.querySelector(`[data-email-id="${emailId}"], [onclick*="${emailId}"]`);
+        if (!emailElement) return;
+
+        // Check current state
+        const xBtn = emailElement.querySelector('.x-btn');
+        const isCurrentlyUnimportant = xBtn && xBtn.innerHTML.includes('fa-times-circle" style="color: #ef4444;');
+
+        try {
+            if (!isCurrentlyUnimportant) {
+                // Save to server
+                await fetch(`${API_BASE}/api/coi-email-status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Bypass-Tunnel-Reminder': 'true'
+                    },
+                    body: JSON.stringify({
+                        emailId: emailId,
+                        status: 'unimportant',
+                        updatedBy: 'User'
+                    })
+                });
+
+                // Update UI immediately without reload
+                emailElement.style.background = 'linear-gradient(to right, #fee2e2 0%, #fef2f2 100%)';
+                emailElement.style.borderLeft = '4px solid #ef4444';
+                if (xBtn) {
+                    xBtn.innerHTML = '<i class="fas fa-times-circle" style="color: #ef4444;"></i>';
+                }
+            } else {
+                // Remove from server
+                await fetch(`${API_BASE}/api/coi-email-status/${emailId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Bypass-Tunnel-Reminder': 'true'
+                    }
+                });
+
+                // Update UI immediately without reload
+                emailElement.style.background = 'white';
+                emailElement.style.borderLeft = '';
+                if (xBtn) {
+                    xBtn.innerHTML = '<i class="far fa-times-circle" style="color: #9ca3af;"></i>';
+                }
+            }
+        } catch (error) {
+            console.error('Failed to update server:', error);
+        }
+    };
+
+    // Override the original loadCOIInbox to fetch statuses from server
+    const originalLoadCOIInbox = window.loadCOIInbox;
+
+    window.loadCOIInbox = async function() {
+        console.log('✅ Loading emails WITH check/X buttons (server-based)...');
+
+        const coiInbox = document.getElementById('coiInbox');
+        if (!coiInbox) return;
+
+        // Show loading state
+        coiInbox.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #667eea;"></i>
+                <p>Loading emails from corptech06@gmail.com...</p>
+            </div>
+        `;
+
+        try {
+            // Fetch emails
+            const response = await fetch('http://162-220-14-239.nip.io/api/gmail/messages?maxResults=20', {
+                headers: {
+                    'Bypass-Tunnel-Reminder': 'true',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch emails');
+            }
+
+            const emails = await response.json();
+            console.log(`Loaded ${emails.length} emails`);
+
+            // Get statuses from server
+            let statuses = {};
+            try {
+                const statusResponse = await fetch(`${API_BASE}/api/coi-email-status`, {
+                    headers: {
+                        'Bypass-Tunnel-Reminder': 'true',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                if (statusResponse.ok) {
+                    statuses = await statusResponse.json();
+                    console.log('📡 Loaded email statuses from server:', statuses);
+                }
+            } catch (error) {
+                console.error('Failed to load statuses from server:', error);
+            }
+
+            // Display emails - KEEP ORIGINAL DESIGN
+            coiInbox.innerHTML = `
+                <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                    <div style="background: linear-gradient(to right, #667eea, #764ba2); padding: 20px;">
+                        <h2 style="color: white; margin: 0 0 10px 0; font-size: 24px;">
+                            <i class="fas fa-inbox" style="margin-right: 10px;"></i>
+                            COI Request Inbox
+                        </h2>
+                        <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 14px;">
+                            corptech06@gmail.com • ${emails.length} emails
+                        </p>
+                    </div>
+                    <div class="email-list" style="background: #f9fafb;">
+                        ${emails.map(email => {
+                            const status = statuses[email.id] || null;
+                            const isHandled = status === 'handled';
+                            const isUnimportant = status === 'unimportant';
+
+                            return `
+                                <div class="email-item"
+                                     style="padding: 20px; border-bottom: 1px solid #e5e7eb; cursor: pointer; background: ${
+                                         isHandled ? 'linear-gradient(to right, #d1fae5 0%, #ecfdf5 100%)' :
+                                         isUnimportant ? 'linear-gradient(to right, #fee2e2 0%, #fef2f2 100%)' :
+                                         'white'
+                                     }; position: relative; ${
+                                         isHandled ? 'border-left: 4px solid #10b981;' :
+                                         isUnimportant ? 'border-left: 4px solid #ef4444;' : ''
+                                     }"
+                                     onclick="expandEmail('${email.id}')"
+                                     data-email-id="${email.id}">
+
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">
+                                                ${email.from || 'Unknown Sender'}
+                                            </div>
+                                            <div style="color: #374151; font-size: 15px; margin-bottom: 5px;">
+                                                ${email.subject || 'No subject'}
+                                            </div>
+                                            <div style="color: #6b7280; font-size: 13px;">
+                                                ${email.snippet || ''}
+                                            </div>
+                                        </div>
+
+                                        <!-- CHECK AND X BUTTONS -->
+                                        <div style="display: flex; gap: 15px; align-items: center;">
+                                            <!-- Green Check -->
+                                            <button class="check-btn"
+                                                    onclick="event.stopPropagation(); markEmailHandled('${email.id}', ${!isHandled})"
+                                                    style="background: none; border: none; cursor: pointer; padding: 8px; font-size: 24px;">
+                                                ${isHandled ?
+                                                    '<i class="fas fa-check-circle" style="color: #10b981;"></i>' :
+                                                    '<i class="far fa-check-circle" style="color: #9ca3af;"></i>'}
+                                            </button>
+
+                                            <!-- Red X -->
+                                            <button class="x-btn"
+                                                    onclick="event.stopPropagation(); markEmailUnimportant('${email.id}')"
+                                                    style="background: none; border: none; cursor: pointer; padding: 8px; font-size: 24px;">
+                                                ${isUnimportant ?
+                                                    '<i class="fas fa-times-circle" style="color: #ef4444;"></i>' :
+                                                    '<i class="far fa-times-circle" style="color: #9ca3af;"></i>'}
+                                            </button>
+
+                                            <!-- Date -->
+                                            <span style="color: #6b7280; font-size: 12px; min-width: 80px; text-align: right;">
+                                                ${new Date(email.date || Date.now()).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            console.log('✅ Emails loaded WITH CHECK/X BUTTONS (server-based)');
+
+        } catch (error) {
+            console.error('Failed to load emails:', error);
+            coiInbox.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                    <p style="font-size: 18px; font-weight: 600;">Failed to load emails</p>
+                    <p style="margin-top: 8px; color: #6b7280;">${error.message}</p>
+                    <button onclick="loadCOIInbox()" class="btn-primary" style="margin-top: 16px;">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
+    };
+}
+
+console.log('✅ CHECK/X BUTTONS WITH SERVER STORAGE - NO RELOAD ON CLICK');

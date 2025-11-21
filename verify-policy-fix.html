@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Policy Fix Verification</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+        }
+        .test-card {
+            margin: 20px 0;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .test-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        .success {
+            color: #22c55e;
+            font-weight: bold;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        .policy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .policy-card {
+            padding: 15px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .policy-number {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .status-online {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .log-output {
+            background: #1e293b;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .summary-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Policy Fix Verification Dashboard</h1>
+
+        <div class="summary-box" id="summary">
+            <h2>System Status</h2>
+            <p>Click "Run Complete Verification" to test the policy persistence fix</p>
+        </div>
+
+        <div class="test-card">
+            <h3>1️⃣ Server Connection Test</h3>
+            <button onclick="testServerConnection()">Test Server</button>
+            <div id="server-status"></div>
+        </div>
+
+        <div class="test-card">
+            <h3>2️⃣ Browser Data Clear Simulation</h3>
+            <button onclick="simulateBrowserClear()">Clear localStorage</button>
+            <div id="clear-status"></div>
+        </div>
+
+        <div class="test-card">
+            <h3>3️⃣ Policy Loading Test</h3>
+            <button onclick="testPolicyLoading()">Test Policy Loading</button>
+            <div id="load-status"></div>
+            <div id="policy-display" class="policy-grid"></div>
+        </div>
+
+        <div class="test-card">
+            <h3>4️⃣ Complete Verification</h3>
+            <button onclick="runCompleteVerification()">Run Complete Verification</button>
+            <div id="verification-status"></div>
+            <div id="log-output" class="log-output" style="display:none;"></div>
+        </div>
+
+        <div class="test-card">
+            <h3>5️⃣ Navigate to Main App</h3>
+            <button onclick="window.location.href='/#policies'">Go to Policies Page</button>
+            <button onclick="window.location.href='/#dashboard'">Go to Dashboard</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname.includes('nip.io')
+            ? `http://${window.location.hostname.split('.')[0]}:3001/api`
+            : window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : 'http://192.168.40.232:3001/api';
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log-output');
+            logDiv.style.display = 'block';
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'success' ? '✓' : type === 'error' ? '✗' : '→';
+            logDiv.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function testServerConnection() {
+            const statusDiv = document.getElementById('server-status');
+            statusDiv.innerHTML = 'Testing connection...';
+
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = `
+                        <span class="success">✓ Server Online</span>
+                        <span class="status-badge status-online">Connected</span>
+                        <br>Endpoint: ${API_URL}
+                        <br>Policies: ${data.policies?.length || 0}
+                        <br>Clients: ${data.clients?.length || 0}
+                        <br>Leads: ${data.leads?.length || 0}
+                    `;
+                } else {
+                    statusDiv.innerHTML = `<span class="error">✗ Server Error: ${response.status}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <span class="error">✗ Connection Failed</span>
+                    <span class="status-badge status-offline">Offline</span>
+                    <br>Error: ${error.message}
+                `;
+            }
+        }
+
+        function simulateBrowserClear() {
+            const statusDiv = document.getElementById('clear-status');
+            const beforeCount = JSON.parse(localStorage.getItem('insurance_policies') || '[]').length;
+
+            localStorage.clear();
+
+            const afterCount = JSON.parse(localStorage.getItem('insurance_policies') || '[]').length;
+
+            statusDiv.innerHTML = `
+                <span class="success">✓ localStorage Cleared</span>
+                <br>Before: ${beforeCount} policies
+                <br>After: ${afterCount} policies (should be 0)
+                <br><span class="warning">⚠️ This simulates clearing browser data</span>
+            `;
+
+            // Clear the policy display
+            document.getElementById('policy-display').innerHTML = '';
+        }
+
+        async function testPolicyLoading() {
+            const statusDiv = document.getElementById('load-status');
+            const displayDiv = document.getElementById('policy-display');
+
+            statusDiv.innerHTML = 'Loading policies from server...';
+
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const policies = data.policies || [];
+
+                    // Save to localStorage like the app does
+                    localStorage.setItem('insurance_policies', JSON.stringify(policies));
+
+                    statusDiv.innerHTML = `
+                        <span class="success">✓ Loaded ${policies.length} policies</span>
+                        <br>Expected: 8 policies
+                        <br>Result: ${policies.length === 8 ? '✓ PASS' : '✗ FAIL'}
+                    `;
+
+                    // Display the policies
+                    displayDiv.innerHTML = policies.map(p => `
+                        <div class="policy-card">
+                            <div class="policy-number">${p.policyNumber}</div>
+                            <div>${p.clientName}</div>
+                            <div>Carrier: ${p.carrier}</div>
+                            <div>Status: ${p.policyStatus || p.status || 'Active'}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    statusDiv.innerHTML = `<span class="error">✗ Server Error: ${response.status}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">✗ Load Failed: ${error.message}</span>`;
+            }
+        }
+
+        async function runCompleteVerification() {
+            const statusDiv = document.getElementById('verification-status');
+            const summaryDiv = document.getElementById('summary');
+
+            statusDiv.innerHTML = '<h4>Running Complete Verification...</h4>';
+            log('Starting complete verification', 'info');
+
+            let allTestsPassed = true;
+
+            // Test 1: Server Connection
+            log('Testing server connection...', 'info');
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                if (response.ok) {
+                    log('Server connection successful', 'success');
+                } else {
+                    log(`Server returned status ${response.status}`, 'error');
+                    allTestsPassed = false;
+                }
+            } catch (error) {
+                log(`Server connection failed: ${error.message}`, 'error');
+                allTestsPassed = false;
+            }
+
+            // Test 2: Clear localStorage
+            log('Clearing localStorage...', 'info');
+            localStorage.clear();
+            const afterClear = JSON.parse(localStorage.getItem('insurance_policies') || '[]').length;
+            if (afterClear === 0) {
+                log('localStorage cleared successfully', 'success');
+            } else {
+                log(`localStorage not fully cleared: ${afterClear} policies remain`, 'error');
+                allTestsPassed = false;
+            }
+
+            // Test 3: Load from server
+            log('Loading policies from server...', 'info');
+            try {
+                const response = await fetch(`${API_URL}/all-data`);
+                const data = await response.json();
+                const policies = data.policies || [];
+
+                localStorage.setItem('insurance_policies', JSON.stringify(policies));
+                log(`Loaded ${policies.length} policies from server`, 'success');
+
+                // Test 4: Verify localStorage
+                const stored = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                if (stored.length === 8) {
+                    log('All 8 policies stored in localStorage', 'success');
+                } else {
+                    log(`Expected 8 policies, found ${stored.length}`, 'error');
+                    allTestsPassed = false;
+                }
+
+                // Test 5: Verify each policy has an ID
+                const missingIds = stored.filter(p => !p.id);
+                if (missingIds.length === 0) {
+                    log('All policies have valid IDs', 'success');
+                } else {
+                    log(`${missingIds.length} policies missing IDs`, 'error');
+                    allTestsPassed = false;
+                }
+            } catch (error) {
+                log(`Failed to load from server: ${error.message}`, 'error');
+                allTestsPassed = false;
+            }
+
+            // Update status
+            if (allTestsPassed) {
+                statusDiv.innerHTML = '<h4 class="success">✓ All Tests Passed!</h4>';
+                summaryDiv.innerHTML = `
+                    <h2>✅ System Verified</h2>
+                    <p>The policy persistence fix is working correctly!</p>
+                    <p>• Policies are stored on the server</p>
+                    <p>• Policies survive browser data clearing</p>
+                    <p>• All 8 policies are loading properly</p>
+                `;
+            } else {
+                statusDiv.innerHTML = '<h4 class="error">✗ Some Tests Failed</h4>';
+                summaryDiv.innerHTML = `
+                    <h2>⚠️ Issues Detected</h2>
+                    <p>Some tests failed. Check the log output below for details.</p>
+                `;
+            }
+
+            log(`\nVerification complete: ${allTestsPassed ? 'PASSED' : 'FAILED'}`, allTestsPassed ? 'success' : 'error');
+        }
+
+        // Auto-run server test on load
+        window.addEventListener('DOMContentLoaded', () => {
+            testServerConnection();
+        });
+    </script>
+</body>
+</html>

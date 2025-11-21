@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>August Insurance Expiration Leads - Ohio</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .subtitle {
+            margin: 10px 0 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 20px;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        input[type="text"] {
+            padding: 10px 15px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 300px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+        .download-btn {
+            background: #007bff;
+        }
+        .download-btn:hover {
+            background: #0056b3;
+        }
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 14px;
+        }
+        th {
+            background: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .expiry-soon {
+            background: #fff3cd !important;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #6c757d;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 August Insurance Expiration Leads</h1>
+            <div class="subtitle">Ohio Commercial Trucking Insurance Renewals</div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="total-count">1,938</div>
+                    <div class="stat-label">Total Leads</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="filtered-count">1,938</div>
+                    <div class="stat-label">Filtered Results</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">August</div>
+                    <div class="stat-label">Expiration Month</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div>
+                <input type="text" id="search" placeholder="Search by company, DOT, insurance carrier...">
+                <button onclick="filterTable()">🔍 Search</button>
+                <button onclick="clearSearch()">Clear</button>
+            </div>
+            <div>
+                <button class="download-btn" onclick="downloadCSV()">⬇️ Download Full CSV</button>
+                <button class="download-btn" onclick="downloadFiltered()">⬇️ Download Filtered</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="loading" class="loading">Loading data...</div>
+            <table id="dataTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>DOT #</th>
+                        <th>Company Name</th>
+                        <th>DBA Name</th>
+                        <th>Representative</th>
+                        <th>Title</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>City</th>
+                        <th>Current Insurer</th>
+                        <th>Expiry Date</th>
+                        <th>Coverage Amount</th>
+                        <th>Fleet Size</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>Data extracted from FMCSA Database • Last Updated: October 2025</p>
+            <p>Access URL: <strong>http://162.220.14.239/august-leads.html</strong></p>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let filteredData = [];
+
+        // Load CSV data
+        async function loadData() {
+            try {
+                const response = await fetch('/august_insurance_expirations.csv');
+                const text = await response.text();
+                const lines = text.split('\n');
+                const headers = lines[0].split(',');
+
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim()) {
+                        const values = parseCSVLine(lines[i]);
+                        const row = {};
+                        headers.forEach((header, index) => {
+                            row[header.replace(/"/g, '')] = values[index] || '';
+                        });
+                        allData.push(row);
+                    }
+                }
+
+                filteredData = [...allData];
+                displayData();
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dataTable').style.display = 'table';
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('loading').innerHTML = 'Error loading data. Please refresh.';
+            }
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim().replace(/^"|"$/g, ''));
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+
+            result.push(current.trim().replace(/^"|"$/g, ''));
+            return result;
+        }
+
+        function displayData() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            filteredData.slice(0, 500).forEach(row => {
+                const tr = document.createElement('tr');
+
+                // Check if expiry is within 30 days
+                const expiryDate = new Date(row['Policy_Expiration_Date']);
+                const today = new Date();
+                const daysUntilExpiry = Math.floor((expiryDate - today) / (1000 * 60 * 60 * 24));
+
+                if (daysUntilExpiry <= 30 && daysUntilExpiry >= 0) {
+                    tr.classList.add('expiry-soon');
+                }
+
+                tr.innerHTML = `
+                    <td>${row['DOT_Number'] || '-'}</td>
+                    <td><strong>${row['Company_Name'] || '-'}</strong></td>
+                    <td>${row['DBA_Name'] || '-'}</td>
+                    <td>${row['Representative_Name'] || '-'}</td>
+                    <td>${row['Representative_Title'] || '-'}</td>
+                    <td>${row['Phone'] || '-'}</td>
+                    <td>${row['Email'] || '-'}</td>
+                    <td>${row['City'] || '-'}</td>
+                    <td>${row['Current_Insurance_Carrier'] || '-'}</td>
+                    <td>${row['Policy_Expiration_Date'] || '-'}</td>
+                    <td>$${parseInt(row['Insurance_Amount_On_File'] || 0).toLocaleString()}</td>
+                    <td>${row['Fleet_Size'] || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('filtered-count').textContent = filteredData.length.toLocaleString();
+
+            if (filteredData.length > 500) {
+                const notice = document.createElement('tr');
+                notice.innerHTML = `<td colspan="12" style="text-align: center; padding: 20px; background: #ffeaa7;">
+                    Showing first 500 of ${filteredData.length} results. Download CSV for full data.</td>`;
+                tbody.appendChild(notice);
+            }
+        }
+
+        function filterTable() {
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+
+            if (!searchTerm) {
+                filteredData = [...allData];
+            } else {
+                filteredData = allData.filter(row => {
+                    return Object.values(row).some(value =>
+                        value.toString().toLowerCase().includes(searchTerm)
+                    );
+                });
+            }
+
+            displayData();
+        }
+
+        function clearSearch() {
+            document.getElementById('search').value = '';
+            filteredData = [...allData];
+            displayData();
+        }
+
+        function downloadCSV() {
+            window.location.href = '/august_insurance_expirations.csv';
+        }
+
+        function downloadFiltered() {
+            let csv = 'DOT_Number,Company_Name,DBA_Name,Representative_Name,Representative_Title,Phone,Email,City,Current_Insurance_Carrier,Policy_Expiration_Date,Insurance_Amount_On_File,Fleet_Size\n';
+
+            filteredData.forEach(row => {
+                csv += `"${row['DOT_Number']}","${row['Company_Name']}","${row['DBA_Name']}","${row['Representative_Name']}","${row['Representative_Title']}","${row['Phone']}","${row['Email']}","${row['City']}","${row['Current_Insurance_Carrier']}","${row['Policy_Expiration_Date']}","${row['Insurance_Amount_On_File']}","${row['Fleet_Size']}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'august_leads_filtered.csv';
+            a.click();
+        }
+
+        // Load data on page load
+        loadData();
+    </script>
+</body>
+</html>

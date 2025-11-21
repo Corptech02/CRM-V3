@@ -1,0 +1,1945 @@
+/* Mobile-Specific Styles for Vanguard Insurance Platform */
+/* ========================================================= */
+
+/* Base Mobile Variables */
+:root {
+    --mobile-breakpoint-sm: 480px;
+    --mobile-breakpoint-md: 768px;
+    --mobile-breakpoint-lg: 1024px;
+    --mobile-header-height: 60px;
+    --mobile-nav-height: 56px;
+    --mobile-spacing: 12px;
+    --mobile-radius: 8px;
+}
+
+/* Global Mobile Overflow Prevention */
+@media (max-width: 768px) {
+    html {
+        overflow-x: hidden !important;
+        width: 100% !important;
+    }
+
+    body {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        position: relative !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    *, *::before, *::after {
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+    }
+
+    img, video, iframe {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    /* Specific fix for dashboard sections overflow */
+    .dashboard-sections > * {
+        max-width: calc(50vw - 8px) !important;
+        overflow: hidden !important;
+    }
+
+    .recent-activity *,
+    .upcoming-renewals * {
+        max-width: 100% !important;
+    }
+}
+
+/* Mobile Navigation Toggle Button */
+.mobile-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--dark);
+    cursor: pointer;
+    padding: 8px;
+    margin-left: -8px;
+}
+
+.mobile-menu-toggle:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--mobile-radius);
+}
+
+/* Mobile Overlay */
+.mobile-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 995; /* Lower than mobile nav (997) */
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none; /* Allow clicks through when not active */
+}
+
+.mobile-overlay.active {
+    opacity: 1;
+    display: block;
+    pointer-events: auto; /* Enable clicks when active */
+}
+
+/* Tablet Styles (768px - 1024px) */
+@media (max-width: 1024px) {
+    /* Dashboard Adjustments */
+    .dashboard-sections {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .charts-section {
+        grid-template-columns: 1fr;
+    }
+
+    /* Table Adjustments */
+    .data-table {
+        font-size: 14px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 10px 8px;
+    }
+
+    /* Modal Adjustments */
+    .modal-content {
+        width: 90%;
+        max-width: 600px;
+        margin: 20px auto;
+    }
+
+    /* Forms */
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+}
+
+/* Mobile Styles (max-width: 768px) */
+@media (max-width: 768px) {
+    /* Prevent horizontal scroll */
+    body {
+        overflow-x: hidden !important;
+        width: 100%;
+    }
+
+    /* Header Mobile - More Compact */
+    .header {
+        height: 50px;
+        padding: 0 8px;
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 998; /* Higher than nav (997) and overlay (996) */
+    }
+
+    .navbar {
+        height: 100%;
+    }
+
+    .nav-container {
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    /* Compact Brand Section */
+    .nav-brand {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        min-width: 0; /* Allow shrinking */
+    }
+
+    .nav-brand .logo {
+        width: 30px;
+        height: 30px;
+        margin-right: 8px;
+        flex-shrink: 0;
+    }
+
+    .nav-brand .brand-text {
+        overflow: hidden;
+    }
+
+    .nav-brand h1 {
+        font-size: 14px !important;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .nav-brand span {
+        display: none; /* Hide tagline on mobile */
+    }
+
+    /* Show mobile menu toggle */
+    .mobile-menu-toggle {
+        display: block;
+        padding: 6px;
+        font-size: 20px;
+    }
+
+    /* Compact nav actions */
+    .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .notification-btn {
+        padding: 6px;
+        font-size: 16px;
+        position: relative;
+    }
+
+    .notification-btn .badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        font-size: 9px;
+        padding: 2px 4px;
+        min-width: 14px;
+        height: 14px;
+        line-height: 10px;
+    }
+
+    .user-menu {
+        display: none; /* Hide user menu on mobile */
+    }
+
+    /* Hide desktop navigation */
+    .nav-menu {
+        display: none;
+    }
+
+    /* Mobile Navigation Menu */
+    .mobile-nav {
+        position: fixed;
+        top: 50px; /* Match new header height */
+        left: -280px;
+        width: 260px;
+        height: calc(100vh - 50px);
+        background: var(--white);
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.15);
+        z-index: 996; /* Above overlay (995) but below header (998) */
+        transition: left 0.3s ease;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        transform: translateZ(0); /* Force hardware acceleration */
+    }
+
+    .mobile-nav.active {
+        left: 0;
+        z-index: 996; /* Keep consistent z-index */
+    }
+
+    .mobile-nav-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .mobile-nav-item {
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .mobile-nav-link {
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        color: var(--dark);
+        text-decoration: none;
+        font-size: 14px;
+        transition: background 0.2s ease;
+        position: relative;
+        z-index: 997; /* Ensure links are clickable */
+        cursor: pointer;
+    }
+
+    .mobile-nav-link:hover,
+    .mobile-nav-link.active {
+        background: #f3f4f6;
+        color: var(--primary);
+    }
+
+    .mobile-nav-link:active {
+        background: #e5e7eb;
+    }
+
+    .mobile-nav-link i {
+        width: 18px;
+        margin-right: 10px;
+        text-align: center;
+        font-size: 14px;
+    }
+
+    /* Sidebar Adjustments */
+    .sidebar {
+        position: fixed;
+        left: -260px;
+        width: 260px;
+        height: 100vh;
+        z-index: 997;
+        transition: left 0.3s ease;
+    }
+
+    .sidebar.active {
+        left: 0;
+    }
+
+    /* Main Content Adjustments - Compact with proper containment */
+    .dashboard-content {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: 6px !important;
+        padding-top: 56px !important; /* 50px header + 6px padding */
+        padding-bottom: 66px !important; /* Space for bottom nav */
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: 6px !important;
+        padding-top: 56px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Ensure all sections stay within viewport */
+    section, .section {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Page Headers - Compact */
+    .page-header {
+        padding: 12px 0 !important;
+        margin-bottom: 12px !important;
+    }
+
+    .page-header h1 {
+        font-size: 18px !important;
+        margin-bottom: 4px !important;
+    }
+
+    .page-header p {
+        font-size: 12px !important;
+        margin: 0 !important;
+    }
+
+    /* Mobile Table Layout - Lead List Specific */
+    .table-responsive {
+        width: 100% !important;
+        overflow: hidden !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+    }
+
+    .table-container {
+        width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    /* Lead Table - Keep visible but compressed */
+    #leadsTable,
+    .leads-table {
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+
+    /* Data tables in general - compress but show */
+    .data-table {
+        display: table !important;
+        width: 100% !important;
+        font-size: 7px !important;
+    }
+
+    /* Show mobile lead cards when they exist */
+    .lead-mobile-cards {
+        display: block !important;
+    }
+
+    /* If table must be shown, extreme compression */
+    .force-table .data-table {
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+        font-size: 8px !important;
+    }
+
+    .force-table .data-table th,
+    .force-table .data-table td {
+        padding: 3px 2px !important;
+        font-size: 7px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 50px !important;
+    }
+
+    /* Lead Table Specific Column Handling */
+    #leadsTable th,
+    #leadsTable td,
+    .leads-table th,
+    .leads-table td {
+        padding: 2px !important;
+        font-size: 6px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* Column widths for lead table - Stack vertically */
+    #leadsTable,
+    .leads-table {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    #leadsTable thead {
+        display: none !important; /* Hide headers on mobile */
+    }
+
+    #leadsTable tbody,
+    #leadsTable tr,
+    #leadsTable td {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    /* Each row becomes a card */
+    #leadsTable tr,
+    .leads-table tr {
+        margin-bottom: 8px !important;
+        background: var(--white) !important;
+        border-radius: 4px !important;
+        padding: 6px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
+
+    /* Hide checkbox column */
+    #leadsTable td:nth-child(1) {
+        display: none !important;
+    }
+
+    /* Name as header */
+    #leadsTable td:nth-child(2) {
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        margin-bottom: 4px !important;
+        padding-bottom: 4px !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+
+    /* Contact and Status inline */
+    #leadsTable td:nth-child(3),
+    #leadsTable td:nth-child(4) {
+        display: inline-block !important;
+        width: 50% !important;
+        font-size: 9px !important;
+        padding: 2px 0 !important;
+    }
+
+    /* Actions - show as buttons below */
+    #leadsTable td:nth-child(5),
+    #leadsTable td:last-child {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 4px !important;
+        padding-top: 4px !important;
+        border-top: 1px solid #e5e7eb !important;
+    }
+
+    /* Action buttons in lead rows */
+    #leadsTable .actions,
+    #leadsTable .action-buttons,
+    .leads-table .actions {
+        display: flex !important;
+        gap: 4px !important;
+        width: 100% !important;
+    }
+
+    #leadsTable .actions button,
+    #leadsTable .actions a,
+    .leads-table .actions button,
+    .leads-table .actions a {
+        flex: 1 !important;
+        padding: 4px !important;
+        font-size: 8px !important;
+        text-align: center !important;
+        background: #f3f4f6 !important;
+        border: none !important;
+        border-radius: 3px !important;
+        color: var(--dark) !important;
+    }
+
+    #leadsTable .actions button i,
+    #leadsTable .actions a i {
+        font-size: 8px !important;
+        margin: 0 !important;
+    }
+
+    /* Hide other columns */
+    #leadsTable th:nth-child(n+6),
+    #leadsTable td:nth-child(n+6):not(:last-child),
+    .data-table th:nth-child(n+6),
+    .data-table td:nth-child(n+6):not(:last-child) {
+        display: none !important;
+    }
+
+    /* Lead name specific */
+    #leadsTableBody .lead-name {
+        max-width: 60px !important;
+        font-size: 7px !important;
+    }
+
+    /* Contact icons tiny */
+    #leadsTableBody .contact-info a {
+        width: 14px !important;
+        height: 14px !important;
+        font-size: 6px !important;
+        padding: 2px !important;
+    }
+
+    /* Status badges tiny */
+    .status-badge {
+        padding: 1px 3px !important;
+        font-size: 6px !important;
+        border-radius: 2px !important;
+    }
+
+    /* Lead Mobile Card Layout */
+    .lead-card-mobile {
+        background: var(--white) !important;
+        border-radius: 4px !important;
+        padding: 6px !important;
+        margin-bottom: 4px !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .lead-card-mobile .lead-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 4px !important;
+        padding-bottom: 4px !important;
+        border-bottom: 1px solid #f3f4f6 !important;
+    }
+
+    .lead-card-mobile .lead-name {
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        color: var(--dark) !important;
+        max-width: 60% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .lead-card-mobile .lead-status {
+        padding: 2px 4px !important;
+        border-radius: 2px !important;
+        font-size: 8px !important;
+        font-weight: 500 !important;
+        text-transform: uppercase !important;
+    }
+
+    .lead-card-mobile .lead-details {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 4px !important;
+        margin-bottom: 4px !important;
+    }
+
+    .lead-card-mobile .lead-detail-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 3px !important;
+        font-size: 9px !important;
+    }
+
+    .lead-card-mobile .lead-detail-item i {
+        font-size: 8px !important;
+        color: #6b7280 !important;
+        width: 10px !important;
+    }
+
+    .lead-card-mobile .lead-detail-value {
+        color: var(--dark) !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .lead-card-mobile .lead-actions-row {
+        display: flex !important;
+        gap: 3px !important;
+        margin-top: 4px !important;
+        padding-top: 4px !important;
+        border-top: 1px solid #f3f4f6 !important;
+    }
+
+    .lead-card-mobile .lead-action-btn {
+        flex: 1 !important;
+        padding: 4px !important;
+        background: #f3f4f6 !important;
+        border: none !important;
+        border-radius: 3px !important;
+        color: var(--dark) !important;
+        font-size: 8px !important;
+        text-align: center !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 2px !important;
+    }
+
+    .lead-card-mobile .lead-action-btn i {
+        font-size: 8px !important;
+    }
+
+    .lead-card-mobile .lead-action-btn:hover {
+        background: var(--primary) !important;
+        color: white !important;
+    }
+
+    /* Mobile Card Layout for Tables */
+    .mobile-card-view {
+        display: none;
+    }
+
+    .show-mobile-cards .data-table {
+        display: none;
+    }
+
+    .show-mobile-cards .mobile-card-view {
+        display: block;
+    }
+
+    .mobile-card {
+        background: var(--white);
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 8px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .mobile-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .mobile-card-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--dark);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 70%;
+    }
+
+    .mobile-card-status {
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+
+    .mobile-card-body {
+        display: grid;
+        gap: 4px;
+    }
+
+    .mobile-card-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        align-items: center;
+    }
+
+    .mobile-card-label {
+        color: var(--gray);
+        font-size: 11px;
+        max-width: 50%;
+    }
+
+    .mobile-card-value {
+        font-weight: 500;
+        font-size: 12px;
+        color: var(--dark);
+        text-align: right;
+        max-width: 50%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mobile-card-actions {
+        display: flex;
+        gap: 4px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .mobile-card-action {
+        flex: 1;
+        padding: 6px 4px;
+        text-align: center;
+        background: #f3f4f6;
+        border-radius: 4px;
+        color: var(--dark);
+        text-decoration: none;
+        font-size: 11px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+    }
+
+    .mobile-card-action i {
+        font-size: 10px;
+    }
+
+    .mobile-card-action:hover {
+        background: var(--primary);
+        color: var(--white);
+    }
+
+    /* Forms Mobile */
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+    }
+
+    .form-control,
+    .form-select {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px; /* Prevent zoom on iOS */
+        border-radius: 6px;
+    }
+
+    /* Sections - Compact */
+    .section {
+        padding: 12px 0 !important;
+        margin-bottom: 16px !important;
+    }
+
+    .section-header {
+        margin-bottom: 12px !important;
+        padding: 0 !important;
+    }
+
+    .section-header h2 {
+        font-size: 16px !important;
+        margin: 0 !important;
+    }
+
+    /* Buttons Mobile - Compact */
+    .btn {
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+        border-radius: 6px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .btn-sm {
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+    }
+
+    .btn-group {
+        display: flex;
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
+    .btn-group .btn {
+        margin: 0;
+        flex: 1;
+    }
+
+    /* Modal Mobile */
+    .modal {
+        padding: var(--mobile-spacing);
+    }
+
+    .modal-content {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        border-radius: var(--mobile-radius);
+    }
+
+    .modal-header {
+        padding: 16px;
+        position: sticky;
+        top: 0;
+        background: var(--white);
+        z-index: 10;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-footer {
+        padding: 16px;
+        position: sticky;
+        bottom: 0;
+        background: var(--white);
+        border-top: 1px solid #e5e7eb;
+    }
+
+    /* Stats Cards Mobile - ACTUALLY TINY for Lead Management */
+    .stats-grid,
+    .lead-stats,
+    .stats-row {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important; /* 4 columns to fit all */
+        gap: 3px !important;
+        margin-bottom: 6px !important;
+        padding: 0 !important;
+    }
+
+    .stat-card,
+    .stat-item,
+    .lead-stat {
+        padding: 4px 2px !important;
+        border-radius: 3px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
+        background: var(--white) !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .stat-card .stat-icon,
+    .stat-item .icon {
+        display: none !important; /* Remove icons completely to save space */
+    }
+
+    .stat-card .stat-icon i,
+    .stat-item i {
+        display: none !important;
+    }
+
+    .stat-card .stat-content {
+        text-align: center !important;
+    }
+
+    .stat-card .stat-content h3,
+    .stat-item .label,
+    .stat-label {
+        font-size: 8px !important;
+        margin: 0 0 2px 0 !important;
+        font-weight: 400 !important;
+        color: #6b7280 !important;
+        line-height: 1 !important;
+        text-align: center !important;
+    }
+
+    .stat-card .stat-value,
+    .stat-item .value,
+    .stat-number {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        line-height: 1 !important;
+        text-align: center !important;
+        color: var(--primary) !important;
+    }
+
+    .stat-card .stat-change,
+    .stat-item .change {
+        display: none !important; /* Hide change indicators to save space */
+    }
+
+    /* For stat cards that show as row */
+    .stats-horizontal {
+        display: flex !important;
+        gap: 2px !important;
+        margin-bottom: 4px !important;
+    }
+
+    .stats-horizontal .stat-card {
+        flex: 1 !important;
+    }
+
+    /* Lead Management Section - Mobile Specific */
+    .lead-management,
+    .leads-section {
+        padding: 4px !important;
+    }
+
+    /* Lead Management Action Buttons - Just 2 Main Buttons */
+    .lead-actions,
+    .action-buttons,
+    .leads-actions,
+    .button-row,
+    .button-group {
+        display: flex !important;
+        gap: 8px !important;
+        margin-bottom: 10px !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
+
+    /* Hide all buttons except Sync and New Lead on mobile */
+    .lead-actions button:not(:nth-child(1)):not(:nth-child(2)),
+    .action-buttons button:not(:nth-child(1)):not(:nth-child(2)),
+    .leads-actions button:not(:nth-child(1)):not(:nth-child(2)) {
+        display: none !important;
+    }
+
+    .lead-actions button,
+    .action-buttons button,
+    .leads-actions button,
+    .lead-actions .btn,
+    .action-buttons .btn,
+    .leads-actions .btn {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        border-radius: 4px !important;
+        flex: 1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        height: 32px !important;
+        line-height: 1 !important;
+        background: var(--primary) !important;
+        color: white !important;
+        border: none !important;
+        margin: 0 !important;
+        font-weight: 500 !important;
+    }
+
+    /* Override button text with shorter versions */
+    button[onclick*="sync"]:after,
+    button[onclick*="Sync"]:after,
+    button[onclick*="vicidial"]:after,
+    button[onclick*="Vicidial"]:after {
+        content: "Sync" !important;
+    }
+
+    button[onclick*="sync"] span,
+    button[onclick*="Sync"] span,
+    button[onclick*="vicidial"] span,
+    button[onclick*="Vicidial"] span {
+        display: none !important;
+    }
+
+    /* New Lead button */
+    button[onclick*="new"],
+    button[onclick*="New"],
+    button[onclick*="add"],
+    button[onclick*="Add"] {
+        background: #10b981 !important;
+    }
+
+    /* Icons in buttons - small but visible */
+    .lead-actions button i,
+    .action-buttons button i,
+    .leads-actions button i {
+        font-size: 10px !important;
+        margin-right: 4px !important;
+    }
+
+    /* Search Bar Mobile - Lead Management */
+    .search-container,
+    .search-bar,
+    .lead-search {
+        width: 100% !important;
+        margin-bottom: 8px !important;
+        display: flex !important;
+        gap: 4px !important;
+    }
+
+    .search-input,
+    input[type="search"],
+    .lead-search input {
+        width: 100% !important;
+        padding: 6px 8px !important;
+        font-size: 12px !important;
+        border-radius: 4px !important;
+        border: 1px solid #e5e7eb !important;
+    }
+
+    .search-button,
+    .search-btn {
+        padding: 6px 8px !important;
+        font-size: 11px !important;
+        min-width: auto !important;
+    }
+
+    /* Lead Filters - Mobile */
+    .lead-filters,
+    .filter-section,
+    .filters-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+        margin-bottom: 8px !important;
+        width: 100% !important;
+    }
+
+    .lead-filters select,
+    .filter-section select,
+    .filter-dropdown {
+        padding: 4px 6px !important;
+        font-size: 10px !important;
+        border-radius: 3px !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+        max-width: calc(33.33% - 4px) !important;
+    }
+
+    /* Lead count and pagination - Mobile */
+    .lead-count,
+    .pagination-info {
+        font-size: 10px !important;
+        padding: 4px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .pagination,
+    .lead-pagination {
+        display: flex !important;
+        gap: 2px !important;
+        justify-content: center !important;
+        margin: 8px 0 !important;
+    }
+
+    .pagination button,
+    .pagination a,
+    .page-link {
+        padding: 4px 6px !important;
+        font-size: 10px !important;
+        min-width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Tabs Mobile */
+    .tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        margin: 0 -var(--mobile-spacing);
+        padding: 0 var(--mobile-spacing);
+    }
+
+    .tab {
+        display: inline-block;
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+
+    /* Dropdowns Mobile */
+    .dropdown-menu {
+        position: fixed;
+        left: var(--mobile-spacing);
+        right: var(--mobile-spacing);
+        top: auto;
+        width: auto;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    /* Charts Mobile - Side by Side and Compact */
+    .charts-section {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .chart-card {
+        background: var(--white) !important;
+        border-radius: 6px !important;
+        padding: 8px !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .chart-card h3 {
+        font-size: 11px !important;
+        margin: 0 0 6px 0 !important;
+        font-weight: 600 !important;
+    }
+
+    .chart-container {
+        height: 120px !important;
+    }
+
+    canvas {
+        max-height: 120px !important;
+    }
+
+    /* Quick Actions Cards - Ultra Compact */
+    .action-card {
+        padding: 6px 2px !important;
+        border-radius: 6px !important;
+        min-height: 45px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: var(--white) !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+        cursor: pointer !important;
+    }
+
+    .action-card:hover {
+        transform: none !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .action-card i {
+        font-size: 14px !important;
+        margin-bottom: 2px !important;
+        color: var(--primary) !important;
+    }
+
+    .action-card h3 {
+        font-size: 8px !important;
+        margin: 0 !important;
+        text-align: center !important;
+        line-height: 1 !important;
+        font-weight: 500 !important;
+        color: var(--dark) !important;
+        word-break: break-all !important;
+        padding: 0 2px !important;
+    }
+
+    .action-card p {
+        display: none !important;
+    }
+
+    /* Quick Actions Section */
+    .quick-actions {
+        margin-bottom: 10px !important;
+        padding: 0 !important;
+    }
+
+    .quick-actions .section-header {
+        margin-bottom: 6px !important;
+    }
+
+    .quick-actions .section-header h2 {
+        font-size: 13px !important;
+    }
+
+    /* Recent Activity and Renewals Side-by-Side */
+    .dashboard-sections {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        gap: 4px !important;
+        margin-bottom: 10px !important;
+        width: calc(100% - 4px) !important;
+        margin-left: 2px !important;
+        margin-right: 2px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+
+    .recent-activity,
+    .upcoming-renewals {
+        background: var(--white) !important;
+        border-radius: 4px !important;
+        padding: 4px !important;
+        height: 140px !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .recent-activity .section-header,
+    .upcoming-renewals .section-header {
+        padding: 0 0 3px 0 !important;
+        margin-bottom: 3px !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-shrink: 0 !important;
+        height: 18px !important;
+    }
+
+    .recent-activity .section-header h2,
+    .upcoming-renewals .section-header h2 {
+        font-size: 10px !important;
+        margin: 0 !important;
+        font-weight: 600 !important;
+        line-height: 1 !important;
+    }
+
+    .recent-activity .view-all,
+    .upcoming-renewals .view-all {
+        font-size: 8px !important;
+        padding: 1px 3px !important;
+        background: #f3f4f6 !important;
+        border-radius: 2px !important;
+        text-decoration: none !important;
+        color: var(--primary) !important;
+    }
+
+    /* Activity List - Ultra Compact */
+    .activity-list {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        flex: 1 !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    .activity-item {
+        padding: 3px 0 !important;
+        border-bottom: 1px solid #f9fafb !important;
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 3px !important;
+        min-height: auto !important;
+    }
+
+    .activity-item:last-child {
+        border-bottom: none !important;
+    }
+
+    .activity-item i {
+        font-size: 8px !important;
+        width: 14px !important;
+        height: 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #e6f2ff !important;
+        border-radius: 50% !important;
+        flex-shrink: 0 !important;
+        margin-top: 1px !important;
+    }
+
+    .activity-item .activity-content {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .activity-item .activity-text {
+        font-size: 9px !important;
+        line-height: 1.2 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        color: var(--dark) !important;
+    }
+
+    .activity-item .activity-time {
+        font-size: 7px !important;
+        color: #9ca3af !important;
+        margin-top: 1px !important;
+    }
+
+    /* Renewals Table - Ultra Compact with proper containment */
+    .renewals-table {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        flex: 1 !important;
+        -webkit-overflow-scrolling: touch !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .renewals-table table {
+        width: 100% !important;
+        font-size: 7px !important;
+        table-layout: fixed !important;
+        box-sizing: border-box !important;
+    }
+
+    .renewals-table thead {
+        display: none !important;
+    }
+
+    .renewals-table tbody {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .renewals-table tr {
+        display: block !important;
+        padding: 2px 0 !important;
+        border-bottom: 1px solid #f9fafb !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .renewals-table tr:last-child {
+        border-bottom: none !important;
+    }
+
+    .renewals-table td {
+        padding: 1px !important;
+        display: block !important;
+        font-size: 7px !important;
+        border: none !important;
+        box-sizing: border-box !important;
+    }
+
+    .renewals-table td:nth-child(1) {
+        font-weight: 600 !important;
+        font-size: 8px !important;
+        margin-bottom: 1px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        color: var(--dark) !important;
+        width: 100% !important;
+    }
+
+    .renewals-table td:nth-child(2),
+    .renewals-table td:nth-child(3) {
+        display: inline-block !important;
+        width: 48% !important;
+        box-sizing: border-box !important;
+    }
+
+    .renewals-table td:nth-child(2) {
+        color: #6b7280 !important;
+        font-size: 6px !important;
+        padding-right: 2px !important;
+    }
+
+    .renewals-table td:nth-child(3) {
+        text-align: right !important;
+        color: #dc2626 !important;
+        font-weight: 500 !important;
+        font-size: 6px !important;
+    }
+
+    .renewals-table td:nth-child(4),
+    .renewals-table td:nth-child(5) {
+        display: none !important;
+    }
+
+    /* Footer Mobile */
+    .footer {
+        padding: 20px var(--mobile-spacing);
+        text-align: center;
+    }
+
+    .footer-links {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* Small Mobile Styles (max-width: 480px) */
+@media (max-width: 480px) {
+    /* Even more compact spacing */
+    :root {
+        --mobile-spacing: 6px;
+    }
+
+    /* Prevent any horizontal overflow */
+    html, body {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
+
+    * {
+        max-width: 100% !important;
+        word-wrap: break-word !important;
+    }
+
+    /* Ultra-compact header */
+    .header {
+        height: 45px !important;
+    }
+
+    .mobile-nav {
+        top: 45px !important;
+        height: calc(100vh - 45px) !important;
+    }
+
+    .nav-brand h1 {
+        font-size: 12px !important;
+    }
+
+    .mobile-menu-toggle {
+        font-size: 18px !important;
+        padding: 4px !important;
+    }
+
+    /* Adjust content for smaller header */
+    .dashboard-content,
+    .main-content {
+        padding-top: 51px !important; /* 45px header + 6px padding */
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+    }
+
+    /* Smaller fonts */
+    body {
+        font-size: 13px;
+    }
+
+    h1 {
+        font-size: 16px !important;
+    }
+
+    h2 {
+        font-size: 14px !important;
+    }
+
+    h3 {
+        font-size: 13px !important;
+    }
+
+    /* Ultra-compact cards */
+    .mobile-card {
+        padding: 8px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .mobile-card-title {
+        font-size: 13px !important;
+    }
+
+    .mobile-card-label {
+        font-size: 10px !important;
+    }
+
+    .mobile-card-value {
+        font-size: 11px !important;
+    }
+
+    /* Keep 2-column stats grid but smaller */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 4px !important;
+    }
+
+    /* Ultra compact quick actions on small screens */
+    .actions-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 3px !important;
+    }
+
+    .action-card {
+        padding: 4px 1px !important;
+        min-height: 40px !important;
+    }
+
+    .action-card i {
+        font-size: 12px !important;
+    }
+
+    .action-card h3 {
+        font-size: 7px !important;
+        line-height: 0.9 !important;
+    }
+
+    /* Keep side-by-side layout but smaller and contained */
+    .dashboard-sections {
+        gap: 3px !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        width: calc(100vw - 12px) !important;
+        margin: 0 !important;
+    }
+
+    .recent-activity,
+    .upcoming-renewals {
+        height: 120px !important;
+        padding: 3px !important;
+        max-width: calc(50vw - 9px) !important;
+    }
+
+    /* Force dashboard sections to be contained */
+    .dashboard-sections > * {
+        max-width: calc(50vw - 9px) !important;
+    }
+
+    .recent-activity .section-header h2,
+    .upcoming-renewals .section-header h2 {
+        font-size: 9px !important;
+    }
+
+    .activity-item .activity-text {
+        font-size: 8px !important;
+    }
+
+    .renewals-table td:nth-child(1) {
+        font-size: 8px !important;
+    }
+
+    /* Charts even smaller */
+    .charts-section {
+        gap: 4px !important;
+    }
+
+    .chart-card {
+        padding: 6px !important;
+    }
+
+    .chart-card h3 {
+        font-size: 10px !important;
+        margin-bottom: 4px !important;
+    }
+
+    .chart-container,
+    canvas {
+        height: 100px !important;
+        max-height: 100px !important;
+    }
+
+    .stat-card {
+        padding: 8px !important;
+    }
+
+    .stat-card .stat-icon {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 12px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .stat-card .stat-content h3 {
+        font-size: 10px !important;
+        line-height: 1.2 !important;
+    }
+
+    .stat-card .stat-value {
+        font-size: 14px !important;
+    }
+
+    .stat-card .stat-change {
+        font-size: 9px !important;
+    }
+
+    /* Ultra-compact buttons */
+    .btn {
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+    }
+
+    .btn-sm {
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+    }
+
+    /* Compact bottom nav */
+    .bottom-nav {
+        padding: 4px 0 !important;
+        height: 50px !important;
+    }
+
+    .bottom-nav-item {
+        padding: 4px !important;
+    }
+
+    .bottom-nav-item i {
+        font-size: 16px !important;
+        margin-bottom: 2px !important;
+    }
+
+    .bottom-nav-item span {
+        font-size: 9px !important;
+    }
+
+    /* Adjust for bottom nav */
+    .dashboard-content,
+    .main-content {
+        padding-bottom: 56px !important;
+    }
+
+    /* Table adjustments */
+    .data-table {
+        font-size: 11px !important;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 6px 4px !important;
+    }
+
+    /* Smaller modals */
+    .modal-content {
+        border-radius: 12px 12px 0 0;
+        margin-top: 20px;
+    }
+
+    /* Actions Grid Mobile - Ultra Compact */
+    .actions-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 4px !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Forms ultra-compact */
+    .form-group {
+        margin-bottom: 10px !important;
+    }
+
+    .form-control,
+    .form-select {
+        padding: 8px !important;
+        font-size: 14px !important;
+    }
+
+    /* Notification styles */
+    .notification {
+        left: var(--mobile-spacing);
+        right: var(--mobile-spacing);
+        bottom: var(--mobile-spacing);
+        width: auto;
+    }
+}
+
+/* Touch and Gesture Support */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase touch targets */
+    .btn,
+    .mobile-nav-link,
+    .mobile-card-action {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Remove hover effects on touch devices */
+    .btn:hover {
+        transform: none;
+    }
+
+    /* Add active states for touch feedback */
+    .btn:active,
+    .mobile-card-action:active {
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+
+    /* Improve scrolling */
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .scrollable {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+}
+
+/* Landscape Mobile Adjustments */
+@media (max-width: 896px) and (orientation: landscape) {
+    .header {
+        height: 50px;
+    }
+
+    .mobile-nav {
+        top: 50px;
+        height: calc(100vh - 50px);
+    }
+
+    .modal-content {
+        max-height: calc(100vh - 20px);
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .mobile-menu-toggle,
+    .mobile-nav,
+    .sidebar,
+    .header,
+    .footer {
+        display: none !important;
+    }
+
+    .dashboard-content,
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .data-table {
+        font-size: 10px;
+    }
+}
+
+/* Accessibility Improvements for Mobile */
+@media (max-width: 768px) {
+    /* Focus styles for mobile */
+    *:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+    }
+
+    /* Skip to content link */
+    .skip-to-content {
+        position: absolute;
+        left: -9999px;
+        z-index: 1000;
+    }
+
+    .skip-to-content:focus {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        padding: 8px 16px;
+        background: var(--primary);
+        color: var(--white);
+        text-decoration: none;
+        border-radius: 4px;
+    }
+}
+
+/* Loading States for Mobile */
+.mobile-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    color: var(--gray);
+}
+
+.mobile-loading-spinner {
+    width: 30px;
+    height: 30px;
+    border: 3px solid #f3f4f6;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Empty States for Mobile */
+.mobile-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray);
+}
+
+.mobile-empty-state i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.mobile-empty-state h3 {
+    font-size: 18px;
+    color: var(--dark);
+    margin-bottom: 8px;
+}
+
+.mobile-empty-state p {
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+/* Pull to Refresh (iOS-style) */
+.pull-to-refresh {
+    position: absolute;
+    top: -60px;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.3s ease;
+}
+
+.pull-to-refresh.active {
+    transform: translateY(60px);
+}
+
+/* Bottom Navigation Bar (Mobile) */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 990;
+}
+
+@media (max-width: 768px) {
+    .bottom-nav {
+        display: flex;
+        justify-content: space-around;
+        padding: 8px 0;
+    }
+
+    .bottom-nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px;
+        color: var(--gray);
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    .bottom-nav-item.active,
+    .bottom-nav-item:hover {
+        color: var(--primary);
+    }
+
+    .bottom-nav-item i {
+        font-size: 20px;
+        margin-bottom: 4px;
+    }
+
+    .bottom-nav-item span {
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    /* Adjust content for bottom nav */
+    .dashboard-content,
+    .main-content {
+        padding-bottom: calc(60px + var(--mobile-spacing));
+    }
+}
+
+/* Swipe Actions for Mobile Cards */
+.swipeable-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.swipe-actions {
+    position: absolute;
+    top: 0;
+    right: -200px;
+    bottom: 0;
+    width: 200px;
+    display: flex;
+    transition: right 0.3s ease;
+}
+
+.swipeable-card.swiped .swipe-actions {
+    right: 0;
+}
+
+.swipe-action {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.swipe-action.edit {
+    background: #3b82f6;
+}
+
+.swipe-action.delete {
+    background: #ef4444;
+}
+
+/* Floating Action Button (FAB) */
+.fab {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    background: var(--primary);
+    color: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 900;
+}
+
+.fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.fab:active {
+    transform: scale(0.95);
+}
+
+@media (min-width: 769px) {
+    .fab {
+        display: none;
+    }
+}

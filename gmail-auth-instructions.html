@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Re-Authentication Instructions</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            border-bottom: 2px solid #1a73e8;
+            padding-bottom: 10px;
+        }
+        .alert {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .step {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .step h3 {
+            margin: 0 0 10px 0;
+            color: #1e40af;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #d1343a;
+            font-family: 'Courier New', monospace;
+        }
+        .url-box {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 6px;
+            word-break: break-all;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+            color: #166534;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #1557b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 Gmail API Re-Authentication Required</h1>
+
+        <div class="alert">
+            <strong>⚠️ Current Status:</strong> Gmail token has expired for <code>corptech06@gmail.com</code>
+            <br><br>
+            The COI Request Inbox cannot fetch emails until this is fixed.
+        </div>
+
+        <h2>Quick Fix Instructions</h2>
+
+        <div class="step">
+            <h3>Step 1: Open Terminal</h3>
+            <p>SSH into the server or open a terminal on the server:</p>
+            <code>ssh corp06@162.220.14.239</code>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Run Re-authentication Script</h3>
+            <p>Navigate to the backend directory and run the script:</p>
+            <div class="url-box">
+                cd /var/www/vanguard/backend<br>
+                ./reauth-gmail.sh
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Authorize Gmail Access</h3>
+            <p>The script will give you a URL. Open it in your browser and:</p>
+            <ol>
+                <li>Sign in with: <strong>corptech06@gmail.com</strong></li>
+                <li>Password: <strong>corp2006</strong></li>
+                <li>Click "Allow" to grant permissions</li>
+                <li>Copy the authorization code shown</li>
+                <li>Paste it back in the terminal</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>Step 4: Verify It Works</h3>
+            <p>After the script completes:</p>
+            <ol>
+                <li>Go back to the Vanguard CRM</li>
+                <li>Navigate to COI Management</li>
+                <li>Check the COI Request Inbox</li>
+                <li>You should see emails loading properly</li>
+            </ol>
+        </div>
+
+        <div class="success">
+            <strong>✅ Expected Result:</strong> The COI inbox will show real emails from corptech06@gmail.com instead of the error message.
+        </div>
+
+        <h2>Alternative: Manual Token Setup</h2>
+        <p>If the script doesn't work, you can manually get an authorization code:</p>
+
+        <div class="step">
+            <h3>Manual Step 1: Get Authorization Code</h3>
+            <p>Open this URL in your browser:</p>
+            <div class="url-box" id="authUrl">
+                Loading authorization URL...
+            </div>
+            <button onclick="copyUrl()">Copy URL</button>
+        </div>
+
+        <div class="step">
+            <h3>Manual Step 2: Save Token</h3>
+            <p>After getting the code, run this command with your code:</p>
+            <div class="url-box">
+                curl -X POST http://localhost:3001/api/gmail/exchange-code \<br>
+                  -H "Content-Type: application/json" \<br>
+                  -d '{"code": "YOUR_AUTH_CODE_HERE"}'
+            </div>
+        </div>
+
+        <h2>Need Help?</h2>
+        <p>If you're still having issues:</p>
+        <ul>
+            <li>Check that the Google account has "Less secure app access" enabled</li>
+            <li>Make sure 2-factor authentication is not blocking the OAuth flow</li>
+            <li>Verify the Gmail API is enabled in Google Cloud Console</li>
+            <li>Check the backend logs: <code>pm2 logs vanguard-backend</code></li>
+        </ul>
+    </div>
+
+    <script>
+        // Generate the authorization URL
+        const CLIENT_ID = '794453705883-6b32cpfctd77t5ls5kktu2s9ub27p19q.apps.googleusercontent.com';
+        const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
+        const SCOPES = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/gmail.compose',
+            'https://www.googleapis.com/auth/gmail.modify'
+        ].join(' ');
+
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+            `client_id=${CLIENT_ID}&` +
+            `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+            `response_type=code&` +
+            `scope=${encodeURIComponent(SCOPES)}&` +
+            `access_type=offline&` +
+            `prompt=consent`;
+
+        document.getElementById('authUrl').textContent = authUrl;
+
+        function copyUrl() {
+            navigator.clipboard.writeText(authUrl).then(() => {
+                alert('URL copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>

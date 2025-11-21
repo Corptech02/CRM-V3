@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Assigned To Persistence</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .lead-item {
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #007bff;
+        }
+        select {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .info { color: blue; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #0056b3; }
+        .assigned-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .assigned-unassigned { background: #e5e7eb; color: #374151; }
+        .assigned-hunter { background: #dbeafe; color: #1e40af; }
+        .assigned-grant { background: #d1fae5; color: #065f46; }
+        .assigned-maureen { background: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Assigned To Persistence</h1>
+
+    <div class="test-section">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Change a lead's "Assigned To" using the dropdown</li>
+            <li>Click "Reload from Server" to verify it persisted</li>
+            <li>Or refresh the entire page to test full persistence</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Leads</h2>
+        <button onclick="loadLeads()">Reload from Server</button>
+        <button onclick="addTestLead()">Add Test Lead</button>
+        <div id="status"></div>
+        <div id="leadsList"></div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001'
+            : `http://${window.location.hostname}:3001`;
+
+        async function loadLeads() {
+            const statusDiv = document.getElementById('status');
+            const listDiv = document.getElementById('leadsList');
+
+            try {
+                const response = await fetch(`${API_URL}/api/leads`);
+                const leads = await response.json();
+
+                statusDiv.innerHTML = `<p class="info">Loaded ${leads.length} leads from server</p>`;
+
+                // Show last 5 leads
+                const recentLeads = leads.slice(-5).reverse();
+                listDiv.innerHTML = recentLeads.map(lead => `
+                    <div class="lead-item">
+                        <div>
+                            <strong>${lead.name || 'No Name'}</strong><br>
+                            ID: ${lead.id}<br>
+                            Current: <span class="assigned-badge assigned-${(lead.assignedTo || 'unassigned').toLowerCase()}">${lead.assignedTo || 'Unassigned'}</span>
+                        </div>
+                        <div>
+                            <select onchange="updateAssignedTo('${lead.id}', this.value)">
+                                <option value="">Change Assigned To...</option>
+                                <option value="Unassigned" ${lead.assignedTo === 'Unassigned' ? 'selected' : ''}>Unassigned</option>
+                                <option value="Hunter" ${lead.assignedTo === 'Hunter' ? 'selected' : ''}>Hunter</option>
+                                <option value="Grant" ${lead.assignedTo === 'Grant' ? 'selected' : ''}>Grant</option>
+                                <option value="Maureen" ${lead.assignedTo === 'Maureen' ? 'selected' : ''}>Maureen</option>
+                            </select>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                statusDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function updateAssignedTo(leadId, newAssignedTo) {
+            if (!newAssignedTo) return;
+
+            const statusDiv = document.getElementById('status');
+
+            try {
+                // First, get the full lead object
+                const getResponse = await fetch(`${API_URL}/api/leads`);
+                const allLeads = await getResponse.json();
+                const lead = allLeads.find(l => l.id === leadId);
+
+                if (!lead) {
+                    statusDiv.innerHTML = `<p class="error">Lead not found</p>`;
+                    return;
+                }
+
+                // Update the assignedTo
+                lead.assignedTo = newAssignedTo;
+                lead.assignedAt = new Date().toISOString();
+
+                // Save back to server
+                const response = await fetch(`${API_URL}/api/leads`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(lead)
+                });
+
+                if (response.ok) {
+                    statusDiv.innerHTML = `<p class="success">✅ Assigned to "${newAssignedTo}" and saved to server!</p>`;
+                    setTimeout(() => loadLeads(), 1000); // Reload after 1 second
+                } else {
+                    statusDiv.innerHTML = `<p class="error">Failed to save to server</p>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function addTestLead() {
+            const timestamp = Date.now();
+            const testLead = {
+                id: `assigned_test_${timestamp}`,
+                name: `Assignment Test ${timestamp}`,
+                contact: 'Test Contact',
+                phone: '555-' + Math.floor(Math.random() * 9000 + 1000),
+                email: `assigned${timestamp}@test.com`,
+                stage: 'new',
+                assignedTo: 'Unassigned',
+                product: 'Test Product'
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/leads`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testLead)
+                });
+
+                if (response.ok) {
+                    document.getElementById('status').innerHTML =
+                        `<p class="success">✅ Added test lead: ${testLead.name}</p>`;
+                    loadLeads();
+                }
+            } catch (error) {
+                document.getElementById('status').innerHTML =
+                    `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Load on startup
+        window.addEventListener('DOMContentLoaded', loadLeads);
+    </script>
+</body>
+</html>

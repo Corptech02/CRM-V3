@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complete Save Test</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+        }
+        h2 {
+            color: #2563eb;
+            margin-top: 0;
+        }
+        .field-group {
+            margin: 10px 0;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Complete Lead Save Test</h1>
+
+    <div class="test-section">
+        <h2>Step 1: Load Current Data from Database</h2>
+        <button onclick="loadFromDatabase()">Load Lead 88571</button>
+        <div id="load-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 2: Edit Lead Data</h2>
+
+        <div class="field-group">
+            <label>Company Name:</label>
+            <input type="text" id="company_name" onchange="trackChange('company_name', this.value)">
+        </div>
+
+        <div class="field-group">
+            <label>Contact Name:</label>
+            <input type="text" id="contact_name" onchange="trackChange('contact_name', this.value)">
+        </div>
+
+        <div class="field-group">
+            <label>Phone:</label>
+            <input type="text" id="phone" onchange="trackChange('phone', this.value)">
+        </div>
+
+        <div class="field-group">
+            <label>Email:</label>
+            <input type="text" id="email" onchange="trackChange('email', this.value)">
+        </div>
+
+        <div class="field-group">
+            <label>Notes:</label>
+            <textarea id="notes" rows="4" onchange="trackChange('notes', this.value)"></textarea>
+        </div>
+
+        <div class="field-group">
+            <label>DOT Number:</label>
+            <input type="text" id="dot_number" onchange="trackChange('dot_number', this.value)">
+        </div>
+
+        <div class="field-group">
+            <label>MC Number:</label>
+            <input type="text" id="mc_number" onchange="trackChange('mc_number', this.value)">
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 3: Save to Database</h2>
+        <button onclick="saveToDatabase()">💾 SAVE CHANGES</button>
+        <div id="save-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 4: Verify Save</h2>
+        <button onclick="verifySave()">Verify Changes Saved</button>
+        <div id="verify-status"></div>
+    </div>
+
+    <script>
+        const leadId = '88571';
+        const apiUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:8897'
+            : `http://${window.location.hostname}:8897`;
+
+        let changes = {};
+        let originalData = {};
+
+        function trackChange(field, value) {
+            changes[field] = value;
+            console.log(`Changed ${field} to: ${value}`);
+        }
+
+        async function loadFromDatabase() {
+            const status = document.getElementById('load-status');
+            status.innerHTML = '<div class="status info">Loading from database...</div>';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`);
+                if (!response.ok) throw new Error('Failed to load');
+
+                const data = await response.json();
+                originalData = data;
+
+                // Populate fields
+                document.getElementById('company_name').value = data.company_name || '';
+                document.getElementById('contact_name').value = data.contact_name || '';
+                document.getElementById('phone').value = data.phone || '';
+                document.getElementById('email').value = data.email || '';
+                document.getElementById('notes').value = data.notes || '';
+                document.getElementById('dot_number').value = data.dot_number || '';
+                document.getElementById('mc_number').value = data.mc_number || '';
+
+                status.innerHTML = `
+                    <div class="status success">✅ Loaded from database</div>
+                    <pre>${JSON.stringify({
+                        company_name: data.company_name,
+                        contact_name: data.contact_name,
+                        phone: data.phone,
+                        notes: data.notes
+                    }, null, 2)}</pre>
+                `;
+
+                changes = {}; // Reset changes
+            } catch (error) {
+                status.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function saveToDatabase() {
+            const status = document.getElementById('save-status');
+            status.innerHTML = '<div class="status info">Saving to database...</div>';
+
+            // Collect current values from all fields
+            const dataToSave = {
+                company_name: document.getElementById('company_name').value,
+                contact_name: document.getElementById('contact_name').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                notes: document.getElementById('notes').value,
+                dot_number: document.getElementById('dot_number').value,
+                mc_number: document.getElementById('mc_number').value
+            };
+
+            console.log('Saving data:', dataToSave);
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(dataToSave)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    status.innerHTML = `
+                        <div class="status success">✅ Saved successfully!</div>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                        <div class="status info">Data sent:</div>
+                        <pre>${JSON.stringify(dataToSave, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error(result.error || 'Save failed');
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="status error">❌ Save error: ${error.message}</div>`;
+            }
+        }
+
+        async function verifySave() {
+            const status = document.getElementById('verify-status');
+            status.innerHTML = '<div class="status info">Verifying in database...</div>';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/leads/${leadId}`);
+                if (!response.ok) throw new Error('Failed to verify');
+
+                const data = await response.json();
+
+                // Check if current form values match database
+                const currentValues = {
+                    company_name: document.getElementById('company_name').value,
+                    contact_name: document.getElementById('contact_name').value,
+                    phone: document.getElementById('phone').value,
+                    email: document.getElementById('email').value,
+                    notes: document.getElementById('notes').value,
+                    dot_number: document.getElementById('dot_number').value,
+                    mc_number: document.getElementById('mc_number').value
+                };
+
+                let allMatch = true;
+                let comparison = '<div><strong>Comparison:</strong></div>';
+
+                for (let field in currentValues) {
+                    const formValue = currentValues[field];
+                    const dbValue = data[field] || '';
+                    const matches = formValue === dbValue;
+
+                    if (!matches) allMatch = false;
+
+                    comparison += `<div>${matches ? '✅' : '❌'} ${field}: Form="${formValue}" | DB="${dbValue}"</div>`;
+                }
+
+                if (allMatch) {
+                    status.innerHTML = `
+                        <div class="status success">✅ All values match! Data is saved correctly.</div>
+                        ${comparison}
+                    `;
+                } else {
+                    status.innerHTML = `
+                        <div class="status error">❌ Values don't match!</div>
+                        ${comparison}
+                    `;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="status error">❌ Verify error: ${error.message}</div>`;
+            }
+        }
+
+        // Load on page load
+        window.addEventListener('load', loadFromDatabase);
+    </script>
+</body>
+</html>

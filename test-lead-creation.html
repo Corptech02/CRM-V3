@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Lead Creation</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        #result { margin-top: 20px; padding: 20px; background: #f0f0f0; border-radius: 5px; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Lead Creation</h1>
+
+        <button onclick="testCreateLead()">Test Create Lead via API</button>
+        <button onclick="testLocalStorage()">Check localStorage</button>
+        <button onclick="clearLocalStorage()">Clear localStorage</button>
+        <button onclick="fetchLeads()">Fetch Leads from API</button>
+
+        <div id="result"></div>
+    </div>
+
+    <!-- Load API config -->
+    <script src="js/api-config.js?v=2"></script>
+    <script>
+        function showResult(message, isError = false) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="${isError ? 'error' : 'success'}">${message}</div>`;
+        }
+
+        async function testCreateLead() {
+            const testLead = {
+                company_name: 'Test Company ' + Date.now(),
+                contact_name: 'John Test',
+                email: 'test@example.com',
+                phone: '555-1234',
+                dot_number: 'DOT123',
+                mc_number: 'MC456',
+                years_in_business: '5',
+                fleet_size: '10 units',
+                radius_of_operation: 'Regional',
+                commodity_hauled: 'General Freight',
+                operating_states: 'OH, PA, WV',
+                product: 'Commercial Auto Insurance',
+                premium: 5000,
+                stage: 'new',
+                status: 'Active'
+            };
+
+            try {
+                const API_URL = window.VANGUARD_API_URL || 'http://162.220.14.239:3001';
+                const response = await fetch(`${API_URL}/api/leads`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testLead)
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${error}`);
+                }
+
+                const result = await response.json();
+
+                // Also save to localStorage
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const transformedLead = {
+                    id: result.id,
+                    name: result.company_name || testLead.company_name,
+                    contact: result.contact_name || testLead.contact_name,
+                    email: result.email || testLead.email,
+                    phone: result.phone || testLead.phone,
+                    company: result.company_name || testLead.company_name,
+                    dotNumber: result.dot_number || testLead.dot_number,
+                    mcNumber: result.mc_number || testLead.mc_number,
+                    yearsInBusiness: result.years_in_business || testLead.years_in_business,
+                    fleetSize: result.fleet_size || testLead.fleet_size,
+                    radiusOfOperation: result.radius_of_operation || testLead.radius_of_operation,
+                    commodityHauled: result.commodity_hauled || testLead.commodity_hauled,
+                    operatingStates: result.operating_states || testLead.operating_states,
+                    product: result.product || testLead.product,
+                    premium: result.premium || testLead.premium,
+                    stage: result.stage || testLead.stage,
+                    status: result.status || testLead.status,
+                    created: new Date().toLocaleDateString(),
+                    createdAt: new Date().toISOString()
+                };
+
+                leads.unshift(transformedLead);
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                localStorage.setItem('leads', JSON.stringify(leads));
+
+                showResult(`<h3>Success!</h3>
+                    <p>Lead created with ID: ${result.id}</p>
+                    <p>Company: ${transformedLead.name}</p>
+                    <p>Contact: ${transformedLead.contact}</p>
+                    <p>Saved to localStorage: ${leads.length} total leads</p>
+                    <pre>${JSON.stringify(transformedLead, null, 2)}</pre>`);
+
+            } catch (error) {
+                showResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        function testLocalStorage() {
+            const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+            showResult(`<h3>localStorage Contents:</h3>
+                <p>insurance_leads: ${insuranceLeads.length} items</p>
+                <p>leads: ${regularLeads.length} items</p>
+                <h4>Last 3 insurance_leads:</h4>
+                <pre>${JSON.stringify(insuranceLeads.slice(0, 3), null, 2)}</pre>`);
+        }
+
+        function clearLocalStorage() {
+            if (confirm('Clear all leads from localStorage?')) {
+                localStorage.removeItem('insurance_leads');
+                localStorage.removeItem('leads');
+                showResult('localStorage cleared!');
+            }
+        }
+
+        async function fetchLeads() {
+            try {
+                const API_URL = window.VANGUARD_API_URL || 'http://162.220.14.239:3001';
+                const response = await fetch(`${API_URL}/api/leads`);
+                const data = await response.json();
+                const leads = data.leads || data;
+
+                showResult(`<h3>API Leads:</h3>
+                    <p>Total: ${leads.length} leads</p>
+                    <h4>First 3 leads:</h4>
+                    <pre>${JSON.stringify(leads.slice(0, 3).map(l => ({
+                        id: l.id,
+                        name: l.name || l.company_name,
+                        contact: l.contact || l.contact_name
+                    })), null, 2)}</pre>`);
+            } catch (error) {
+                showResult(`Error fetching leads: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Policy Check</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 20px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #10b981; color: white; }
+        .error { background: #ef4444; color: white; }
+        .warning { background: #f59e0b; color: white; }
+        .info { background: #3b82f6; color: white; }
+        pre { background: #f3f4f6; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Final Policy Check - COI Management</h1>
+    <div id="results"></div>
+
+    <!-- Load exactly as the main app does -->
+    <script src="js/api-config.js?v=1"></script>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        function addResult(title, content, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<h3>${title}</h3><p>${content}</p>`;
+            resultsDiv.appendChild(div);
+        }
+
+        async function runFinalCheck() {
+            // Step 1: Check API Configuration
+            const apiUrl = window.VANGUARD_API_URL || 'http://localhost:3001';
+            addResult('API Configuration', `VANGUARD_API_URL: ${apiUrl}`,
+                      apiUrl.includes('localhost') ? 'success' : 'error');
+
+            // Step 2: Test API Connection
+            try {
+                const response = await fetch(`${apiUrl}/api/policies`, {
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Bypass-Tunnel-Reminder': 'true'
+                    }
+                });
+
+                if (response.ok) {
+                    const policies = await response.json();
+                    addResult('API Connection',
+                             `✅ Successfully connected! Retrieved ${policies.length} policies`,
+                             'success');
+
+                    // Step 3: Verify Policy Data
+                    if (policies.length > 0) {
+                        addResult('Policy Data Check',
+                                 `Found ${policies.length} policies. First: ${policies[0].clientName}`,
+                                 'success');
+
+                        // Step 4: Check Display Logic
+                        const willDisplay = policies.length > 0;
+                        addResult('Display Logic',
+                                 willDisplay ? '✅ Policies WILL be displayed in COI Management' : '❌ "No policies found" will be shown',
+                                 willDisplay ? 'success' : 'error');
+                    } else {
+                        addResult('Policy Data Check',
+                                 '⚠️ No policies in the API response',
+                                 'warning');
+                    }
+                } else {
+                    addResult('API Connection',
+                             `❌ Failed with status ${response.status}`,
+                             'error');
+                }
+            } catch (error) {
+                addResult('API Connection',
+                         `❌ Connection failed: ${error.message}`,
+                         'error');
+            }
+
+            // Step 5: Final Summary
+            addResult('Summary',
+                     'The COI Management tab should now show your policies. Please refresh the main application page.',
+                     'info');
+        }
+
+        // Run the check
+        runFinalCheck();
+    </script>
+</body>
+</html>

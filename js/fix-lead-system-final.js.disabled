@@ -1,0 +1,372 @@
+// FINAL COMPLETE FIX FOR LEAD CREATION AND VIEWING
+(function() {
+    'use strict';
+
+    console.log('🔧 Loading FINAL lead system fix...');
+
+    // Store leads in memory to ensure they're accessible
+    window.leadStore = window.leadStore || {};
+
+    // Override saveNewLead to properly capture and save data
+    window.saveNewLead = function(event) {
+        if (event) event.preventDefault();
+
+        console.log('📝 FINAL FIX: Creating new lead...');
+
+        try {
+            // Generate a proper ID first
+            const leadId = Date.now().toString();
+            console.log('🆔 Generated lead ID:', leadId);
+
+            // Get form values - check multiple possible field IDs
+            const getFieldValue = (ids) => {
+                for (const id of ids) {
+                    const elem = document.getElementById(id);
+                    if (elem && elem.value) {
+                        return elem.value;
+                    }
+                }
+                // Also try by name attribute
+                for (const id of ids) {
+                    const elem = document.querySelector(`[name="${id}"]`);
+                    if (elem && elem.value) {
+                        return elem.value;
+                    }
+                }
+                return '';
+            };
+
+            // Collect all form data
+            const companyName = getFieldValue(['leadCompanyName', 'leadName', 'companyName']) || 'New Company';
+            const contactName = getFieldValue(['leadContact', 'contactName', 'contact']) || '';
+            const phone = getFieldValue(['leadPhone', 'phone']) || '';
+            const email = getFieldValue(['leadEmail', 'email']) || '';
+            const dotNumber = getFieldValue(['leadDOT', 'dotNumber', 'dot']) || '';
+            const mcNumber = getFieldValue(['leadMC', 'mcNumber', 'mc']) || '';
+            const yearsInBusiness = getFieldValue(['leadYearsInBusiness', 'yearsInBusiness']) || '';
+            const fleetSize = getFieldValue(['leadFleetSize', 'fleetSize']) || '';
+            const radius = getFieldValue(['leadRadius', 'radiusOfOperation']) || '';
+            const commodity = getFieldValue(['leadCommodity', 'commodityHauled']) || '';
+            const operatingStates = getFieldValue(['leadOperatingStates', 'operatingStates']) || '';
+            const stage = getFieldValue(['leadStage', 'stage']) || 'new';
+            const status = getFieldValue(['leadStatus', 'status']) || 'Active';
+            const premium = getFieldValue(['leadPremium', 'premium']) || '0';
+            const notes = getFieldValue(['leadNotes', 'notes']) || '';
+
+            console.log('📋 Captured data:', {
+                id: leadId,
+                companyName,
+                contactName,
+                phone,
+                email
+            });
+
+            // Create the complete lead object
+            const newLead = {
+                id: leadId,
+                name: companyName,
+                contact: contactName,
+                phone: phone,
+                email: email,
+                company: companyName,
+                dotNumber: dotNumber,
+                mcNumber: mcNumber,
+                yearsInBusiness: yearsInBusiness,
+                fleetSize: fleetSize,
+                radiusOfOperation: radius,
+                commodityHauled: commodity,
+                operatingStates: operatingStates,
+                product: 'Commercial Auto',
+                premium: parseFloat(premium.replace(/[$,]/g, '')) || 0,
+                stage: stage,
+                status: status,
+                notes: notes,
+                assignedTo: 'Unassigned',
+                source: 'Manual Entry',
+                created: new Date().toLocaleDateString(),
+                createdAt: new Date().toISOString(),
+                renewalDate: ''
+            };
+
+            // Store in memory
+            window.leadStore[leadId] = newLead;
+            console.log('💾 Lead stored in memory');
+
+            // Get existing leads from localStorage
+            let leads = [];
+            try {
+                const storedLeads = localStorage.getItem('insurance_leads');
+                if (storedLeads) {
+                    leads = JSON.parse(storedLeads);
+                    if (!Array.isArray(leads)) leads = [];
+                }
+            } catch (e) {
+                console.warn('Error parsing stored leads:', e);
+                leads = [];
+            }
+
+            // Add new lead at the beginning
+            leads.unshift(newLead);
+
+            // Save to both localStorage keys
+            try {
+                const leadsJson = JSON.stringify(leads);
+                localStorage.setItem('insurance_leads', leadsJson);
+                localStorage.setItem('leads', leadsJson);
+                console.log('✅ Saved to localStorage. Total leads:', leads.length);
+            } catch (e) {
+                console.error('Error saving to localStorage:', e);
+            }
+
+            // Try to save to API (optional)
+            try {
+                const apiUrl = window.location.hostname === 'localhost'
+                    ? 'http://localhost:3001/api/leads'
+                    : 'http://162-220-14-239.nip.io:3001/api/leads';
+
+                fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: leadId,
+                        company_name: companyName,
+                        contact_name: contactName,
+                        phone: phone,
+                        email: email,
+                        dot_number: dotNumber,
+                        mc_number: mcNumber,
+                        years_in_business: yearsInBusiness,
+                        fleet_size: fleetSize,
+                        radius_of_operation: radius,
+                        commodity_hauled: commodity,
+                        operating_states: operatingStates,
+                        premium: newLead.premium,
+                        stage: stage,
+                        status: status,
+                        notes: notes
+                    })
+                }).then(response => {
+                    if (response.ok) {
+                        console.log('✅ Also saved to API');
+                    }
+                }).catch(error => {
+                    console.log('API save failed (continuing with local save):', error);
+                });
+            } catch (e) {
+                console.log('API not available, using local storage only');
+            }
+
+            // Close modal
+            const modal = document.getElementById('newLeadModal');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.style.display = 'none';
+            }
+
+            // Clear form
+            const form = document.getElementById('newLeadForm');
+            if (form) {
+                form.reset();
+            }
+
+            // Show success message
+            if (window.showNotification) {
+                window.showNotification(`Lead "${companyName}" created successfully!`, 'success');
+            } else {
+                alert(`Lead "${companyName}" created successfully!`);
+            }
+
+            // Refresh the leads view
+            setTimeout(() => {
+                if (window.loadLeadsView) {
+                    window.loadLeadsView();
+                } else {
+                    location.reload();
+                }
+            }, 500);
+
+            return newLead;
+
+        } catch (error) {
+            console.error('❌ Error in saveNewLead:', error);
+            alert('Error creating lead: ' + error.message);
+        }
+    };
+
+    // Fix viewLead to find leads properly
+    const originalViewLead = window.viewLead;
+    window.viewLead = async function(leadId) {
+        console.log('👁️ FINAL FIX: Viewing lead:', leadId);
+
+        if (!leadId || leadId === 'undefined') {
+            console.error('Invalid lead ID');
+            alert('Error: Invalid lead ID');
+            return;
+        }
+
+        // Try memory store first
+        let lead = window.leadStore[leadId];
+
+        // Try localStorage if not in memory
+        if (!lead) {
+            try {
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                lead = leads.find(l => String(l.id) === String(leadId));
+
+                if (lead) {
+                    // Store in memory for quick access
+                    window.leadStore[leadId] = lead;
+                }
+            } catch (e) {
+                console.error('Error loading leads:', e);
+            }
+        }
+
+        // Try database if still not found
+        if (!lead) {
+            try {
+                console.log('Checking database for client:', leadId);
+                const response = await fetch(`/api/clients`);
+                if (response.ok) {
+                    const clients = await response.json();
+                    console.log('Database returned', clients.length, 'clients');
+
+                    // Try multiple comparison methods
+                    lead = clients.find(c => {
+                        const match = String(c.id) === String(leadId) ||
+                                     c.id == leadId ||
+                                     Number(c.id) === Number(leadId);
+                        if (c.name && c.name.includes('Grant')) {
+                            console.log('Checking Grant Corp - ID:', c.id, 'Type:', typeof c.id, 'Looking for:', leadId, 'Type:', typeof leadId, 'Match:', match);
+                        }
+                        return match;
+                    });
+
+                    if (lead) {
+                        console.log('✅ Found client in database:', lead.name);
+                        // Store in memory for quick access
+                        window.leadStore[leadId] = lead;
+                    } else {
+                        console.log('❌ Client not found in database. Looking for ID:', leadId);
+                    }
+                }
+            } catch (e) {
+                console.error('Error fetching from database:', e);
+            }
+        }
+
+        if (!lead) {
+            console.error('Lead not found:', leadId);
+            alert('Lead/Client not found. It may have been deleted.');
+            return;
+        }
+
+        console.log('✅ Found lead/client:', lead.name);
+
+        // Store globally for the profile to access
+        window.currentViewLead = lead;
+
+        // If this is a client from the database, use viewClient instead of viewLead
+        if (lead && (lead.status === 'Active' || lead.status === 'Active Client' || lead.type === 'client' || lead.id.toString().startsWith('client_') || lead.id.toString().length > 10)) {
+            // Navigate to clients page and call viewClient
+            window.location.hash = '#clients';
+            setTimeout(() => {
+                if (typeof window.viewClient === 'function') {
+                    console.log('Calling viewClient for:', leadId);
+                    window.viewClient(leadId);
+                } else {
+                    console.error('viewClient function not found');
+                }
+            }, 500);
+        } else {
+            // For actual leads, use the lead viewing functions
+            if (originalViewLead) {
+                originalViewLead(leadId);
+            } else if (window.createEnhancedProfile) {
+                window.createEnhancedProfile(lead);
+            } else if (window.showLeadProfile) {
+                window.showLeadProfile(lead);
+            } else {
+                // Fallback: show basic info
+                alert(`Lead Details:\n\nCompany: ${lead.name}\nContact: ${lead.contact || lead.contactName || 'N/A'}\nPhone: ${lead.phone}\nEmail: ${lead.email}`);
+            }
+        }
+    };
+
+    // Fix lead table row generation
+    window.generateSimpleLeadRows = function(leads) {
+        if (!leads || leads.length === 0) {
+            return '<tr><td colspan="10" style="text-align: center; padding: 2rem;">No leads found</td></tr>';
+        }
+
+        console.log('📊 FINAL FIX: Generating rows for', leads.length, 'leads');
+
+        return leads.map((lead, index) => {
+            // Ensure lead has proper data
+            if (!lead.id) {
+                console.warn('Lead without ID at index', index);
+                return '';
+            }
+
+            // Store lead in memory for quick access
+            window.leadStore[lead.id] = lead;
+
+            const displayName = lead.name || lead.company || 'Unnamed Lead';
+            const truncatedName = displayName.length > 15 ? displayName.substring(0, 15) + '...' : displayName;
+
+            return `
+                <tr>
+                    <td>
+                        <input type="checkbox" class="lead-checkbox" value="${lead.id}">
+                    </td>
+                    <td class="lead-name" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline;"
+                                onclick="viewLead('${lead.id}')" title="${displayName}">
+                            ${truncatedName}
+                        </strong>
+                    </td>
+                    <td>
+                        <div class="contact-info" style="display: flex; gap: 10px; align-items: center;">
+                            ${lead.phone ? `<a href="tel:${lead.phone}" title="${lead.phone}" style="color: #3b82f6;"><i class="fas fa-phone"></i></a>` : '<i class="fas fa-phone" style="color: #ccc;"></i>'}
+                            ${lead.email ? `<a href="mailto:${lead.email}" title="${lead.email}" style="color: #3b82f6;"><i class="fas fa-envelope"></i></a>` : '<i class="fas fa-envelope" style="color: #ccc;"></i>'}
+                        </div>
+                    </td>
+                    <td>${lead.product || 'Commercial Auto'}</td>
+                    <td>$${(lead.premium || 0).toLocaleString()}</td>
+                    <td>${window.getStageHtml ? window.getStageHtml(lead.stage || 'new') : lead.stage || 'new'}</td>
+                    <td>${lead.renewalDate || 'N/A'}</td>
+                    <td>${lead.assignedTo || 'Unassigned'}</td>
+                    <td>${lead.created || 'N/A'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-icon" onclick="viewLead('${lead.id}')" title="View Lead">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn-icon" onclick="archiveLead('${lead.id}')" title="Archive">
+                                <i class="fas fa-archive"></i>
+                            </button>
+                            <button class="btn-icon" onclick="convertLead('${lead.id}')" title="Convert">
+                                <i class="fas fa-user-check"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).filter(row => row !== '').join('');
+    };
+
+    // Load existing leads into memory on startup
+    try {
+        const existingLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        existingLeads.forEach(lead => {
+            if (lead.id) {
+                window.leadStore[lead.id] = lead;
+            }
+        });
+        console.log('📚 Loaded', Object.keys(window.leadStore).length, 'existing leads into memory');
+    } catch (e) {
+        console.warn('Could not load existing leads:', e);
+    }
+
+    console.log('✅ FINAL lead system fix loaded successfully!');
+})();/* Fixed API URL: 1760629487 */

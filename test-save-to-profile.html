@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Save to Profile</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-container {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            color: white;
+            background: #8b5cf6;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .log-output {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Save to Profile Functionality</h1>
+
+    <div class="test-container">
+        <h2>Test Policy Data</h2>
+        <p><strong>Policy Number:</strong> a-vino</p>
+        <p><strong>Client:</strong> Test Client</p>
+        <p><strong>Carrier:</strong> Test Insurance Co.</p>
+        <p><strong>Coverage:</strong> $1,000,000</p>
+
+        <div class="button-container">
+            <button onclick="testSaveToProfile()">
+                <i class="fas fa-user-circle"></i> Test Save to Profile
+            </button>
+            <button onclick="clearLog()">
+                <i class="fas fa-trash"></i> Clear Log
+            </button>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Console Output</h2>
+        <div id="log" class="log-output"></div>
+    </div>
+
+    <script>
+        // Set up test policy data
+        window.currentCOIPolicy = {
+            policyNumber: 'a-vino',
+            clientName: 'Test Client',
+            carrier: 'Test Insurance Co.',
+            policyType: 'general-liability',
+            effectiveDate: '2024-01-01',
+            expirationDate: '2025-01-01',
+            coverageLimit: '1000000',
+            address: '123 Test St, Test City, TX 12345'
+        };
+
+        window.currentCOIPolicyId = 'a-vino';
+
+        // Override console.log to display in page
+        const originalLog = console.log;
+        const originalError = console.error;
+        const logDiv = document.getElementById('log');
+
+        function addLog(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.style.marginBottom = '5px';
+            entry.style.color = type === 'error' ? '#dc2626' : '#374151';
+            entry.innerHTML = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), 'log');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog(args.join(' '), 'error');
+        };
+
+        function clearLog() {
+            logDiv.innerHTML = '';
+            document.getElementById('status').innerHTML = '';
+        }
+
+        // Test function that creates a simple PDF and uploads it
+        async function testSaveToProfile() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = '';
+            statusDiv.innerHTML = '';
+
+            try {
+                console.log('🧪 Starting Save to Profile test...');
+
+                // Create a simple PDF using jsPDF
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+
+                // Add content
+                pdf.setFontSize(16);
+                pdf.text('ACORD 25 CERTIFICATE OF LIABILITY INSURANCE', 105, 20, { align: 'center' });
+
+                pdf.setFontSize(10);
+                const today = new Date().toISOString().split('T')[0];
+                pdf.text(`DATE: ${today}`, 20, 35);
+
+                // Producer section
+                pdf.setFontSize(12);
+                pdf.text('PRODUCER', 20, 50);
+                pdf.setFontSize(10);
+                pdf.text('Vanguard Insurance Agency', 20, 60);
+
+                // Insured section
+                pdf.setFontSize(12);
+                pdf.text('INSURED', 20, 80);
+                pdf.setFontSize(10);
+                pdf.text('Test Client', 20, 90);
+                pdf.text('Policy: a-vino', 20, 95);
+
+                // Certificate holder placeholder
+                pdf.setFontSize(12);
+                pdf.text('CERTIFICATE HOLDER', 20, 110);
+                pdf.rect(20, 115, 170, 40);
+                pdf.setFontSize(10);
+                pdf.text('[To be filled by policyholder]', 25, 135);
+
+                // Convert to blob
+                const pdfBlob = pdf.output('blob');
+                console.log('📄 PDF generated, size:', pdfBlob.size, 'bytes');
+
+                // Convert to base64
+                const reader = new FileReader();
+                reader.onloadend = async function() {
+                    const base64PDF = reader.result.split(',')[1];
+                    console.log('🔄 Converted to base64, length:', base64PDF.length);
+
+                    // Upload to backend
+                    const payload = {
+                        policy_number: 'a-vino',
+                        pdf_base64: base64PDF,
+                        filename: `COI_a-vino_${Date.now()}.pdf`,
+                        uploaded_by: 'CRM System'
+                    };
+
+                    console.log('📡 Uploading to website backend...');
+                    console.log('URL: http://162.220.14.239:8888/api/coi/upload');
+
+                    try {
+                        const response = await fetch('http://162.220.14.239:8888/api/coi/upload', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok && result.success) {
+                            console.log('✅ Success! COI saved to profile');
+                            console.log('Response:', JSON.stringify(result, null, 2));
+
+                            statusDiv.className = 'status success';
+                            statusDiv.innerHTML = `
+                                <i class="fas fa-check-circle"></i> <strong>Success!</strong><br>
+                                COI template saved for policy a-vino<br><br>
+                                <strong>Next steps to test:</strong><br>
+                                1. Go to: <a href="http://162.220.14.239:8888/pages/login.html" target="_blank">http://162.220.14.239:8888/pages/login.html</a><br>
+                                2. Login: a-vino / 1111<br>
+                                3. Click "Email COI" button<br>
+                                4. Fill certificate holder info<br>
+                                5. Submit to send COI with overlay
+                            `;
+                        } else {
+                            throw new Error(result.error || 'Upload failed');
+                        }
+                    } catch (error) {
+                        console.error('❌ Upload error:', error.message);
+                        statusDiv.className = 'status error';
+                        statusDiv.innerHTML = `
+                            <i class="fas fa-exclamation-circle"></i> <strong>Error:</strong><br>
+                            ${error.message}<br><br>
+                            Note: The website backend may be down or unreachable.
+                        `;
+                    }
+                };
+                reader.readAsDataURL(pdfBlob);
+
+            } catch (error) {
+                console.error('❌ Test error:', error);
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <i class="fas fa-exclamation-circle"></i> <strong>Error:</strong><br>
+                    ${error.message}
+                `;
+            }
+        }
+    </script>
+
+    <!-- Load the Save to Profile script -->
+    <script src="js/save-to-profile.js"></script>
+</body>
+</html>

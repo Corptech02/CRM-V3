@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test COI Upload to Website</title>
+</head>
+<body>
+    <h1>Test COI Upload Directly to Policyholder Website</h1>
+    <button onclick="testUpload()">Test Upload to Website</button>
+    <div id="result"></div>
+
+    <script>
+    async function testUpload() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Testing...';
+
+        try {
+            // Create test data
+            const testData = {
+                policy_number: 'a-vino',
+                pdf_base64: 'JVBERi0xLjQKJeLjz9MKNCAwIG9iago8PC9GaWx0ZXIvRmxhdGVEZWNvZGU=', // Minimal PDF
+                filename: 'TEST_COI_a-vino_' + new Date().toISOString() + '.pdf',
+                uploaded_by: 'CRM Direct Test'
+            };
+
+            console.log('Sending to ngrok endpoint:', testData);
+
+            const response = await fetch('https://frenzily-nonacculturated-collin.ngrok-free.dev/api/coi/upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ngrok-skip-browser-warning': 'true'
+                },
+                body: JSON.stringify(testData)
+            });
+
+            const result = await response.json();
+            console.log('Response:', result);
+
+            if (result.success) {
+                resultDiv.innerHTML = `
+                    <h3 style="color: green;">✅ Success!</h3>
+                    <p>COI uploaded to website successfully!</p>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                    <p>The COI should now be visible on the policyholder dashboard for policy: a-vino</p>
+                    <p><a href="https://frenzily-nonacculturated-collin.ngrok-free.dev/pages/policyholder-dashboard.html" target="_blank">Check Policyholder Dashboard</a></p>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <h3 style="color: orange;">⚠️ Partial Success</h3>
+                    <p>Response received from website:</p>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                    <p>The website is accessible but may need configuration.</p>
+                `;
+            }
+
+        } catch (error) {
+            resultDiv.innerHTML = `
+                <h3 style="color: red;">Error</h3>
+                <p>${error.message}</p>
+            `;
+        }
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lead Generation Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>Lead Generation Functionality Test</h1>
+    <div id="results"></div>
+
+    <!-- Load all required scripts -->
+    <script src="js/api-service.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/vicidial-uploader.js"></script>
+    <script src="js/restore-lead-generation-complete.js"></script>
+    <script src="js/complete-lead-generation-restoration.js"></script>
+
+    <script>
+        window.addEventListener('load', function() {
+            const results = document.getElementById('results');
+
+            const functions = [
+                // Core functions
+                { name: 'loadLeadGenerationView', type: 'function', critical: true },
+                { name: 'switchLeadSection', type: 'function', critical: true },
+                { name: 'getSMSBlastContent', type: 'function', critical: true },
+
+                // Search functions
+                { name: 'performLeadSearch', type: 'function', critical: true },
+                { name: 'displaySearchResults', type: 'function', critical: false },
+                { name: 'clearLeadFilters', type: 'function', critical: false },
+
+                // Generation functions
+                { name: 'generateLeads', type: 'function', critical: true },
+                { name: 'generateLeadsFromForm', type: 'function', critical: true },
+                { name: 'displayGeneratedLeads', type: 'function', critical: false },
+
+                // Export functions
+                { name: 'exportGeneratedLeads', type: 'function', critical: true },
+                { name: 'viewGeneratedLeads', type: 'function', critical: false },
+
+                // Upload functions
+                { name: 'uploadToVicidialWithCriteria', type: 'function', critical: true },
+                { name: 'vicidialUploader', type: 'object', critical: true },
+
+                // SMS functions
+                { name: 'sendSMSBlast', type: 'function', critical: true },
+                { name: 'launchSMSCampaign', type: 'function', critical: false },
+                { name: 'testSMSCampaign', type: 'function', critical: false },
+
+                // Helper functions
+                { name: 'selectAllInsurance', type: 'function', critical: false },
+                { name: 'clearAllInsurance', type: 'function', critical: false },
+                { name: 'selectAllLeads', type: 'function', critical: false },
+                { name: 'resetGenerateForm', type: 'function', critical: false },
+                { name: 'importLead', type: 'function', critical: false }
+            ];
+
+            let criticalCount = 0;
+            let totalCritical = 0;
+            let totalCount = 0;
+
+            functions.forEach(func => {
+                const exists = (func.type === 'object')
+                    ? (typeof window[func.name] === 'object' && window[func.name] !== null)
+                    : (typeof window[func.name] === 'function');
+
+                totalCount++;
+                if (func.critical) totalCritical++;
+                if (exists && func.critical) criticalCount++;
+
+                const result = document.createElement('div');
+                result.className = 'test-result ' + (exists ? 'success' : (func.critical ? 'error' : 'warning'));
+                result.innerHTML = `
+                    <strong>${func.name}:</strong>
+                    ${exists ? '✅ Available' : '❌ Missing'}
+                    ${func.critical ? '(Critical)' : '(Optional)'}
+                `;
+                results.appendChild(result);
+            });
+
+            // Summary
+            const summary = document.createElement('div');
+            summary.style.marginTop = '20px';
+            summary.style.padding = '15px';
+            summary.style.border = '2px solid #333';
+            summary.style.borderRadius = '5px';
+
+            const allCritical = criticalCount === totalCritical;
+            summary.className = allCritical ? 'success' : 'error';
+            summary.innerHTML = `
+                <h2>Summary</h2>
+                <p>Critical Functions: ${criticalCount}/${totalCritical} ✅</p>
+                <p>Total Functions: ${totalCount} checked</p>
+                <p>Status: ${allCritical ? '✅ All critical functions available!' : '⚠️ Some critical functions missing'}</p>
+            `;
+            results.appendChild(summary);
+
+            // Test tabs
+            const tabTest = document.createElement('div');
+            tabTest.style.marginTop = '20px';
+            tabTest.innerHTML = '<h3>Tab Test:</h3>';
+
+            try {
+                // Test if we can create the lead generation view
+                const testDiv = document.createElement('div');
+                testDiv.className = 'dashboard-content';
+                document.body.appendChild(testDiv);
+
+                if (typeof loadLeadGenerationView === 'function') {
+                    loadLeadGenerationView('generate');
+
+                    // Check if tabs were created
+                    const tabs = document.querySelectorAll('.folder-tab');
+                    tabTest.innerHTML += `<p class="success">✅ Found ${tabs.length} tabs</p>`;
+
+                    tabs.forEach((tab, index) => {
+                        tabTest.innerHTML += `<p>Tab ${index + 1}: ${tab.textContent.trim()}</p>`;
+                    });
+
+                    // Check for sections
+                    const sections = ['carrierLookupSection', 'generateLeadsSection', 'smsBlastSection'];
+                    sections.forEach(id => {
+                        const section = document.getElementById(id);
+                        tabTest.innerHTML += `<p class="${section ? 'success' : 'error'}">
+                            ${id}: ${section ? '✅ Found' : '❌ Missing'}
+                        </p>`;
+                    });
+                } else {
+                    tabTest.innerHTML += '<p class="error">❌ loadLeadGenerationView function not available</p>';
+                }
+            } catch (error) {
+                tabTest.innerHTML += `<p class="error">❌ Error testing tabs: ${error.message}</p>`;
+            }
+
+            results.appendChild(tabTest);
+        });
+    </script>
+</body>
+</html>

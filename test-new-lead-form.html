@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test New Lead Form</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 300px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #005c8a; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Test New Lead Form</h1>
+
+    <form id="testLeadForm" onsubmit="testSaveNewLead(event)">
+        <div class="form-group">
+            <label for="leadCompanyName">Company Name: *</label>
+            <input type="text" id="leadCompanyName" required>
+        </div>
+
+        <div class="form-group">
+            <label for="leadContact">Contact: *</label>
+            <input type="text" id="leadContact" required>
+        </div>
+
+        <div class="form-group">
+            <label for="leadPhone">Phone: *</label>
+            <input type="tel" id="leadPhone" required>
+        </div>
+
+        <div class="form-group">
+            <label for="leadEmail">Email:</label>
+            <input type="email" id="leadEmail">
+        </div>
+
+        <div class="form-group">
+            <label for="leadStage">Stage:</label>
+            <select id="leadStage">
+                <option value="new" selected>New</option>
+                <option value="qualified">Qualified</option>
+                <option value="quoted">Quoted</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="leadStatus">Status:</label>
+            <select id="leadStatus">
+                <option value="Active" selected>Active</option>
+                <option value="Inactive">Inactive</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="leadPremium">Premium:</label>
+            <input type="text" id="leadPremium">
+        </div>
+
+        <button type="submit">Save Lead</button>
+    </form>
+
+    <div id="debugOutput" class="debug"></div>
+
+    <script>
+    async function testSaveNewLead(event) {
+        event.preventDefault();
+        console.log('=== TEST: SAVING NEW LEAD ===');
+
+        const debugDiv = document.getElementById('debugOutput');
+        debugDiv.innerHTML = 'Processing...';
+
+        try {
+            // Get form values
+            const newLead = {
+                id: Date.now().toString(),
+                name: document.getElementById('leadCompanyName').value,
+                contact: document.getElementById('leadContact').value,
+                phone: document.getElementById('leadPhone').value,
+                email: document.getElementById('leadEmail').value || '',
+                stage: document.getElementById('leadStage').value,
+                status: document.getElementById('leadStatus').value,
+                premium: document.getElementById('leadPremium').value || '',
+                product: 'Commercial Auto',
+                created: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                source: 'Test Form'
+            };
+
+            console.log('Test lead data:', newLead);
+            debugDiv.innerHTML += '<br>Lead data collected: ' + JSON.stringify(newLead, null, 2);
+
+            // Validate required fields
+            if (!newLead.name || !newLead.contact || !newLead.phone) {
+                debugDiv.innerHTML += '<br><strong style="color: red;">Validation failed: Missing required fields</strong>';
+                return;
+            }
+
+            debugDiv.innerHTML += '<br>Validation passed. Saving to API...';
+
+            // Save to API
+            const API_URL = 'http://162.220.14.239:3001';
+            const response = await fetch(`${API_URL}/api/leads`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newLead)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('Save result:', result);
+            debugDiv.innerHTML += '<br><strong style="color: green;">SUCCESS! Lead saved to database.</strong>';
+            debugDiv.innerHTML += '<br>API Response: ' + JSON.stringify(result, null, 2);
+
+            // Test loading from API
+            const loadResponse = await fetch(`${API_URL}/api/leads`);
+            const allLeads = await loadResponse.json();
+            const savedLead = allLeads.find(l => l.id === newLead.id);
+
+            if (savedLead) {
+                debugDiv.innerHTML += '<br><strong style="color: green;">VERIFICATION: Lead found in database!</strong>';
+                debugDiv.innerHTML += '<br>Retrieved lead: ' + JSON.stringify(savedLead, null, 2);
+            } else {
+                debugDiv.innerHTML += '<br><strong style="color: orange;">WARNING: Lead saved but not found in retrieve</strong>';
+            }
+
+        } catch (error) {
+            console.error('Test error:', error);
+            debugDiv.innerHTML += '<br><strong style="color: red;">ERROR: ' + error.message + '</strong>';
+        }
+    }
+    </script>
+</body>
+</html>

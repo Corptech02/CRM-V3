@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead List Download - 30 Day Expiration Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+            border-radius: 8px;
+        }
+
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-box li {
+            padding: 5px 0;
+            color: #555;
+        }
+
+        .info-box li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .download-section {
+            margin: 40px 0;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .download-btn:active {
+            transform: translateY(0);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            flex: 1;
+            min-width: 150px;
+            padding: 20px;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .date-info {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .date-info strong {
+            color: #667eea;
+        }
+
+        .loading {
+            display: none;
+            color: #667eea;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #dc3545;
+            display: none;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8d7da;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Ohio Progressive Lead Export</h1>
+        <p class="subtitle">30-Day Expiration Report - Progressive Insurance</p>
+
+        <div class="date-info">
+            <strong>Report Date:</strong> <span id="currentDate"></span><br>
+            <strong>Expiration Window:</strong> <span id="expirationWindow"></span>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-number" id="leadCount">-</span>
+                <span class="stat-label">Total Leads</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="stateCount">-</span>
+                <span class="stat-label">States Covered</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="premiumTotal">-</span>
+                <span class="stat-label">Total Premium</span>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3>Ohio Progressive Leads - Report Includes:</h3>
+            <ul>
+                <li>Ohio-based companies only</li>
+                <li>Current carrier: Progressive Insurance</li>
+                <li>Policies expiring in exactly 30 days</li>
+                <li>Company Name & Contact Information</li>
+                <li>DOT/MC Numbers</li>
+                <li>Representative Assigned</li>
+                <li>Premium Information</li>
+                <li>Fleet Size & Operating Information</li>
+                <li>Safety Ratings & Compliance</li>
+            </ul>
+        </div>
+
+        <div class="download-section">
+            <button class="download-btn" onclick="downloadExcel()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download Excel Report
+            </button>
+        </div>
+
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Generating your report...</p>
+        </div>
+
+        <div class="error" id="errorMessage"></div>
+    </div>
+
+    <script>
+        // Set current date and expiration window
+        const today = new Date();
+        const thirtyDaysOut = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+        document.getElementById('currentDate').textContent = today.toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+        document.getElementById('expirationWindow').textContent =
+            thirtyDaysOut.toLocaleDateString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            }) + ' - ' +
+            new Date(thirtyDaysOut.getTime() + (5 * 24 * 60 * 60 * 1000)).toLocaleDateString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+        // Load stats on page load
+        window.addEventListener('DOMContentLoaded', loadStats);
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/all-lead-stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('leadCount').textContent = stats.leadCount || '0';
+                    document.getElementById('stateCount').textContent = stats.stateCount || '0';
+                    document.getElementById('premiumTotal').textContent = '$' + (stats.premiumTotal || 0).toLocaleString();
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                // Set default values if stats fail to load
+                document.getElementById('leadCount').textContent = '0';
+                document.getElementById('stateCount').textContent = '0';
+                document.getElementById('premiumTotal').textContent = '$0';
+            }
+        }
+
+        async function downloadExcel() {
+            const button = document.querySelector('.download-btn');
+            const loading = document.querySelector('.loading');
+            const errorDiv = document.getElementById('errorMessage');
+
+            // Show loading
+            button.style.display = 'none';
+            loading.style.display = 'block';
+            errorDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/export-all-leads', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate report');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+
+                const dateStr = today.toISOString().split('T')[0];
+                a.download = `lead_report_30day_${dateStr}.xlsx`;
+
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                errorDiv.textContent = 'Error generating report. Please try again or contact support.';
+                errorDiv.style.display = 'block';
+            } finally {
+                // Hide loading and show button
+                loading.style.display = 'none';
+                button.style.display = 'inline-flex';
+            }
+        }
+    </script>
+</body>
+</html>

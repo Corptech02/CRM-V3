@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Incoming Call Answer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #667eea;
+            background: white;
+        }
+        .success {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+        }
+        .error {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        .info {
+            border-left-color: #3b82f6;
+            background: #eff6ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Incoming Call Answer</h1>
+
+        <p>This page tests the incoming call answer functionality to ensure the phone window opens properly.</p>
+
+        <div style="margin: 20px 0;">
+            <button onclick="testIncomingCall()">📞 Trigger Test Incoming Call</button>
+            <button onclick="clearLog()">🗑️ Clear Log</button>
+        </div>
+
+        <div id="log" class="log">
+            <div class="log-entry info">Ready to test incoming calls...</div>
+        </div>
+    </div>
+
+    <script>
+        let logCount = 0;
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            logCount++;
+            if (logCount > 100) {
+                log.removeChild(log.firstChild);
+                logCount--;
+            }
+        }
+
+        function clearLog() {
+            const log = document.getElementById('log');
+            log.innerHTML = '<div class="log-entry info">Log cleared. Ready for new tests...</div>';
+            logCount = 1;
+        }
+
+        function testIncomingCall() {
+            addLog('Triggering test incoming call...', 'info');
+
+            // Check if we're in the main Vanguard window
+            if (window.opener || window.parent !== window) {
+                // We're in a child window, try to trigger in parent
+                if (window.opener && window.opener.testIncomingCall) {
+                    window.opener.testIncomingCall();
+                    addLog('Triggered incoming call in parent window', 'success');
+                } else if (window.parent && window.parent.testIncomingCall) {
+                    window.parent.testIncomingCall();
+                    addLog('Triggered incoming call in parent frame', 'success');
+                } else {
+                    addLog('Could not find testIncomingCall in parent context', 'error');
+                }
+            } else {
+                // We're in the main window, check if function exists
+                if (typeof window.testIncomingCall === 'function') {
+                    // Call the test function
+                    window.testIncomingCall();
+                    addLog('Incoming call popup triggered!', 'success');
+
+                    // Monitor for answer button click
+                    setTimeout(() => {
+                        const popup = document.getElementById('incomingCallPopup');
+                        if (popup) {
+                            addLog('Popup found! Monitoring answer button...', 'info');
+
+                            // Find answer button
+                            const answerBtn = popup.querySelector('button[onclick*="answerIncomingCall"]');
+                            if (answerBtn) {
+                                addLog('Answer button found. Click it to test phone window opening.', 'success');
+
+                                // Add event listener to track when clicked
+                                const originalOnclick = answerBtn.onclick;
+                                answerBtn.onclick = function() {
+                                    addLog('Answer button clicked!', 'info');
+
+                                    // Check if phone window opens
+                                    setTimeout(() => {
+                                        const phoneWindow = document.querySelector('.tool-window');
+                                        if (phoneWindow) {
+                                            const title = phoneWindow.querySelector('.window-title');
+                                            if (title && title.textContent.includes('Phone')) {
+                                                addLog('✅ Phone window opened successfully!', 'success');
+
+                                                // Check for call controls
+                                                setTimeout(() => {
+                                                    const callControls = document.getElementById('callStatusText');
+                                                    if (callControls) {
+                                                        addLog('✅ Call controls loaded!', 'success');
+
+                                                        // Check if status updates
+                                                        setTimeout(() => {
+                                                            if (callControls.textContent.includes('Connected')) {
+                                                                addLog('✅ Call status updated to Connected!', 'success');
+                                                            } else {
+                                                                addLog('⚠️ Call status not yet connected: ' + callControls.textContent, 'error');
+                                                            }
+                                                        }, 1000);
+                                                    } else {
+                                                        addLog('❌ Call controls not found!', 'error');
+                                                    }
+                                                }, 500);
+                                            } else {
+                                                addLog('❌ Phone window title not found!', 'error');
+                                            }
+                                        } else {
+                                            addLog('❌ Phone window did not open!', 'error');
+                                        }
+                                    }, 1500);
+
+                                    // Call original function
+                                    if (originalOnclick) {
+                                        return originalOnclick.call(this);
+                                    }
+                                };
+                            } else {
+                                addLog('Answer button not found in popup', 'error');
+                            }
+                        } else {
+                            addLog('Popup not found after trigger', 'error');
+                        }
+                    }, 100);
+
+                } else {
+                    addLog('testIncomingCall function not found! Loading script...', 'error');
+
+                    // Try to load the incoming calls script
+                    const script = document.createElement('script');
+                    script.src = '/js/incoming-calls.js';
+                    script.onload = () => {
+                        addLog('Incoming calls script loaded. Try again.', 'success');
+                    };
+                    script.onerror = () => {
+                        addLog('Failed to load incoming calls script', 'error');
+                    };
+                    document.head.appendChild(script);
+                }
+            }
+        }
+
+        // Auto-detect if we're in the Vanguard system
+        window.addEventListener('load', () => {
+            if (document.querySelector('.toolbar-btn') || document.querySelector('#app-container')) {
+                addLog('✅ Running in Vanguard Management System', 'success');
+
+                // Check if incoming calls script is loaded
+                if (typeof window.testIncomingCall === 'function') {
+                    addLog('✅ Incoming calls script is loaded', 'success');
+                } else {
+                    addLog('⚠️ Incoming calls script not loaded yet', 'error');
+                }
+
+                // Check if phone tool functions are available
+                if (typeof window.showCallControls === 'function') {
+                    addLog('✅ showCallControls function is available', 'success');
+                } else {
+                    addLog('⚠️ showCallControls function not available', 'error');
+                }
+
+                if (typeof window.markCallConnected === 'function') {
+                    addLog('✅ markCallConnected function is available', 'success');
+                } else {
+                    addLog('⚠️ markCallConnected function not available', 'error');
+                }
+
+            } else {
+                addLog('⚠️ Not running in Vanguard system. Open this page within Vanguard.', 'error');
+                addLog('Navigate to: http://162.220.14.239:3001/test-incoming-answer.html', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

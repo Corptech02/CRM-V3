@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Final Override Fix</title>
+</head>
+<body>
+    <h1>Testing Final Override Fix</h1>
+    <button onclick="runCompleteTest()">Run Complete Test</button>
+    <pre id="output"></pre>
+
+    <script src="js/fcsma-api-override.js?v=20251010_0603"></script>
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.textContent += message + '\n';
+            console.log(message);
+        }
+
+        async function runCompleteTest() {
+            log('🧪 Starting complete override test...');
+            document.getElementById('output').textContent = '';
+
+            try {
+                // Wait for API_SERVICE to load
+                let attempts = 0;
+                while ((!window.API_SERVICE || !window.API_SERVICE.generateLeads) && attempts < 10) {
+                    log(`⏳ Waiting for API_SERVICE... attempt ${attempts + 1}`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    attempts++;
+                }
+
+                if (!window.API_SERVICE || !window.API_SERVICE.generateLeads) {
+                    log('❌ API_SERVICE not available after 5 seconds');
+                    return;
+                }
+
+                log('✅ API_SERVICE found');
+
+                // Test with OH + Progressive + 30 days (the original failing case)
+                const criteria = {
+                    state: 'OH',
+                    daysUntilExpiry: 30,
+                    limit: 5,
+                    skipDays: 0,
+                    insuranceCompanies: ['Progressive']
+                };
+
+                log('📊 Testing with criteria: ' + JSON.stringify(criteria));
+
+                const result = await window.API_SERVICE.generateLeads(criteria);
+
+                log('🎯 API_SERVICE.generateLeads result:');
+                log('  - Success: ' + result.success);
+                log('  - Total: ' + result.total);
+                log('  - Leads count: ' + result.leads.length);
+
+                if (result.leads.length > 0) {
+                    log('  - First lead sample: ' + JSON.stringify(result.leads[0], null, 2));
+
+                    // Check if transformed fields exist
+                    const firstLead = result.leads[0];
+                    log('🔍 Field validation:');
+                    log('  - usdot_number: ' + firstLead.usdot_number);
+                    log('  - expiry: ' + firstLead.expiry);
+                    log('  - renewal_date: ' + firstLead.renewal_date);
+                    log('  - insurance_company: ' + firstLead.insurance_company);
+                    log('  - location: ' + firstLead.location);
+                    log('  - source: ' + firstLead.source);
+                }
+
+                log('✅ Test completed successfully!');
+
+            } catch (error) {
+                log('❌ Test failed: ' + error.message);
+                log('Error stack: ' + error.stack);
+            }
+        }
+    </script>
+</body>
+</html>

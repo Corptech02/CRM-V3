@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>COI Mapping Test</title>
+</head>
+<body>
+    <h2>Testing COI Policy Field Mapping</h2>
+    <p>Open browser console to see the mapping results</p>
+    <div id="results">Loading...</div>
+    <script src="/js/fix-coi-policy-display.js"></script>
+    <script>
+        // Simulate policy data from client profile
+        const testPolicy = {
+            policyNumber: "TEST-001",
+            overview: {
+                "Insurance Carrier": "State Farm",
+                "Effective Date": "2024-01-01",
+                "Expiration Date": "2025-01-01",
+                "Premium": "5000.00"
+            },
+            financial: {
+                "Annual Premium": "5000.00"
+            }
+        };
+        
+        // Test the mapping
+        console.log("Testing with nested policy:", testPolicy);
+        
+        // Mock the original function to capture result
+        let mappedResult = null;
+        const origShow = window.showPolicyDetailsModal || function(p) { mappedResult = p; };
+        window.originalShowPolicyDetailsModal = function(p) {
+            mappedResult = p;
+            console.log("Mapped policy:", p);
+        };
+        
+        // Call the overridden function
+        if (window.showPolicyDetailsModal) {
+            window.showPolicyDetailsModal(testPolicy);
+            document.getElementById("results").innerHTML = "Carrier: " + (mappedResult?.carrier || "FAILED") +
+                "<br>Premium: " + (mappedResult?.premium || "FAILED") +
+                "<br>Effective: " + (mappedResult?.effectiveDate || "FAILED");
+        }
+    </script>
+</body>
+</html>
