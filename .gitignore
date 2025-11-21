@@ -1,7 +1,14 @@
 # Database files
 *.db
+*.db.*
 *.sqlite
 *.sqlite3
+
+# Large files
+*.tar.gz
+*.zip
+matched_carriers_*.csv
+*backup*
 
 # Node modules
 node_modules/
