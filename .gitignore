@@ -1,46 +1,53 @@
+
+# API keys and credentials
+backend/add-gmail-token.js
+backend/add-gmail-token-web.js
+backend/setup-gmail-auth.js
+*.backup
+*backup*
+# Backup files
+backup_gmail_20251024_020633/add-gmail-token.js
+backup_gmail_20251024_020633/add-gmail-token-web.js
+backup_gmail_20251024_020633/setup-gmail-auth.js
+*.bak
+check-whisper-alternative.py
+*credentials*.json
+credentials.json
 # Database files
 *.db
 *.db.*
-*.sqlite
-*.sqlite3
-
-# Large files
-*.tar.gz
-*.zip
-matched_carriers_*.csv
-*backup*
-
-# Node modules
-node_modules/
-
-# Environment files
-.env
-.env.local
-
-# Log files
-*.log
-npm-debug.log*
-
-# OS files
 .DS_Store
-Thumbs.db
-
-# Backup files
-*.bak
-*.backup
-
+*.env
+.env
+# Environment files
+.env.local
+*.key
+# Large files
+lead-transfer-integration/
+*.log
+# Log files
+matched_carriers_*.csv
+node_modules/
+# Node modules
+npm-debug.log*
+openai-processor.py
+# OS files
+*.pem
+save-gmail-token.js
+# Sensitive files
 # Session files
 sessions/
-
+*.sqlite
+*.sqlite3
+# Submodules and embedded repos
+*.tar.gz
+temp/
+test-api-org.py
+test-github-push.sh
+test-whisper-api.py
+Thumbs.db
+*token*.json
+token.json
 # Upload directories
 uploads/
-temp/
-
-# API keys and credentials
-credentials.json
-token.json
-*.pem
-*.key
-
-# Submodules and embedded repos
-lead-transfer-integration/
+*.zip
