@@ -63,56 +63,67 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <div>
                         <label style="font-weight: 600; font-size: 12px;">Current Stage:</label>
                         <select id="lead-stage-${lead.id}" onchange="updateLeadStage('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-                            <option value="new" ${lead.stage === 'new' ? 'selected' : ''}>New</option>
-                            <option value="contact_attempted" ${lead.stage === 'contact_attempted' ? 'selected' : ''}>Contact Attempted</option>
-                            <option value="info_requested" ${lead.stage === 'info_requested' ? 'selected' : ''}>Info Requested</option>
-                            <option value="info_received" ${lead.stage === 'info_received' ? 'selected' : ''}>Info Received</option>
-                            <option value="loss_runs_requested" ${lead.stage === 'loss_runs_requested' ? 'selected' : ''}>Loss Runs Requested</option>
-                            <option value="loss_runs_received" ${lead.stage === 'loss_runs_received' ? 'selected' : ''}>Loss Runs Received</option>
-                            <option value="app_prepared" ${lead.stage === 'app_prepared' ? 'selected' : ''}>App Prepared</option>
-                            <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>App Sent</option>
-                            <option value="app_quote_received" ${lead.stage === 'app_quote_received' ? 'selected' : ''}>App Quote Received</option>
-                            <option value="app_quote_sent" ${lead.stage === 'app_quote_sent' ? 'selected' : ''}>App Quote Sent</option>
-                            <option value="quoted" ${lead.stage === 'quoted' ? 'selected' : ''}>Quoted</option>
-                            <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
-                            <option value="interested" ${lead.stage === 'interested' ? 'selected' : ''}>Interested</option>
-                            <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
-                            <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
+                            <option value="New" ${lead.stage === 'New' ? 'selected' : ''}>New</option>
+                            <option value="Contact Attempted" ${lead.stage === 'Contact Attempted' ? 'selected' : ''}>Contact Attempted</option>
+                            <option value="Info Requested" ${lead.stage === 'Info Requested' ? 'selected' : ''}>Info Requested</option>
+                            <option value="Info Received" ${lead.stage === 'Info Received' ? 'selected' : ''}>Info Received</option>
+                            <option value="Loss Runs Requested" ${lead.stage === 'Loss Runs Requested' ? 'selected' : ''}>Loss Runs Requested</option>
+                            <option value="Loss Runs Received" ${lead.stage === 'Loss Runs Received' ? 'selected' : ''}>Loss Runs Received</option>
+                            <option value="App Prepared" ${lead.stage === 'App Prepared' ? 'selected' : ''}>App Prepared</option>
+                            <option value="App Sent" ${lead.stage === 'App Sent' ? 'selected' : ''}>App Sent</option>
+                            <option value="Quote Sent" ${lead.stage === 'Quote Sent' ? 'selected' : ''}>Quote Sent</option>
+                            <option value="Interested" ${lead.stage === 'Interested' ? 'selected' : ''}>Interested</option>
+                            <option value="Not Interested" ${lead.stage === 'Not Interested' ? 'selected' : ''}>Not Interested</option>
+                            <option value="Closed" ${lead.stage === 'Closed' ? 'selected' : ''}>Closed</option>
                         </select>
                     </div>
-                    <!-- Lead Age Timestamp with Color Coding -->
+                    <!-- Stage Timestamp with Color Coding -->
                     <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; text-align: center;">
-                        <div style="font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 5px;">Lead Age</div>
-                        <div id="lead-age-${lead.id}" style="font-size: 14px; font-weight: bold;">
+                        <div id="lead-age-${lead.id}" style="display: flex; justify-content: center;">
                             ${(function() {
-                                const createdDate = lead.createdDate || lead.created_at || new Date().toISOString();
+                                // Use stage update timestamp if available, otherwise lead creation date
+                                const stageDate = lead.stageUpdatedAt || lead.createdDate || lead.created_at || new Date().toISOString();
                                 const now = new Date();
-                                const created = new Date(createdDate);
-                                const daysDiff = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+                                const updated = new Date(stageDate);
+                                const daysDiff = Math.floor((now - updated) / (1000 * 60 * 60 * 24));
 
-                                let color = '#10b981'; // green
-                                if (daysDiff >= 7) color = '#dc2626'; // red
-                                else if (daysDiff >= 3) color = '#f59e0b'; // orange
-                                else if (daysDiff >= 1) color = '#eab308'; // yellow
+                                // Calculate color based on stage age - URGENT TIMELINE
+                                let ageColor;
+                                if (daysDiff >= 3) ageColor = 'red';    // 3+ days = RED (urgent)
+                                else if (daysDiff >= 2) ageColor = 'orange';  // 2 days = ORANGE
+                                else if (daysDiff >= 1) ageColor = 'yellow';  // 1 day = YELLOW
+                                else ageColor = 'green';  // Today = GREEN
 
-                                const timeText = daysDiff === 0 ? 'Today' :
-                                               daysDiff === 1 ? '1 day ago' :
-                                               `${daysDiff} days ago`;
+                                // Map color names to background colors for pills
+                                const colorMap = {
+                                    'green': '#10b981',
+                                    'yellow': '#eab308',
+                                    'orange': '#f59e0b',
+                                    'red': '#dc2626'
+                                };
 
-                                return `<span style="color: ${color};">${timeText}</span>`;
-                            })()}
-                        </div>
-                        <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">
-                            ${(function() {
-                                const createdDate = lead.createdDate || lead.created_at || new Date().toISOString();
-                                return new Date(createdDate).toLocaleDateString('en-US', {
+                                const backgroundColor = colorMap[ageColor] || '#10b981';
+
+                                // Show actual date/time instead of relative time
+                                const timeText = updated.toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
-                                    year: 'numeric',
+                                    year: updated.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
                                     hour: 'numeric',
                                     minute: '2-digit',
                                     hour12: true
                                 });
+
+                                return `<span id="stage-timestamp-${lead.id}" style="
+                                    background-color: ${backgroundColor};
+                                    color: white;
+                                    padding: 6px 12px;
+                                    border-radius: 20px;
+                                    font-size: 11px;
+                                    font-weight: bold;
+                                    display: inline-block;
+                                    white-space: nowrap;
+                                ">${timeText}</span>`;
                             })()}
                         </div>
                     </div>
@@ -120,10 +131,11 @@ protectedFunctions.createEnhancedProfile = function(lead) {
 
                 <!-- Reach Out Checklist -->
                 <div class="profile-section" style="background: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="margin: 0;"><i class="fas fa-tasks"></i> Reach Out</h3>
-                        <div id="reach-out-status-${lead.id}" style="font-weight: bold; font-size: 16px;">
-                            <!-- Reach-out status will be dynamically updated here -->
+                    <!-- Header with TO DO message -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f59e0b;">
+                        <h3 style="margin: 0; color: #dc2626; font-weight: bold;"><i class="fas fa-tasks"></i> Reach Out</h3>
+                        <div id="reach-out-todo-${lead.id}" style="font-weight: bold; font-size: 18px; color: #dc2626;">
+                            TO DO: Call
                         </div>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -492,12 +504,30 @@ protectedFunctions.createEnhancedProfile = function(lead) {
 
     document.body.appendChild(modalContainer);
 
+    // Apply reach-out styling based on lead's to-do status
+    setTimeout(() => {
+        // Import getActionText function from app.js
+        if (window.getActionText) {
+            const actionText = window.getActionText(lead.stage, lead.reachOut);
+            const hasReachOutTodo = actionText === 'Reach out';
+            console.log(`🔍 Profile load - Lead ${lead.id} stage: ${lead.stage}, actionText: ${actionText}, hasReachOutTodo: ${hasReachOutTodo}`);
+            applyReachOutStyling(lead.id, hasReachOutTodo);
+        } else {
+            console.error('❌ getActionText function not available');
+            // Even if getActionText isn't available, still show the basic to-do structure
+            applyReachOutStyling(lead.id, false);
+        }
+    }, 100);
+
     // Add click-outside-to-close functionality
     modalContainer.addEventListener('click', function(e) {
         // Only close if clicking the background (not the modal content)
         if (e.target === modalContainer) {
             console.log('🖱️ Clicked outside modal, closing...');
             modalContainer.remove();
+
+            // Refresh the leads table to show any changes made
+            refreshLeadsTable();
         }
     });
 
@@ -523,12 +553,33 @@ protectedFunctions.updateLeadField = function(leadId, field, value) {
     if (leadIndex !== -1) {
         leads[leadIndex][field] = value;
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
-        console.log('Field updated and saved:', field, value);
+        console.log('Field updated and saved to localStorage:', field, value);
 
-        // Update the table if visible
-        if (window.displayLeads) {
-            window.displayLeads();
-        }
+        // Save to server database
+        const updateData = {};
+        updateData[field] = value;
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Field updated on server:', field, value);
+            } else {
+                console.error('❌ Server update failed:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Server update error:', error);
+        });
+
+        // Update the table display immediately
+        refreshLeadsTable();
     }
 };
 
@@ -737,11 +788,11 @@ protectedFunctions.uploadLossRunsFiles = function(leadId, files) {
 
     // Add all files to FormData
     Array.from(files).forEach((file, index) => {
-        formData.append('files[]', file);
+        formData.append('files', file);
     });
 
     // Upload to server
-    fetch('/api/loss-runs-upload.php', {
+    fetch('/api/loss-runs-upload', {
         method: 'POST',
         body: formData
     })
@@ -777,7 +828,7 @@ protectedFunctions.loadLossRuns = function(leadId) {
     container.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">⏳ Loading documents...</p>';
 
     // Load from server
-    fetch(`/api/loss-runs-upload.php?leadId=${encodeURIComponent(leadId)}`)
+    fetch(`/api/loss-runs-upload?leadId=${encodeURIComponent(leadId)}`)
     .then(response => response.json())
     .then(data => {
         if (data.success && data.files.length > 0) {
@@ -831,7 +882,7 @@ protectedFunctions.viewLossRuns = function(leadId, fileId, originalName) {
     console.log('👁️ Viewing loss runs from server:', leadId, fileId, originalName);
 
     // Open file from server in new window
-    const fileUrl = `/api/loss-runs-download.php?fileId=${encodeURIComponent(fileId)}`;
+    const fileUrl = `/api/loss-runs-download?fileId=${encodeURIComponent(fileId)}`;
     const newWindow = window.open(fileUrl, '_blank');
 
     if (!newWindow) {
@@ -850,7 +901,7 @@ protectedFunctions.removeLossRuns = function(leadId, fileId) {
     console.log('🗑️ Removing loss runs from server:', leadId, fileId);
 
     // Remove from server
-    fetch('/api/loss-runs-upload.php', {
+    fetch('/api/loss-runs-upload', {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json'
@@ -917,7 +968,9 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
         }
     } else if (type === 'call') {
         if (checked) {
-            leads[leadIndex].reachOut.callAttempts++;
+            // Show popup when call checkbox is checked
+            showCallOutcomePopup(leadId);
+            return; // Exit early - let popup handle everything
         } else {
             leads[leadIndex].reachOut.callAttempts = Math.max(0, leads[leadIndex].reachOut.callAttempts - 1);
         }
@@ -928,7 +981,338 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
     }
 
     localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+    // Save reach-out data to server
+    const updateData = {
+        reachOut: leads[leadIndex].reachOut
+    };
+
+    fetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Reach-out data updated on server');
+        } else {
+            console.error('❌ Server reach-out update failed:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Error updating reach-out data:', error);
+    });
+
+    // Update the sequential to-do display if this lead has "Reach out" as the main to-do
+    if (window.getActionText) {
+        const actionText = window.getActionText(leads[leadIndex].stage, leads[leadIndex].reachOut);
+        if (actionText === 'Reach out') {
+            applyReachOutStyling(leadId, true);
+        }
+    }
 };
+
+// Function to show call outcome popup
+window.showCallOutcomePopup = function(leadId) {
+    // Remove any existing popup
+    const existingPopup = document.getElementById('call-outcome-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+    const existingBackdrop = document.getElementById('popup-backdrop');
+    if (existingBackdrop) {
+        existingBackdrop.remove();
+    }
+
+    // Create backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = 'popup-backdrop';
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 9998;
+    `;
+    document.body.appendChild(backdrop);
+
+    // Create popup
+    const popup = document.createElement('div');
+    popup.id = 'call-outcome-popup';
+    popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        z-index: 9999;
+        min-width: 400px;
+    `;
+
+    popup.innerHTML = `
+        <div style="text-align: center;">
+            <h3 style="margin-top: 0;">Call Outcome</h3>
+            <p style="font-size: 16px; margin: 20px 0;">Did they answer?</p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                <button onclick="handleCallOutcome('${leadId}', true)" style="
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 10px 30px;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                ">Yes</button>
+                <button onclick="handleCallOutcome('${leadId}', false)" style="
+                    background: #ef4444;
+                    color: white;
+                    border: none;
+                    padding: 10px 30px;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                ">No</button>
+            </div>
+            <div id="voicemail-question" style="display: none;">
+                <p style="font-size: 16px; margin: 20px 0;">Did you leave a voicemail?</p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button onclick="handleVoicemailOutcome('${leadId}', true)" style="
+                        background: #f59e0b;
+                        color: white;
+                        border: none;
+                        padding: 10px 30px;
+                        border-radius: 5px;
+                        font-size: 16px;
+                        cursor: pointer;
+                    ">Yes</button>
+                    <button onclick="handleVoicemailOutcome('${leadId}', false)" style="
+                        background: #6b7280;
+                        color: white;
+                        border: none;
+                        padding: 10px 30px;
+                        border-radius: 5px;
+                        font-size: 16px;
+                        cursor: pointer;
+                    ">No</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+};
+
+// Function to handle call outcome
+window.handleCallOutcome = function(leadId, answered) {
+    console.log(`🐛 DEBUG handleCallOutcome called: leadId=${leadId}, answered=${answered}`);
+
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {
+                emailCount: 0,
+                textCount: 0,
+                callAttempts: 0,
+                callsConnected: 0,
+                voicemailCount: 0
+            };
+        }
+
+        // Always increment attempts counter
+        leads[leadIndex].reachOut.callAttempts = (leads[leadIndex].reachOut.callAttempts || 0) + 1;
+
+        // Update attempts display
+        const attemptsDisplay = document.getElementById(`call-count-${leadId}`);
+        if (attemptsDisplay) {
+            attemptsDisplay.textContent = leads[leadIndex].reachOut.callAttempts;
+        }
+
+        if (answered) {
+            // Lead answered - increment connected counter
+            leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
+
+            // Update connected display
+            const connectedDisplay = document.getElementById(`call-connected-${leadId}`);
+            if (connectedDisplay) {
+                connectedDisplay.textContent = leads[leadIndex].reachOut.callsConnected;
+            }
+
+            // Close popup and backdrop
+            const popup = document.getElementById('call-outcome-popup');
+            if (popup) {
+                popup.remove();
+            }
+            const backdrop = document.getElementById('popup-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+
+            // Save to localStorage and server
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            saveReachOutToServer(leadId, leads[leadIndex].reachOut);
+
+            // Update checkbox to checked
+            const checkbox = document.getElementById(`call-made-${leadId}`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+
+            showNotification('Call connected successfully!', 'success');
+
+            // Update the sequential to-do display
+            if (window.getActionText) {
+                const actionText = window.getActionText(leads[leadIndex].stage, leads[leadIndex].reachOut);
+                if (actionText === 'Reach out') {
+                    applyReachOutStyling(leadId, true);
+                }
+            }
+        } else {
+            // Lead didn't pick up - save and show voicemail question
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            saveReachOutToServer(leadId, leads[leadIndex].reachOut);
+
+            // Update checkbox to checked
+            const checkbox = document.getElementById(`call-made-${leadId}`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+
+            // Show voicemail question
+            const voicemailQuestion = document.getElementById('voicemail-question');
+            if (voicemailQuestion) {
+                voicemailQuestion.style.display = 'block';
+            }
+
+            // Update the sequential to-do display
+            if (window.getActionText) {
+                const actionText = window.getActionText(leads[leadIndex].stage, leads[leadIndex].reachOut);
+                if (actionText === 'Reach out') {
+                    applyReachOutStyling(leadId, true);
+                }
+            }
+        }
+    }
+};
+
+// Function to handle voicemail outcome
+window.handleVoicemailOutcome = function(leadId, leftVoicemail) {
+    console.log('Voicemail outcome:', { leadId, leftVoicemail });
+
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        if (leftVoicemail) {
+            leads[leadIndex].reachOut.voicemailCount = (leads[leadIndex].reachOut.voicemailCount || 0) + 1;
+
+            // Update voicemail display
+            const voicemailDisplay = document.getElementById(`voicemail-count-${leadId}`);
+            if (voicemailDisplay) {
+                voicemailDisplay.textContent = leads[leadIndex].reachOut.voicemailCount;
+            }
+        }
+
+        // Save to localStorage and server
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        saveReachOutToServer(leadId, leads[leadIndex].reachOut);
+    }
+
+    // Close popup and backdrop
+    const popup = document.getElementById('call-outcome-popup');
+    if (popup) {
+        popup.remove();
+    }
+    const backdrop = document.getElementById('popup-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+
+    showNotification(leftVoicemail ? 'Voicemail recorded!' : 'Call attempt recorded!', 'success');
+
+    // Update the sequential to-do display
+    if (window.getActionText) {
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const lead = leads.find(l => String(l.id) === String(leadId));
+        if (lead) {
+            const actionText = window.getActionText(lead.stage, lead.reachOut);
+            if (actionText === 'Reach out') {
+                applyReachOutStyling(leadId, true);
+            }
+        }
+    }
+};
+
+// Helper function to save reach-out data to server
+function saveReachOutToServer(leadId, reachOutData) {
+    const updateData = {
+        reachOut: reachOutData
+    };
+
+    fetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Reach-out data updated on server');
+        } else {
+            console.error('❌ Server reach-out update failed:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Error updating reach-out data:', error);
+    });
+}
+
+// Function to apply red styling to reach-out section when lead has "Reach out" to-do
+function applyReachOutStyling(leadId, hasReachOutTodo) {
+    // Update the TO DO message in the header
+    const todoDiv = document.getElementById(`reach-out-todo-${leadId}`);
+    if (todoDiv) {
+        const lead = JSON.parse(localStorage.getItem('insurance_leads') || '[]').find(l => String(l.id) === String(leadId));
+        if (lead) {
+            // Initialize reachOut if it doesn't exist
+            if (!lead.reachOut) {
+                lead.reachOut = {
+                    emailCount: 0,
+                    textCount: 0,
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    voicemailCount: 0
+                };
+            }
+
+            let nextAction = '';
+            // Sequential to-do system: call → email → text
+            if (!lead.reachOut.callAttempts || lead.reachOut.callAttempts === 0) {
+                nextAction = 'TO DO: Call';
+            } else if (!lead.reachOut.emailCount || lead.reachOut.emailCount === 0) {
+                nextAction = 'TO DO: Email';
+            } else if (!lead.reachOut.textCount || lead.reachOut.textCount === 0) {
+                nextAction = 'TO DO: Text';
+            } else {
+                nextAction = 'All methods completed';
+            }
+
+            // Always show the to-do message in red and bold - reach-out section is always important
+            todoDiv.innerHTML = `<span style="color: #dc2626; font-weight: bold; font-size: 18px;">${nextAction}</span>`;
+            console.log(`✅ Applied reach-out styling for lead ${leadId}: ${nextAction}, isReachOutTodo: ${hasReachOutTodo}`);
+        }
+    }
+}
 
 // Update stage function
 protectedFunctions.updateLeadStage = function(leadId, stage) {
@@ -938,13 +1322,51 @@ protectedFunctions.updateLeadStage = function(leadId, stage) {
     const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
 
     if (leadIndex !== -1) {
+        const now = new Date().toISOString();
+
+        // Update stage and timestamp
         leads[leadIndex].stage = stage;
+        leads[leadIndex].stageUpdatedAt = now;
+
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
 
-        // Update the table if visible
-        if (window.displayLeads) {
-            window.displayLeads();
+        // Save stage change to server
+        const updateData = {
+            stage: stage,
+            stageUpdatedAt: now
+        };
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Stage updated on server:', stage);
+            } else {
+                console.error('❌ Server stage update failed:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Server stage update error:', error);
+        });
+
+        // Update the stage dropdown immediately
+        const stageDropdown = document.getElementById(`lead-stage-${leadId}`);
+        if (stageDropdown) {
+            stageDropdown.value = stage;
+            console.log('✅ Stage dropdown updated immediately:', stage);
         }
+
+        // Update the timestamp display in the current profile if open
+        updateStageTimestampDisplay(leadId, now);
+
+        // Update the table display immediately
+        refreshLeadsTable();
     }
 };
 
@@ -1591,18 +2013,35 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
         return;
     }
 
-    // Get saved applications for this lead
-    const allApplications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-    const leadApplications = allApplications.filter(app => String(app.leadId) === String(leadId));
+    // Show loading message
+    applicationsContainer.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">⏳ Loading applications...</p>';
 
-    if (leadApplications.length === 0) {
-        applicationsContainer.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No applications submitted yet</p>';
-        return;
-    }
+    // Get saved applications for this lead from server
+    fetch(`/api/quote-applications?leadId=${encodeURIComponent(leadId)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const leadApplications = data.applications;
 
-    // Display applications using clean format - same as showApplicationSubmissions
-    let applicationsHTML = '';
-    leadApplications.forEach((app, index) => {
+            if (leadApplications.length === 0) {
+                applicationsContainer.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No applications submitted yet</p>';
+                return;
+            }
+
+            displayApplications(leadApplications, applicationsContainer);
+        } else {
+            applicationsContainer.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Error loading applications</p>';
+        }
+    })
+    .catch(error => {
+        console.error('Error loading applications:', error);
+        applicationsContainer.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Error loading applications</p>';
+    });
+
+    function displayApplications(leadApplications, container) {
+        // Display applications using clean format - same as showApplicationSubmissions
+        let applicationsHTML = '';
+        leadApplications.forEach((app, index) => {
         applicationsHTML += `
             <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
@@ -1639,8 +2078,9 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
         `;
     });
 
-    applicationsContainer.innerHTML = applicationsHTML;
-    console.log(`✅ Loaded ${leadApplications.length} quote applications for lead ${leadId}`);
+        container.innerHTML = applicationsHTML;
+        console.log(`✅ Loaded ${leadApplications.length} quote applications for lead ${leadId}`);
+    }
 };
 
 protectedFunctions.addQuoteSubmission = function(leadId) {
@@ -1911,7 +2351,119 @@ console.log('🔥 Available functions:', {
     'sendEmail': typeof window.sendEmail
 });
 
-// Make email composer functions globally available for onclick handlers
+// Function to refresh the leads table when modal closes
+function refreshLeadsTable() {
+    console.log('🔄 Refreshing leads table after profile changes...');
+
+    // Try multiple methods to refresh the leads display
+    if (window.displayLeads && typeof window.displayLeads === 'function') {
+        window.displayLeads();
+        console.log('✅ Refreshed using displayLeads()');
+    } else if (window.loadLeadsView && typeof window.loadLeadsView === 'function') {
+        window.loadLeadsView();
+        console.log('✅ Refreshed using loadLeadsView()');
+    } else if (document.querySelector('.data-table tbody')) {
+        // Force reload leads from localStorage and server
+        loadLeadsFromServerAndRefresh();
+        console.log('✅ Forced reload from server');
+    } else {
+        console.log('❌ No refresh method available');
+    }
+}
+
+// Function to load leads from server and refresh display
+async function loadLeadsFromServerAndRefresh() {
+    try {
+        // Load fresh data from server
+        const response = await fetch('/api/leads');
+        if (response.ok) {
+            const serverLeads = await response.json();
+
+            // Update localStorage with fresh server data
+            localStorage.setItem('insurance_leads', JSON.stringify(serverLeads));
+
+            // Trigger display refresh
+            if (window.displayLeads) {
+                window.displayLeads();
+            } else if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+
+            console.log('✅ Leads refreshed from server');
+        }
+    } catch (error) {
+        console.error('❌ Error refreshing leads from server:', error);
+    }
+}
+
+// Function to update stage timestamp display in real-time
+function updateStageTimestampDisplay(leadId, stageUpdatedAt) {
+    const timestampElement = document.getElementById(`stage-timestamp-${leadId}`);
+    if (timestampElement) {
+        const now = new Date();
+        const updated = new Date(stageUpdatedAt);
+        const daysDiff = Math.floor((now - updated) / (1000 * 60 * 60 * 24));
+
+        // Calculate color based on stage age - URGENT TIMELINE
+        let ageColor;
+        if (daysDiff >= 3) ageColor = 'red';    // 3+ days = RED (urgent)
+        else if (daysDiff >= 2) ageColor = 'orange';  // 2 days = ORANGE
+        else if (daysDiff >= 1) ageColor = 'yellow';  // 1 day = YELLOW
+        else ageColor = 'green';  // Today = GREEN
+
+        // Map color names to background colors for pills
+        const colorMap = {
+            'green': '#10b981',
+            'yellow': '#eab308',
+            'orange': '#f59e0b',
+            'red': '#dc2626'
+        };
+
+        const backgroundColor = colorMap[ageColor] || '#10b981';
+
+        // Show actual date/time instead of relative time
+        const timeText = updated.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: updated.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+
+        // Update the pill appearance
+        timestampElement.style.backgroundColor = backgroundColor;
+        timestampElement.textContent = timeText;
+
+        console.log('✅ Stage timestamp display updated:', timeText);
+    }
+}
+
+// Helper function to sync lead data to server
+function syncLeadToServer(leadId, leadData) {
+    fetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(leadData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Lead data synced to server');
+        } else {
+            console.error('❌ Server sync failed:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Server sync error:', error);
+    });
+}
+
+// Make functions globally available for onclick handlers
+window.updateLeadField = protectedFunctions.updateLeadField;
+window.updateLeadStage = protectedFunctions.updateLeadStage;
 window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
 window.sendEmail = protectedFunctions.sendEmail;
@@ -1928,7 +2480,7 @@ window.addVehicle = function(leadId) {
     const lead = leads.find(l => String(l.id) === String(leadId));
     if (lead) {
         if (!lead.vehicles) lead.vehicles = [];
-        lead.vehicles.push({
+        const newVehicle = {
             year: '',
             make: '',
             model: '',
@@ -1937,8 +2489,13 @@ window.addVehicle = function(leadId) {
             deductible: '',
             type: '',
             gvwr: ''
-        });
+        };
+        lead.vehicles.push(newVehicle);
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Sync to server
+        syncLeadToServer(leadId, { vehicles: lead.vehicles });
+
         // Refresh the lead profile to show new card
         if (window.showLeadProfile) {
             window.showLeadProfile(leadId);
@@ -1953,7 +2510,7 @@ window.addTrailer = function(leadId) {
     const lead = leads.find(l => String(l.id) === String(leadId));
     if (lead) {
         if (!lead.trailers) lead.trailers = [];
-        lead.trailers.push({
+        const newTrailer = {
             year: '',
             make: '',
             type: '',
@@ -1961,8 +2518,13 @@ window.addTrailer = function(leadId) {
             length: '',
             value: '',
             deductible: ''
-        });
+        };
+        lead.trailers.push(newTrailer);
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Sync to server
+        syncLeadToServer(leadId, { trailers: lead.trailers });
+
         // Refresh the lead profile to show new card
         if (window.showLeadProfile) {
             window.showLeadProfile(leadId);
@@ -2088,17 +2650,34 @@ window.showApplicationSubmissions = function(leadId) {
     }
 
     // Get saved applications for this lead
-    const allApplications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-    const leadApplications = allApplications.filter(app => String(app.leadId) === String(leadId));
+    // Show loading message
+    container.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">⏳ Loading applications...</p>';
 
-    console.log('📋 Found', leadApplications.length, 'applications for lead', leadId);
+    // Get saved applications for this lead from server
+    fetch(`/api/quote-applications?leadId=${encodeURIComponent(leadId)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const leadApplications = data.applications;
+            console.log('📋 Found', leadApplications.length, 'applications for lead', leadId);
 
-    if (leadApplications.length === 0) {
-        container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No applications submitted yet</p>';
-        return;
-    }
+            if (leadApplications.length === 0) {
+                container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No applications submitted yet</p>';
+                return;
+            }
 
-    // Display applications using detailed format
+            displayDetailedApplications(leadApplications, container);
+        } else {
+            container.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Error loading applications</p>';
+        }
+    })
+    .catch(error => {
+        console.error('Error loading applications:', error);
+        container.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Error loading applications</p>';
+    });
+
+    function displayDetailedApplications(leadApplications, container) {
+        // Display applications using detailed format
     let applicationsHTML = '';
     leadApplications.forEach((app, index) => {
         applicationsHTML += `
@@ -2137,36 +2716,42 @@ window.showApplicationSubmissions = function(leadId) {
         `;
     });
 
-    container.innerHTML = applicationsHTML;
-    console.log('✅ Applications display updated successfully');
+        container.innerHTML = applicationsHTML;
+        console.log('✅ Applications display updated successfully');
+    }
 };
 
 // Quote Application Management Functions
 window.viewQuoteApplication = function(appId) {
     console.log('📄 Viewing quote application:', appId);
 
-    // Get the application data from localStorage
-    const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-    const application = applications.find(app => String(app.id) === String(appId));
+    // Get the application data from server
+    fetch(`/api/quote-applications/${appId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const application = data.application;
+                console.log('📄 Found application data:', application);
 
-    if (!application) {
-        alert('Application not found');
-        return;
-    }
+                // Set up editing mode and global data for the form to access
+                window.editingApplicationId = appId;
+                window.editingApplicationData = application;
 
-    console.log('📄 Found application data:', application);
-
-    // Set up editing mode and global data for the form to access
-    window.editingApplicationId = appId;
-    window.editingApplicationData = application;
-
-    // Open the original quote application form
-    if (typeof window.createQuoteApplicationSimple === 'function') {
-        window.createQuoteApplicationSimple(application.leadId);
-    } else {
-        console.error('createQuoteApplicationSimple function not available');
-        alert('Unable to open application form');
-    }
+                // Open the original quote application form
+                if (typeof window.createQuoteApplicationSimple === 'function') {
+                    window.createQuoteApplicationSimple(application.leadId);
+                } else {
+                    console.error('createQuoteApplicationSimple function not available');
+                    alert('Unable to open application form');
+                }
+            } else {
+                alert('Application not found');
+            }
+        })
+        .catch(error => {
+            console.error('❌ View error:', error);
+            alert('Error loading application. Please try again.');
+        });
 };
 
 window.editQuoteApplication = function(appId) {
@@ -2175,40 +2760,32 @@ window.editQuoteApplication = function(appId) {
 };
 
 window.deleteQuoteApplication = function(appId) {
-    console.log('🗑️ DELETE FUNCTION CALLED - VERSION LATEST:', appId);
+    console.log('🗑️ DELETE FUNCTION CALLED:', appId);
     if (confirm('Are you sure you want to delete this quote application?')) {
         console.log('🗑️ User confirmed delete, proceeding...');
-        const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-        console.log('🗑️ Found applications in storage:', applications.length);
-        const updatedApplications = applications.filter(app => String(app.id) !== String(appId));
-        console.log('🗑️ After filter, applications remaining:', updatedApplications.length);
-        localStorage.setItem('quote_applications', JSON.stringify(updatedApplications));
 
-        // Try multiple refresh methods
-        const leadProfileModal = document.getElementById('lead-profile-container');
-        const currentLead = window.currentViewingLead || (leadProfileModal && leadProfileModal.dataset.leadId);
-
-        console.log('🔄 Attempting refresh with leadId:', currentLead);
-        console.log('🔄 showApplicationSubmissions available:', typeof window.showApplicationSubmissions);
-
-        if (currentLead && window.showApplicationSubmissions) {
-            console.log('🔄 Calling showApplicationSubmissions...');
-            window.showApplicationSubmissions(currentLead);
-            console.log('🔄 showApplicationSubmissions called successfully');
-        } else {
-            console.error('❌ Cannot refresh - missing leadId or function');
-            console.log('leadId:', currentLead, 'function:', typeof window.showApplicationSubmissions);
-        }
-
-        // Also try to trigger a more aggressive refresh
-        setTimeout(() => {
-            console.log('🔄 Secondary refresh attempt...');
-            if (currentLead && window.showApplicationSubmissions) {
-                window.showApplicationSubmissions(currentLead);
+        // Delete from server
+        fetch(`/api/quote-applications/${appId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Quote application deleted from server');
+                // Refresh the applications display
+                const leadProfileModal = document.getElementById('lead-profile-container');
+                const currentLead = window.currentViewingLead || (leadProfileModal && leadProfileModal.dataset.leadId);
+                if (currentLead) {
+                    protectedFunctions.loadQuoteApplications(currentLead);
+                }
+            } else {
+                alert('Error deleting application: ' + data.error);
             }
-        }, 50);
-
-        console.log('✅ Quote application deleted successfully');
+        })
+        .catch(error => {
+            console.error('❌ Delete error:', error);
+            alert('Error deleting application. Please try again.');
+        });
     } else {
         console.log('🗑️ Delete cancelled by user');
     }
@@ -2543,12 +3120,37 @@ window.saveQuoteApplication = function(leadId) {
         status: 'draft'
     };
 
-    // Save to localStorage
-    const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-    applications.unshift(applicationData);
-    localStorage.setItem('quote_applications', JSON.stringify(applications));
+    // Save to server
+    fetch('/api/quote-applications', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            leadId: leadId,
+            applicationData: applicationData
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Quote application saved to server:', data.applicationId);
+            // Close quote application modal
+            modal.remove();
+            // Refresh the applications display
+            protectedFunctions.loadQuoteApplications(leadId);
+        } else {
+            console.error('❌ Save failed:', data.error);
+            alert('Error saving quote application: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Save error:', error);
+        alert('Error saving quote application. Please try again.');
+    });
 
-    console.log('✅ Quote application saved:', applicationData);
+    // Return early - async operation will handle modal closing
+    return;
 
     // Close quote application modal
     modal.remove();
