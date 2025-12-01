@@ -3497,8 +3497,10 @@ function generateSimpleLeadRows(leads) {
         let rowClass = '';
 
         // Get TO DO text to determine if highlighting is needed
+        console.log(`🎯 TABLE GEN: Getting next action for lead ${lead.id} - ${lead.name}, stage: ${lead.stage}`);
         const todoText = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) :
                          (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead'));
+        console.log(`🎯 TABLE GEN: Todo text result for lead ${lead.id}: "${todoText}"`);
 
         // Apply timestamp highlighting to leads EXCEPT closed leads
         // Closed leads should not be tracked by timestamps
@@ -3623,7 +3625,12 @@ function generateSimpleLeadRows(leads) {
                 <td>${getStageHtml(lead.stage, lead)}</td>
                 <td>
                     <div style="font-weight: bold; color: black;">
-                        ${(typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || ''}
+                        ${(() => {
+                            console.log(`🎯 TO DO CELL: Getting next action for lead ${lead.id} - ${lead.name}, stage: ${lead.stage}`);
+                            const result = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || '';
+                            console.log(`🎯 TO DO CELL: Result for lead ${lead.id}: "${result}"`);
+                            return result;
+                        })()}
                     </div>
                 </td>
                 <td>${lead.renewalDate || 'N/A'}</td>
@@ -16567,20 +16574,41 @@ function formatStageName(stage) {
 
 // Helper function to get next action based on stage and reach out status
 function getNextAction(stage, lead) {
+    console.log(`🔍 GET NEXT ACTION: Lead ${lead.id} - ${lead.name}, stage: ${stage}`);
+    console.log(`🔍 GET NEXT ACTION: Lead data:`, lead);
+
     // Check if reach out is complete
     if (lead && lead.reachOut) {
         const reachOut = lead.reachOut;
+        console.log(`🔍 GET NEXT ACTION: ReachOut data:`, reachOut);
 
         // Check if stage requires reach out (NOT info_received - that needs quote preparation)
-        if (stage === 'quoted' || stage === 'info_requested' ||
-            stage === 'loss_runs_requested' || stage === 'app_sent' || stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
-            stage === 'interested') {
+        console.log(`🔍 STAGE CHECK: stage="${stage}" (type: ${typeof stage})`);
+        console.log(`🔍 STAGE CHECK: Checking conditions...`);
+        if (stage === 'quoted' || stage === 'info_requested' || stage === 'Info Requested' ||
+            stage === 'loss_runs_requested' || stage === 'Loss Runs Requested' ||
+            stage === 'app_sent' || stage === 'App Sent' ||
+            stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
+            stage === 'interested' || stage === 'Interested') {
+            console.log(`🔍 STAGE CHECK: ✅ STAGE MATCHED - proceeding to completion check`);
 
             // Reach out is complete when:
             // 1. Lead answered call (completedAt exists), OR
             // 2. Connected call was made, OR
             // 3. Text has been sent (final step in sequence)
-            if (reachOut.completedAt || reachOut.callsConnected > 0 || reachOut.textCount > 0) {
+            console.log(`🔍 COMPLETION CHECK VALUES: completedAt=${!!reachOut.completedAt}, reachOutCompletedAt=${!!reachOut.reachOutCompletedAt}, callsConnected=${reachOut.callsConnected}, textCount=${reachOut.textCount}`);
+            console.log(`🔍 COMPLETION CHECK TYPES: completedAt=${typeof reachOut.completedAt}, reachOutCompletedAt=${typeof reachOut.reachOutCompletedAt}, callsConnected=${typeof reachOut.callsConnected}, textCount=${typeof reachOut.textCount}`);
+
+            const condition1 = reachOut.completedAt;
+            const condition2 = reachOut.reachOutCompletedAt;
+            const condition3 = reachOut.callsConnected > 0;
+            const condition4 = reachOut.textCount > 0;
+            const finalCondition = condition1 || condition2 || condition3 || condition4;
+
+            console.log(`🔍 INDIVIDUAL CONDITIONS: 1=${condition1}, 2=${condition2}, 3=${condition3}, 4=${condition4}, FINAL=${finalCondition}`);
+
+            if (finalCondition) {
+                console.log(`🔍 REACH-OUT COMPLETE CHECK - Lead ${lead.id}: completedAt=${!!reachOut.completedAt}, reachOutCompletedAt=${!!reachOut.reachOutCompletedAt}, callsConnected=${reachOut.callsConnected}, textCount=${reachOut.textCount}`);
                 // NEW: Check if reach out completion has expired (older than 2 days)
                 if (reachOut.reachOutCompletedAt) {
                     const completedTime = new Date(reachOut.reachOutCompletedAt);
@@ -16818,7 +16846,12 @@ function renderLeadsList(leads) {
                 </td>
                 <td>
                     <div style="font-weight: bold; color: black;">
-                        ${(typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || ''}
+                        ${(() => {
+                            console.log(`🎯 TO DO CELL: Getting next action for lead ${lead.id} - ${lead.name}, stage: ${lead.stage}`);
+                            const result = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || '';
+                            console.log(`🎯 TO DO CELL: Result for lead ${lead.id}: "${result}"`);
+                            return result;
+                        })()}
                     </div>
                 </td>
                 <td>

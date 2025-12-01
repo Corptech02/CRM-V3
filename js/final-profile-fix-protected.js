@@ -1515,12 +1515,30 @@ protectedFunctions.updateLeadStage = function(leadId, stage) {
         leads[leadIndex].stage = stage;
         leads[leadIndex].stageUpdatedAt = now;
 
+        // Reset reach-out data when stage changes
+        console.log('🔄 Stage changed - resetting reach-out data for lead:', leadId);
+        if (leads[leadIndex].reachOut) {
+            // Reset all reach-out completion data
+            leads[leadIndex].reachOut.completedAt = null;
+            leads[leadIndex].reachOut.reachOutCompletedAt = null;
+            leads[leadIndex].reachOut.callsConnected = 0;
+            leads[leadIndex].reachOut.textCount = 0;
+            leads[leadIndex].reachOut.emailSent = false;
+            leads[leadIndex].reachOut.textSent = false;
+            leads[leadIndex].reachOut.callMade = false;
+            leads[leadIndex].reachOut.emailCount = 0;
+            leads[leadIndex].reachOut.callAttempts = 0;
+            leads[leadIndex].reachOut.voicemailCount = 0;
+            console.log('✅ Reach-out data reset for lead:', leadId);
+        }
+
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
 
-        // Save stage change to server
+        // Save stage change to server (including reset reach-out data)
         const updateData = {
             stage: stage,
-            stageUpdatedAt: now
+            stageUpdatedAt: now,
+            reachOut: leads[leadIndex].reachOut // Include the reset reach-out data
         };
 
         fetch(`/api/leads/${leadId}`, {
