@@ -34,13 +34,15 @@
         }
     </script>
     <!-- COI Email Timeout Fix -->
-    <script src="js/fix-coi-email-timeout.js?v=1"></script>
+    <script src="js/fix-coi-email-timeout.js?v=999"></script>
 
     <!-- Call Status Fix -->
     <script src="js/call-status-fix.js?v=1"></script>
     <script src="js/simple-call-fix.js?v=1"></script>
     <script src="js/incoming-calls.js?v=2"></script>
     <script src="js/fix-call-disconnect-detection.js?v=1"></script>
+
+    <!-- HEAD TEST DISABLED - Using comprehensive script only -->
     <style>
         /* Force lead name truncation and contact icon display */
         #leadsTableBody .lead-name {
@@ -110,62 +112,86 @@
         /* Name column */
         #leadsTable th:nth-child(2),
         #leadsTable td:nth-child(2) {
-            width: 160px !important;
-            max-width: 160px !important;
+            width: 140px !important;
+            max-width: 140px !important;
         }
 
         /* Contact column - centered icons */
         #leadsTable th:nth-child(3),
         #leadsTable td:nth-child(3) {
-            width: 90px !important;
+            width: 80px !important;
             text-align: center !important;
         }
 
         /* Product Interest */
         #leadsTable th:nth-child(4),
         #leadsTable td:nth-child(4) {
-            width: 180px !important;
+            width: 160px !important;
         }
 
         /* Premium */
         #leadsTable th:nth-child(5),
         #leadsTable td:nth-child(5) {
-            width: 100px !important;
+            width: 90px !important;
         }
 
         /* Stage */
         #leadsTable th:nth-child(6),
         #leadsTable td:nth-child(6) {
-            width: 110px !important;
+            width: 100px !important;
         }
 
-        /* Renewal Date - needs more space for header + sort arrow */
+        /* To Do - NEW COLUMN that was missing */
         #leadsTable th:nth-child(7),
         #leadsTable td:nth-child(7) {
             width: 130px !important;
+            max-width: 130px !important;
         }
 
-        #leadsTable th:nth-child(7) {
-            white-space: nowrap !important;
-            overflow: hidden !important;
-        }
-
-        /* Assigned To */
+        /* Renewal Date - needs more space for header + sort arrow */
         #leadsTable th:nth-child(8),
         #leadsTable td:nth-child(8) {
             width: 110px !important;
         }
 
-        /* Created */
+        #leadsTable th:nth-child(8) {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+        }
+
+        /* Assigned To */
         #leadsTable th:nth-child(9),
         #leadsTable td:nth-child(9) {
             width: 100px !important;
         }
 
-        /* Actions */
+        /* Created */
         #leadsTable th:nth-child(10),
         #leadsTable td:nth-child(10) {
-            width: 140px !important;
+            width: 90px !important;
+        }
+
+        /* Actions */
+        #leadsTable th:nth-child(11),
+        #leadsTable td:nth-child(11) {
+            width: 110px !important;
+            min-width: 110px !important;
+            text-align: center !important;
+        }
+
+        /* Action buttons - ensure horizontal alignment */
+        #leadsTable .action-buttons {
+            display: flex !important;
+            justify-content: center !important;
+            gap: 8px !important;
+            flex-wrap: nowrap !important;
+        }
+
+        #leadsTable .btn-icon {
+            padding: 6px 8px !important;
+            margin: 0 !important;
+            font-size: 12px !important;
+            flex-shrink: 0 !important;
         }
 
         /* Fix sort arrows to prevent overflow */
@@ -230,6 +256,166 @@
         .clients-view .data-table {
             table-layout: auto !important;
         }
+
+        /* BULLETPROOF HIGHLIGHTING CSS - Maximum specificity to override everything */
+        #leadsTableBody tr.force-persistent-highlight[data-highlight="yellow"],
+        #leadsTableBody tr[data-highlight="yellow"],
+        #leadsTableBody tr.timestamp-yellow,
+        table tr[data-highlight="yellow"] {
+            background-color: #fef3c7 !important;
+            background: #fef3c7 !important;
+            border-left: 4px solid #f59e0b !important;
+            border-right: 2px solid #f59e0b !important;
+        }
+
+        #leadsTableBody tr.force-persistent-highlight[data-highlight="orange"],
+        #leadsTableBody tr[data-highlight="orange"],
+        #leadsTableBody tr.timestamp-orange,
+        table tr[data-highlight="orange"] {
+            background-color: #fed7aa !important;
+            background: #fed7aa !important;
+            border-left: 4px solid #fb923c !important;
+            border-right: 2px solid #fb923c !important;
+        }
+
+        #leadsTableBody tr.force-persistent-highlight[data-highlight="red"],
+        #leadsTableBody tr[data-highlight="red"],
+        #leadsTableBody tr.timestamp-red,
+        table tr[data-highlight="red"] {
+            background-color: #fecaca !important;
+            background: #fecaca !important;
+            border-left: 4px solid #ef4444 !important;
+            border-right: 2px solid #ef4444 !important;
+        }
+
+        /* GREY highlighting for process complete */
+        #leadsTableBody tr.process-complete,
+        table tr.process-complete {
+            background-color: rgba(156, 163, 175, 0.3) !important;
+            background: rgba(156, 163, 175, 0.3) !important;
+            border-left: 4px solid #9ca3af !important;
+            border-right: 2px solid #9ca3af !important;
+        }
+
+        /* GREEN highlighting for reach out complete (empty TODO) */
+        #leadsTableBody tr.reach-out-complete,
+        table tr.reach-out-complete {
+            background-color: rgba(16, 185, 129, 0.2) !important;
+            background: rgba(16, 185, 129, 0.2) !important;
+            border-left: 4px solid #10b981 !important;
+            border-right: 2px solid #10b981 !important;
+        }
+
+        /* Force transparent cells for highlighted rows */
+        #leadsTableBody tr[data-highlight-applied="true"] td,
+        #leadsTableBody tr[data-highlight] td,
+        #leadsTableBody tr.timestamp-yellow td,
+        #leadsTableBody tr.timestamp-orange td,
+        #leadsTableBody tr.timestamp-red td,
+        #leadsTableBody tr.process-complete td,
+        #leadsTableBody tr.reach-out-complete td {
+            background-color: transparent !important;
+            background: transparent !important;
+        }
+
+        /* Ultimate specificity - use CSS variables that can't be overridden */
+        :root {
+            --yellow-bg: #fef3c7;
+            --yellow-border: #f59e0b;
+            --orange-bg: #fed7aa;
+            --orange-border: #fb923c;
+            --red-bg: #fecaca;
+            --red-border: #ef4444;
+            --green-bg: rgba(16, 185, 129, 0.2);
+            --green-border: #10b981;
+        }
+
+        /* Apply via CSS custom properties */
+        tr[data-highlight="yellow"],
+        tr.timestamp-yellow {
+            background-color: var(--yellow-bg) !important;
+            border-left: 4px solid var(--yellow-border) !important;
+        }
+
+        tr[data-highlight="orange"],
+        tr.timestamp-orange {
+            background-color: var(--orange-bg) !important;
+            border-left: 4px solid var(--orange-border) !important;
+        }
+
+        tr[data-highlight="red"],
+        tr.timestamp-red {
+            background-color: var(--red-bg) !important;
+            border-left: 4px solid var(--red-border) !important;
+        }
+
+        /* NUCLEAR HIGHLIGHTING - Absolutely bulletproof */
+        tr.nuclear-highlight.timestamp-yellow,
+        tr[data-nuclear-highlight="yellow"] {
+            background-color: #fef3c7 !important;
+            background: #fef3c7 !important;
+            border-left: 4px solid #f59e0b !important;
+            border-right: 2px solid #f59e0b !important;
+        }
+
+        tr.nuclear-highlight.timestamp-orange,
+        tr[data-nuclear-highlight="orange"] {
+            background-color: #fed7aa !important;
+            background: #fed7aa !important;
+            border-left: 4px solid #fb923c !important;
+            border-right: 2px solid #fb923c !important;
+        }
+
+        tr.nuclear-highlight.timestamp-red,
+        tr[data-nuclear-highlight="red"] {
+            background-color: #fecaca !important;
+            background: #fecaca !important;
+            border-left: 4px solid #ef4444 !important;
+            border-right: 2px solid #ef4444 !important;
+        }
+
+        tr.nuclear-highlight.process-complete,
+        tr[data-nuclear-highlight="grey"] {
+            background-color: rgba(156, 163, 175, 0.3) !important;
+            background: rgba(156, 163, 175, 0.3) !important;
+            border-left: 4px solid #9ca3af !important;
+            border-right: 2px solid #9ca3af !important;
+        }
+
+        tr.nuclear-highlight.reach-out-complete,
+        tr[data-nuclear-highlight="green"] {
+            background-color: rgba(16, 185, 129, 0.2) !important;
+            background: rgba(16, 185, 129, 0.2) !important;
+            border-left: 4px solid #10b981 !important;
+            border-right: 2px solid #10b981 !important;
+        }
+
+
+        /* Force transparent cells for nuclear highlighted rows */
+        tr[data-nuclear-applied="true"] td,
+        tr.nuclear-highlight td {
+            background-color: transparent !important;
+            background: transparent !important;
+        }
+
+        /* TODO Text Coloring */
+        #leadsTable td:nth-child(7) strong {
+            font-weight: bold !important;
+        }
+
+        /* Green color for "Process complete" TODO text */
+        #leadsTable td:nth-child(7) strong.todo-process-complete,
+        #leadsTableBody td:nth-child(7) strong.todo-process-complete {
+            color: #059669 !important; /* Green-600 */
+            font-weight: bold !important;
+        }
+
+        /* Red color for "Reach out to lead" TODO text */
+        #leadsTable td:nth-child(7) strong.todo-reach-out,
+        #leadsTableBody td:nth-child(7) strong.todo-reach-out {
+            color: #dc2626 !important; /* Red-600 */
+            font-weight: bold !important;
+        }
     </style>
     <!-- Authentication Service -->
     <script src="js/auth-service.js"></script>
@@ -277,7 +463,6 @@
                 <div class="nav-actions">
                     <button class="notification-btn">
                         <i class="fas fa-bell"></i>
-                        <span class="badge">5</span>
                     </button>
                     <div class="user-menu" id="userMenuNav" onclick="toggleUserMenu()" style="cursor: pointer;">
                         <img src="https://ui-avatars.com/api/?name=User&background=0066cc&color=fff" alt="User" class="user-avatar" id="userAvatar">
@@ -503,28 +688,24 @@
                             <a href="#leads" data-tooltip="Leads">
                                 <i class="fas fa-user-plus"></i>
                                 <span>Leads</span>
-                                <span class="count badge-new">156</span>
                             </a>
                         </li>
                         <li>
                             <a href="#clients" data-tooltip="Clients">
                                 <i class="fas fa-users"></i>
                                 <span>Clients</span>
-                                <span class="count">2,847</span>
                             </a>
                         </li>
                         <li>
                             <a href="#policies" data-tooltip="Policies">
                                 <i class="fas fa-file-contract"></i>
                                 <span>Policies</span>
-                                <span class="count">5,234</span>
                             </a>
                         </li>
                         <li>
                             <a href="#renewals" data-tooltip="Renewals">
                                 <i class="fas fa-sync-alt"></i>
                                 <span>Renewals</span>
-                                <span class="count">87</span>
                             </a>
                         </li>
                     </ul>
@@ -571,7 +752,6 @@
                             <a href="#carriers" data-tooltip="Carriers">
                                 <i class="fas fa-building"></i>
                                 <span>Carriers</span>
-                                <span class="count">47</span>
                             </a>
                         </li>
                         <li>
@@ -764,17 +944,7 @@
                 </div>
             </div>
 
-            <!-- Charts Section -->
-            <div class="charts-section">
-                <div class="chart-card">
-                    <h3>Premium Growth</h3>
-                    <canvas id="premiumChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Policy Distribution</h3>
-                    <canvas id="policyChart"></canvas>
-                </div>
-            </div>
+            <!-- Charts Section Removed -->
         </section>
     </main>
 
@@ -1049,7 +1219,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- CDN Fallback Handler -->
-    <script src="js/cdn-fallback.js"></script>
+    <!-- <script src="js/cdn-fallback.js"></script> DISABLED - Not needed for basic profile -->
 
     <!-- Agent Configuration -->
     <script src="js/agent-config.js"></script>
@@ -1072,7 +1242,10 @@
     <script src="js/performance-optimization.js"></script>
 
     <!-- <script src="js/auto-clean-leads.js?v=3"></script> -->
-    <script src="js/app.js?v=64"></script>
+    <script src="js/app.js?v=70_force_refresh"></script>
+
+    <!-- NUCLEAR HIGHLIGHTING FIX - Bulletproof highlighting that cannot be removed -->
+    <!-- <script src="js/nuclear-highlighting-fix.js?v=6"></script> DISABLED - Intercepting viewLead -->
 
     <!-- Protect ViciDial leads stored in database from localStorage clearing -->
     <script src="js/protect-database-leads.js?v=5"></script>
@@ -1119,9 +1292,10 @@
     <script src="js/clear-test-clients.js?v=1"></script>
     <!-- <script src="js/load-vicidial-leads.js"></script> DISABLED - Auto-loads mock data -->
     <script src="js/load-vicidial-transcripts.js"></script>
-    <script src="js/fix-navigation.js"></script>
-    <!-- Re-enabled for proper profile function -->
-    <script src="js/final-profile-fix.js"></script>
+    <!-- <script src="js/fix-navigation.js"></script> -->
+    <!-- Re-enabled for proper profile function - MOVED TO LOAD LATER -->
+    <!-- <script src="js/final-profile-fix.js?v=1004"></script> MOVED -->
+    <script src="js/debug-script-loading.js?v=1"></script>
     <script src="js/add-test-button.js"></script>
     <!-- DISABLED: Overrides proper generateClientRows with outdated logic
     <script src="js/fix-clients-view.js"></script> -->
@@ -1138,7 +1312,7 @@
     <script src="js/quote-application-server.js"></script>
     <script src="js/test-quote-modal.js"></script>
     <script src="js/quote-applications-view.js"></script>
-    <script src="js/fix-quote-application-button.js"></script>
+    <!-- <script src="js/fix-quote-application-button.js"></script> DISABLED - Intercepting viewLead -->
     <script src="js/show-comprehensive-application.js"></script>
     <script src="js/app-submissions.js"></script>
     <script src="js/force-app-submissions-local.js"></script>
@@ -1147,34 +1321,34 @@
     <!-- Ensure required functions exist -->
     <script src="js/ensure-functions.js"></script>
     <!-- USING PROFILE FROM SEP 22 -->
-    <script src="js/final-profile-fix.js"></script>
+    <!-- <script src="js/final-profile-fix.js?v=1004"></script> DISABLED - Duplicate loading -->
     <!-- DEBUG: Monitor localStorage persistence -->
     <script src="js/debug-localstorage-persistence.js"></script>
     <script src="js/fix-stage-saving-unified.js?v=4"></script>
     <!-- Critical Lead Profile Scripts from Working System -->
-    <script src="js/fix-lead-table-eye-icon-only.js"></script>
+    <!-- <script src="js/fix-lead-table-eye-icon-only.js"></script> DISABLED - Annoying loading overlay -->
     <script src="js/fix-profile-quotes.js"></script>
     <script src="js/fix-add-quote-direct.js"></script>
-    <script src="js/load-display-quotes.js"></script>
-    <script src="js/load-lead-from-api.js"></script>
-    <script src="js/force-save-button-v2.js"></script>
+    <!-- <script src="js/load-display-quotes.js"></script> DISABLED - May interfere with profile -->
+    <!-- <script src="js/load-lead-from-api.js"></script> DISABLED - Conflicting with profile display -->
+    <!-- <script src="js/force-save-button-v2.js"></script> DISABLED - Interfering with modal -->
     <!-- Demo Data Blocking Script -->
     <script src="js/block-demo-data-import.js"></script>
-    <!-- Fix Profile Display Issues -->
-    <script src="js/fix-profile-display.js"></script>
+    <!-- Fix Profile Display Issues - DISABLED: Conflicts with profile loading -->
+    <!-- <script src="js/fix-profile-display.js"></script> -->
     <!-- Fix Profile Position -->
-    <script src="js/fix-profile-position.js"></script>
+    <!-- <script src="js/fix-profile-position.js"></script> DISABLED - Interfering with modal -->
     <!-- Fix Gmail API URL -->
     <!-- DISABLED: Interfering with Titan email expansion - <script src="js/fix-gmail-api-url.js"></script> -->
     <!-- Connect eye icon to proper profile -->
     <script src="js/connect-eye-icon-properly.js?v=1"></script>
     <!-- Fix viewLead to use createEnhancedProfile -->
-    <script src="js/fix-viewlead-proper.js"></script>
+    <!-- <script src="js/fix-viewlead-proper.js"></script> DISABLED - Creates loading overlay -->
     <!-- Disabled: Overrides viewLead incorrectly
     <script src="js/save-button-in-profile.js"></script> -->
-    <script src="js/debug-lead-storage.js"></script>
+    <!-- <script src="js/debug-lead-storage.js"></script> DISABLED - Intercepting viewLead -->
     <script src="js/unarchive-all-leads.js"></script>
-    <script src="js/fix-lead-not-found.js"></script>
+    <!-- <script src="js/fix-lead-not-found.js"></script> DISABLED - Intercepting viewLead -->
 
     <!-- ALL RECENTLY CREATED PROFILE SCRIPTS DISABLED -->
     <!-- <script src="js/use-original-app-profile.js"></script> -->
@@ -1268,8 +1442,25 @@
     <!-- ORIGINAL CLIENT PROFILE - Must be LAST to override all other viewClient functions -->
     <script src="js/original-client-profile.js?v=2"></script>
 
-    <!-- FIX PREMIUM DISPLAY - Must be absolutely LAST to fix premium calculation -->
+    <!-- FINAL PROFILE FIX - Must load AFTER all other lead profile scripts to ensure functions are available -->
+    <!-- <script src="js/final-profile-fix.js?v=1005"></script> REPLACED WITH PROTECTED VERSION -->
+
+    <!-- TEST SCRIPT EXECUTION -->
+    <script src="js/test-script-execution.js?v=1"></script>
+
+    <!-- FIX PREMIUM DISPLAY -->
     <script src="js/fix-premium-display.js?v=1"></script>
+
+    <!-- FINAL PROFILE FIX PROTECTED - MUST BE ABSOLUTELY LAST - Cannot be overridden -->
+    <script src="js/final-profile-fix-protected.js?v=23"></script>
+
+    <!-- PREVENT TAB SWITCHING OVERRIDE - DISABLED because it blocks legitimate lead loading -->
+    <!-- <script src="js/prevent-tab-switching-override.js?v=1"></script> -->
+
+    <!-- ENSURE CORRECT LEAD TABLE - Force correct highlighted view to load -->
+    <!-- <script src="js/ensure-correct-lead-table.js?v=16"></script> DISABLED - Causing blinking conflicts -->
+
+    <!-- TEST SCRIPTS DISABLED - Using comprehensive script only -->
 
     <!-- COI Email Integration - Auto-switches between Gmail and Outlook -->
     <!-- DISABLED: Interfering with Titan - <script src="js/coi-email-integration.js?v=1"></script> -->
@@ -1370,7 +1561,7 @@
     <!-- Force Policy List Navigation - Ensures Policy Profile back button goes to Policy List -->
     <script src="js/force-policy-list-navigation.js?v=1"></script>
     <!-- DEBUG Navigation Loop - Find the real cause of the loop -->
-    <script src="js/debug-navigation-loop.js?v=1"></script>
+    <!-- <script src="js/debug-navigation-loop.js?v=1"></script> -->
     <!-- Only Check X Buttons - Force status buttons to show -->
     <!-- DISABLED: Interfering with Titan - <script src="js/only-check-x-buttons.js?v=2"></script> -->
     <!-- Renewal Tasks Server Storage - Save task completion to server -->
@@ -1396,7 +1587,7 @@
     <script src="js/format-coverage-limits.js?v=1"></script>
 
     <!-- Complete Fix for Lead Creation - Ensures leads save with all data -->
-    <script src="js/fix-lead-creation-complete.js?v=1"></script>
+    <!-- <script src="js/fix-lead-creation-complete.js?v=1"></script> DISABLED - Intercepting viewLead -->
 
     <!-- FINAL Lead System Fix - DISABLED (conflicting with main app.js) -->
     <!-- <script src="js/fix-lead-system-final.js?v=1"></script> -->
@@ -1423,8 +1614,8 @@
     <!-- Agent assignment persistence fix - saves assigned_to field to server -->
     <script src="js/fix-agent-assignment-persistence.js?v=2"></script>
 
-    <!-- Add Assigned To dropdown to lead profiles -->
-    <script src="js/add-assigned-to-dropdown.js?v=2"></script>
+    <!-- Add Assigned To dropdown to lead profiles - DISABLED: Conflicts with profile loading -->
+    <!-- <script src="js/add-assigned-to-dropdown.js?v=2"></script> -->
 
     <!-- Authentication Manager -->
     <script src="js/auth-manager.js?v=1"></script>
@@ -1523,7 +1714,7 @@
     <script src="js/super-simple-delete.js?v=1"></script>
 
     <!-- DATABASE SYNC FIX - Ensures all operations use the correct backend database -->
-    <script src="js/fix-database-sync.js?v=1"></script>
+    <!-- <script src="js/fix-database-sync.js?v=1"></script> DISABLED - May be removing leads -->
 
     <script src="js/cleanup-invalid-leads.js?v=1"></script>
 
@@ -1539,25 +1730,169 @@
     <script src="js/fix-stage-count-display.js?v=1"></script>
 
     <!-- Fix stage count concatenation - ensures numeric addition -->
-    <script src="js/fix-stage-count-concatenation.js?v=1"></script>
+    <!-- <script src="js/fix-stage-count-concatenation.js?v=1"></script> -->
 
     <!-- Fix Assigned To column sorting -->
     <script src="js/fix-assigned-to-sorting.js?v=1"></script>
 
-    <!-- Debug lead not found issues -->
-    <script src="js/debug-lead-not-found.js?v=1"></script>
+    <!-- TEST SCRIPT LOADING -->
+    <script>
+        console.log('🔥 TEST: Script loading starting...');
+    </script>
 
-    <!-- Fix lead data synchronization -->
-    <script src="js/fix-lead-data-sync.js?v=1"></script>
+    <!-- FORCE RELOAD ENHANCED PROFILE - VERSION 1764538875 -->
+    <script>
+        console.log('🔥 FORCE-1764538875: Creating enhanced profile function directly...');
 
-    <!-- Enable simple lead profile -->
-    <script src="js/simple-lead-profile.js"></script>
+        window.createEnhancedProfile = function(lead) {
+            console.log('✅ DIRECT: Enhanced profile called for:', lead.name);
 
-    <!-- Unified save system - handles lead field updates -->
-    <script src="js/unified-save-system.js"></script>
+            // Remove any existing modals
+            const existing = document.getElementById('lead-profile-container');
+            if (existing) existing.remove();
 
-    <!-- Restore original lead profile UI - MUST LOAD BEFORE TIMESTAMP FEATURE -->
-    <script src="js/restore-original-lead-profile.js"></script>
+            // Create the original enhanced profile modal with YOUR features
+            const modalContainer = document.createElement('div');
+            modalContainer.id = 'lead-profile-container';
+            modalContainer.style.cssText = \`
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0, 0, 0, 0.5); display: flex; align-items: center;
+                justify-content: center; z-index: 999999; padding: 20px;
+            \`;
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = \`
+                background: white; border-radius: 12px; max-width: 1400px; width: 100%;
+                max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            \`;
+
+            modalContent.innerHTML = \`
+                <div style="padding: 24px 30px; background: linear-gradient(135deg, #0066cc 0%, #004999 100%);
+                           color: white; display: flex; justify-content: space-between; align-items: center; border-radius: 12px 12px 0 0;">
+                    <h2 style="margin: 0; font-size: 24px; font-weight: 600; color: white;">
+                        <i class="fas fa-truck" style="margin-right: 12px;"></i>Lead Profile: \${lead.name || 'Unknown'}
+                    </h2>
+                    <button onclick="document.getElementById('lead-profile-container').remove()"
+                            style="background: rgba(255,255,255,0.9); border: 2px solid white; color: #0066cc;
+                                   font-size: 24px; font-weight: bold; cursor: pointer; padding: 0; width: 36px;
+                                   height: 36px; border-radius: 6px;">×</button>
+                </div>
+                <div style="padding: 30px; overflow-y: auto; flex: 1;">
+
+                    <!-- Company Information -->
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Company Information</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                            <div><label style="display: block; font-weight: bold; margin-bottom: 5px;">Company Name:</label>
+                                 <input type="text" value="\${lead.name || ''}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></div>
+                            <div><label style="display: block; font-weight: bold; margin-bottom: 5px;">Contact:</label>
+                                 <input type="text" value="\${lead.contact || ''}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></div>
+                            <div><label style="display: block; font-weight: bold; margin-bottom: 5px;">Phone:</label>
+                                 <input type="text" value="\${lead.phone || ''}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></div>
+                            <div><label style="display: block; font-weight: bold; margin-bottom: 5px;">Email:</label>
+                                 <input type="text" value="\${lead.email || ''}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Reach-out & Communication -->
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Reach-out & Communication</h3>
+                        <textarea placeholder="Add notes about calls, emails, follow-ups..."
+                                  style="width: 100%; height: 120px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">\${lead.notes || ''}</textarea>
+                    </div>
+
+                    <!-- Loss Runs & Documentation -->
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Loss Runs & Documentation</h3>
+                        <button onclick="alert('Loss Runs upload for: ' + '\${lead.name}')"
+                                style="background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 6px; margin-right: 10px;">📁 Upload Loss Runs</button>
+                        <button onclick="openEmailDocumentation && openEmailDocumentation('\${lead.id}')"
+                                style="background: #16a34a; color: white; border: none; padding: 12px 20px; border-radius: 6px;">📧 Email Documentation</button>
+                    </div>
+
+                    <!-- Call Transcription -->
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Call Transcription & Details</h3>
+                        <textarea placeholder="Call transcription and details..."
+                                  style="width: 100%; height: 100px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">\${lead.transcriptText || ''}</textarea>
+                    </div>
+
+                    <!-- Vehicles -->
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Vehicles</h3>
+                        <p style="color: #6b7280;">Vehicle information for \${lead.name}</p>
+                    </div>
+
+                </div>
+            \`;
+
+            modalContainer.appendChild(modalContent);
+            document.body.appendChild(modalContainer);
+
+            console.log('✅ DIRECT: Enhanced profile modal created successfully');
+        };
+
+        // Create Email Documentation function
+        window.openEmailDocumentation = function(leadId) {
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const lead = leads.find(l => String(l.id) === String(leadId));
+            if (lead) {
+                const subject = \`Insurance Quote Documentation Request - \${lead.name} \${lead.renewalDate ? '(Exp: ' + lead.renewalDate + ')' : '(Exp: TBD)'}\`;
+                alert(\`Email Documentation:\\nTo: \${lead.email || 'No email'}\\nSubject: \${subject}\`);
+            }
+        };
+
+        console.log('✅ DIRECT: Enhanced profile functions created successfully');
+        console.log('✅ DIRECT: createEnhancedProfile available:', typeof window.createEnhancedProfile);
+
+        // Force override viewLead function
+        window.viewLead = function(leadId) {
+            console.log('🔥 DIRECT: viewLead called for:', leadId);
+
+            // Get lead data
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const lead = leads.find(l => String(l.id) === String(leadId));
+
+            if (lead && window.createEnhancedProfile) {
+                console.log('🔥 DIRECT: Opening enhanced profile for:', lead.name);
+                window.createEnhancedProfile(lead);
+            } else if (lead) {
+                console.error('🔥 DIRECT: createEnhancedProfile not available');
+                console.log('🔥 DIRECT: Available functions:', Object.keys(window).filter(k => k.includes('Lead') || k.includes('Profile')));
+            } else {
+                console.error('🔥 DIRECT: Lead not found for ID:', leadId);
+            }
+
+            return false;
+        };
+
+        console.log('✅ DIRECT: viewLead override complete');
+    </script>
+
+    <!-- DEBUG SCRIPTS DISABLED - They are intercepting viewLead -->
+    <!-- <script src="js/debug-lead-not-found.js?v=1"></script> DISABLED - Intercepting viewLead -->
+    <!-- <script src="js/fix-lead-creation-complete.js?v=1"></script> DISABLED - Intercepting viewLead -->
+    <!-- <script src="js/fix-lead-not-found.js"></script> DISABLED - Intercepting viewLead -->
+    <!-- <script src="js/debug-lead-storage.js"></script> DISABLED - Intercepting viewLead -->
+    <!-- <script src="js/fix-quote-application-button.js"></script> DISABLED - Intercepting viewLead -->
+    <!-- <script src="js/nuclear-highlighting-fix.js?v=6"></script> DISABLED - Intercepting viewLead -->
+
+    <!-- Working profile with reach-out and loss runs sections -->
+    <!-- <script src="js/working-profile-fix.js"></script> DISABLED - Using exact original -->
+
+    <!-- Simple auto-save that doesn't interfere with typing -->
+    <!-- <script src="js/simple-profile-autosave.js"></script> DISABLED - May interfere with modal -->
+
+    <!-- Restore original lead profile UI -->
+    <!-- <script src="js/restore-original-lead-profile.js"></script> DISABLED - Conflicts with protected version -->
+
+    <!-- Profile enhancements DISABLED - causing conflicts with original profile -->
+    <!-- <script src="js/fix-profile-display.js"></script> DISABLED - Conflicts with protected version -->
+    <!-- <script src="js/add-assigned-to-dropdown.js?v=2"></script> -->
+
+    <!-- Direct profile fix - ensures profile opens regardless of conflicts - DISABLED: Restoring original system -->
+    <!-- <script src="js/direct-profile-fix.js"></script> -->
 
     <!-- Lead Stage Timestamp Feature - DISABLED - Moved to lead profile
     <script src="js/lead-stage-timestamp.js?v=10"></script> -->
@@ -1565,7 +1900,7 @@
     <script src="js/transcription-progress.js?v=1760730555"></script>
 
     <!-- FINAL FIX - Must load absolutely last to override everything -->
-    <script src="js/fix-lead-table-final.js?v=3"></script>
+    <!-- <script src="js/fix-lead-table-final.js?v=7"></script> DISABLED - Causing blinking conflicts -->
 
     <!-- Timestamp highlighting fixes -->
     <!-- Disabled old attempts
@@ -1584,5 +1919,16 @@
     <script src="js/synchronized-timestamp-colors.js"></script>
     <script src="js/final-debug-timestamps.js"></script>
     <script src="js/fix-year-2025-timestamps.js"></script>
+
+    <!-- Disable all loading overlays - MUST BE LAST to override all other scripts -->
+    <script src="js/disable-loading-overlays.js"></script>
+    <!-- Live Debug Script for 162.220.14.239 -->
+    <script src="js/live-debug-dulling.js?v=1"></script>
+    <script src="js/force-freeze-timestamps.js"></script>
+    <script src="js/force-quote-modal-front.js"></script>
+    <script src="js/enhanced-quote-form.js"></script>
+    <script src="js/enhanced-quote-modal.js"></script>
+
+    <!-- REMOVED: Scripts moved earlier to ensure loading -->
 </body>
 </html>
