@@ -132,12 +132,22 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 <!-- Reach Out Checklist -->
                 <div class="profile-section" style="background: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <!-- Header with TO DO message -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f59e0b;">
-                        <h3 style="margin: 0; color: #dc2626; font-weight: bold;"><i class="fas fa-tasks"></i> Reach Out</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0; font-weight: bold;" id="reach-out-header-title-${lead.id}"><i class="fas fa-tasks"></i> <span style="color: #dc2626;">Reach Out</span></h3>
                         <div id="reach-out-todo-${lead.id}" style="font-weight: bold; font-size: 18px; color: #dc2626;">
                             TO DO: Call
                         </div>
                     </div>
+
+                    <!-- Completion Timestamp -->
+                    <div id="reach-out-completion-${lead.id}" style="text-align: center; margin-bottom: 10px; display: none;">
+                        <div style="background: #10b981; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block;">
+                            Completed: <span id="completion-timestamp-${lead.id}"></span>
+                        </div>
+                    </div>
+
+                    <!-- Separator Line -->
+                    <div id="reach-out-separator-${lead.id}" style="border-bottom: 2px solid #f59e0b; margin-bottom: 15px; padding-bottom: 10px;"></div>
                     <div style="display: flex; flex-direction: column; gap: 15px;">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
@@ -506,17 +516,30 @@ protectedFunctions.createEnhancedProfile = function(lead) {
 
     // Apply reach-out styling based on lead's to-do status
     setTimeout(() => {
-        // Import getActionText function from app.js
+        // Check if this stage requires reach-out based on stage name
+        const stagesRequiringReachOut = [
+            'Info Requested', 'info_requested',
+            'Loss Runs Requested', 'loss_runs_requested',
+            'Quote Sent', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware',
+            'App Sent', 'app_sent',
+            'Interested', 'interested'
+        ];
+
+        const stageRequiresReachOut = stagesRequiringReachOut.includes(lead.stage);
+
+        // Also check getActionText as backup
+        let actionTextCheck = false;
         if (window.getActionText) {
             const actionText = window.getActionText(lead.stage, lead.reachOut);
-            const hasReachOutTodo = actionText === 'Reach out';
-            console.log(`🔍 Profile load - Lead ${lead.id} stage: ${lead.stage}, actionText: ${actionText}, hasReachOutTodo: ${hasReachOutTodo}`);
-            applyReachOutStyling(lead.id, hasReachOutTodo);
-        } else {
-            console.error('❌ getActionText function not available');
-            // Even if getActionText isn't available, still show the basic to-do structure
-            applyReachOutStyling(lead.id, false);
+            actionTextCheck = actionText === 'Reach out';
+            console.log(`🔍 Profile load - Lead ${lead.id} stage: ${lead.stage}, actionText: "${actionText}", stageRequiresReachOut: ${stageRequiresReachOut}, actionTextCheck: ${actionTextCheck}`);
         }
+
+        // Use stage-based check as primary method
+        const hasReachOutTodo = stageRequiresReachOut || actionTextCheck;
+        console.log(`🎯 Final hasReachOutTodo: ${hasReachOutTodo}`);
+
+        applyReachOutStyling(lead.id, hasReachOutTodo);
     }, 100);
 
     // Add click-outside-to-close functionality
@@ -956,9 +979,42 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
         if (emailCountDisplay) {
             emailCountDisplay.textContent = leads[leadIndex].reachOut.emailCount;
         }
+
+        // Update TO DO display immediately after email checkbox change
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        applyReachOutStyling(leadId, true);
+        console.log('🔄 Updated TO DO display after email checkbox change');
     } else if (type === 'text') {
         if (checked) {
             leads[leadIndex].reachOut.textCount++;
+
+            // Mark reach-out as COMPLETE when text is sent (final step in sequence)
+            if (leads[leadIndex].reachOut.textCount > 0) {
+                leads[leadIndex].reachOut.completedAt = new Date().toISOString();
+                leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
+
+                // Mark as complete with green styling
+                markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt);
+
+                showNotification('Text sent! Reach-out sequence completed.', 'success');
+
+                // Refresh main table to remove red "Reach out" text - AGGRESSIVE APPROACH
+                setTimeout(() => {
+                    console.log('🔄 Text completion: Immediate localStorage update');
+                    localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+                    // Force multiple refresh methods
+                    if (window.displayLeads) window.displayLeads();
+                    if (window.loadLeadsView) window.loadLeadsView();
+                    refreshLeadsTable();
+                    console.log('✅ Text completion: Multiple table refresh methods called');
+                }, 100);
+
+                setTimeout(() => {
+                    loadLeadsFromServerAndRefresh();
+                    console.log('🔄 Text completion: Secondary server reload');
+                }, 1500);
+            }
         } else {
             leads[leadIndex].reachOut.textCount = Math.max(0, leads[leadIndex].reachOut.textCount - 1);
         }
@@ -1006,11 +1062,15 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
         console.error('❌ Error updating reach-out data:', error);
     });
 
-    // Update the sequential to-do display if this lead has "Reach out" as the main to-do
-    if (window.getActionText) {
-        const actionText = window.getActionText(leads[leadIndex].stage, leads[leadIndex].reachOut);
-        if (actionText === 'Reach out') {
-            applyReachOutStyling(leadId, true);
+    // Update the sequential to-do display after every action
+    // Check if the lead is completed first, otherwise update the sequential display
+    if (!leads[leadIndex].reachOut.completedAt && !leads[leadIndex].reachOut.reachOutCompletedAt) {
+        // Only update sequential display if not completed
+        if (window.getActionText) {
+            const actionText = window.getActionText(leads[leadIndex].stage, leads[leadIndex].reachOut);
+            if (actionText === 'Reach out') {
+                applyReachOutStyling(leadId, true);
+            }
         }
     }
 };
@@ -1036,8 +1096,8 @@ window.showCallOutcomePopup = function(leadId) {
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 9998;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000001;
     `;
     document.body.appendChild(backdrop);
 
@@ -1052,8 +1112,8 @@ window.showCallOutcomePopup = function(leadId) {
         background: white;
         padding: 30px;
         border-radius: 10px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        z-index: 9999;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        z-index: 1000002;
         min-width: 400px;
     `;
 
@@ -1137,8 +1197,10 @@ window.handleCallOutcome = function(leadId, answered) {
         }
 
         if (answered) {
-            // Lead answered - increment connected counter
+            // Lead answered - increment connected counter AND mark reach-out as COMPLETE
             leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
+            leads[leadIndex].reachOut.completedAt = new Date().toISOString();
+            leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString(); // BOTH fields for compatibility
 
             // Update connected display
             const connectedDisplay = document.getElementById(`call-connected-${leadId}`);
@@ -1158,7 +1220,36 @@ window.handleCallOutcome = function(leadId, answered) {
 
             // Save to localStorage and server
             localStorage.setItem('insurance_leads', JSON.stringify(leads));
-            saveReachOutToServer(leadId, leads[leadIndex].reachOut);
+
+            // Save the complete lead with reachOut data to server
+            const updateData = {
+                reachOut: leads[leadIndex].reachOut
+            };
+
+            fetch(`/api/leads/${leadId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ Lead completion data saved to server - triggering final refresh');
+
+                    // FINAL refresh after confirmed server save
+                    setTimeout(() => {
+                        loadLeadsFromServerAndRefresh();
+                        console.log('🔄 FINAL refresh after confirmed server save');
+                    }, 300);
+                } else {
+                    console.error('❌ Server completion update failed:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error saving completion data:', error);
+            });
 
             // Update checkbox to checked
             const checkbox = document.getElementById(`call-made-${leadId}`);
@@ -1166,15 +1257,37 @@ window.handleCallOutcome = function(leadId, answered) {
                 checkbox.checked = true;
             }
 
-            showNotification('Call connected successfully!', 'success');
+            // Mark reach-out as COMPLETE with green styling and timestamp
+            markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt);
 
-            // Update the sequential to-do display
-            if (window.getActionText) {
-                const actionText = window.getActionText(leads[leadIndex].stage, leads[leadIndex].reachOut);
-                if (actionText === 'Reach out') {
-                    applyReachOutStyling(leadId, true);
+            showNotification('Call connected! Reach-out completed.', 'success');
+
+            // Refresh the leads table to remove the red "Reach out" from TO DO column
+            // CRITICAL: Must wait for server save to complete first
+            setTimeout(() => {
+                console.log('🔄 Step 1: Updating localStorage for immediate effect');
+                // Update localStorage immediately for instant local refresh
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+                // Force table refresh with updated localStorage
+                if (window.displayLeads) {
+                    window.displayLeads();
+                    console.log('✅ Forced displayLeads refresh');
                 }
-            }
+                if (window.loadLeadsView) {
+                    window.loadLeadsView();
+                    console.log('✅ Forced loadLeadsView refresh');
+                }
+                refreshLeadsTable();
+                console.log('✅ Forced refreshLeadsTable');
+            }, 100);
+
+            // Secondary refresh after server save completes
+            setTimeout(() => {
+                console.log('🔄 Step 2: Server reload after save completion');
+                loadLeadsFromServerAndRefresh();
+                console.log('🔄 FORCED SERVER RELOAD after completion');
+            }, 2000);
         } else {
             // Lead didn't pick up - save and show voicemail question
             localStorage.setItem('insurance_leads', JSON.stringify(leads));
@@ -1192,13 +1305,9 @@ window.handleCallOutcome = function(leadId, answered) {
                 voicemailQuestion.style.display = 'block';
             }
 
-            // Update the sequential to-do display
-            if (window.getActionText) {
-                const actionText = window.getActionText(leads[leadIndex].stage, leads[leadIndex].reachOut);
-                if (actionText === 'Reach out') {
-                    applyReachOutStyling(leadId, true);
-                }
-            }
+            // Update the sequential to-do display - FORCE UPDATE since we know this is a reach-out stage
+            applyReachOutStyling(leadId, true);
+            console.log('🔄 Updated TO DO display after call attempt (no answer)');
         }
     }
 };
@@ -1238,17 +1347,9 @@ window.handleVoicemailOutcome = function(leadId, leftVoicemail) {
 
     showNotification(leftVoicemail ? 'Voicemail recorded!' : 'Call attempt recorded!', 'success');
 
-    // Update the sequential to-do display
-    if (window.getActionText) {
-        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-        const lead = leads.find(l => String(l.id) === String(leadId));
-        if (lead) {
-            const actionText = window.getActionText(lead.stage, lead.reachOut);
-            if (actionText === 'Reach out') {
-                applyReachOutStyling(leadId, true);
-            }
-        }
-    }
+    // Update the sequential to-do display - FORCE UPDATE since we know this is a reach-out stage
+    applyReachOutStyling(leadId, true);
+    console.log('🔄 Updated TO DO display after voicemail outcome');
 };
 
 // Helper function to save reach-out data to server
@@ -1277,10 +1378,14 @@ function saveReachOutToServer(leadId, reachOutData) {
     });
 }
 
-// Function to apply red styling to reach-out section when lead has "Reach out" to-do
+// Function to apply styling to reach-out section based on lead's to-do requirements
 function applyReachOutStyling(leadId, hasReachOutTodo) {
     // Update the TO DO message in the header
     const todoDiv = document.getElementById(`reach-out-todo-${leadId}`);
+    const headerTitle = document.getElementById(`reach-out-header-title-${leadId}`);
+    const separator = document.getElementById(`reach-out-separator-${leadId}`);
+    const completionDiv = document.getElementById(`reach-out-completion-${leadId}`);
+
     if (todoDiv) {
         const lead = JSON.parse(localStorage.getItem('insurance_leads') || '[]').find(l => String(l.id) === String(leadId));
         if (lead) {
@@ -1295,23 +1400,105 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
                 };
             }
 
-            let nextAction = '';
-            // Sequential to-do system: call → email → text
-            if (!lead.reachOut.callAttempts || lead.reachOut.callAttempts === 0) {
-                nextAction = 'TO DO: Call';
-            } else if (!lead.reachOut.emailCount || lead.reachOut.emailCount === 0) {
-                nextAction = 'TO DO: Email';
-            } else if (!lead.reachOut.textCount || lead.reachOut.textCount === 0) {
-                nextAction = 'TO DO: Text';
-            } else {
-                nextAction = 'All methods completed';
-            }
+            // Check if reach-out is already completed first (regardless of stage requirement)
+            if (lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) {
+                // COMPLETED REACH-OUT - Always show green regardless of current stage requirement
+                const completedTime = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
+                markReachOutComplete(leadId, completedTime);
+            } else if (hasReachOutTodo) {
+                // STAGE REQUIRES REACH-OUT AND NOT COMPLETED - Show red styling
+                todoDiv.style.display = 'block'; // Show TO DO text
 
-            // Always show the to-do message in red and bold - reach-out section is always important
-            todoDiv.innerHTML = `<span style="color: #dc2626; font-weight: bold; font-size: 18px;">${nextAction}</span>`;
-            console.log(`✅ Applied reach-out styling for lead ${leadId}: ${nextAction}, isReachOutTodo: ${hasReachOutTodo}`);
+                // Show sequential to-do system: call → email → text
+                let nextAction = '';
+                if (!lead.reachOut.callAttempts || lead.reachOut.callAttempts === 0) {
+                    nextAction = 'TO DO: Call';
+                } else if (!lead.reachOut.emailCount || lead.reachOut.emailCount === 0) {
+                    nextAction = 'TO DO: Email';
+                } else if (!lead.reachOut.textCount || lead.reachOut.textCount === 0) {
+                    nextAction = 'TO DO: Text';
+                } else {
+                    nextAction = 'All methods completed';
+                }
+
+                // Show red to-do message for active reach-out requirements
+                todoDiv.innerHTML = `<span style="color: #dc2626; font-weight: bold; font-size: 18px;">${nextAction}</span>`;
+
+                // Change header to red
+                if (headerTitle) {
+                    headerTitle.innerHTML = '<i class="fas fa-tasks"></i> <span style="color: #dc2626;">Reach Out</span>';
+                }
+
+                // Change separator line to orange
+                if (separator) {
+                    separator.style.borderBottom = '2px solid #f59e0b';
+                }
+
+                // Hide completion timestamp if not completed
+                if (completionDiv) {
+                    completionDiv.style.display = 'none';
+                }
+            } else {
+                // STAGE DOESN'T REQUIRE REACH-OUT AND NOT COMPLETED - Show neutral black styling
+                todoDiv.style.display = 'none'; // Hide TO DO text completely
+
+                // Change header to neutral black
+                if (headerTitle) {
+                    headerTitle.innerHTML = '<i class="fas fa-tasks"></i> <span style="color: #374151;">Reach Out</span>';
+                }
+
+                // Change separator line to neutral black
+                if (separator) {
+                    separator.style.borderBottom = '2px solid #374151';
+                }
+
+                // Hide completion timestamp
+                if (completionDiv) {
+                    completionDiv.style.display = 'none';
+                }
+            }
+            console.log(`✅ Applied reach-out styling for lead ${leadId}, hasReachOutTodo: ${hasReachOutTodo}, completed: ${!!(lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt)}`);
         }
     }
+}
+
+// Function to mark reach-out as complete
+function markReachOutComplete(leadId, completedAt) {
+    // Update the TO DO text to show COMPLETED
+    const todoDiv = document.getElementById(`reach-out-todo-${leadId}`);
+    if (todoDiv) {
+        todoDiv.innerHTML = `<span style="color: #10b981; font-weight: bold; font-size: 18px;">COMPLETED</span>`;
+    }
+
+    // Change "Reach Out" title to green
+    const headerTitle = document.getElementById(`reach-out-header-title-${leadId}`);
+    if (headerTitle) {
+        headerTitle.innerHTML = '<i class="fas fa-tasks"></i> <span style="color: #10b981;">Reach Out</span>';
+    }
+
+    // Change separator line to green
+    const separator = document.getElementById(`reach-out-separator-${leadId}`);
+    if (separator) {
+        separator.style.borderBottom = '2px solid #10b981';
+    }
+
+    // Show completion timestamp
+    const completionDiv = document.getElementById(`reach-out-completion-${leadId}`);
+    const timestampSpan = document.getElementById(`completion-timestamp-${leadId}`);
+
+    if (completionDiv && timestampSpan) {
+        const completedDate = new Date(completedAt);
+        timestampSpan.textContent = completedDate.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+        completionDiv.style.display = 'block';
+    }
+
+    console.log(`✅ Marked reach-out as complete for lead ${leadId} at ${completedAt}`);
 }
 
 // Update stage function
@@ -1364,6 +1551,19 @@ protectedFunctions.updateLeadStage = function(leadId, stage) {
 
         // Update the timestamp display in the current profile if open
         updateStageTimestampDisplay(leadId, now);
+
+        // Update reach-out styling based on new stage requirements
+        const stagesRequiringReachOut = [
+            'Info Requested', 'info_requested',
+            'Loss Runs Requested', 'loss_runs_requested',
+            'Quote Sent', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware',
+            'App Sent', 'app_sent',
+            'Interested', 'interested'
+        ];
+
+        const hasReachOutTodo = stagesRequiringReachOut.includes(stage);
+        applyReachOutStyling(leadId, hasReachOutTodo);
+        console.log(`🎨 Stage change: ${stage}, hasReachOut: ${hasReachOutTodo}`);
 
         // Update the table display immediately
         refreshLeadsTable();

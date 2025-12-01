@@ -238,20 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadContent('#dashboard');
     }
     
-    // Add explicit dashboard link handlers
-    setTimeout(() => {
-        document.querySelectorAll('a[href="#dashboard"]').forEach(link => {
-            link.addEventListener('click', function(e) {
-                console.log('Dashboard link clicked');
-                // Don't prevent default, let the hash change naturally
-                // Force reload dashboard after a small delay
-                setTimeout(() => {
-                    loadContent('#dashboard');
-                    updateActiveMenuItem('#dashboard');
-                }, 50);
-            });
-        });
-    }, 500);
+    // BASIC APPROACH - Let browser handle hash changes naturally without any click handlers
     
     // Handle initial hash
     if (window.location.hash) {
@@ -342,14 +329,17 @@ function loadCOIView() {
 }
 
 // Load Policy List
-async function loadPolicyList() {
+function loadPolicyList() {
     const policyList = document.getElementById('policyList');
     if (!policyList) return;
 
-    console.log('📋 Loading REAL policies from API...');
+    console.log('📋 Loading policies from localStorage...');
 
-    try {
-        // Show loading state
+    // Load policies from localStorage immediately
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    console.log(`✅ Loaded ${policies.length} policies from localStorage`);
+
+    if (policies.length === 0) {
         policyList.innerHTML = `
             <table class="policy-table">
                 <thead>
@@ -364,76 +354,35 @@ async function loadPolicyList() {
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 20px;">
-                            <i class="fas fa-spinner fa-spin"></i> Loading real policies...
+                        <td colspan="6" style="text-align: center; padding: 40px; color: #6b7280;">
+                            <i class="fas fa-file-contract" style="font-size: 48px; margin-bottom: 16px;"></i>
+                            <p>No policies found</p>
+                            <button class="btn-primary" onclick="addNewPolicy()" style="margin-top: 16px;">
+                                <i class="fas fa-plus"></i> Add Policy
+                            </button>
                         </td>
                     </tr>
                 </tbody>
             </table>
         `;
+        return;
+    }
 
-        // Get the correct API URL
-        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
-
-        // Fetch real policies from API
-        const response = await fetch(`${API_URL}/api/policies`, {
-            headers: {
-                'Cache-Control': 'no-cache',
-                'Bypass-Tunnel-Reminder': 'true'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
-        }
-
-        const policies = await response.json();
-        console.log(`✅ Loaded ${policies.length} real policies:`, policies);
-
-        if (policies.length === 0) {
-            policyList.innerHTML = `
-                <table class="policy-table">
-                    <thead>
-                        <tr>
-                            <th>Policy #</th>
-                            <th>Client</th>
-                            <th>Type</th>
-                            <th>Coverage</th>
-                            <th>Expiry</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="6" style="text-align: center; padding: 40px; color: #6b7280;">
-                                <i class="fas fa-file-contract" style="font-size: 48px; margin-bottom: 16px;"></i>
-                                <p>No policies found</p>
-                                <button class="btn-primary" onclick="addNewPolicy()" style="margin-top: 16px;">
-                                    <i class="fas fa-plus"></i> Add Policy
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
-            return;
-        }
-
-        // Build the table with real data
-        const tableHTML = `
-            <table class="policy-table">
-                <thead>
-                    <tr>
-                        <th>Policy #</th>
-                        <th>Client</th>
-                        <th>Type</th>
-                        <th>Coverage</th>
-                        <th>Expiry</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${policies.map(policy => {
+    // Build the table with real data
+    const tableHTML = `
+        <table class="policy-table">
+            <thead>
+                <tr>
+                    <th>Policy #</th>
+                    <th>Client</th>
+                    <th>Type</th>
+                    <th>Coverage</th>
+                    <th>Expiry</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${policies.map(policy => {
                         // Format the expiration date
                         const expiryDate = new Date(policy.expirationDate || policy.expiration_date || policy.expiryDate);
                         const formattedExpiry = expiryDate.toLocaleDateString('en-US', {
@@ -497,40 +446,11 @@ async function loadPolicyList() {
             </table>
         `;
 
-        policyList.innerHTML = tableHTML;
-        console.log('✅ Successfully displayed real policies');
+    policyList.innerHTML = tableHTML;
+    console.log('✅ Successfully displayed policies from localStorage');
 
-        // Restore renewal completion highlighting
-        restoreRenewalHighlighting();
-
-    } catch (error) {
-        console.error('Error loading policies:', error);
-        policyList.innerHTML = `
-            <table class="policy-table">
-                <thead>
-                    <tr>
-                        <th>Policy #</th>
-                        <th>Client</th>
-                        <th>Type</th>
-                        <th>Coverage</th>
-                        <th>Expiry</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="6" style="text-align: center; padding: 20px; color: #ef4444;">
-                            <i class="fas fa-exclamation-triangle"></i> Error loading policies: ${error.message}
-                            <br>
-                            <button onclick="loadPolicyList()" style="margin-top: 10px; padding: 5px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                Retry
-                            </button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        `;
-    }
+    // Restore renewal completion highlighting
+    restoreRenewalHighlighting();
 }
 
 // Load COI Inbox
@@ -2203,7 +2123,28 @@ function clearNotepad() {
 // Handle browser back/forward navigation
 window.addEventListener('hashchange', function() {
     const hash = window.location.hash || '#dashboard';
-    console.log('Hash changed to:', hash);
+    console.log('🔥 CRITICAL DEBUG: Hash changed to:', hash);
+    console.log('🔥 CRITICAL DEBUG: About to call loadContent');
+
+    // Force clear any stuck loading states and timeouts before switching
+    window.leadsViewLoading = false;
+    if (window.leadsRefreshTimeout) {
+        clearTimeout(window.leadsRefreshTimeout);
+    }
+    if (window.leadsViewTimeout) {
+        clearTimeout(window.leadsViewTimeout);
+        window.leadsViewTimeout = null;
+    }
+
+    // Force clear dashboard content if switching away from leads to ensure clean switch
+    if (hash !== '#leads') {
+        const dashboardContent = document.querySelector('.dashboard-content');
+        if (dashboardContent && dashboardContent.querySelector('.leads-view')) {
+            console.log('Switching away from leads - forcing content clear');
+            dashboardContent.innerHTML = '<div>Loading...</div>';
+        }
+    }
+
     loadContent(hash);
     updateActiveMenuItem(hash);
 });
@@ -2345,83 +2286,7 @@ function initializeCharts() {
     Chart.defaults.responsive = true;
     Chart.defaults.maintainAspectRatio = false;
     
-    // Premium Growth Chart
-    const premiumCtx = document.getElementById('premiumChart');
-    if (premiumCtx) {
-        // Set explicit dimensions on the canvas
-        premiumCtx.style.maxHeight = '250px';
-        premiumCtx.style.width = '100%';
-        
-        new Chart(premiumCtx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                datasets: [{
-                    label: 'Premium ($)',
-                    data: [850000, 920000, 980000, 1050000, 1100000, 1150000, 1200000, 1180000, 1220000, 1280000, 1350000, 1400000],
-                    borderColor: '#0066cc',
-                    backgroundColor: 'rgba(0, 102, 204, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                aspectRatio: 2,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        ticks: {
-                            callback: function(value) {
-                                return '$' + (value / 1000000).toFixed(1) + 'M';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-    
-    // Policy Distribution Chart
-    const policyCtx = document.getElementById('policyChart');
-    if (policyCtx) {
-        // Set explicit dimensions on the canvas
-        policyCtx.style.maxHeight = '250px';
-        policyCtx.style.width = '100%';
-        
-        new Chart(policyCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Auto', 'Homeowners', 'Commercial', 'Life', 'Other'],
-                datasets: [{
-                    data: [35, 28, 20, 12, 5],
-                    backgroundColor: [
-                        '#0066cc',
-                        '#4d94ff',
-                        '#8b5cf6',
-                        '#10b981',
-                        '#f59e0b'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                aspectRatio: 1,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    }
-                }
-            }
-        });
-    }
+    // Removed Premium Growth and Policy Distribution charts
 }
 
 // Initialize Event Listeners
@@ -2468,14 +2333,18 @@ function initializeAutomation() {
 
 // Load Content Based on Navigation
 function loadContent(section) {
+    console.log('🔥 DEBUG: loadContent called with section:', section);
+    console.log('🔥 DEBUG: Current location:', window.location.href);
+
     // Get dashboard content area
     let dashboardContent = document.querySelector('.dashboard-content');
-    
+    console.log('🔥 DEBUG: Dashboard content element found:', !!dashboardContent);
+
     if (!dashboardContent) {
+        console.error('🔥 ERROR: Dashboard content not found!');
         return;
     }
-    
-    
+
     switch(section) {
         case '':
         case '#':
@@ -2484,7 +2353,20 @@ function loadContent(section) {
             loadFullDashboard();
             break;
         case '#leads':
-            loadLeadsView();
+            console.log('🔥 DEBUG: About to call loadLeadsView()');
+            dashboardContent.innerHTML = '<div>Loading leads from server...</div>'; // Show loading state
+            console.log('🔥 DEBUG: Set loading state');
+            loadLeadsView().then(() => {
+                console.log('🔥 DEBUG: loadLeadsView() completed');
+                setTimeout(() => {
+                    console.log('🔥 DEBUG: Dashboard content after loadLeadsView:', dashboardContent.innerHTML.length, 'characters');
+                    if (dashboardContent.innerHTML.length === 0) {
+                        console.error('🔥 ERROR: loadLeadsView() did not add any content!');
+                    }
+                }, 100);
+            }).catch(error => {
+                console.error('🔥 ERROR: loadLeadsView() failed:', error);
+            });
             break;
         case '#clients':
             dashboardContent.innerHTML = ''; // Clear content
@@ -2517,8 +2399,18 @@ function loadContent(section) {
             loadAccountingView();
             break;
         case '#reports':
+            console.log('🔥 DEBUG: About to call loadReportsView()');
             dashboardContent.innerHTML = ''; // Clear content
+            console.log('🔥 DEBUG: Cleared dashboard content');
             loadReportsView();
+            console.log('🔥 DEBUG: Called loadReportsView()');
+            // Check if content was added
+            setTimeout(() => {
+                console.log('🔥 DEBUG: Dashboard content after loadReportsView:', dashboardContent.innerHTML.length, 'characters');
+                if (dashboardContent.innerHTML.length === 0) {
+                    console.error('🔥 ERROR: loadReportsView() did not add any content!');
+                }
+            }, 100);
             break;
         case '#communications':
             dashboardContent.innerHTML = ''; // Clear content
@@ -3507,6 +3399,10 @@ function getStageHtml(stage, lead) {
         'info_received': 'Info Received',
         'loss_runs_requested': 'Loss Runs Requested',
         'loss_runs_received': 'Loss Runs Received',
+        'app_prepared': 'App Prepared',
+        'app_sent': 'App Sent',
+        'app_quote_received': 'App Quote Received',
+        'app_quote_sent': 'App Quote Sent',
         'qualified': 'Info Requested',
         'quoted': 'Quoted',
         'quote_sent': 'Quote Sent',
@@ -3534,18 +3430,183 @@ function generateSimpleLeadRows(leads) {
     if (!leads || leads.length === 0) {
         return '<tr><td colspan="11" style="text-align: center; padding: 2rem;">No leads found</td></tr>';
     }
-    
+
+    console.log(`🔥 generateSimpleLeadRows: Processing ${leads.length} leads for highlighting`);
+    leads.forEach((lead, idx) => {
+        console.log(`Lead ${idx}: ${lead.name} - assignedTo: ${lead.assignedTo} - stage: ${lead.stage}`);
+    });
+
+    // Get current user for dulling logic - ENHANCED DEBUG
+    let currentUserName = '';
+    console.log('🔍 DULLING: Starting user detection...');
+
+    try {
+        // PRIORITY 1: Real authentication from sessionStorage (login.html)
+        const sessionData = sessionStorage.getItem('vanguard_user');
+        console.log('🔍 DULLING: sessionData from sessionStorage:', sessionData);
+
+        if (sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                currentUserName = user.username || '';
+                console.log('🔐 DULLING: Using real authenticated user:', currentUserName);
+            } catch (e) {
+                console.error('🔍 DULLING: Failed to parse session data:', e);
+            }
+        }
+
+        // PRIORITY 2: Simulated user (for testing) - only if no real auth
+        if (!currentUserName) {
+            const simulatedUser = localStorage.getItem('simulatedUser');
+            console.log('🔍 DULLING: simulatedUser from localStorage:', simulatedUser);
+
+            if (simulatedUser) {
+                currentUserName = simulatedUser;
+                console.log('🧪 DULLING: Using simulated user:', currentUserName);
+            }
+        }
+
+        // PRIORITY 3: Legacy authService - only if nothing else worked
+        if (!currentUserName && window.authService && window.authService.getCurrentUser) {
+            const currentUser = window.authService.getCurrentUser();
+            currentUserName = currentUser?.username || currentUser?.full_name || '';
+            console.log('⚡ DULLING: Using authService user:', currentUserName);
+        }
+
+        if (!currentUserName) {
+            console.log('❌ DULLING: No user detected from any source');
+        }
+    } catch (error) {
+        console.log('❌ DULLING: Error getting current user:', error);
+    }
+
+    console.log('🎯 DULLING: Final detected user:', `"${currentUserName}"`);
+    console.log('🎯 DULLING: Will dull leads NOT assigned to:', `"${currentUserName}"`);
+
+    if (!currentUserName) {
+        console.log('⚠️ DULLING: No user detected - no dulling will be applied');
+    }
+
     return leads.map(lead => {
         // Truncate name to 15 characters max
         const displayName = lead.name && lead.name.length > 15 ? lead.name.substring(0, 15) + '...' : lead.name || '';
 
+
+        // Calculate highlighting during HTML generation (no continuous DOM manipulation)
+        let rowStyle = '';
+        let rowClass = '';
+
+        // Get TO DO text to determine if highlighting is needed
+        const todoText = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) :
+                         (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead'));
+
+        // Apply timestamp highlighting to leads EXCEPT closed leads
+        // Closed leads should not be tracked by timestamps
+        const isClosed = lead.stage === 'closed' || lead.stage === 'Closed';
+        if (!isClosed) {
+            // Find the most relevant timestamp - FIXED ORDER AND HANDLING
+            let timestamp = null;
+            if (lead.stageTimestamps && lead.stageTimestamps[lead.stage]) {
+                timestamp = lead.stageTimestamps[lead.stage];
+            } else if (lead.stageUpdatedAt) {
+                timestamp = lead.stageUpdatedAt;
+            } else if (lead.updatedAt) {
+                timestamp = lead.updatedAt;
+            } else if (lead.createdAt) {
+                timestamp = lead.createdAt;
+            } else if (lead.created) {
+                // Convert from MM/DD/YYYY format if needed
+                const parts = lead.created.split('/');
+                if (parts.length === 3) {
+                    timestamp = new Date(parts[2], parts[0] - 1, parts[1]).toISOString();
+                } else {
+                    timestamp = lead.created;
+                }
+            }
+
+            if (timestamp) {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                const diffMs = todayStart - dateStart;
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                // Debug logging for timestamp highlighting in table generation
+                console.log(`📊 generateSimpleLeadRows: ${lead.name} - ${diffDays} days old - timestamp: ${timestamp} - assignedTo: ${lead.assignedTo}`);
+
+                if (diffDays === 1) {
+                    // Yellow for 1 day old - URGENT TIMELINE
+                    rowStyle = 'style="background-color: #fef3c7 !important; border-left: 4px solid #f59e0b !important; border-right: 2px solid #f59e0b !important;"';
+                    rowClass = 'timestamp-yellow force-persistent-highlight';
+                    console.log(`🟡 Built-in highlighting: ${lead.name} -> YELLOW (1 day)`);
+                } else if (diffDays === 2) {
+                    // Orange for 2 days old - URGENT TIMELINE
+                    rowStyle = 'style="background-color: #fed7aa !important; border-left: 4px solid #fb923c !important; border-right: 2px solid #fb923c !important;"';
+                    rowClass = 'timestamp-orange force-persistent-highlight';
+                    console.log(`🟠 Built-in highlighting: ${lead.name} -> ORANGE (2 days)`);
+                } else if (diffDays >= 3) {
+                    // Red for 3+ days old - URGENT TIMELINE
+                    rowStyle = 'style="background-color: #fecaca !important; border-left: 4px solid #ef4444 !important; border-right: 2px solid #ef4444 !important;"';
+                    rowClass = 'timestamp-red force-persistent-highlight';
+                    console.log(`🔴 Built-in highlighting: ${lead.name} -> RED (${diffDays} days)`);
+                }
+            } else {
+                console.log(`⚪ generateSimpleLeadRows: ${lead.name} - No timestamp found`);
+            }
+        } else {
+            console.log(`⚫ generateSimpleLeadRows: ${lead.name} - CLOSED LEAD - skipping timestamp highlighting`);
+        }
+
+        // OVERRIDE: Apply grey highlighting for "Process complete" TODO (including closed leads)
+        if (todoText && (todoText.toLowerCase().includes('process complete') || todoText.includes('Process complete'))) {
+            // Grey for "Process complete" TODO - OVERRIDES timestamp highlighting
+            rowStyle = 'style="background-color: rgba(156, 163, 175, 0.3) !important; border-left: 4px solid #9ca3af !important; border-right: 2px solid #9ca3af !important;"';
+            rowClass = 'process-complete';
+            console.log(`⚫ Built-in highlighting: ${lead.name} -> GREY (Process complete)`);
+        }
+        // OVERRIDE: Apply gray highlighting for other closed leads (without "Process complete" TODO)
+        else if (isClosed) {
+            // Gray for closed leads - OVERRIDES all other highlighting
+            rowStyle = 'style="background-color: #f3f4f6 !important; border-left: 4px solid #9ca3af !important; border-right: 2px solid #9ca3af !important; opacity: 0.7;"';
+            rowClass = 'lead-closed';
+            console.log(`⚫ Built-in highlighting: ${lead.name} -> GRAY (closed, non-process-complete)`);
+        }
+        // OVERRIDE: Apply green highlighting for empty TODOs (takes priority over timestamp colors but not closed)
+        else if (!todoText || todoText.trim() === '') {
+            // Green for empty TO DO - OVERRIDES timestamp highlighting
+            rowStyle = 'style="background-color: rgba(16, 185, 129, 0.2) !important; border-left: 4px solid #10b981 !important; border-right: 2px solid #10b981 !important;"';
+            rowClass = 'reach-out-complete';
+            console.log(`🟢 Built-in highlighting: ${lead.name} -> GREEN (empty TODO)`);
+        }
+
+        // Add data attributes for highlighting persistence - ENHANCED
+        let dataAttributes = '';
+        if (rowClass.includes('lead-closed')) {
+            dataAttributes = 'data-highlight="gray" data-highlight-applied="true" data-highlight-source="builtin"';
+        } else if (rowClass.includes('timestamp-yellow')) {
+            dataAttributes = 'data-highlight="yellow" data-highlight-applied="true" data-highlight-source="builtin"';
+        } else if (rowClass.includes('timestamp-orange')) {
+            dataAttributes = 'data-highlight="orange" data-highlight-applied="true" data-highlight-source="builtin"';
+        } else if (rowClass.includes('timestamp-red')) {
+            dataAttributes = 'data-highlight="red" data-highlight-applied="true" data-highlight-source="builtin"';
+        } else if (rowClass.includes('process-complete')) {
+            dataAttributes = 'data-highlight="grey" data-highlight-applied="true" data-highlight-source="builtin"';
+        } else if (rowClass.includes('reach-out-complete')) {
+            dataAttributes = 'data-highlight="green" data-highlight-applied="true" data-highlight-source="builtin"';
+        }
+
+        // Also add lead identification for robust matching
+        dataAttributes += ` data-lead-name="${lead.name}" data-lead-id="${lead.id}"`;
+
+
         return `
-            <tr>
+            <tr ${rowClass ? `class="${rowClass}"` : ''} ${rowStyle} ${dataAttributes}>
                 <td>
                     <input type="checkbox" class="lead-checkbox" value="${lead.id}" onchange="updateBulkDeleteButton()" data-lead='${JSON.stringify(lead).replace(/'/g, '&apos;')}'>
                 </td>
                 <td class="lead-name" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="viewLead(${lead.id})" title="${lead.name}">${displayName}</strong>
+                    <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="viewLead('${lead.id}')" title="${lead.name}">${displayName}</strong>
                 </td>
                 <td>
                     <div class="contact-info" style="display: flex; gap: 10px; align-items: center;">
@@ -3557,12 +3618,12 @@ function generateSimpleLeadRows(leads) {
                         </a>
                     </div>
                 </td>
-                <td>${lead.product}</td>
+                <td>${lead.product || lead.insuranceType || lead.type || 'Commercial Auto'}</td>
                 <td>$${(lead.premium || 0).toLocaleString()}</td>
                 <td>${getStageHtml(lead.stage, lead)}</td>
                 <td>
                     <div style="font-weight: bold; color: black;">
-                        ${typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')}
+                        ${(typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || ''}
                     </div>
                 </td>
                 <td>${lead.renewalDate || 'N/A'}</td>
@@ -3584,19 +3645,36 @@ function generateSimpleLeadRows(leads) {
 window.generateSimpleLeadRows = generateSimpleLeadRows;
 
 // Leads Management Functions
-function loadLeadsView() {
-    // Prevent multiple simultaneous loads
-    if (window.leadsViewLoading) {
-        console.log('Leads view already loading, skipping...');
-        return;
+async function loadLeadsView() {
+    console.log('loadLeadsView called - loading leads view');
+
+    // Clear any timeouts immediately
+    if (window.leadsViewTimeout) {
+        clearTimeout(window.leadsViewTimeout);
+        window.leadsViewTimeout = null;
     }
-    window.leadsViewLoading = true;
+    if (window.leadsRefreshTimeout) {
+        clearTimeout(window.leadsRefreshTimeout);
+        window.leadsRefreshTimeout = null;
+    }
 
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) {
-        window.leadsViewLoading = false;
+        console.log('No dashboard content found');
         return;
     }
+
+    // FIRST: Load fresh data from server
+    try {
+        console.log('🌐 Loading leads from server first...');
+        await loadLeadsFromServer();
+        console.log('✅ Server data loaded, now rendering view');
+    } catch (error) {
+        console.log('⚠️ Server load failed, using localStorage:', error);
+        // Continue with localStorage data if server fails
+    }
+
+    // Show the leads HTML first (rest of function continues normally)
 
     // Update dashboard stats with real data after view loads
     setTimeout(() => {
@@ -3686,17 +3764,30 @@ function loadLeadsView() {
         // Use insurance_leads as primary, sync both keys
         let allLeads = insuranceLeads.length > 0 ? insuranceLeads : regularLeads;
 
+        // Filter out archived leads from server data
+        const activeLeads = allLeads.filter(lead => {
+            if (archivedIds.has(String(lead.id))) return false;
+            if (lead.phone && archivedPhones.has(lead.phone.replace(/\D/g, ''))) return false;
+            if (lead.email && archivedEmails.has(lead.email.toLowerCase())) return false;
+            if (lead.name && archivedNames.has(lead.name.toLowerCase())) return false;
+            return true;
+        });
+
+        // Use activeLeads from here on
+        let leads = activeLeads;
+        console.log(`Using ${leads.length} active leads`);
+
         // FILTER OUT DELETED LEADS (but not recently imported ones)
         const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
         if (deletedLeadIds.length > 0) {
             console.log(`📋 Deleted lead IDs in localStorage:`, deletedLeadIds);
-            console.log(`📋 Current lead IDs being processed:`, allLeads.map(l => l.id));
+            console.log(`📋 Current lead IDs being processed:`, leads.map(l => l.id));
 
             // Don't filter out leads that were created in the last 5 minutes (recently imported)
             const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-            const beforeFilter = allLeads.length;
+            const beforeFilter = leads.length;
 
-            allLeads = allLeads.filter(lead => {
+            leads = leads.filter(lead => {
                 if (deletedLeadIds.includes(String(lead.id))) {
                     // Check if this lead was created recently
                     const createdAt = new Date(lead.createdAt || lead.created_at || 0);
@@ -3711,15 +3802,15 @@ function loadLeadsView() {
                 return true;
             });
 
-            console.log(`Filtered ${beforeFilter - allLeads.length} deleted leads (kept ${allLeads.length})`);
+            console.log(`Filtered ${beforeFilter - leads.length} deleted leads (kept ${leads.length})`);
         }
 
         // Save cleaned leads to BOTH keys
-        localStorage.setItem('insurance_leads', JSON.stringify(allLeads));
-        localStorage.setItem('leads', JSON.stringify(allLeads));
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        localStorage.setItem('leads', JSON.stringify(leads));
 
         // STRICT FILTER: Remove ANY lead that matches archived criteria
-        let leads = allLeads.filter(lead => {
+        leads = allLeads.filter(lead => {
             // Check if lead is marked as archived
             if (lead.archived === true) {
                 console.log(`Excluding archived lead: ${lead.id} - ${lead.name}`);
@@ -3769,17 +3860,46 @@ function loadLeadsView() {
         // Filter out archived leads - they should not appear in the active leads view
         leads = leads.filter(lead => !lead.archived);
 
-        // Sort leads by assignedTo by default to group them by user
+        // Sort leads with logged-in user's leads at the top, then by assignedTo, with closed leads at the bottom
         leads.sort((a, b) => {
+            // Get current logged-in user
+            let currentUser = '';
+            const userData = sessionStorage.getItem('vanguard_user');
+            if (userData) {
+                try {
+                    const user = JSON.parse(userData);
+                    // Capitalize username to match assignedTo format (grant -> Grant)
+                    currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+                } catch (e) {
+                    console.error('Error parsing user data:', e);
+                }
+            }
+
+            // First, check if either lead is closed - closed leads go to the bottom
+            const aIsClosed = a.stage === 'closed' || a.stage === 'Closed';
+            const bIsClosed = b.stage === 'closed' || b.stage === 'Closed';
+
+            if (aIsClosed && !bIsClosed) return 1;
+            if (bIsClosed && !aIsClosed) return -1;
+
+            // If both are closed or both are not closed, prioritize current user's leads
             const aVal = a.assignedTo || 'zzz'; // Put unassigned at the end
             const bVal = b.assignedTo || 'zzz';
 
-            // Sort in ascending order (A-Z)
+            // Check if leads belong to current user
+            const aIsCurrentUser = currentUser && aVal === currentUser;
+            const bIsCurrentUser = currentUser && bVal === currentUser;
+
+            // If one belongs to current user and other doesn't, current user goes first
+            if (aIsCurrentUser && !bIsCurrentUser) return -1;
+            if (bIsCurrentUser && !aIsCurrentUser) return 1;
+
+            // If both belong to current user or both don't, sort by assignedTo (A-Z)
             if (aVal < bVal) return -1;
             if (aVal > bVal) return 1;
             return 0;
         });
-        console.log('Applied default sort by assignedTo field');
+        console.log('Applied user-prioritized sort by assignedTo field', currentUser ? `- ${currentUser}'s leads at top` : '');
 
         // Store leads globally for filtering
         window.allLeads = leads;
@@ -3792,6 +3912,19 @@ function loadLeadsView() {
             // Don't save empty leads array - let real data populate
         }
         
+        // Safe premium parsing function to fix string concatenation issue
+        const safeParsePremium = (premium) => {
+            if (!premium) return 0;
+            if (typeof premium === 'number') return premium;
+            if (typeof premium === 'string') {
+                // Remove dollar signs, commas, and other non-numeric characters
+                const cleaned = premium.replace(/[$,\s]/g, '');
+                const parsed = parseFloat(cleaned);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+            return 0;
+        };
+
         const totalLeads = leads.length;
         const newLeads = leads.filter(l => l.stage === 'new').length;
         const quotedLeads = leads.filter(l => l.stage === 'quoted').length;
@@ -3837,7 +3970,17 @@ function loadLeadsView() {
                         <select id="filterStage" onchange="applyAdvancedFilters()" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                             <option value="">All Stages</option>
                             <option value="new">New</option>
+                            <option value="contact_attempted">Contact Attempted</option>
+                            <option value="info_requested">Info Requested</option>
+                            <option value="info_received">Info Received</option>
+                            <option value="loss_runs_requested">Loss Runs Requested</option>
+                            <option value="loss_runs_received">Loss Runs Received</option>
+                            <option value="app_prepared">App Prepared</option>
+                            <option value="app_sent">App Sent</option>
+                            <option value="app_quote_received">App Quote Received</option>
+                            <option value="app_quote_sent">App Quote Sent</option>
                             <option value="quoted">Quoted</option>
+                            <option value="quote_sent">Quote Sent</option>
                             <option value="quote-sent-unaware">Quote Sent (Unaware)</option>
                             <option value="quote-sent-aware">Quote Sent (Aware)</option>
                             <option value="interested">Interested</option>
@@ -3902,7 +4045,7 @@ function loadLeadsView() {
                         <h3>New</h3>
                         <span class="stage-count">${newLeads}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "new").reduce((sum, l) => sum + (l.premium || 0), 0).toLocaleString()}</div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "new").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
                     <div class="stage-bar" style="width: ${totalLeads > 0 ? (newLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
                 </div>
                 <div class="pipeline-stage" data-stage="quoted">
@@ -3910,7 +4053,7 @@ function loadLeadsView() {
                         <h3>Quoted</h3>
                         <span class="stage-count">${quotedLeads}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "quoted").reduce((sum, l) => sum + (l.premium || 0), 0).toLocaleString()}</div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "quoted").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
                     <div class="stage-bar" style="width: ${totalLeads > 0 ? (quotedLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
                 </div>
                 <div class="pipeline-stage" data-stage="quote-sent">
@@ -3918,7 +4061,7 @@ function loadLeadsView() {
                         <h3>Quote Sent</h3>
                         <span class="stage-count">${quoteSentUnaware + quoteSentAware}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "quote-sent-unaware" || l.stage === "quote-sent-aware").reduce((sum, l) => sum + (l.premium || 0), 0).toLocaleString()}</div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "quote-sent-unaware" || l.stage === "quote-sent-aware").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
                     <div class="stage-bar" style="width: ${totalLeads > 0 ? ((quoteSentUnaware + quoteSentAware)/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
                 </div>
                 <div class="pipeline-stage" data-stage="interested">
@@ -3926,7 +4069,7 @@ function loadLeadsView() {
                         <h3>Interested</h3>
                         <span class="stage-count">${interestedLeads}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "interested").reduce((sum, l) => sum + (l.premium || 0), 0).toLocaleString()}</div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "interested").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
                     <div class="stage-bar" style="width: ${totalLeads > 0 ? (interestedLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);"></div>
                 </div>
                 <div class="pipeline-stage" data-stage="closed">
@@ -3934,7 +4077,7 @@ function loadLeadsView() {
                         <h3>Closed</h3>
                         <span class="stage-count">${closedLeads}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "closed").reduce((sum, l) => sum + (l.premium || 0), 0).toLocaleString()}</div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "closed").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
                     <div class="stage-bar success" style="width: ${totalLeads > 0 ? (closedLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
                 </div>
             </div>
@@ -3970,13 +4113,27 @@ function loadLeadsView() {
                                 currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
                             }
 
-                            // Count leads assigned to this user
-                            const userLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser) : [];
+                            // Count leads assigned to this user, excluding closed stage
+                            const userLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser && lead.stage !== 'closed') : [];
 
-                            console.log('Total Leads - Current user:', currentUser, 'Count:', userLeads.length);
+                            console.log('Total Leads - Current user:', currentUser, 'Count (excluding closed):', userLeads.length);
                             return userLeads.length;
                         })()}</p>
-                        <span class="stat-trend positive">Your assigned leads</span>
+                        <span class="stat-trend positive">${(() => {
+                            // Get current user for the button text
+                            const userData = sessionStorage.getItem('vanguard_user');
+                            let currentUser = '';
+
+                            if (userData) {
+                                const user = JSON.parse(userData);
+                                currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+                            }
+
+                            // Get total count including closed for button text
+                            const allUserLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser) : [];
+
+                            return `${allUserLeads.length} Including closed`;
+                        })()}</span>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -4028,8 +4185,10 @@ function loadLeadsView() {
                                         'contact_attempted': 'Follow up with lead',
                                         'info_requested': 'Reach out to lead',
                                         'info_received': 'Prepare Quote',
-                                        'loss_runs_requested': 'Follow up for Loss Runs',
-                                        'loss_runs_received': 'Analyze Loss Runs & Quote',
+                                        'loss_runs_requested': 'Reach out to lead',
+                                        'loss_runs_received': 'Prepare app.',
+                                        'app_prepared': 'Send application',
+                                        'app_sent': '',
                                         'quoted': 'Email Quote, and make contact',
                                         'quote_sent': 'Reach out to lead',
                                         'quote-sent-unaware': 'Reach out to lead',
@@ -4040,15 +4199,15 @@ function loadLeadsView() {
                                     };
 
                                     const stage = lead.stage || 'new';
-                                    const todoAction = actionMap[stage] || 'Review lead';
+                                    const todoAction = actionMap.hasOwnProperty(stage) ? actionMap[stage] : 'Review lead';
 
                                     // Check if reach out is complete (makes To Do empty)
                                     let isToDoEmpty = false;
                                     if (lead.reachOut && (stage === 'quoted' || stage === 'info_requested' ||
-                                        stage === 'quote_sent' || stage === 'interested')) {
+                                        stage === 'loss_runs_requested' || stage === 'app_sent' || stage === 'quote_sent' || stage === 'interested')) {
                                         const ro = lead.reachOut;
-                                        // Reach out complete if connected call or all methods tried
-                                        if (ro.callsConnected > 0 || (ro.callAttempts > 0 && ro.emailCount > 0 && ro.textCount > 0)) {
+                                        // Reach out complete if: 1) Lead answered call (completedAt exists), or 2) All methods tried
+                                        if (ro.completedAt || ro.callsConnected > 0 || (ro.callAttempts > 0 && ro.emailCount > 0 && ro.textCount > 0)) {
                                             isToDoEmpty = true;
                                         }
                                     }
@@ -4192,7 +4351,18 @@ function loadLeadsView() {
         
         // Set the HTML
         dashboardContent.innerHTML = html;
-        
+
+        // Apply highlighting after the table is rendered
+        setTimeout(() => {
+            console.log('🎨 Initial highlighting after leads view render...');
+            if (window.applyReachOutCompleteHighlighting) {
+                window.applyReachOutCompleteHighlighting();
+            }
+            if (window.forceAllHighlighting) {
+                window.forceAllHighlighting();
+            }
+        }, 200);
+
         // Scan for clickable phone numbers and emails with aggressive retry
         const scanLeadsContent = () => {
             if (window.scanForClickableContent) {
@@ -4228,10 +4398,8 @@ function loadLeadsView() {
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
         dashboardContent.innerHTML = `<div class="error-message">Error loading leads view: ${error.message}</div>`;
-    } finally {
-        // Always reset loading flag
-        window.leadsViewLoading = false;
     }
+    // Removed finally block and loading flags - no more blocking
 }
 
 // Moved to before generateSimpleLeadRows function
@@ -4303,9 +4471,20 @@ function showNewLead() {
                                 <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151; font-size: 14px;">Lead Stage</label>
                                 <select class="form-control" id="leadStage" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; background: white;">
                                     <option value="new">New</option>
-                                    <option value="contacted">Contacted</option>
+                                    <option value="contact_attempted">Contact Attempted</option>
+                                    <option value="info_requested">Info Requested</option>
+                                    <option value="info_received">Info Received</option>
+                                    <option value="loss_runs_requested">Loss Runs Requested</option>
+                                    <option value="loss_runs_received">Loss Runs Received</option>
+                                    <option value="app_prepared">App Prepared</option>
+                                    <option value="app_sent">App Sent</option>
+                                    <option value="app_quote_received">App Quote Received</option>
+                                    <option value="app_quote_sent">App Quote Sent</option>
                                     <option value="quoted">Quoted</option>
-                                    <option value="negotiating">Negotiating</option>
+                                    <option value="quote_sent">Quote Sent</option>
+                                    <option value="interested">Interested</option>
+                                    <option value="not-interested">Not Interested</option>
+                                    <option value="closed">Closed</option>
                                 </select>
                             </div>
                             
@@ -4442,6 +4621,15 @@ async function saveNewLead(event) {
 
 function viewLead(leadId) {
     // Use the enhanced lead profile for commercial auto leads
+    if (window.createEnhancedProfile) {
+        console.log('✅ APP.JS: Using createEnhancedProfile for:', leadId);
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const lead = leads.find(l => String(l.id) === String(leadId));
+        if (lead) {
+            window.createEnhancedProfile(lead);
+            return;
+        }
+    }
     if (window.showLeadProfile) {
         window.showLeadProfile(leadId);
         return;
@@ -4508,7 +4696,7 @@ function viewLead(leadId) {
                         </div>
                         <div class="info-item">
                             <label>Product Interest</label>
-                            <p>${lead.product}</p>
+                            <p>${lead.product || lead.insuranceType || lead.type || "Commercial Auto"}</p>
                         </div>
                         <div class="info-item">
                             <label>Stage</label>
@@ -4596,7 +4784,7 @@ function viewLead(leadId) {
                                 <strong>${lead.assignedTo}</strong>
                                 <span class="note-date">Today at 10:30 AM</span>
                             </div>
-                            <p>Initial contact made. Client interested in ${lead.product}. Scheduled follow-up for next week.</p>
+                            <p>Initial contact made. Client interested in ${lead.product || lead.insuranceType || lead.type || "Commercial Auto"}. Scheduled follow-up for next week.</p>
                         </div>
                     </div>
                 </div>
@@ -4633,7 +4821,17 @@ function editLead(leadId) {
                                 <label>Stage *</label>
                                 <select class="form-control" id="editLeadStage" required>
                                     <option value="new" ${lead.stage === 'new' ? 'selected' : ''}>New</option>
+                                    <option value="contact_attempted" ${lead.stage === 'contact_attempted' ? 'selected' : ''}>Contact Attempted</option>
+                                    <option value="info_requested" ${lead.stage === 'info_requested' ? 'selected' : ''}>Info Requested</option>
+                                    <option value="info_received" ${lead.stage === 'info_received' ? 'selected' : ''}>Info Received</option>
+                                    <option value="loss_runs_requested" ${lead.stage === 'loss_runs_requested' ? 'selected' : ''}>Loss Runs Requested</option>
+                                    <option value="loss_runs_received" ${lead.stage === 'loss_runs_received' ? 'selected' : ''}>Loss Runs Received</option>
+                                    <option value="app_prepared" ${lead.stage === 'app_prepared' ? 'selected' : ''}>App Prepared</option>
+                                    <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>App Sent</option>
+                                    <option value="app_quote_received" ${lead.stage === 'app_quote_received' ? 'selected' : ''}>App Quote Received</option>
+                                    <option value="app_quote_sent" ${lead.stage === 'app_quote_sent' ? 'selected' : ''}>App Quote Sent</option>
                                     <option value="quoted" ${lead.stage === 'quoted' ? 'selected' : ''}>Quoted</option>
+                                    <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
                                     <option value="quote-sent-unaware" ${lead.stage === 'quote-sent-unaware' ? 'selected' : ''}>Quote Sent (Unaware)</option>
                                     <option value="quote-sent-aware" ${lead.stage === 'quote-sent-aware' ? 'selected' : ''}>Quote Sent (Aware)</option>
                                     <option value="interested" ${lead.stage === 'interested' ? 'selected' : ''}>Interested</option>
@@ -4700,6 +4898,41 @@ function editLead(leadId) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 }
 
+// Save individual lead to server
+async function saveLeadToServer(lead) {
+    try {
+        const apiUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001'
+            : `http://${window.location.hostname}:3001`;
+
+        // Ensure the lead has an updatedAt timestamp
+        lead.updatedAt = new Date().toISOString();
+
+        // Debug: Log what timestamps we're saving
+        console.log(`💾 Saving lead ${lead.id} to server with timestamps:`, {
+            updatedAt: lead.updatedAt,
+            stageTimestamps: lead.stageTimestamps,
+            stage: lead.stage
+        });
+
+        const response = await fetch(`${apiUrl}/api/leads`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(lead)
+        });
+
+        if (response.ok) {
+            console.log(`✅ Lead ${lead.id} saved to server successfully`);
+        } else {
+            console.warn(`⚠️ Failed to save lead ${lead.id} to server`);
+        }
+    } catch (error) {
+        console.error(`❌ Error saving lead ${lead.id} to server:`, error);
+    }
+}
+
 function saveLeadEdits(leadId) {
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
     const leadIndex = leads.findIndex(l => l.id === leadId);
@@ -4729,14 +4962,221 @@ function saveLeadEdits(leadId) {
         if (!leads[leadIndex].stageTimestamps) {
             leads[leadIndex].stageTimestamps = {};
         }
-        leads[leadIndex].stageTimestamps[newStage] = new Date().toISOString();
-        console.log(`Stage changed from ${oldStage} to ${newStage}, timestamp updated`);
+        const newTimestamp = new Date().toISOString();
+        leads[leadIndex].stageTimestamps[newStage] = newTimestamp;
+        leads[leadIndex].updatedAt = newTimestamp; // Also update general timestamp
+        console.log(`✅ Stage changed from ${oldStage} to ${newStage}, timestamp updated to ${newTimestamp}`);
+        console.log(`✅ Lead stageTimestamps now:`, leads[leadIndex].stageTimestamps);
     }
+
+    // Save to server first
+    saveLeadToServer(leads[leadIndex]);
 
     localStorage.setItem('insurance_leads', JSON.stringify(leads));
     closeEditLeadModal();
-    viewLead(leadId); // Refresh the view
+
+    // Refresh the leads table if we're on the leads view
+    const currentHash = window.location.hash;
+    if (currentHash === '#leads') {
+        console.log('🔄 Refreshing leads table after status change...');
+        refreshLeadsTable();
+
+        // AGGRESSIVE REAL-TIME HIGHLIGHTING UPDATE after stage change
+        // Apply multiple highlighting attempts to ensure immediate visual update
+        const forceHighlightingUpdate = () => {
+            console.log('🎨 AGGRESSIVE HIGHLIGHTING: Stage changed, forcing immediate highlighting update');
+
+            // FIRST: Remove green highlighting from rows that now have TO DO text
+            const tableBody = document.getElementById('leadsTableBody');
+            if (tableBody) {
+                const rows = tableBody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const todoCell = row.querySelector('td:nth-child(6)'); // TO DO column
+                    if (todoCell) {
+                        const todoText = todoCell.textContent.trim();
+                        // If row has TO DO text but still has completion highlighting, remove it immediately
+                        if (todoText && todoText.length > 0) {
+                            // Check if this is NOT "Process complete" but has completion highlighting
+                            if (!todoText.toLowerCase().includes('process complete')) {
+                                if (row.classList.contains('reach-out-complete') ||
+                                    row.classList.contains('process-complete') ||
+                                    row.style.backgroundColor.includes('156, 163, 175') ||
+                                    row.style.backgroundColor.includes('16, 185, 129')) {
+                                    console.log('🔴 REMOVING completion highlight - row now has TO DO text:', todoText);
+                                    row.classList.remove('reach-out-complete');
+                                    row.classList.remove('process-complete');
+                                    row.style.removeProperty('background-color');
+                                    row.style.removeProperty('background');
+                                    row.style.removeProperty('border-left');
+                                    row.style.removeProperty('border-right');
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // THEN: Apply regular highlighting functions
+            if (window.forceAllHighlighting) {
+                window.forceAllHighlighting();
+            }
+            if (window.applyReachOutCompleteHighlighting) {
+                window.applyReachOutCompleteHighlighting();
+            }
+            if (window.synchronizedHighlighting) {
+                window.synchronizedHighlighting();
+            }
+            if (window.ultimateHighlight) {
+                window.ultimateHighlight();
+            }
+        };
+
+        // Apply immediately and with multiple timing attempts to combat any delays
+        forceHighlightingUpdate(); // Immediate
+        setTimeout(forceHighlightingUpdate, 50);   // Quick follow-up
+        setTimeout(forceHighlightingUpdate, 200);  // Delayed follow-up
+        setTimeout(forceHighlightingUpdate, 500);  // Final follow-up
+    }
+
+    // Update the reach out status in the profile if it's open
+    setTimeout(() => {
+        console.log('🔄 Updating reach out status in profile...');
+        console.log('🔄 Lead data after save:', leads[leadIndex]);
+
+        if (window.updateReachOutStatus) {
+            console.log('🔄 Calling updateReachOutStatus...');
+            window.updateReachOutStatus(leadId);
+        } else {
+            console.log('❌ updateReachOutStatus function not found');
+        }
+
+        // Also try to update any open lead profile completely
+        const profileElement = document.querySelector('.lead-profile-modal, #simple-lead-profile, .enhanced-lead-profile');
+        if (profileElement) {
+            console.log('🔄 Profile is open, forcing complete refresh...');
+            setTimeout(() => {
+                if (window.showLeadProfile) {
+                    window.showLeadProfile(leadId);
+                }
+            }, 50);
+        }
+    }, 100);
+
     showNotification('Lead updated successfully!', 'success');
+}
+
+// Function to refresh just the leads table content
+function refreshLeadsTable() {
+    console.log('🔄 Refreshing leads table content...');
+
+    const tableBody = document.getElementById('leadsTableBody');
+    if (!tableBody) {
+        console.log('❌ No leads table body found');
+        return;
+    }
+
+    // Get fresh leads data
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    // Apply current sorting if any
+    const currentSort = window.currentSort || { field: 'name', direction: 'asc' };
+
+    // Sort leads - closed leads always go to the bottom
+    leads.sort((a, b) => {
+        // First, check if either lead is closed - closed leads go to the bottom
+        if (a.stage === 'closed' && b.stage !== 'closed') return 1;
+        if (b.stage === 'closed' && a.stage !== 'closed') return -1;
+
+        // If both are closed or both are not closed, apply the regular sorting
+        let aVal = a[currentSort.field] || '';
+        let bVal = b[currentSort.field] || '';
+
+        if (currentSort.field === 'premium') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+        } else {
+            aVal = aVal.toString().toLowerCase();
+            bVal = bVal.toString().toLowerCase();
+        }
+
+        if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    // Update the table body with fresh data
+    tableBody.innerHTML = generateSimpleLeadRows(leads);
+
+    // Reapply highlighting
+    setTimeout(() => {
+        console.log('🎨 Reapplying highlighting after table refresh...');
+        if (window.applyReachOutCompleteHighlighting) {
+            window.applyReachOutCompleteHighlighting();
+        }
+        if (window.forceAllHighlighting) {
+            window.forceAllHighlighting();
+        }
+    }, 100);
+
+    console.log('✅ Leads table refreshed successfully');
+}
+
+// Function to update a specific lead row in the table without refreshing the entire table
+function updateLeadRowInTable(leadId, updatedLead) {
+    const tableBody = document.getElementById('leadsTableBody');
+    if (!tableBody) {
+        console.log('No leads table found');
+        return;
+    }
+
+    // Find the row for this lead
+    const rows = tableBody.querySelectorAll('tr');
+    let targetRow = null;
+
+    rows.forEach(row => {
+        // Check if this row contains the lead (look for data attributes or lead info)
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 0) {
+            // Look for the lead name or any identifying information
+            const nameCell = cells[0];
+            if (nameCell && nameCell.textContent.includes(updatedLead.name)) {
+                targetRow = row;
+            }
+        }
+    });
+
+    if (targetRow) {
+        console.log(`🔄 Found row for lead ${updatedLead.name}, updating...`);
+
+        // Generate the updated row HTML
+        const updatedRowHTML = generateSimpleLeadRows([updatedLead]);
+
+        // Replace the old row with the new one
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = updatedRowHTML;
+        const newRow = tempDiv.querySelector('tr');
+
+        if (newRow) {
+            targetRow.replaceWith(newRow);
+            console.log(`✅ Updated row for lead ${updatedLead.name}`);
+
+            // Reapply highlighting to the new row
+            setTimeout(() => {
+                if (window.applyReachOutCompleteHighlighting) {
+                    window.applyReachOutCompleteHighlighting();
+                }
+                if (window.forceAllHighlighting) {
+                    window.forceAllHighlighting();
+                }
+            }, 50);
+        } else {
+            console.log('❌ Failed to generate new row HTML');
+        }
+    } else {
+        console.log(`❌ Could not find row for lead ${updatedLead.name} - refreshing entire table`);
+        // Fallback: refresh the entire leads view
+        loadLeadsView();
+    }
 }
 
 function closeEditLeadModal() {
@@ -4943,6 +5383,15 @@ function confirmConvertLead(event, leadId) {
         leads[leadIndex].clientId = newClient.id;
         leads[leadIndex].stage = 'converted';  // Set stage to converted
         leads[leadIndex].status = 'converted';  // Also set status for backward compatibility
+
+        // Update stage timestamp for conversion
+        if (!leads[leadIndex].stageTimestamps) {
+            leads[leadIndex].stageTimestamps = {};
+        }
+        leads[leadIndex].stageTimestamps['converted'] = new Date().toISOString();
+
+        // Save to server with updated timestamps
+        saveLeadToServer(leads[leadIndex]);
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
     }
     
@@ -5769,34 +6218,62 @@ function sortLeads(field) {
     
     // Sort the leads
     leads.sort((a, b) => {
+        // FIRST: Always prioritize current user's leads regardless of field being sorted
+        let currentUser = '';
+        const userData = sessionStorage.getItem('vanguard_user');
+        if (userData) {
+            try {
+                const user = JSON.parse(userData);
+                // Capitalize username to match assignedTo format (grant -> Grant)
+                currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+            }
+        }
+
+        // Check if leads belong to current user
+        const aIsCurrentUser = currentUser && (a.assignedTo === currentUser);
+        const bIsCurrentUser = currentUser && (b.assignedTo === currentUser);
+
+        // If one belongs to current user and other doesn't, current user goes first
+        if (aIsCurrentUser && !bIsCurrentUser) return -1;
+        if (bIsCurrentUser && !aIsCurrentUser) return 1;
+
+        // SECOND: If both leads have same user assignment (both current user's OR both other users'), sort by the selected field
         let aVal = a[field];
         let bVal = b[field];
-        
+
+        // Special handling for assignedTo field
+        if (field === 'assignedTo') {
+            // Handle unassigned
+            aVal = aVal || 'zzz';
+            bVal = bVal || 'zzz';
+        }
         // Handle different field types
-        if (field === 'premium') {
+        else if (field === 'premium') {
             aVal = parseFloat(aVal) || 0;
             bVal = parseFloat(bVal) || 0;
         } else if (field === 'renewalDate' || field === 'created') {
             aVal = new Date(aVal || '2099-12-31');
             bVal = new Date(bVal || '2099-12-31');
         } else if (field === 'stage') {
-            // Custom stage ordering
-            const stageOrder = { 
-                'new': 1, 
-                'quoted': 2, 
-                'quote-sent-unaware': 3, 
-                'quote-sent-aware': 4, 
-                'interested': 5, 
-                'not-interested': 6, 
-                'closed': 7,
-                'contacted': 8,
-                'reviewed': 9,
-                'converted': 10
+            // Custom stage ordering - closed leads always at the bottom
+            const stageOrder = {
+                'new': 1,
+                'quoted': 2,
+                'quote-sent-unaware': 3,
+                'quote-sent-aware': 4,
+                'interested': 5,
+                'not-interested': 6,
+                'contacted': 7,
+                'reviewed': 8,
+                'converted': 9,
+                'closed': 999  // Always at bottom regardless of sort direction
             };
-            aVal = stageOrder[aVal] || 999;
-            bVal = stageOrder[bVal] || 999;
+            aVal = stageOrder[aVal] || 500;
+            bVal = stageOrder[bVal] || 500;
         }
-        
+
         // Compare values
         if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
@@ -5807,6 +6284,17 @@ function sortLeads(field) {
     const tableBody = document.getElementById('leadsTableBody');
     if (tableBody) {
         tableBody.innerHTML = generateSimpleLeadRows(leads);
+
+        // Apply reach out completion highlighting after table is rendered
+        setTimeout(() => {
+            console.log('🎨 Applying reach out highlighting after server data load...');
+            if (window.applyReachOutCompleteHighlighting) {
+                window.applyReachOutCompleteHighlighting();
+            }
+            if (window.forceAllHighlighting) {
+                window.forceAllHighlighting();
+            }
+        }, 100);
     }
     
     // Update sort arrows
@@ -5833,35 +6321,11 @@ function updateSortArrows(field, direction) {
 let currentClientPage = 1;
 const clientsPerPage = 10;
 
-async function generateClientRows(page = 1) {
-    console.log('🚨 GENERATECLIENTROWS v52 RUNNING - New version loaded!');
-    // Get clients from API instead of localStorage
-    let clients = [];
-
-    try {
-        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
-        const response = await fetch(`${API_URL}/api/clients`, {
-            headers: {
-                'Cache-Control': 'no-cache',
-                'Bypass-Tunnel-Reminder': 'true'
-            }
-        });
-
-        if (response.ok) {
-            clients = await response.json();
-            console.log(`✅ Loaded ${clients.length} real clients from API`);
-
-            // CRITICAL: Save API data to localStorage so viewClient can find it
-            localStorage.setItem('insurance_clients', JSON.stringify(clients));
-            console.log(`💾 Saved ${clients.length} clients to localStorage for viewClient`);
-        } else {
-            console.warn('API failed, falling back to localStorage');
-            clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-        }
-    } catch (error) {
-        console.warn('API error, falling back to localStorage:', error);
-        clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-    }
+function generateClientRows(page = 1) {
+    console.log('🚨 GENERATECLIENTROWS - Loading from localStorage');
+    // Load clients from localStorage immediately
+    let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    console.log(`✅ Loaded ${clients.length} clients from localStorage`);
 
     // Remove duplicates based on name
     const uniqueClients = [];
@@ -5990,7 +6454,7 @@ async function generateClientRows(page = 1) {
     }).join('');
 }
 
-async function loadClientsView() {
+function loadClientsView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
     dashboardContent.innerHTML = `
@@ -6070,7 +6534,7 @@ async function loadClientsView() {
     // Populate the table with actual client data
     const tbody = document.getElementById('clientsTableBody');
     if (tbody) {
-        tbody.innerHTML = await generateClientRows(currentClientPage);
+        tbody.innerHTML = generateClientRows(currentClientPage);
     }
 
     // Update count and pagination
@@ -6228,11 +6692,11 @@ function updateClientsPagination() {
 }
 
 // Navigate to a specific page in clients table
-window.goToClientPage = async function(page) {
+window.goToClientPage = function(page) {
     currentClientPage = page;
     const tbody = document.getElementById('clientsTableBody');
     if (tbody) {
-        tbody.innerHTML = await generateClientRows(page);
+        tbody.innerHTML = generateClientRows(page);
     }
     updateClientsPagination();
 
@@ -6268,22 +6732,29 @@ window.goToClientPage = async function(page) {
     }, 100);
 };
 
-async function loadPoliciesView() {
+function loadPoliciesView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 
-    // Always load policies from server first
-    let policies = [];
+    // Load policies from localStorage first, then update from server in background
+    let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    console.log('📊 Loading policies from localStorage:', policies.length);
+
+    // Update from server in background (non-blocking)
     if (window.PolicySyncManager && window.PolicySyncManager.loadPolicies) {
-        console.log('🔄 Loading policies from server via PolicySyncManager...');
-        policies = await window.PolicySyncManager.loadPolicies();
-        console.log('📊 Loaded policies sample:', policies.length > 0 ? policies[0] : 'No policies');
-        console.log('📋 First policy ID check:', policies.length > 0 ? policies[0].id : 'No ID found');
-    } else {
-        // Fallback to localStorage only if server fails
-        console.log('⚠️ Fallback: Loading policies from localStorage');
-        policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-        console.log('📊 Fallback policies sample:', policies.length > 0 ? policies[0] : 'No policies');
+        console.log('🔄 Updating policies from server in background...');
+        window.PolicySyncManager.loadPolicies().then(serverPolicies => {
+            if (serverPolicies && serverPolicies.length > 0) {
+                localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
+                console.log('✅ Updated policies from server');
+                // Optionally refresh the view with new data
+                if (document.querySelector('.dashboard-content')?.innerHTML?.includes('Policies Management')) {
+                    loadPoliciesView();
+                }
+            }
+        }).catch(error => {
+            console.log('⚠️ Server update failed, using localStorage data');
+        });
     }
 
     // Calculate actual statistics
@@ -8774,8 +9245,12 @@ function loadAccountingView() {
 }
 
 function loadReportsView() {
+    console.log('loadReportsView function called');
     const dashboardContent = document.querySelector('.dashboard-content');
-    if (!dashboardContent) return;
+    if (!dashboardContent) {
+        console.log('No dashboard content found!');
+        return;
+    }
     dashboardContent.innerHTML = `
         <div class="reports-view">
             <header class="content-header">
@@ -8918,9 +9393,9 @@ function loadCommunicationsView() {
             
             <div class="tabs">
                 <button class="tab-btn active" onclick="loadCommunicationTab('campaigns')">Campaigns</button>
+                <button class="tab-btn" onclick="loadCommunicationTab('reminders')">Reminders</button>
                 <button class="tab-btn" onclick="loadCommunicationTab('email')">Email Blast</button>
                 <button class="tab-btn" onclick="loadCommunicationTab('sms')">SMS Blast</button>
-                <button class="tab-btn" onclick="loadCommunicationTab('templates')">Templates</button>
                 <button class="tab-btn" onclick="loadCommunicationTab('history')">History</button>
             </div>
             
@@ -8968,8 +9443,53 @@ function renderCampaignsTab() {
     
     return `
         <div class="campaigns-container">
+            <div class="campaigns-grid">
+                ${campaigns.map(campaign => `
+                    <div class="campaign-card" data-campaign-id="${campaign.id}">
+                        <div class="campaign-header">
+                            <h3>${campaign.name}</h3>
+                            <span class="status-badge ${campaign.status}">${campaign.status}</span>
+                        </div>
+                        <div class="campaign-info">
+                            <span class="campaign-type"><i class="fas fa-${campaign.type === 'sms' ? 'sms' : 'envelope'}"></i> ${campaign.type.toUpperCase()}</span>
+                            <span class="campaign-schedule"><i class="fas fa-clock"></i> ${campaign.schedule}</span>
+                        </div>
+                        <div class="campaign-stats">
+                            <div>
+                                <span class="stat-label">Sent</span>
+                                <span class="stat-value">${campaign.sent}</span>
+                            </div>
+                            <div>
+                                <span class="stat-label">Opened</span>
+                                <span class="stat-value">${campaign.opened} (${Math.round(campaign.opened/campaign.sent*100)}%)</span>
+                            </div>
+                            <div>
+                                <span class="stat-label">Clicked</span>
+                                <span class="stat-value">${campaign.clicked} (${Math.round(campaign.clicked/campaign.sent*100)}%)</span>
+                            </div>
+                        </div>
+                        <div class="campaign-actions">
+                            <button class="btn-small" onclick="viewCampaignDetails(${campaign.id})">
+                                <i class="fas fa-eye"></i> Details
+                            </button>
+                            ${campaign.status === 'active' ? 
+                                `<button class="btn-small btn-warning" onclick="toggleCampaign(${campaign.id})">
+                                    <i class="fas fa-pause"></i> Pause
+                                </button>` :
+                                `<button class="btn-small btn-success" onclick="toggleCampaign(${campaign.id})">
+                                    <i class="fas fa-play"></i> Start
+                                </button>`
+                            }
+                            <button class="btn-small btn-danger" onclick="deleteCampaign(${campaign.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
             ${aiCampaigns.length > 0 ? `
-                <div style="margin-bottom: 30px;">
+                <div style="margin-top: 30px;">
                     <h2 style="margin-bottom: 15px; color: #111827;">
                         <i class="fas fa-robot" style="margin-right: 10px; color: #0066cc;"></i>
                         AI Caller Campaigns
@@ -9017,55 +9537,6 @@ function renderCampaignsTab() {
                     </div>
                 </div>
             ` : ''}
-            
-            <h2 style="margin-bottom: 15px; color: #111827;">
-                <i class="fas fa-bullhorn" style="margin-right: 10px; color: #0066cc;"></i>
-                Marketing Campaigns
-            </h2>
-            <div class="campaigns-grid">
-                ${campaigns.map(campaign => `
-                    <div class="campaign-card" data-campaign-id="${campaign.id}">
-                        <div class="campaign-header">
-                            <h3>${campaign.name}</h3>
-                            <span class="status-badge ${campaign.status}">${campaign.status}</span>
-                        </div>
-                        <div class="campaign-info">
-                            <span class="campaign-type"><i class="fas fa-${campaign.type === 'sms' ? 'sms' : 'envelope'}"></i> ${campaign.type.toUpperCase()}</span>
-                            <span class="campaign-schedule"><i class="fas fa-clock"></i> ${campaign.schedule}</span>
-                        </div>
-                        <div class="campaign-stats">
-                            <div>
-                                <span class="stat-label">Sent</span>
-                                <span class="stat-value">${campaign.sent}</span>
-                            </div>
-                            <div>
-                                <span class="stat-label">Opened</span>
-                                <span class="stat-value">${campaign.opened} (${Math.round(campaign.opened/campaign.sent*100)}%)</span>
-                            </div>
-                            <div>
-                                <span class="stat-label">Clicked</span>
-                                <span class="stat-value">${campaign.clicked} (${Math.round(campaign.clicked/campaign.sent*100)}%)</span>
-                            </div>
-                        </div>
-                        <div class="campaign-actions">
-                            <button class="btn-small" onclick="viewCampaignDetails(${campaign.id})">
-                                <i class="fas fa-eye"></i> Details
-                            </button>
-                            ${campaign.status === 'active' ? 
-                                `<button class="btn-small btn-warning" onclick="toggleCampaign(${campaign.id})">
-                                    <i class="fas fa-pause"></i> Pause
-                                </button>` :
-                                `<button class="btn-small btn-success" onclick="toggleCampaign(${campaign.id})">
-                                    <i class="fas fa-play"></i> Start
-                                </button>`
-                            }
-                            <button class="btn-small btn-danger" onclick="deleteCampaign(${campaign.id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
         </div>
     `;
 }
@@ -9419,73 +9890,71 @@ function loadCommunicationTab(tabName) {
             `;
             break;
             
-        case 'templates':
+        case 'reminders':
             content = `
-                <div class="templates-view">
-                    <div class="template-actions">
-                        <button class="btn-primary" onclick="createNewTemplate()">
-                            <i class="fas fa-plus"></i> Create Template
-                        </button>
+                <div class="reminders-view">
+                    <div class="reminders-stats">
+                        <div class="mini-stat">
+                            <span class="mini-stat-value" id="pending-gifts-count">0</span>
+                            <span class="mini-stat-label">Pending Gifts</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-value" id="sent-gifts-count">0</span>
+                            <span class="mini-stat-label">Gifts Sent</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-value" id="urgent-birthdays-count">0</span>
+                            <span class="mini-stat-label">Urgent Birthdays</span>
+                        </div>
                     </div>
-                    <div class="templates-grid">
-                        <div class="template-card">
-                            <h4>Welcome Email</h4>
-                            <p>Sent to new clients after signup</p>
-                            <div class="template-meta">
-                                <span>Email</span>
-                                <span>Used 45 times</span>
+
+                    <div class="reminders-sections">
+                        <!-- Birthday Reminders Section -->
+                        <div class="reminders-section">
+                            <div class="section-header">
+                                <h3><i class="fas fa-birthday-cake"></i> Birthday Reminders</h3>
+                                <span class="section-count" id="birthday-count">0</span>
                             </div>
-                            <div class="template-actions">
-                                <button class="btn-secondary">Edit</button>
-                                <button class="btn-secondary">Duplicate</button>
-                                <button class="btn-secondary">Preview</button>
+                            <div class="reminder-cards-stack" id="birthday-reminders">
+                                <!-- Birthday cards will be populated here -->
                             </div>
                         </div>
-                        
-                        <div class="template-card">
-                            <h4>Renewal Reminder</h4>
-                            <p>30-day policy renewal notification</p>
-                            <div class="template-meta">
-                                <span>Email</span>
-                                <span>Used 234 times</span>
+
+
+                        <!-- New Policy Gifts Section -->
+                        <div class="reminders-section">
+                            <div class="section-header">
+                                <h3><i class="fas fa-gift"></i> New Policy Gifts</h3>
+                                <span class="section-count" id="new-policy-count">0</span>
                             </div>
-                            <div class="template-actions">
-                                <button class="btn-secondary">Edit</button>
-                                <button class="btn-secondary">Duplicate</button>
-                                <button class="btn-secondary">Preview</button>
-                            </div>
-                        </div>
-                        
-                        <div class="template-card">
-                            <h4>Payment Confirmation</h4>
-                            <p>SMS confirmation for payment received</p>
-                            <div class="template-meta">
-                                <span>SMS</span>
-                                <span>Used 89 times</span>
-                            </div>
-                            <div class="template-actions">
-                                <button class="btn-secondary">Edit</button>
-                                <button class="btn-secondary">Duplicate</button>
-                                <button class="btn-secondary">Preview</button>
-                            </div>
-                        </div>
-                        
-                        <div class="template-card">
-                            <h4>Birthday Wishes</h4>
-                            <p>Annual birthday greeting to clients</p>
-                            <div class="template-meta">
-                                <span>Email</span>
-                                <span>Used 156 times</span>
-                            </div>
-                            <div class="template-actions">
-                                <button class="btn-secondary">Edit</button>
-                                <button class="btn-secondary">Duplicate</button>
-                                <button class="btn-secondary">Preview</button>
+                            <div class="reminder-cards-stack" id="new-policy-reminders">
+                                <!-- New policy cards will be populated here -->
                             </div>
                         </div>
                     </div>
                 </div>
             `;
+
+            // Initialize reminders after content is loaded
+            setTimeout(() => {
+                if (window.communicationsReminders) {
+                    window.communicationsReminders.init();
+                    loadReminderCards();
+                } else {
+                    // Load the reminders module if not loaded
+                    const script = document.createElement('script');
+                    script.src = 'js/communications-reminders.js';
+                    script.onload = () => {
+                        setTimeout(() => {
+                            if (window.communicationsReminders) {
+                                window.communicationsReminders.init();
+                                loadReminderCards();
+                            }
+                        }, 100);
+                    };
+                    document.head.appendChild(script);
+                }
+            }, 100);
             break;
             
         case 'history':
@@ -12806,7 +13275,7 @@ function initializeAnalyticsCharts() {
             }
         });
     }
-    
+
     // Policy Type Chart
     const policyTypeCtx = document.getElementById('policyTypeChart');
     if (policyTypeCtx) {
@@ -14951,12 +15420,512 @@ function addCommunicationStyles() {
             margin-left: 10px;
             font-weight: bold;
         }
+
+        /* Reminders View Styles */
+        .reminders-view {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .reminders-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .reminders-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+        }
+
+        .reminders-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .section-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .reminder-cards-stack {
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .reminder-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .reminder-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .reminder-card.urgent {
+            border-left: 4px solid #ef4444;
+            background: linear-gradient(to right, #fef2f2, white);
+        }
+
+        .reminder-card.soon {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(to right, #fffbeb, white);
+        }
+
+        .reminder-card.completed {
+            opacity: 0.7;
+            border-left: 4px solid #10b981;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 16px;
+            font-size: 20px;
+        }
+
+        .birthday-card .card-icon {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .new-policy-card .card-icon {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .card-info {
+            flex: 1;
+        }
+
+        .card-info h4 {
+            margin: 0 0 4px 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .card-subtitle {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .card-urgency {
+            text-align: right;
+        }
+
+        .urgency-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .urgency-badge.urgent {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .urgency-badge.soon {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .urgency-badge:not(.urgent):not(.soon) {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+
+        .policy-premium {
+            font-weight: 600;
+            color: #059669;
+            font-size: 0.9rem;
+        }
+
+        .card-body {
+            padding: 0 16px;
+        }
+
+        .card-details {
+            margin-bottom: 16px;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .detail-item i {
+            width: 16px;
+            margin-right: 8px;
+            text-align: center;
+        }
+
+        .card-actions {
+            padding: 12px 16px;
+            border-top: 1px solid #f3f4f6;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .status-completed {
+            color: #059669;
+            font-size: 0.875rem;
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .no-reminders {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+
+        .no-reminders p {
+            margin: 0;
+            font-size: 0.9rem;
+        }
     `;
     document.head.appendChild(style);
 }
 
 // Initialize communication styles
 addCommunicationStyles();
+
+// Load reminder cards for the reminders tab
+function loadReminderCards() {
+    if (!window.communicationsReminders) {
+        console.warn('Communications reminders module not loaded');
+        return;
+    }
+
+    const reminders = window.communicationsReminders.getReminders();
+
+    // Separate reminders by type
+    const birthdays = reminders.filter(r => r.type === 'birthday');
+    const newPolicies = reminders.filter(r => r.type === 'new_policy');
+
+    // Update counts
+    document.getElementById('birthday-count').textContent = birthdays.length;
+    document.getElementById('new-policy-count').textContent = newPolicies.length;
+
+    // Load birthday cards
+    loadBirthdayCards(birthdays);
+
+    // Load new policy cards
+    loadNewPolicyCards(newPolicies);
+}
+
+function loadBirthdayCards(birthdays) {
+    const container = document.getElementById('birthday-reminders');
+    if (!container) return;
+
+    if (birthdays.length === 0) {
+        container.innerHTML = `
+            <div class="no-reminders">
+                <i class="fas fa-birthday-cake" style="font-size: 48px; color: #d1d5db; margin-bottom: 16px;"></i>
+                <p>No upcoming birthdays in the next 30 days</p>
+            </div>
+        `;
+        return;
+    }
+
+    const cards = birthdays.map(birthday => {
+        const urgencyClass = birthday.daysUntil <= 3 ? 'urgent' : birthday.daysUntil <= 7 ? 'soon' : '';
+        const dateStr = birthday.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        return `
+            <div class="reminder-card birthday-card ${urgencyClass} ${birthday.giftSent ? 'completed' : ''}">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <i class="fas fa-birthday-cake"></i>
+                    </div>
+                    <div class="card-info">
+                        <h4>${birthday.clientName}</h4>
+                        <p class="card-subtitle">Turning ${birthday.age} years old</p>
+                    </div>
+                    <div class="card-urgency">
+                        <span class="urgency-badge ${urgencyClass}">
+                            ${birthday.daysUntil === 0 ? 'Today!' :
+                              birthday.daysUntil === 1 ? 'Tomorrow' :
+                              `${birthday.daysUntil} days`}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="card-details">
+                        <div class="detail-item">
+                            <i class="fas fa-calendar"></i>
+                            <span>${dateStr}</span>
+                        </div>
+                        ${birthday.email ? `
+                            <div class="detail-item">
+                                <i class="fas fa-envelope"></i>
+                                <span>${birthday.email}</span>
+                            </div>
+                        ` : ''}
+                        ${birthday.phone ? `
+                            <div class="detail-item">
+                                <i class="fas fa-phone"></i>
+                                <span>${birthday.phone}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="card-actions">
+                    ${!birthday.giftSent ? `
+                        <button class="btn-primary btn-small" onclick="window.communicationsReminders.markGiftSent('${birthday.id}', '${birthday.clientName}')">
+                            <i class="fas fa-gift"></i> Mark Gift Sent
+                        </button>
+                        <button class="btn-secondary btn-small" onclick="sendBirthdayMessage('${birthday.clientName}', '${birthday.email}', '${birthday.phone}')">
+                            <i class="fas fa-paper-plane"></i> Send Message
+                        </button>
+                    ` : `
+                        <span class="status-completed">
+                            <i class="fas fa-check-circle"></i> Gift Sent
+                        </span>
+                        <button class="btn-secondary btn-small" onclick="window.communicationsReminders.undoGiftSent('${birthday.id}')">
+                            <i class="fas fa-undo"></i> Undo
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = cards;
+}
+
+function loadNewPolicyCards(newPolicies) {
+    const container = document.getElementById('new-policy-reminders');
+    if (!container) return;
+
+    if (newPolicies.length === 0) {
+        container.innerHTML = `
+            <div class="no-reminders">
+                <i class="fas fa-file-contract" style="font-size: 48px; color: #d1d5db; margin-bottom: 16px;"></i>
+                <p>No new policies in the last 7 days</p>
+            </div>
+        `;
+        return;
+    }
+
+    const cards = newPolicies.map(policy => {
+        const premium = typeof policy.premium === 'number' ? policy.premium.toLocaleString() : policy.premium;
+
+        return `
+            <div class="reminder-card new-policy-card ${policy.giftSent ? 'completed' : ''}">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <i class="fas fa-file-contract"></i>
+                    </div>
+                    <div class="card-info">
+                        <h4>${policy.clientName}</h4>
+                        <p class="card-subtitle">${policy.policyType}</p>
+                    </div>
+                    <div class="card-urgency">
+                        <span class="policy-premium">$${premium}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="card-details">
+                        <div class="detail-item">
+                            <i class="fas fa-calendar-plus"></i>
+                            <span>${policy.daysAgo === 0 ? 'Today' :
+                                   policy.daysAgo === 1 ? 'Yesterday' :
+                                   `${policy.daysAgo} days ago`}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    ${!policy.giftSent ? `
+                        <button class="btn-primary btn-small" onclick="window.communicationsReminders.markGiftSent('${policy.id}', '${policy.clientName}')">
+                            <i class="fas fa-gift"></i> Mark Gift Sent
+                        </button>
+                        <button class="btn-secondary btn-small" onclick="sendWelcomeMessage('${policy.clientName}')">
+                            <i class="fas fa-paper-plane"></i> Send Welcome
+                        </button>
+                    ` : `
+                        <span class="status-completed">
+                            <i class="fas fa-check-circle"></i> Gift Sent
+                        </span>
+                        <button class="btn-secondary btn-small" onclick="window.communicationsReminders.undoGiftSent('${policy.id}')">
+                            <i class="fas fa-undo"></i> Undo
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = cards;
+}
+
+
+// Birthday message helpers
+function sendBirthdayMessage(clientName, email, phone) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-birthday-cake"></i> Send Birthday Message to ${clientName}</h3>
+                <button class="close-modal" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tabs" style="margin-bottom: 20px;">
+                    <button class="tab-btn active" onclick="switchBirthdayTab(this, 'email')">Email</button>
+                    <button class="tab-btn" onclick="switchBirthdayTab(this, 'sms')">SMS</button>
+                </div>
+
+                <div id="birthday-email-tab" class="birthday-tab active">
+                    <div class="form-group">
+                        <label>To:</label>
+                        <input type="email" value="${email || ''}" class="form-control" id="birthdayEmailTo">
+                    </div>
+                    <div class="form-group">
+                        <label>Subject:</label>
+                        <input type="text" value="Happy Birthday, ${clientName}!" class="form-control" id="birthdayEmailSubject">
+                    </div>
+                    <div class="form-group">
+                        <label>Message:</label>
+                        <textarea class="form-control" rows="6" id="birthdayEmailMessage">Dear ${clientName},
+
+Happy Birthday! 🎉
+
+We hope you have a wonderful day filled with joy and celebration. Thank you for being such a valued client.
+
+As a small token of our appreciation, we've prepared a special gift for you. We'll be in touch soon!
+
+Best wishes,
+Your Insurance Team</textarea>
+                    </div>
+                </div>
+
+                <div id="birthday-sms-tab" class="birthday-tab" style="display: none;">
+                    <div class="form-group">
+                        <label>To:</label>
+                        <input type="tel" value="${phone || ''}" class="form-control" id="birthdaySmsTo">
+                    </div>
+                    <div class="form-group">
+                        <label>Message:</label>
+                        <textarea class="form-control" rows="4" maxlength="160" id="birthdaySmsMessage">Happy Birthday ${clientName}! 🎂 Hope you have an amazing day! - Your Insurance Team</textarea>
+                        <small class="char-count">0 / 160 characters</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                <button class="btn-primary" onclick="sendBirthdayMessageNow('${clientName}')">
+                    <i class="fas fa-paper-plane"></i> Send Message
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+
+    // Add character counter for SMS
+    const smsTextarea = modal.querySelector('#birthdaySmsMessage');
+    const charCount = modal.querySelector('.char-count');
+    smsTextarea.addEventListener('input', function() {
+        charCount.textContent = `${this.value.length} / 160 characters`;
+    });
+    // Initial count
+    charCount.textContent = `${smsTextarea.value.length} / 160 characters`;
+}
+
+function switchBirthdayTab(button, tabType) {
+    // Update buttons
+    button.parentNode.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+
+    // Update tabs
+    document.querySelectorAll('.birthday-tab').forEach(tab => tab.style.display = 'none');
+    document.getElementById(`birthday-${tabType}-tab`).style.display = 'block';
+}
+
+function sendBirthdayMessageNow(clientName) {
+    const activeTab = document.querySelector('.birthday-tab[style="display: block;"], .birthday-tab.active:not([style*="none"])');
+    const isEmail = activeTab.id === 'birthday-email-tab';
+
+    if (isEmail) {
+        const to = document.getElementById('birthdayEmailTo').value;
+        const subject = document.getElementById('birthdayEmailSubject').value;
+        const message = document.getElementById('birthdayEmailMessage').value;
+
+        if (!to || !subject || !message) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        // Simulate sending email
+        alert(`Birthday email sent to ${clientName} at ${to}!`);
+    } else {
+        const to = document.getElementById('birthdaySmsTo').value;
+        const message = document.getElementById('birthdaySmsMessage').value;
+
+        if (!to || !message) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        // Simulate sending SMS
+        alert(`Birthday SMS sent to ${clientName} at ${to}!`);
+    }
+
+    document.querySelector('.modal').remove();
+}
+
+function sendWelcomeMessage(clientName) {
+    alert(`Welcome message functionality for ${clientName} - Coming soon!`);
+}
 
 // Lead Import and Blast Functions
 function importLeads() {
@@ -15475,6 +16444,7 @@ window.applyAdvancedFilters = function() {
     const filterPremium = document.getElementById('filterPremium')?.value;
     const filterRenewal = document.getElementById('filterRenewal')?.value;
     const filterAssigned = document.getElementById('filterAssigned')?.value;
+    console.log('🔍 FILTER DEBUG: filterAssigned =', filterAssigned);
     const filterProduct = document.getElementById('filterProduct')?.value;
 
     let filteredLeads = [...window.allLeads || []];
@@ -15519,11 +16489,13 @@ window.applyAdvancedFilters = function() {
 
     // Apply assigned filter
     if (filterAssigned) {
+        const beforeFilterCount = filteredLeads.length;
         if (filterAssigned === 'unassigned') {
             filteredLeads = filteredLeads.filter(lead => !lead.assignedTo);
         } else {
             filteredLeads = filteredLeads.filter(lead => lead.assignedTo === filterAssigned);
         }
+        console.log(`🔍 AssignedTo Filter: ${beforeFilterCount} → ${filteredLeads.length} leads (filtered by: "${filterAssigned}")`);
         filterCount++;
     }
 
@@ -15601,39 +16573,146 @@ function getNextAction(stage, lead) {
 
         // Check if stage requires reach out (NOT info_received - that needs quote preparation)
         if (stage === 'quoted' || stage === 'info_requested' ||
-            stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
+            stage === 'loss_runs_requested' || stage === 'app_sent' || stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
             stage === 'interested') {
 
-            // If connected call was made or all methods attempted, reach out is complete
-            if (reachOut.callsConnected > 0 ||
-                (reachOut.callAttempts > 0 && reachOut.emailCount > 0 && reachOut.textCount > 0)) {
-                return ''; // Empty TO DO when reach out is complete
+            // Reach out is complete when:
+            // 1. Lead answered call (completedAt exists), OR
+            // 2. Connected call was made, OR
+            // 3. Text has been sent (final step in sequence)
+            if (reachOut.completedAt || reachOut.callsConnected > 0 || reachOut.textCount > 0) {
+                // NEW: Check if reach out completion has expired (older than 2 days)
+                if (reachOut.reachOutCompletedAt) {
+                    const completedTime = new Date(reachOut.reachOutCompletedAt);
+                    const currentTime = new Date();
+                    const timeDifferenceMs = currentTime.getTime() - completedTime.getTime();
+                    const timeDifferenceDays = timeDifferenceMs / (1000 * 60 * 60 * 24);
+
+                    // If more than 2 days have passed, reach out has expired - reset and require new reach out
+                    if (timeDifferenceDays > 2) {
+                        console.log(`🔄 REACH OUT EXPIRED: Lead ${lead.id} - ${lead.name}, completed ${timeDifferenceDays.toFixed(1)} days ago`);
+
+                        // Reset reach out completion status to trigger new reach out
+                        reachOut.callsConnected = 0;
+                        reachOut.textCount = 0;
+                        reachOut.emailSent = false;
+                        reachOut.textSent = false;
+                        reachOut.callMade = false;
+                        delete reachOut.reachOutCompletedAt;
+
+                        // Save the updated lead data
+                        updateLeadInStorage(lead);
+
+                        // Return appropriate reach out action based on stage
+                        return getReachOutAction(stage);
+                    }
+                }
+
+                return ''; // Empty TO DO when reach out is complete and not expired
             }
         }
     }
 
     const actionMap = {
+        // Original lowercase with underscores format
         'new': 'Assign Stage',
         'contact_attempted': 'Follow up with lead',
-        'info_requested': 'Reach out to lead',
+        'info_requested': 'Reach out',
         'info_received': 'Prepare Quote',
-        'loss_runs_requested': 'Follow up for Loss Runs',
-        'loss_runs_received': 'Analyze Loss Runs & Quote',
+        'loss_runs_requested': 'Reach out',
+        'loss_runs_received': 'Prepare app.',
+        'app_prepared': 'Send application',
+        'app_sent': '',
         'quoted': 'Email Quote, and make contact',
-        'quote_sent': 'Reach out to lead',
-        'quote-sent-unaware': 'Reach out to lead',
+        'quote_sent': 'Reach out',
+        'quote-sent-unaware': 'Reach out',
         'quote-sent-aware': 'Follow up with lead',
         'interested': 'Close the deal',
         'not-interested': 'Archive lead',
-        'closed': 'Process complete'
+        'closed': 'Process complete',
+
+        // Title case with spaces format (actual database format)
+        'New': 'Assign Stage',
+        'Contact Attempted': 'Follow up with lead',
+        'Info Requested': 'Reach out',
+        'Info Received': 'Prepare Quote',
+        'Loss Runs Requested': 'Reach out',
+        'Loss Runs Received': 'Prepare app.',
+        'App Prepared': 'Send application',
+        'App Sent': '',
+        'Quoted': 'Email Quote, and make contact',
+        'Quote Sent': 'Reach out',
+        'Quote Sent Unaware': 'Reach out',
+        'Quote Sent Aware': 'Follow up with lead',
+        'Interested': 'Close the deal',
+        'Not Interested': 'Archive lead',
+        'Closed': 'Process complete'
     };
-    return actionMap[stage] || 'Review lead';
+
+    const actionText = actionMap.hasOwnProperty(stage) ? actionMap[stage] : 'Review lead';
+
+    // Apply color styling based on action
+    if (actionText === 'Process complete') {
+        return `<span style="color: #16a34a; font-weight: bold;">${actionText}</span>`;
+    } else if (actionText === 'Reach out') {
+        return `<span style="color: #dc2626; font-weight: bold;">${actionText}</span>`;
+    } else {
+        return actionText;
+    }
+}
+
+// Helper function to get the appropriate reach out action text based on stage
+function getReachOutAction(stage) {
+    const reachOutActionMap = {
+        'quoted': 'Email Quote, and make contact',
+        'info_requested': 'Reach out to lead',
+        'loss_runs_requested': 'Reach out to lead',
+        'app_sent': 'Reach out to lead',
+        'quote_sent': 'Reach out to lead',
+        'quote-sent-unaware': 'Reach out to lead',
+        'quote-sent-aware': 'Follow up with lead',
+        'interested': 'Close the deal'
+    };
+    return reachOutActionMap[stage] || 'Reach out to lead';
+}
+
+// Helper function to update lead in storage after reach out expiration reset
+function updateLeadInStorage(lead) {
+    try {
+        // Check if it's an insurance lead or regular lead
+        let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+        // Try to find and update in insurance leads
+        let foundIndex = insuranceLeads.findIndex(l => l.id === lead.id);
+        if (foundIndex !== -1) {
+            insuranceLeads[foundIndex] = lead;
+            localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+            console.log(`✅ Updated insurance lead ${lead.id} in localStorage after reach out expiration`);
+            return;
+        }
+
+        // Try to find and update in regular leads
+        foundIndex = regularLeads.findIndex(l => l.id === lead.id);
+        if (foundIndex !== -1) {
+            regularLeads[foundIndex] = lead;
+            localStorage.setItem('leads', JSON.stringify(regularLeads));
+            console.log(`✅ Updated regular lead ${lead.id} in localStorage after reach out expiration`);
+            return;
+        }
+
+        console.warn(`⚠️ Could not find lead ${lead.id} in storage for reach out expiration update`);
+    } catch (error) {
+        console.error(`❌ Error updating lead ${lead.id} after reach out expiration:`, error);
+    }
 }
 
 // Make it globally accessible
 window.getNextAction = getNextAction;
+window.getReachOutAction = getReachOutAction;
+window.updateLeadInStorage = updateLeadInStorage;
 
-// Helper function to render filtered leads
+// Helper function to render filtered leads - FIXED to use standard table generation
 function renderLeadsList(leads) {
     const leadsList = document.getElementById('leadsTableBody');
     if (!leadsList) return;
@@ -15695,7 +16774,11 @@ function renderLeadsList(leads) {
         return;
     }
 
-    leadsList.innerHTML = leads.map(lead => {
+    // FIXED: Use standard table generation to avoid duplicate tables
+    leadsList.innerHTML = generateSimpleLeadRows(leads);
+
+    // OLD CUSTOM CODE BELOW (disabled):
+    /* leadsList.innerHTML = leads.map(lead => {
         const isPriority = lead.premium && lead.premium > 10000;
         const renewalDate = lead.renewalDate ? new Date(lead.renewalDate) : null;
         const daysUntilRenewal = renewalDate ? Math.floor((renewalDate - new Date()) / (1000 * 60 * 60 * 24)) : null;
@@ -15735,7 +16818,7 @@ function renderLeadsList(leads) {
                 </td>
                 <td>
                     <div style="font-weight: bold; color: black;">
-                        ${typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')}
+                        ${(typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || ''}
                     </div>
                 </td>
                 <td>
@@ -15765,7 +16848,7 @@ function renderLeadsList(leads) {
                 </td>
             </tr>
         `;
-    }).join('');
+    }).join(''); */
 }
 
 // Cache bust: Sun Sep 29 v52 - FORCE REFRESH - Fixed original working flow
