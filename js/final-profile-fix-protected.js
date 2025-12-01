@@ -1,4 +1,6 @@
 // PROTECTED Final Profile Fix - Loads last and prevents overrides
+console.log('🚨🚨🚨 PROTECTED-FINAL-PROFILE-FIX: VERSION 1000 LOADING NOW!!! 🚨🚨🚨');
+alert('PROTECTED SCRIPT LOADING - VERSION 1000');
 console.log('🔥 PROTECTED-FINAL-PROFILE-FIX: Enhanced profile loading with protection...');
 
 // Store references to prevent overriding
@@ -32,6 +34,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     // Create modal container with exact working styling
     const modalContainer = document.createElement('div');
     modalContainer.id = 'lead-profile-container';
+    modalContainer.dataset.leadId = lead.id;
     modalContainer.style.cssText = `
         position: fixed !important;
         top: 0px !important;
@@ -895,38 +898,26 @@ protectedFunctions.addDriverToLead = function(leadId) {
 protectedFunctions.createQuoteApplication = function(leadId) {
     console.log('Create quote application for lead:', leadId);
 
-    // Get the lead data
-    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const lead = leads.find(l => String(l.id) === String(leadId));
-
-    if (!lead) {
-        console.error('Lead not found with ID:', leadId);
-        alert('Lead not found. Please refresh and try again.');
+    // Use the enhanced quote application modal
+    if (typeof window.createQuoteApplicationSimple === 'function') {
+        window.createQuoteApplicationSimple(leadId);
         return;
     }
 
-    // Remove any existing quote modal first
-    const existingModal = document.getElementById('quote-application-modal');
-    if (existingModal) {
-        existingModal.remove();
-    }
+    console.error('Enhanced quote application not available');
+    alert('Quote application feature is loading. Please try again in a moment.');
 
-    // Create quote application modal
-    const modal = document.createElement('div');
-    modal.id = 'quote-application-modal';
-    modal.dataset.leadId = leadId;
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        z-index: 3000000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
+    // End of function - enhanced modal will be used instead
+};
+
+protectedFunctions.loadQuoteApplications = function(leadId) {
+    console.log('📋 Loading quote applications for lead:', leadId);
+
+    const applicationsContainer = document.getElementById(`application-submissions-container-${leadId}`);
+    if (!applicationsContainer) {
+        console.log('❌ Applications container not found');
+        return;
+    }
 
     const content = document.createElement('div');
     content.style.cssText = `
@@ -1759,10 +1750,113 @@ window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
 window.sendEmail = protectedFunctions.sendEmail;
 
+// Quote Application Display Function
+window.showApplicationSubmissions = function(leadId) {
+    console.log('📋 showApplicationSubmissions called for lead:', leadId);
+
+    const containerId = `application-submissions-container-${leadId}`;
+    const container = document.getElementById(containerId);
+
+    if (!container) {
+        console.error('❌ Application submissions container not found:', containerId);
+        return;
+    }
+
+    // Get saved applications for this lead
+    const allApplications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+    const leadApplications = allApplications.filter(app => String(app.leadId) === String(leadId));
+
+    console.log('📋 Found', leadApplications.length, 'applications for lead', leadId);
+
+    if (leadApplications.length === 0) {
+        container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No applications submitted yet</p>';
+        return;
+    }
+
+    // Display applications using detailed format
+    let applicationsHTML = '';
+    leadApplications.forEach((app, index) => {
+        const created = new Date(app.created || app.createdDate);
+        const createdDate = created.toLocaleDateString();
+        const createdTime = created.toLocaleTimeString();
+        applicationsHTML += `
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0; color: #374151; font-size: 14px;">
+                            <i class="fas fa-file-signature" style="color: #10b981; margin-right: 8px;"></i>
+                            Quote Application #${app.id}
+                        </h4>
+                        <p style="margin: 0; color: #6b7280; font-size: 12px;">
+                            <i class="fas fa-clock" style="margin-right: 5px;"></i>
+                            ${createdDate} at ${createdTime}
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button onclick="editQuoteApplication('${app.id}')" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; font-size: 12px; color: #6b7280;">
+                    <div>
+                        <strong style="color: #374151;">Commodities:</strong> ${app.formData?.commodities?.length || app.commodities?.length || 0}
+                    </div>
+                    <div>
+                        <strong style="color: #374151;">Drivers:</strong> ${app.formData?.drivers?.length || app.drivers?.length || 0}
+                    </div>
+                    <div>
+                        <strong style="color: #374151;">Trucks:</strong> ${app.formData?.trucks?.length || app.trucks?.length || 0}
+                    </div>
+                    <div>
+                        <strong style="color: #374151;">Trailers:</strong> ${app.formData?.trailers?.length || app.trailers?.length || 0}
+                    </div>
+                </div>
+                <div style="margin-top: 8px;">
+                    <span style="display: inline-block; background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">
+                        ${app.status?.toUpperCase() || 'SAVED'}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = applicationsHTML;
+    console.log('✅ Applications display updated successfully');
+};
+
 // Quote Application Management Functions
 window.viewQuoteApplication = function(appId) {
     console.log('📄 Viewing quote application:', appId);
-    alert('View application functionality coming soon');
+
+    // Get the application data from localStorage
+    const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+    const application = applications.find(app => String(app.id) === String(appId));
+
+    if (!application) {
+        alert('Application not found');
+        return;
+    }
+
+    console.log('📄 Found application data:', application);
+
+    // Set up editing mode and global data for the form to access
+    window.editingApplicationId = appId;
+    window.editingApplicationData = application;
+
+    // Open the original quote application form
+    if (typeof window.createQuoteApplicationSimple === 'function') {
+        window.createQuoteApplicationSimple(application.leadId);
+    } else {
+        console.error('createQuoteApplicationSimple function not available');
+        alert('Unable to open application form');
+    }
 };
 
 window.editQuoteApplication = function(appId) {
@@ -1771,22 +1865,42 @@ window.editQuoteApplication = function(appId) {
 };
 
 window.deleteQuoteApplication = function(appId) {
-    console.log('🗑️ Deleting quote application:', appId);
+    console.log('🗑️ DELETE FUNCTION CALLED - VERSION LATEST:', appId);
     if (confirm('Are you sure you want to delete this quote application?')) {
+        console.log('🗑️ User confirmed delete, proceeding...');
         const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+        console.log('🗑️ Found applications in storage:', applications.length);
         const updatedApplications = applications.filter(app => String(app.id) !== String(appId));
+        console.log('🗑️ After filter, applications remaining:', updatedApplications.length);
         localStorage.setItem('quote_applications', JSON.stringify(updatedApplications));
 
-        // Refresh the current lead profile
-        const leadProfileModal = document.getElementById('lead-profile-modal');
-        if (leadProfileModal) {
-            const leadId = leadProfileModal.dataset.leadId;
-            if (leadId) {
-                protectedFunctions.loadQuoteApplications(leadId);
-            }
+        // Try multiple refresh methods
+        const leadProfileModal = document.getElementById('lead-profile-container');
+        const currentLead = window.currentViewingLead || (leadProfileModal && leadProfileModal.dataset.leadId);
+
+        console.log('🔄 Attempting refresh with leadId:', currentLead);
+        console.log('🔄 showApplicationSubmissions available:', typeof window.showApplicationSubmissions);
+
+        if (currentLead && window.showApplicationSubmissions) {
+            console.log('🔄 Calling showApplicationSubmissions...');
+            window.showApplicationSubmissions(currentLead);
+            console.log('🔄 showApplicationSubmissions called successfully');
+        } else {
+            console.error('❌ Cannot refresh - missing leadId or function');
+            console.log('leadId:', currentLead, 'function:', typeof window.showApplicationSubmissions);
         }
 
-        alert('Quote application deleted successfully');
+        // Also try to trigger a more aggressive refresh
+        setTimeout(() => {
+            console.log('🔄 Secondary refresh attempt...');
+            if (currentLead && window.showApplicationSubmissions) {
+                window.showApplicationSubmissions(currentLead);
+            }
+        }, 50);
+
+        console.log('✅ Quote application deleted successfully');
+    } else {
+        console.log('🗑️ Delete cancelled by user');
     }
 };
 
@@ -2014,7 +2128,7 @@ window.removeCommodityRow = function(button) {
 };
 
 window.saveQuoteApplication = function(leadId) {
-    console.log('💾 Saving quote application for lead:', leadId);
+    console.log('🚀 SAVE FUNCTION CALLED - VERSION 24 - NO ALERT!', leadId);
 
     const modal = document.getElementById('quote-application-modal');
     if (!modal) {
@@ -2121,28 +2235,33 @@ window.saveQuoteApplication = function(leadId) {
 
     console.log('✅ Quote application saved:', applicationData);
 
-    // Show success message
-    alert(`Quote application saved successfully!\n\nCommodities: ${commodities.length}\nDrivers: ${drivers.length}\nTrucks: ${trucks.length}\nTrailers: ${trailers.length}`);
-
     // Close quote application modal
     modal.remove();
 
     // Refresh the lead profile to show the new application
-    const leadProfileModal = document.getElementById('lead-profile-modal');
+    console.log('🔄 Refreshing lead profile to show saved application...');
+    const leadProfileModal = document.getElementById('lead-profile-container');
     if (leadProfileModal) {
+        console.log('✅ Found lead profile modal, refreshing...');
         // Close and reopen the lead profile to refresh the Application Submissions section
         const leadData = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
         const currentLead = leadData.find(l => String(l.id) === String(leadId));
 
         if (currentLead) {
+            console.log('✅ Found current lead, closing and reopening profile...');
             // Close current profile modal
             leadProfileModal.remove();
 
             // Reopen with updated data
             setTimeout(() => {
+                console.log('🔄 Reopening lead profile...');
                 protectedFunctions.showLeadProfile(leadId);
             }, 100);
+        } else {
+            console.log('❌ Current lead not found');
         }
+    } else {
+        console.log('❌ Lead profile modal not found for refresh');
     }
 };
 
@@ -2161,9 +2280,70 @@ try {
     console.log('💾 Storage usage check failed:', e.message);
 }
 
-// Ensure our protected functions override any others
+// Ensure our protected functions override any others - ULTRA AGGRESSIVE OVERRIDE
 window.viewLead = protectedFunctions.viewLead;
 window.createEnhancedProfile = protectedFunctions.createEnhancedProfile;
 window.showLeadProfile = protectedFunctions.showLeadProfile;
 
 console.log('🔥 PROTECTED FUNCTIONS NOW ACTIVE - Enhanced profile with Reach Out section should load');
+console.log('🚨 FINAL-PROFILE-FIX-PROTECTED SCRIPT LOADED - VERSION 1000');
+console.log('🔍 Current functions on window:', {
+    viewLead: typeof window.viewLead,
+    showLeadProfile: typeof window.showLeadProfile,
+    createEnhancedProfile: typeof window.createEnhancedProfile
+});
+
+// ULTIMATE PROTECTION: Use Object.defineProperty to make functions non-configurable and non-writable
+function lockFunctions() {
+    try {
+        Object.defineProperty(window, 'viewLead', {
+            value: protectedFunctions.viewLead,
+            writable: false,
+            configurable: false
+        });
+        Object.defineProperty(window, 'createEnhancedProfile', {
+            value: protectedFunctions.createEnhancedProfile,
+            writable: false,
+            configurable: false
+        });
+        Object.defineProperty(window, 'showLeadProfile', {
+            value: protectedFunctions.showLeadProfile,
+            writable: false,
+            configurable: false
+        });
+        console.log('🔒 FUNCTIONS LOCKED: Protected functions are now non-configurable and non-writable');
+    } catch (error) {
+        console.warn('⚠️ Could not lock functions, falling back to aggressive override:', error.message);
+        // Fallback to aggressive override
+        window.viewLead = protectedFunctions.viewLead;
+        window.createEnhancedProfile = protectedFunctions.createEnhancedProfile;
+        window.showLeadProfile = protectedFunctions.showLeadProfile;
+    }
+}
+
+// Lock functions immediately
+lockFunctions();
+
+// Set up aggressive protection against function override
+setTimeout(() => {
+    console.log('🛡️ AGGRESSIVE OVERRIDE: Ensuring protected functions stay active');
+    lockFunctions();
+}, 100);
+
+// Also protect against any late-loading scripts
+setTimeout(() => {
+    console.log('🛡️ FINAL OVERRIDE: Last chance protection of functions');
+    lockFunctions();
+}, 1000);
+
+// Set up periodic monitoring to detect and prevent function override
+setInterval(() => {
+    // Check if functions are still ours
+    if (window.showLeadProfile !== protectedFunctions.showLeadProfile ||
+        window.viewLead !== protectedFunctions.viewLead ||
+        window.createEnhancedProfile !== protectedFunctions.createEnhancedProfile) {
+
+        console.warn('🚨 FUNCTION OVERRIDE DETECTED! Re-establishing protection...');
+        lockFunctions();
+    }
+}, 2000);

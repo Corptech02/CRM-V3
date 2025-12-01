@@ -12,7 +12,8 @@
         const quoteButtons = document.querySelectorAll('button');
 
         quoteButtons.forEach(button => {
-            if (button.textContent.includes('Quote Application')) {
+            // Only target the "Quote Application" button, NOT the "Save Quote Application" button
+            if (button.textContent.includes('Quote Application') && !button.textContent.includes('Save')) {
                 // Check if this button is in a lead profile context
                 const leadProfileContainer = button.closest('.lead-details, .profile-container, [data-lead-id]');
 
