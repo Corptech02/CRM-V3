@@ -2273,6 +2273,9 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                         <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-eye"></i> View
                         </button>
+                        <button onclick="downloadQuoteApplication('${app.id}')" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-download"></i> Download
+                        </button>
                         <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-trash"></i> Delete
                         </button>
@@ -2911,6 +2914,9 @@ window.showApplicationSubmissions = function(leadId) {
                         <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-eye"></i> View
                         </button>
+                        <button onclick="downloadQuoteApplication('${app.id}')" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-download"></i> Download
+                        </button>
                         <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-trash"></i> Delete
                         </button>
@@ -2969,6 +2975,65 @@ window.viewQuoteApplication = function(appId) {
         .catch(error => {
             console.error('❌ View error:', error);
             alert('Error loading application. Please try again.');
+        });
+};
+
+window.downloadQuoteApplication = function(appId) {
+    console.log('📥 Downloading quote application:', appId);
+
+    // Get the application data from server
+    fetch(`/api/quote-applications/${appId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const application = data.application;
+                console.log('📥 Found application data for download:', application);
+
+                // Set up editing mode and global data for the form to access
+                window.editingApplicationId = appId;
+                window.editingApplicationData = application;
+
+                // Open the application first
+                if (typeof window.createQuoteApplicationSimple === 'function') {
+                    window.createQuoteApplicationSimple(application.leadId);
+
+                    // Wait a moment for the modal to open, then trigger direct download
+                    setTimeout(() => {
+                        console.log('📥 Triggering direct download after modal opened...');
+
+                        // Call the application download directly, bypassing any ACORD conflicts
+                        const modal = document.getElementById('quote-application-modal');
+                        if (modal && typeof window.downloadQuoteApplicationPDF === 'function') {
+                            // Temporarily disable any ACORD functions that might interfere
+                            const originalDownloadACORD = window.downloadACORD;
+                            window.downloadACORD = function() {
+                                console.log('🚫 ACORD download blocked during application download');
+                                return false;
+                            };
+
+                            // Call the application download
+                            window.downloadQuoteApplicationPDF();
+
+                            // Restore ACORD function after a delay
+                            setTimeout(() => {
+                                window.downloadACORD = originalDownloadACORD;
+                            }, 3000);
+                        } else {
+                            console.error('Quote application modal not found or download function not available');
+                            alert('Download function not available. Please try viewing the application first.');
+                        }
+                    }, 500);
+                } else {
+                    console.error('createQuoteApplicationSimple function not available');
+                    alert('Unable to open application for download');
+                }
+            } else {
+                alert('Application not found');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Download error:', error);
+            alert('Error loading application for download. Please try again.');
         });
 };
 

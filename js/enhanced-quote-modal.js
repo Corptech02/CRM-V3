@@ -1,6 +1,219 @@
 // Enhanced Quote Application Modal with Dynamic Sections
 console.log('📝 Enhanced Quote Application Modal Loading...');
 
+// Define add row functions for the quote application modal
+window.addDriverRow = function() {
+    console.log('🚛 addDriverRow called from enhanced modal');
+    const container = document.getElementById('drivers-container');
+    if (!container) {
+        console.log('❌ drivers-container not found');
+        return;
+    }
+    console.log('✅ Found drivers-container, adding row...');
+
+    const newRow = document.createElement('div');
+    newRow.className = 'driver-row';
+    newRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 2fr auto; gap: 8px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
+
+    newRow.innerHTML = `
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Name:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Date of Birth:</label>
+            <input type="date" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">License Number:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">State:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Years Experience:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Date of Hire:</label>
+            <input type="date" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;"># Accidents/Violations:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <button type="button" onclick="removeDriverRow(this)" style="background: #dc2626; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">Delete</button>
+        </div>
+    `;
+
+    container.appendChild(newRow);
+    console.log('✅ Added new driver row');
+};
+
+window.removeDriverRow = function(button) {
+    const row = button.closest('.driver-row');
+    if (row) {
+        row.remove();
+        console.log('✅ Removed driver row');
+    }
+};
+
+window.addTruckRow = function() {
+    console.log('🚚 addTruckRow called');
+    const container = document.getElementById('trucks-container');
+    if (!container) {
+        console.log('❌ trucks-container not found');
+        return;
+    }
+    console.log('✅ Found trucks-container, adding row...');
+
+    const newRow = document.createElement('div');
+    newRow.className = 'truck-row';
+    newRow.style.cssText = 'display: grid; grid-template-columns: 1fr 2fr 1fr 2fr 1fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
+
+    newRow.innerHTML = `
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Year:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Make/Model:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Type:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">VIN:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Value:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Radius:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <button type="button" onclick="removeTruckRow(this)" style="background: #dc2626; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">Delete</button>
+        </div>
+    `;
+
+    container.appendChild(newRow);
+    console.log('✅ Added new truck row');
+};
+
+window.removeTruckRow = function(button) {
+    const row = button.closest('.truck-row');
+    if (row) {
+        row.remove();
+        console.log('✅ Removed truck row');
+    }
+};
+
+window.addTrailerRow = function() {
+    console.log('🚛 addTrailerRow called');
+    const container = document.getElementById('trailers-container');
+    if (!container) {
+        console.log('❌ trailers-container not found');
+        return;
+    }
+    console.log('✅ Found trailers-container, adding row...');
+
+    const newRow = document.createElement('div');
+    newRow.className = 'trailer-row';
+    newRow.style.cssText = 'display: grid; grid-template-columns: 1fr 2fr 1fr 2fr 1fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
+
+    newRow.innerHTML = `
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Year:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Make/Model:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Trailer Type:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">VIN:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Value:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px;">Radius:</label>
+            <input type="text" style="width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px;">
+        </div>
+        <div>
+            <button type="button" onclick="removeTrailerRow(this)" style="background: #dc2626; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">Delete</button>
+        </div>
+    `;
+
+    container.appendChild(newRow);
+    console.log('✅ Added new trailer row');
+};
+
+window.removeTrailerRow = function(button) {
+    const row = button.closest('.trailer-row');
+    if (row) {
+        row.remove();
+        console.log('✅ Removed trailer row');
+    }
+};
+
+window.addCommodityRow = function() {
+    console.log('📦 addCommodityRow called');
+    const container = document.getElementById('commodities-container');
+    if (!container) {
+        console.log('❌ commodities-container not found');
+        return;
+    }
+    console.log('✅ Found commodities-container, adding row...');
+
+    const newRow = document.createElement('div');
+    newRow.className = 'commodity-row';
+    newRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
+
+    newRow.innerHTML = `
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Commodity:</label>
+            <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">% of Loads:</label>
+            <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Max Value:</label>
+            <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+        </div>
+        <div>
+            <button type="button" onclick="removeCommodityRow(this)" style="background: #dc2626; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Delete</button>
+        </div>
+    `;
+
+    container.appendChild(newRow);
+    console.log('✅ Added new commodity row');
+};
+
+window.removeCommodityRow = function(button) {
+    const row = button.closest('.commodity-row');
+    if (row) {
+        row.remove();
+        console.log('✅ Removed commodity row');
+    }
+};
+
 // Function to close quote application modal and clean up editing state
 window.closeQuoteApplicationModal = function() {
     const modal = document.getElementById('quote-application-modal');
@@ -1052,13 +1265,51 @@ window.saveQuoteApplication = async function() {
 
         console.log('💾 FINAL APPLICATION SUBMISSION OBJECT:', JSON.stringify(applicationSubmission, null, 2));
 
-        localStorage.setItem('quote_applications', JSON.stringify(allSubmissions));
-        console.log('💾 Saved to localStorage, total submissions:', allSubmissions.length);
+        // Save to server as primary method
+        try {
+            const response = await fetch('/api/quote-applications', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    leadId: leadId,
+                    applicationData: applicationSubmission
+                })
+            });
 
-        // Also try to save to server (async, don't wait for it)
-        saveToServer(applicationSubmission).catch(error => {
-            console.warn('⚠️ Server save failed but localStorage succeeded:', error);
-        });
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Server save failed');
+            }
+
+            console.log('✅ Quote application saved to server:', result.applicationId);
+
+            // Store the original frontend ID before updating
+            const originalId = applicationSubmission.id;
+
+            // Update application with server-generated ID
+            applicationSubmission.id = result.applicationId;
+
+            // Update localStorage with correct server ID
+            if (isEditing) {
+                const existingIndex = allSubmissions.findIndex(app => app.id === window.editingApplicationId);
+                if (existingIndex !== -1) {
+                    allSubmissions[existingIndex] = applicationSubmission;
+                }
+            } else {
+                // Remove the local ID version and add server ID version
+                allSubmissions = allSubmissions.filter(app => app.id !== originalId);
+                allSubmissions.push(applicationSubmission);
+            }
+            localStorage.setItem('quote_applications', JSON.stringify(allSubmissions));
+        } catch (error) {
+            console.error('❌ Server save failed:', error);
+            // Fallback to localStorage for now
+            localStorage.setItem('quote_applications', JSON.stringify(allSubmissions));
+            console.log('💾 Saved to localStorage as fallback');
+        }
 
         // Success message removed - no popup needed
         console.log('✅ Quote Application saved successfully');
@@ -1075,27 +1326,28 @@ window.saveQuoteApplication = async function() {
         console.log('🔄 SAVE REFRESH - showApplicationSubmissions available:', typeof window.showApplicationSubmissions);
 
         setTimeout(() => {
-            if (window.showApplicationSubmissions) {
+            // Use the server-based load function
+            if (window.protectedFunctions && window.protectedFunctions.loadQuoteApplications) {
                 try {
-                    console.log('🔄 SAVE REFRESH - Calling showApplicationSubmissions with leadId:', leadId);
+                    console.log('🔄 SAVE REFRESH - Calling server-based loadQuoteApplications with leadId:', leadId);
+                    window.protectedFunctions.loadQuoteApplications(leadId);
+                    console.log('✅ SAVE REFRESH - Successfully called loadQuoteApplications');
+                } catch (error) {
+                    console.error('❌ SAVE REFRESH - Error calling loadQuoteApplications:', error);
+                }
+            } else if (window.showApplicationSubmissions) {
+                try {
+                    console.log('🔄 SAVE REFRESH - Fallback to showApplicationSubmissions with leadId:', leadId);
                     window.showApplicationSubmissions(leadId);
                     console.log('✅ SAVE REFRESH - Successfully called showApplicationSubmissions');
                 } catch (error) {
                     console.error('❌ SAVE REFRESH - Error calling showApplicationSubmissions:', error);
                 }
             } else {
-                console.error('❌ SAVE REFRESH - showApplicationSubmissions function not available');
+                console.error('❌ SAVE REFRESH - No application refresh functions available');
                 console.log('🔍 SAVE REFRESH - Available window functions:', Object.keys(window).filter(k => k.includes('Application')));
             }
-
-            // Try secondary refresh with different timing
-            setTimeout(() => {
-                console.log('🔄 SAVE REFRESH - Secondary attempt...');
-                if (window.showApplicationSubmissions) {
-                    window.showApplicationSubmissions(leadId);
-                }
-            }, 100);
-        }, 100);
+        }, 500);
 
         // Additional fallback: Log what's actually in localStorage to verify save worked
         try {
@@ -2060,9 +2312,9 @@ function generateApplicationPDF(lead, formData) {
                     <div class="field"><div class="field-label">Year:</div><div class="field-value">${item.year || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Make/Model:</div><div class="field-value">${item.make || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Type of Truck:</div><div class="field-value">${item.type || 'N/A'}</div></div>
-                    <div class="field"><div class="field-label">VIN:</div><div class="field-value">${item.vin || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Value:</div><div class="field-value">${item.value || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Radius:</div><div class="field-value">${item.radius || 'N/A'}</div></div>
+                    <div class="field"><div class="field-label">VIN:</div><div class="field-value">${item.vin || 'N/A'}</div></div>
                 </div></div>`;
             });
             arraySectionsHTML += '</div>';
@@ -2077,9 +2329,9 @@ function generateApplicationPDF(lead, formData) {
                     <div class="field"><div class="field-label">Year:</div><div class="field-value">${item.year || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Make/Model:</div><div class="field-value">${item.make || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Trailer Type:</div><div class="field-value">${item.type || 'N/A'}</div></div>
-                    <div class="field"><div class="field-label">VIN:</div><div class="field-value">${item.vin || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Value:</div><div class="field-value">${item.value || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">Radius:</div><div class="field-value">${item.radius || 'N/A'}</div></div>
+                    <div class="field"><div class="field-label">VIN:</div><div class="field-value">${item.vin || 'N/A'}</div></div>
                 </div></div>`;
             });
             arraySectionsHTML += '</div>';
@@ -2432,10 +2684,16 @@ function generateApplicationPDF(lead, formData) {
     </div>
 
     <script>
-        // Automatically open print dialog when page loads
+        // Automatically open print dialog when page loads and close window after
         window.onload = function() {
             setTimeout(function() {
                 window.print();
+
+                // Auto-close window after print dialog
+                setTimeout(function() {
+                    console.log('🚪 Auto-closing download window...');
+                    window.close();
+                }, 2000);
             }, 1000);
         };
     </script>
@@ -2447,6 +2705,23 @@ function generateApplicationPDF(lead, formData) {
         downloadWindow.document.close();
 
         console.log('✅ Download window opened with full application');
+
+        // Add auto-close functionality to the download window
+        setTimeout(() => {
+            if (downloadWindow && !downloadWindow.closed) {
+                downloadWindow.close();
+                console.log('✅ Download window closed after download');
+            }
+        }, 2000); // 2 second delay to let user see the content briefly
+
+        // Close the application modal after download starts
+        setTimeout(() => {
+            const modal = document.getElementById('quote-application-modal');
+            if (modal) {
+                modal.remove();
+                console.log('✅ Application modal closed after download');
+            }
+        }, 1500); // 1.5 second delay to let user see the download started
 
     } catch (error) {
         console.error('❌ Error generating application download:', error);
