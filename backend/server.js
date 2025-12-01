@@ -43,7 +43,7 @@ app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 // Database setup
-const db = new sqlite3.Database(path.join(__dirname, 'vanguard.db'), (err) => {
+const db = new sqlite3.Database('/var/www/vanguard/vanguard.db', (err) => {
     if (err) {
         console.error('Error opening database:', err);
     } else {
@@ -119,6 +119,17 @@ function initializeDatabase() {
         body TEXT,
         sent_date DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Quote applications table
+    db.run(`CREATE TABLE IF NOT EXISTS quote_submissions (
+        id TEXT PRIMARY KEY,
+        lead_id TEXT,
+        form_data TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (lead_id) REFERENCES leads(id)
     )`);
 
     console.log('Database tables initialized');
@@ -1161,53 +1172,20 @@ app.use('/api/outlook', outlookRoutes);
 const coiPdfRoutes = require('./coi-pdf-generator');
 app.use('/api/coi', coiPdfRoutes);
 
-// COI Request Email endpoint
-app.post('/api/coi/send-request', async (req, res) => {
-    const { from, to, subject, message, policyId } = req.body;
-
-    try {
-        // Use nodemailer to send email
-        const nodemailer = require('nodemailer');
-
-        // Create transporter using Titan SMTP settings
-        const transporter = nodemailer.createTransport({
-            host: 'smtp.titan.email',
-            port: 587,
-            secure: false,
-            auth: {
-                user: 'contact@vigagency.com',
-                pass: process.env.TITAN_PASSWORD || '25nickc124!'
-            }
-        });
-
-        // Send email
-        const info = await transporter.sendMail({
-            from: '"VIG Agency" <contact@vigagency.com>',
-            to: to,
-            subject: subject,
-            text: message,
-            html: message.replace(/\n/g, '<br>')
-        });
-
-        console.log('COI request email sent:', info.messageId);
-
-        res.json({
-            success: true,
-            messageId: info.messageId
-        });
-
-    } catch (error) {
-        console.error('Error sending COI request:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
+// COI Request Email endpoint will be defined after multer configuration
 
 // Quote submission endpoints
 const multer = require('multer');
 const fs = require('fs');
+
+// Configure multer for documentation email attachments (memory storage)
+const uploadDocuments = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit per file
+        files: 10 // Maximum 10 files
+    }
+});
 
 // Configure multer for file uploads
 const quoteStorage = multer.diskStorage({
@@ -1398,6 +1376,428 @@ app.get('/api/app-submissions/:leadId', (req, res) => {
             submissions: applications
         });
     });
+});
+
+// ============ LOSS RUNS ENDPOINTS ============
+
+// Configure multer for loss runs uploads
+const lossRunsStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Use temporary location first since req.body may not be available yet
+        const tempPath = path.join(__dirname, '../uploads/loss_runs/temp');
+        if (!fs.existsSync(tempPath)) {
+            fs.mkdirSync(tempPath, { recursive: true });
+        }
+        cb(null, tempPath);
+    },
+    filename: function (req, file, cb) {
+        const timestamp = Date.now();
+        const fileName = `${timestamp}_${file.originalname}`;
+        cb(null, fileName);
+    }
+});
+
+const uploadLossRuns = multer({
+    storage: lossRunsStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF files are allowed'));
+        }
+    }
+});
+
+// Upload loss runs PDF endpoint
+app.post('/api/upload-loss-runs', uploadLossRuns.single('lossRunsPdf'), (req, res) => {
+    console.log('📤 Loss runs upload request received from:', req.ip);
+    console.log('📦 Request body:', req.body);
+    console.log('📁 Request file:', req.file ? req.file.filename : 'No file');
+    console.log('📋 Request headers:', req.headers);
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded', success: false });
+    }
+
+    const leadId = req.body.leadId;
+    console.log('🔍 Lead ID from body:', leadId);
+    if (!leadId) {
+        console.log('❌ No lead ID provided');
+        return res.status(400).json({ error: 'Lead ID required', success: false });
+    }
+
+    // Move file from temp directory to correct lead directory
+    const tempFilePath = req.file.path;
+    const leadDir = path.join(__dirname, '../uploads/loss_runs', leadId);
+    const finalFilePath = path.join(leadDir, req.file.filename);
+
+    try {
+        // Create lead directory if it doesn't exist
+        if (!fs.existsSync(leadDir)) {
+            fs.mkdirSync(leadDir, { recursive: true });
+            console.log('📁 Created directory:', leadDir);
+        }
+
+        // Move file from temp to final location
+        fs.renameSync(tempFilePath, finalFilePath);
+        console.log('📋 Moved file from temp to:', finalFilePath);
+
+        console.log(`✅ Loss runs PDF uploaded: ${req.file.originalname} -> ${req.file.filename} for lead ${leadId}`);
+
+        res.json({
+            success: true,
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            uploadDate: new Date().toISOString(),
+            size: req.file.size,
+            leadId: leadId
+        });
+    } catch (error) {
+        console.error('❌ Error moving file:', error);
+        res.status(500).json({ error: 'Failed to process file upload', success: false });
+    }
+});
+
+// View loss runs PDF endpoint
+app.get('/api/view-loss-runs/:leadId/:filename', (req, res) => {
+    const { leadId, filename } = req.params;
+    const filePath = path.join(__dirname, '../uploads/loss_runs', leadId, filename);
+
+    console.log(`👁️ Viewing loss runs PDF: ${filePath}`);
+
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+    res.sendFile(path.resolve(filePath));
+});
+
+// Download loss runs PDF endpoint
+app.get('/api/download-loss-runs/:leadId/:filename', (req, res) => {
+    const { leadId, filename } = req.params;
+    const filePath = path.join(__dirname, '../uploads/loss_runs', leadId, filename);
+
+    console.log(`⬇️ Downloading loss runs PDF: ${filePath}`);
+
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Extract original filename from timestamped filename
+    const originalName = filename.split('_').slice(1).join('_');
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${originalName}"`);
+    res.sendFile(path.resolve(filePath));
+});
+
+// Remove loss runs PDF endpoint
+app.post('/api/remove-loss-runs', (req, res) => {
+    const { leadId, filename } = req.body;
+
+    if (!leadId || !filename) {
+        return res.status(400).json({ error: 'Lead ID and filename required', success: false });
+    }
+
+    const filePath = path.join(__dirname, '../uploads/loss_runs', leadId, filename);
+
+    console.log(`🗑️ Removing loss runs PDF: ${filePath}`);
+
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found', success: false });
+    }
+
+    fs.unlink(filePath, (err) => {
+        if (err) {
+            console.error('Error deleting file:', err);
+            return res.status(500).json({ error: 'Failed to delete file', success: false });
+        }
+
+        console.log(`✅ Successfully deleted loss runs PDF: ${filename}`);
+        res.json({ success: true, message: 'File deleted successfully' });
+    });
+});
+
+// List loss runs files for a lead
+app.get('/api/list-loss-runs/:leadId', (req, res) => {
+    const { leadId } = req.params;
+    const lossRunsDir = path.join(__dirname, '../uploads/loss_runs', leadId);
+
+    console.log(`📋 Listing loss runs for lead: ${leadId}`);
+
+    if (!fs.existsSync(lossRunsDir)) {
+        console.log('📁 Loss runs directory does not exist for lead:', leadId);
+        return res.json({ success: true, files: [] });
+    }
+
+    try {
+        const files = fs.readdirSync(lossRunsDir);
+        const fileDetails = files.map(filename => {
+            const filePath = path.join(lossRunsDir, filename);
+            const stats = fs.statSync(filePath);
+
+            // Extract original name by removing timestamp prefix
+            const originalName = filename.split('_').slice(1).join('_');
+
+            return {
+                filename: filename,
+                originalName: originalName,
+                uploadDate: stats.mtime.toISOString(),
+                size: stats.size,
+                localOnly: false
+            };
+        });
+
+        console.log(`📋 Found ${fileDetails.length} loss runs files for lead ${leadId}`);
+        res.json({ success: true, files: fileDetails });
+    } catch (error) {
+        console.error('Error reading loss runs directory:', error);
+        res.status(500).json({ success: false, error: 'Failed to list files' });
+    }
+});
+
+// COI Request Email endpoint with file upload support
+app.post('/api/coi/send-request', (req, res, next) => {
+    uploadDocuments.array('attachment', 10)(req, res, (err) => {
+        if (err) {
+            console.log('🚨 Multer error:', err.message);
+            return res.status(400).json({
+                success: false,
+                error: 'File upload error: ' + err.message
+            });
+        }
+        next();
+    });
+}, async (req, res) => {
+    const fs = require('fs');
+    const debugLog = `🚨🚨🚨 COI EMAIL DEBUG ${new Date().toISOString()} 🚨🚨🚨\n` +
+                     `Headers: ${req.headers['user-agent'] || 'No user-agent'}\n` +
+                     `Body fields: ${Object.keys(req.body).join(', ')}\n` +
+                     `Files: ${req.files ? req.files.length : 0}\n` +
+                     `Body content: ${JSON.stringify(req.body, null, 2)}\n\n`;
+    fs.appendFileSync('/var/www/vanguard/coi-debug-final.log', debugLog);
+    console.log('📧 COI Email request received');
+    console.log('   Headers:', req.headers['user-agent'] || 'No user-agent');
+    console.log('   Body fields:', Object.keys(req.body));
+    console.log('   Files:', req.files ? req.files.length : 0);
+
+    const { from, to, subject, policyId } = req.body;
+
+    // Fix email formatting - remove bare CR characters that cause SMTP errors
+    const message = req.body.message ? req.body.message.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : '';
+
+    // Validate required fields
+    if (!to || to.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            error: 'Recipient email address is required'
+        });
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to.trim())) {
+        return res.status(400).json({
+            success: false,
+            error: 'Invalid recipient email address format'
+        });
+    }
+
+    if (!subject || subject.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            error: 'Email subject is required'
+        });
+    }
+
+    if (!message || message.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            error: 'Email message is required'
+        });
+    }
+
+    try {
+        // Use nodemailer to send email
+        const nodemailer = require('nodemailer');
+
+        // Create transporter using GoDaddy SMTP settings
+        const transporter = nodemailer.createTransport({
+            host: 'smtpout.secureserver.net',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'contact@vigagency.com',
+                pass: process.env.GODADDY_PASSWORD || '25nickc124!'
+            }
+        });
+
+        // Prepare attachments from uploaded files
+        const attachments = [];
+        if (req.files && req.files.length > 0) {
+            console.log(`📎 Processing ${req.files.length} uploaded files`);
+
+            req.files.forEach((file, index) => {
+                attachments.push({
+                    filename: file.originalname || `document_${index + 1}`,
+                    content: file.buffer,
+                    contentType: file.mimetype
+                });
+
+                console.log(`📎 Added attachment: ${file.originalname} (${file.buffer.length} bytes, ${file.mimetype})`);
+            });
+        }
+
+        // Add server files if specified
+        const serverFiles = req.body.serverFiles;
+        if (serverFiles) {
+            const fs = require('fs');
+            const path = require('path');
+
+            let fileList = [];
+            try {
+                fileList = typeof serverFiles === 'string' ? JSON.parse(serverFiles) : serverFiles;
+            } catch (e) {
+                console.log('Could not parse serverFiles, treating as single file');
+                fileList = [serverFiles];
+            }
+
+            if (Array.isArray(fileList)) {
+                console.log(`📎 Processing ${fileList.length} server files`);
+
+                for (const fileName of fileList) {
+                    try {
+                        const filePath = path.join('/var/www/vanguard/uploads/loss_runs', req.body.leadId || '', fileName);
+
+                        if (fs.existsSync(filePath)) {
+                            const fileBuffer = fs.readFileSync(filePath);
+                            const cleanFileName = fileName.replace(/^\d+_/, ''); // Remove timestamp prefix
+
+                            attachments.push({
+                                filename: cleanFileName,
+                                content: fileBuffer,
+                                contentType: 'application/pdf' // Default to PDF, could be improved
+                            });
+
+                            console.log(`📎 Added server file: ${cleanFileName} (${fileBuffer.length} bytes from ${filePath})`);
+                        } else {
+                            console.log(`⚠️ Server file not found: ${filePath}`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error processing server file ${fileName}:`, error.message);
+                    }
+                }
+            }
+        }
+
+        // Send email with attachments
+        const info = await transporter.sendMail({
+            from: '"VIG Agency" <contact@vigagency.com>',
+            to: to,
+            subject: subject,
+            text: message,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #0066cc 0%, #004499 100%); color: white; padding: 20px; text-align: center;">
+                        <h1 style="margin: 0; font-size: 24px;">Vanguard Insurance Agency</h1>
+                        <p style="margin: 5px 0 0 0; opacity: 0.9;">Documentation Request</p>
+                    </div>
+
+                    <div style="padding: 30px; background: #f9f9f9;">
+                        <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <div style="color: #333; line-height: 1.6;">
+                                ${message.replace(/\n/g, '<br>')}
+                            </div>
+
+                            ${attachments.length > 0 ? `
+                            <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                                <h3 style="color: #374151; margin: 0 0 10px 0; font-size: 16px;">Attached Documents:</h3>
+                                <ul style="color: #6b7280; margin: 0; padding-left: 20px;">
+                                    ${attachments.map(att => `<li>${att.filename}</li>`).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div style="background: #374151; color: white; padding: 20px; text-align: center; font-size: 14px;">
+                        <p style="margin: 0;">Best regards,<br><strong>Vanguard Insurance Agency</strong></p>
+                        <p style="margin: 10px 0 0 0; opacity: 0.8;">contact@vigagency.com</p>
+                    </div>
+                </div>
+            `,
+            attachments: attachments
+        });
+
+        console.log('COI request email sent:', info.messageId);
+
+        const fs = require('fs');
+        const successLog = `🚨🚨🚨 COI EMAIL SUCCESS ${new Date().toISOString()} 🚨🚨🚨\n` +
+                          `MessageId: ${info.messageId}\n` +
+                          `AttachmentCount: ${attachments.length}\n` +
+                          `About to send 200 response...\n\n`;
+        fs.appendFileSync('/var/www/vanguard/coi-debug-final.log', successLog);
+
+        res.json({
+            success: true,
+            messageId: info.messageId,
+            attachmentCount: attachments.length
+        });
+
+    } catch (error) {
+        const fs = require('fs');
+        const errorLog = `🚨🚨🚨 COI EMAIL ERROR ${new Date().toISOString()} 🚨🚨🚨\n` +
+                        `Error: ${error.message}\n` +
+                        `Stack: ${error.stack}\n` +
+                        `About to send 500 response...\n\n`;
+        fs.appendFileSync('/var/www/vanguard/coi-debug-final.log', errorLog);
+
+        console.error('Error sending COI request:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Get uploaded files for a lead
+app.get('/api/leads/:leadId/files', (req, res) => {
+    const { leadId } = req.params;
+    const fs = require('fs');
+    const path = require('path');
+
+    try {
+        const uploadDir = path.join('/var/www/vanguard/uploads/loss_runs', leadId);
+
+        if (!fs.existsSync(uploadDir)) {
+            return res.json({ files: [] });
+        }
+
+        const files = fs.readdirSync(uploadDir).filter(file => {
+            // Only include actual files, not directories
+            const fullPath = path.join(uploadDir, file);
+            return fs.statSync(fullPath).isFile();
+        });
+
+        console.log(`📁 Found ${files.length} files for lead ${leadId}:`, files);
+
+        res.json({
+            success: true,
+            leadId: leadId,
+            files: files
+        });
+
+    } catch (error) {
+        console.error(`❌ Error reading files for lead ${leadId}:`, error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            files: []
+        });
+    }
 });
 
 // Save application submission endpoint
@@ -2146,6 +2546,435 @@ app.post('/api/twilio/sip-routing', (req, res) => {
 
     res.set('Content-Type', 'text/xml');
     res.status(200).send(twiml);
+});
+
+// Loss Runs File Upload Endpoints
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = '/var/www/vanguard/uploads/loss-runs/';
+        // Ensure directory exists
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
+        }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        // Generate unique filename with timestamp
+        const uniqueId = Date.now() + '_' + Math.round(Math.random() * 1E9);
+        const extension = path.extname(file.originalname);
+        cb(null, uniqueId + extension);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB limit
+    }
+});
+
+// Upload files endpoint
+app.post('/api/loss-runs-upload', upload.array('files'), (req, res) => {
+    console.log('📤 Loss runs upload request received');
+
+    try {
+        const leadId = req.body.leadId;
+
+        if (!leadId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Lead ID is required'
+            });
+        }
+
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No files uploaded'
+            });
+        }
+
+        const uploadedFiles = [];
+
+        // Process each uploaded file
+        req.files.forEach((file) => {
+            const fileId = path.basename(file.filename, path.extname(file.filename));
+
+            // Insert file metadata into database
+            db.run(`
+                INSERT INTO loss_runs (id, lead_id, file_name, file_size, file_type, status)
+                VALUES (?, ?, ?, ?, ?, 'uploaded')
+            `, [fileId, leadId, file.filename, file.size, file.mimetype], function(err) {
+                if (err) {
+                    console.error('Database insert error:', err);
+                } else {
+                    console.log('✅ File metadata inserted:', fileId);
+                }
+            });
+
+            uploadedFiles.push({
+                id: fileId,
+                lead_id: leadId,
+                file_name: file.filename,
+                original_name: file.originalname,
+                file_size: file.size,
+                file_type: file.mimetype,
+                uploaded_date: new Date().toISOString()
+            });
+        });
+
+        res.json({
+            success: true,
+            message: 'Files uploaded successfully',
+            files: uploadedFiles,
+            count: uploadedFiles.length
+        });
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Get files endpoint
+app.get('/api/loss-runs-upload', (req, res) => {
+    const leadId = req.query.leadId;
+
+    if (!leadId) {
+        return res.status(400).json({
+            success: false,
+            error: 'Lead ID is required'
+        });
+    }
+
+    db.all(`
+        SELECT id, lead_id, file_name, file_size, file_type, uploaded_date, status, notes
+        FROM loss_runs
+        WHERE lead_id = ?
+        ORDER BY uploaded_date DESC
+    `, [leadId], (err, rows) => {
+        if (err) {
+            console.error('Database query error:', err);
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        res.json({
+            success: true,
+            files: rows,
+            count: rows.length
+        });
+    });
+});
+
+// Delete file endpoint
+app.delete('/api/loss-runs-upload', (req, res) => {
+    const fileId = req.body.fileId;
+
+    if (!fileId) {
+        return res.status(400).json({
+            success: false,
+            error: 'File ID is required'
+        });
+    }
+
+    // Get file info first
+    db.get('SELECT file_name FROM loss_runs WHERE id = ?', [fileId], (err, row) => {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        if (!row) {
+            return res.status(404).json({
+                success: false,
+                error: 'File not found'
+            });
+        }
+
+        // Delete from filesystem
+        const filePath = `/var/www/vanguard/uploads/loss-runs/${row.file_name}`;
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        // Delete from database
+        db.run('DELETE FROM loss_runs WHERE id = ?', [fileId], function(err) {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            res.json({
+                success: true,
+                message: 'File deleted successfully'
+            });
+        });
+    });
+});
+
+// Download file endpoint
+app.get('/api/loss-runs-download', (req, res) => {
+    const fileId = req.query.fileId;
+
+    if (!fileId) {
+        return res.status(400).json({
+            error: 'File ID is required'
+        });
+    }
+
+    db.get(`
+        SELECT id, lead_id, file_name, file_size, file_type
+        FROM loss_runs
+        WHERE id = ?
+    `, [fileId], (err, row) => {
+        if (err) {
+            return res.status(500).json({
+                error: err.message
+            });
+        }
+
+        if (!row) {
+            return res.status(404).json({
+                error: 'File not found'
+            });
+        }
+
+        const filePath = `/var/www/vanguard/uploads/loss-runs/${row.file_name}`;
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                error: 'File not found on disk'
+            });
+        }
+
+        // Set appropriate headers
+        res.setHeader('Content-Type', row.file_type);
+        res.setHeader('Content-Length', fs.statSync(filePath).size);
+        res.setHeader('Content-Disposition', `inline; filename="${row.file_name}"`);
+
+        // Stream file
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+    });
+});
+
+// Quote Application Endpoints
+app.post('/api/quote-applications', (req, res) => {
+    console.log('📋 Quote application save request received');
+
+    try {
+        const { leadId, applicationData } = req.body;
+
+        if (!leadId || !applicationData) {
+            return res.status(400).json({
+                success: false,
+                error: 'Lead ID and application data are required'
+            });
+        }
+
+        // Generate unique ID for the application
+        const applicationId = 'app_' + Date.now() + '_' + Math.round(Math.random() * 1E9);
+
+        // Save to database
+        db.run(`
+            INSERT INTO quote_submissions (id, lead_id, form_data, status)
+            VALUES (?, ?, ?, ?)
+        `, [applicationId, leadId, JSON.stringify(applicationData), 'submitted'], function(err) {
+            if (err) {
+                console.error('Database insert error:', err);
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            console.log('✅ Quote application saved:', applicationId);
+
+            res.json({
+                success: true,
+                message: 'Quote application saved successfully',
+                applicationId: applicationId,
+                leadId: leadId
+            });
+        });
+
+    } catch (error) {
+        console.error('Save quote application error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Get quote applications for a lead
+app.get('/api/quote-applications', (req, res) => {
+    const leadId = req.query.leadId;
+
+    if (!leadId) {
+        return res.status(400).json({
+            success: false,
+            error: 'Lead ID is required'
+        });
+    }
+
+    db.all(`
+        SELECT id, lead_id, form_data, status, created_at, updated_at
+        FROM quote_submissions
+        WHERE lead_id = ?
+        ORDER BY created_at DESC
+    `, [leadId], (err, rows) => {
+        if (err) {
+            console.error('Database query error:', err);
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        // Parse form_data for each application
+        const applications = rows.map(row => {
+            const formData = JSON.parse(row.form_data);
+            // Remove id from formData to prevent overwriting database ID
+            delete formData.id;
+
+            return {
+                id: row.id, // Use database ID, not form_data ID
+                leadId: row.lead_id,
+                ...formData,
+                status: row.status,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at
+            };
+        });
+
+        res.json({
+            success: true,
+            applications: applications,
+            count: applications.length
+        });
+    });
+});
+
+// Get single quote application by ID
+app.get('/api/quote-applications/:id', (req, res) => {
+    const applicationId = req.params.id;
+
+    db.get(`
+        SELECT id, lead_id, form_data, status, created_at, updated_at
+        FROM quote_submissions
+        WHERE id = ?
+    `, [applicationId], (err, row) => {
+        if (err) {
+            console.error('Database query error:', err);
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        if (!row) {
+            return res.status(404).json({
+                success: false,
+                error: 'Application not found'
+            });
+        }
+
+        // Parse form_data and combine with metadata
+        const formData = JSON.parse(row.form_data);
+        // Remove id from formData to prevent overwriting database ID
+        delete formData.id;
+
+        const application = {
+            id: row.id, // Use database ID, not form_data ID
+            leadId: row.lead_id,
+            ...formData,
+            status: row.status,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        };
+
+        res.json({
+            success: true,
+            application: application
+        });
+    });
+});
+
+// Update quote application
+app.put('/api/quote-applications/:id', (req, res) => {
+    const applicationId = req.params.id;
+    const { applicationData } = req.body;
+
+    if (!applicationData) {
+        return res.status(400).json({
+            success: false,
+            error: 'Application data is required'
+        });
+    }
+
+    db.run(`
+        UPDATE quote_submissions
+        SET form_data = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    `, [JSON.stringify(applicationData), applicationId], function(err) {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Application not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Quote application updated successfully'
+        });
+    });
+});
+
+// Delete quote application
+app.delete('/api/quote-applications/:id', (req, res) => {
+    const applicationId = req.params.id;
+
+    db.run('DELETE FROM quote_submissions WHERE id = ?', [applicationId], function(err) {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Application not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Quote application deleted successfully'
+        });
+    });
 });
 
 // Export database for use in other modules
