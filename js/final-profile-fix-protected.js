@@ -1,6 +1,4 @@
 // PROTECTED Final Profile Fix - Loads last and prevents overrides
-console.log('🚨🚨🚨 PROTECTED-FINAL-PROFILE-FIX: VERSION 1000 LOADING NOW!!! 🚨🚨🚨');
-alert('PROTECTED SCRIPT LOADING - VERSION 1000');
 console.log('🔥 PROTECTED-FINAL-PROFILE-FIX: Enhanced profile loading with protection...');
 
 // Store references to prevent overriding
@@ -52,7 +50,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     `;
 
     modalContainer.innerHTML = `
-        <div style="background: white; border-radius: 12px; max-width: 1200px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px; position: relative; transform: none; top: auto; left: auto;">
+        <div class="modal-content" style="background: white; border-radius: 12px; max-width: 1200px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px; position: relative; transform: none; top: auto; left: auto;">
             <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
                 <h2 style="margin: 0; font-size: 24px;"><i class="fas fa-truck"></i> Commercial Auto Lead Profile</h2>
                 <button class="close-btn" id="profile-close-btn" onclick="document.getElementById('lead-profile-container').remove()" style="position: absolute; top: 20px; right: 20px; font-size: 30px; background: none; border: none; cursor: pointer;">×</button>
@@ -81,6 +79,42 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
                             <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
                         </select>
+                    </div>
+                    <!-- Lead Age Timestamp with Color Coding -->
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; text-align: center;">
+                        <div style="font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 5px;">Lead Age</div>
+                        <div id="lead-age-${lead.id}" style="font-size: 14px; font-weight: bold;">
+                            ${(function() {
+                                const createdDate = lead.createdDate || lead.created_at || new Date().toISOString();
+                                const now = new Date();
+                                const created = new Date(createdDate);
+                                const daysDiff = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+
+                                let color = '#10b981'; // green
+                                if (daysDiff >= 7) color = '#dc2626'; // red
+                                else if (daysDiff >= 3) color = '#f59e0b'; // orange
+                                else if (daysDiff >= 1) color = '#eab308'; // yellow
+
+                                const timeText = daysDiff === 0 ? 'Today' :
+                                               daysDiff === 1 ? '1 day ago' :
+                                               `${daysDiff} days ago`;
+
+                                return `<span style="color: ${color};">${timeText}</span>`;
+                            })()}
+                        </div>
+                        <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">
+                            ${(function() {
+                                const createdDate = lead.createdDate || lead.created_at || new Date().toISOString();
+                                return new Date(createdDate).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                });
+                            })()}
+                        </div>
                     </div>
                 </div>
 
@@ -244,9 +278,46 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <div id="vehicles-container-${lead.id}">
                         ${lead.vehicles && lead.vehicles.length > 0 ?
                             lead.vehicles.map((vehicle, index) => `
-                                <div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 15px; margin-bottom: 10px;">
-                                    <strong>Vehicle ${index + 1}:</strong> ${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}<br>
-                                    <small>VIN: ${vehicle.vin || 'Not provided'}</small>
+                                <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: white;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <h4 style="margin: 0; color: #374151;">Vehicle ${index + 1}</h4>
+                                        <button onclick="removeVehicle('${lead.id}', ${index})" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Year:</label>
+                                            <input type="text" value="${vehicle.year || ''}" onchange="updateVehicle('${lead.id}', ${index}, 'year', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Make:</label>
+                                            <input type="text" value="${vehicle.make || ''}" onchange="updateVehicle('${lead.id}', ${index}, 'make', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Model:</label>
+                                            <input type="text" value="${vehicle.model || ''}" onchange="updateVehicle('${lead.id}', ${index}, 'model', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">VIN:</label>
+                                            <input type="text" value="${vehicle.vin || ''}" onchange="updateVehicle('${lead.id}', ${index}, 'vin', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Value ($):</label>
+                                            <input type="text" value="${vehicle.value || ''}" onchange="updateVehicle('${lead.id}', ${index}, 'value', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Type:</label>
+                                            <select onchange="updateVehicle('${lead.id}', ${index}, 'type', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                                <option value="">Select Type</option>
+                                                <option value="Box Truck" ${vehicle.type === 'Box Truck' ? 'selected' : ''}>Box Truck</option>
+                                                <option value="Semi Truck" ${vehicle.type === 'Semi Truck' ? 'selected' : ''}>Semi Truck</option>
+                                                <option value="Flatbed" ${vehicle.type === 'Flatbed' ? 'selected' : ''}>Flatbed</option>
+                                                <option value="Pickup" ${vehicle.type === 'Pickup' ? 'selected' : ''}>Pickup</option>
+                                                <option value="Van" ${vehicle.type === 'Van' ? 'selected' : ''}>Van</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             `).join('') :
                             '<p style="color: #9ca3af; text-align: center; padding: 20px;">No vehicles added yet</p>'
@@ -265,9 +336,39 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <div id="trailers-container-${lead.id}">
                         ${lead.trailers && lead.trailers.length > 0 ?
                             lead.trailers.map((trailer, index) => `
-                                <div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 15px; margin-bottom: 10px;">
-                                    <strong>Trailer ${index + 1}:</strong> ${trailer.year || ''} ${trailer.make || ''} ${trailer.model || ''}<br>
-                                    <small>VIN: ${trailer.vin || 'Not provided'}</small>
+                                <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: white;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <h4 style="margin: 0; color: #374151;">Trailer ${index + 1}</h4>
+                                        <button onclick="removeTrailer('${lead.id}', ${index})" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Year:</label>
+                                            <input type="text" value="${trailer.year || ''}" onchange="updateTrailer('${lead.id}', ${index}, 'year', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Make:</label>
+                                            <input type="text" value="${trailer.make || ''}" onchange="updateTrailer('${lead.id}', ${index}, 'make', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Type:</label>
+                                            <input type="text" value="${trailer.type || ''}" onchange="updateTrailer('${lead.id}', ${index}, 'type', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">VIN:</label>
+                                            <input type="text" value="${trailer.vin || ''}" onchange="updateTrailer('${lead.id}', ${index}, 'vin', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Length:</label>
+                                            <input type="text" value="${trailer.length || ''}" onchange="updateTrailer('${lead.id}', ${index}, 'length', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Value ($):</label>
+                                            <input type="text" value="${trailer.value || ''}" onchange="updateTrailer('${lead.id}', ${index}, 'value', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                    </div>
                                 </div>
                             `).join('') :
                             '<p style="color: #9ca3af; text-align: center; padding: 20px;">No trailers added yet</p>'
@@ -286,9 +387,39 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <div id="drivers-container-${lead.id}">
                         ${lead.drivers && lead.drivers.length > 0 ?
                             lead.drivers.map((driver, index) => `
-                                <div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 15px; margin-bottom: 10px;">
-                                    <strong>Driver ${index + 1}:</strong> ${driver.name || 'Unknown'}<br>
-                                    <small>License: ${driver.license || 'Not provided'} | Experience: ${driver.experience || 'Not provided'}</small>
+                                <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: white;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <h4 style="margin: 0; color: #374151;">Driver ${index + 1}</h4>
+                                        <button onclick="removeDriver('${lead.id}', ${index})" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Name:</label>
+                                            <input type="text" value="${driver.name || ''}" onchange="updateDriver('${lead.id}', ${index}, 'name', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">License #:</label>
+                                            <input type="text" value="${driver.license || ''}" onchange="updateDriver('${lead.id}', ${index}, 'license', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Date of Birth:</label>
+                                            <input type="date" value="${driver.dob || ''}" onchange="updateDriver('${lead.id}', ${index}, 'dob', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Hire Date:</label>
+                                            <input type="date" value="${driver.hireDate || ''}" onchange="updateDriver('${lead.id}', ${index}, 'hireDate', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Years Experience:</label>
+                                            <input type="text" value="${driver.experience || ''}" onchange="updateDriver('${lead.id}', ${index}, 'experience', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Violations/Accidents:</label>
+                                            <input type="text" value="${driver.violations || ''}" onchange="updateDriver('${lead.id}', ${index}, 'violations', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        </div>
+                                    </div>
                                 </div>
                             `).join('') :
                             '<p style="color: #9ca3af; text-align: center; padding: 20px;">No drivers added yet</p>'
@@ -360,6 +491,15 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     `;
 
     document.body.appendChild(modalContainer);
+
+    // Add click-outside-to-close functionality
+    modalContainer.addEventListener('click', function(e) {
+        // Only close if clicking the background (not the modal content)
+        if (e.target === modalContainer) {
+            console.log('🖱️ Clicked outside modal, closing...');
+            modalContainer.remove();
+        }
+    });
 
     // Initialize dynamic elements after modal is created
     setTimeout(() => {
@@ -583,183 +723,154 @@ protectedFunctions.openLossRunsUpload = function(leadId) {
 
 // Upload files function with Base64 storage (same as working version)
 protectedFunctions.uploadLossRunsFiles = function(leadId, files) {
-    console.log('📤 Uploading loss runs files:', files.length, 'files for lead:', leadId);
+    console.log('📤 Uploading loss runs files to server:', files.length, 'files for lead:', leadId);
 
     // Show uploading message
     const container = document.getElementById(`loss-runs-container-${leadId}`);
     if (container) {
-        container.innerHTML = '<p style="color: #3b82f6; text-align: center; padding: 20px;">Processing files...</p>';
+        container.innerHTML = '<p style="color: #3b82f6; text-align: center; padding: 20px;">📤 Uploading files to server...</p>';
     }
 
-    // Store files with Base64 data (same as working version)
-    const lossRuns = JSON.parse(localStorage.getItem('loss_runs') || '{}');
-    if (!lossRuns[leadId]) {
-        lossRuns[leadId] = [];
-    }
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('leadId', leadId);
 
-    let processedFiles = 0;
-
-    // Process each file with Base64 encoding
+    // Add all files to FormData
     Array.from(files).forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const fileData = {
-                filename: `${leadId}_${Date.now()}_${index}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`,
-                originalName: file.name,
-                size: (file.size / 1024).toFixed(1) + ' KB',
-                uploadedDate: new Date().toISOString(),
-                type: file.type || 'application/octet-stream',
-                data: e.target.result, // Base64 data (same as working version)
-                isLocalOnly: true
-            };
+        formData.append('files[]', file);
+    });
 
-            lossRuns[leadId].push(fileData);
-            processedFiles++;
-
-            // Try to save after each file
-            try {
-                localStorage.setItem('loss_runs', JSON.stringify(lossRuns));
-
-                // If this is the last file, reload display
-                if (processedFiles === files.length) {
-                    setTimeout(() => {
-                        protectedFunctions.loadLossRuns(leadId);
-                        console.log('✅ Files stored locally with viewing capability (same as working version)');
-                    }, 300);
-                }
-            } catch (error) {
-                if (error.name === 'QuotaExceededError') {
-                    // Remove this file and show error
-                    lossRuns[leadId].pop();
-                    alert(`Storage quota exceeded. Could not store "${file.name}". Try uploading smaller files or clearing storage with window.clearLossRunsStorage()`);
-
-                    // Still reload to show files that were successfully stored
-                    if (processedFiles === files.length) {
-                        setTimeout(() => protectedFunctions.loadLossRuns(leadId), 300);
-                    }
-                } else {
-                    console.error('Error storing file:', error);
-                    alert('Error storing file: ' + file.name);
-                }
-            }
-        };
-
-        reader.onerror = function() {
-            console.error('Error reading file:', file.name);
-            alert('Error reading file: ' + file.name);
-        };
-
-        reader.readAsDataURL(file);
+    // Upload to server
+    fetch('/api/loss-runs-upload.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Files uploaded successfully to server:', data.count, 'files');
+            // Reload the loss runs display
+            setTimeout(() => {
+                protectedFunctions.loadLossRuns(leadId);
+            }, 300);
+        } else {
+            console.error('❌ Upload failed:', data.error);
+            alert('Upload failed: ' + data.error);
+            protectedFunctions.loadLossRuns(leadId);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Upload error:', error);
+        alert('Upload error. Please try again.');
+        protectedFunctions.loadLossRuns(leadId);
     });
 };
 
-// Load loss runs from localStorage (temporary until server endpoint is ready)
+// Load loss runs from server
 protectedFunctions.loadLossRuns = function(leadId) {
-    console.log('🔄 Loading loss runs for lead:', leadId);
+    console.log('🔄 Loading loss runs from server for lead:', leadId);
 
     const container = document.getElementById(`loss-runs-container-${leadId}`);
     if (!container) return;
 
-    // Load from localStorage temporarily
-    const lossRuns = JSON.parse(localStorage.getItem('loss_runs') || '{}');
-    const leadLossRuns = lossRuns[leadId] || [];
+    // Show loading message
+    container.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">⏳ Loading documents...</p>';
 
-    if (leadLossRuns.length > 0) {
-        // Display existing loss runs
-        container.innerHTML = leadLossRuns.map(lossRun => `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px;">
-                <div>
-                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                        <i class="fas fa-file-pdf" style="color: #dc3545; margin-right: 8px;"></i>
-                        <strong style="font-size: 14px;">${lossRun.originalName || lossRun.filename}</strong>
+    // Load from server
+    fetch(`/api/loss-runs-upload.php?leadId=${encodeURIComponent(leadId)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.files.length > 0) {
+            // Display existing loss runs from server
+            container.innerHTML = data.files.map(lossRun => {
+                const uploadDate = new Date(lossRun.uploaded_date).toLocaleDateString();
+                const fileSize = Math.round(lossRun.file_size / 1024) + ' KB';
+                const originalName = lossRun.file_name.replace(/^[a-f0-9]+_[0-9]+_/, ''); // Remove unique prefix
+
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px;">
+                        <div>
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <i class="fas fa-file-pdf" style="color: #dc3545; margin-right: 8px;"></i>
+                                <strong style="font-size: 14px;">${originalName}</strong>
+                                <span style="background: #10b981; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 8px;">SERVER</span>
+                            </div>
+                            <div style="font-size: 12px; color: #6b7280;">
+                                Uploaded: ${uploadDate} • Size: ${fileSize}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="view-loss-runs-btn"
+                                    data-file-id="${lossRun.id}"
+                                    onclick="viewLossRuns('${leadId}', '${lossRun.id}', '${originalName}')"
+                                    style="background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                            <button class="remove-loss-runs-btn"
+                                    data-file-id="${lossRun.id}"
+                                    onclick="removeLossRuns('${leadId}', '${lossRun.id}')"
+                                    style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </div>
                     </div>
-                    <div style="font-size: 12px; color: #6b7280;">
-                        Uploaded: ${new Date(lossRun.uploadedDate).toLocaleDateString()} • Size: ${lossRun.size || 'Unknown'}
-                    </div>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button class="view-loss-runs-btn"
-                            data-lead-id="${leadId}"
-                            data-filename="${lossRun.filename}"
-                            data-original-name="${lossRun.originalName || lossRun.filename}"
-                            onclick="viewLossRuns('${leadId}', '${lossRun.filename}', '${lossRun.originalName || lossRun.filename}')"
-                            style="background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                        <i class="fas fa-eye"></i> View
-                    </button>
-                    <button class="remove-loss-runs-btn"
-                            data-lead-id="${leadId}"
-                            data-filename="${lossRun.filename}"
-                            onclick="removeLossRuns('${leadId}', '${lossRun.filename}')"
-                            style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                        <i class="fas fa-trash"></i> Remove
-                    </button>
-                </div>
-            </div>
-        `).join('');
-    } else {
-        container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No loss runs uploaded yet</p>';
-    }
-};
-
-// View loss runs function (restored working functionality)
-protectedFunctions.viewLossRuns = function(leadId, filename, originalName) {
-    console.log('👁️ Viewing loss runs:', leadId, filename, originalName);
-
-    // Get file from localStorage
-    const lossRuns = JSON.parse(localStorage.getItem('loss_runs') || '{}');
-    const leadLossRuns = lossRuns[leadId] || [];
-    const file = leadLossRuns.find(lr => lr.filename === filename);
-
-    if (file && file.data) {
-        try {
-            // Create blob from Base64 data
-            const byteCharacters = atob(file.data.split(',')[1]);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-
-            // Determine MIME type
-            const mimeType = file.type || 'application/octet-stream';
-            const blob = new Blob([byteArray], { type: mimeType });
-
-            // Create URL and open in new window
-            const url = URL.createObjectURL(blob);
-            const newWindow = window.open(url, '_blank');
-
-            // Clean up the URL after a delay
-            setTimeout(() => {
-                URL.revokeObjectURL(url);
-            }, 60000); // Clean up after 1 minute
-
-            console.log('✅ File opened in new window:', originalName);
-        } catch (error) {
-            console.error('Error opening file:', error);
-            alert('Error opening file: ' + originalName);
+                `;
+            }).join('');
+        } else {
+            container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No loss runs uploaded yet</p>';
         }
+    })
+    .catch(error => {
+        console.error('❌ Error loading loss runs:', error);
+        container.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Error loading documents</p>';
+    });
+};
+
+// View loss runs function (server version)
+protectedFunctions.viewLossRuns = function(leadId, fileId, originalName) {
+    console.log('👁️ Viewing loss runs from server:', leadId, fileId, originalName);
+
+    // Open file from server in new window
+    const fileUrl = `/api/loss-runs-download.php?fileId=${encodeURIComponent(fileId)}`;
+    const newWindow = window.open(fileUrl, '_blank');
+
+    if (!newWindow) {
+        alert('Pop-up blocked. Please allow pop-ups and try again.');
     } else {
-        alert('File data not found. The file may not have been stored properly.');
+        console.log('✅ File opened from server:', originalName);
     }
 };
 
-// Remove loss runs function
-protectedFunctions.removeLossRuns = function(leadId, filename) {
-    if (!confirm('Are you sure you want to remove this loss run document?')) {
+// Remove loss runs function (server version)
+protectedFunctions.removeLossRuns = function(leadId, fileId) {
+    if (!confirm('Are you sure you want to remove this loss run document from the server?')) {
         return;
     }
 
-    console.log('🗑️ Removing loss runs:', leadId, filename);
+    console.log('🗑️ Removing loss runs from server:', leadId, fileId);
 
-    // Remove from localStorage
-    const lossRuns = JSON.parse(localStorage.getItem('loss_runs') || '{}');
-    if (lossRuns[leadId]) {
-        lossRuns[leadId] = lossRuns[leadId].filter(lr => lr.filename !== filename);
-        localStorage.setItem('loss_runs', JSON.stringify(lossRuns));
-        console.log('✅ Loss run removed successfully');
-        // Reload the loss runs list
-        protectedFunctions.loadLossRuns(leadId);
-    }
+    // Remove from server
+    fetch('/api/loss-runs-upload.php', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fileId: fileId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Loss run removed successfully from server');
+            // Reload the loss runs list
+            protectedFunctions.loadLossRuns(leadId);
+        } else {
+            alert('Error removing file: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Error removing file:', error);
+        alert('Error removing file. Please try again.');
+    });
 };
 
 // Reach-out update function
@@ -875,23 +986,92 @@ protectedFunctions.updateLeadAssignedTo = function(leadId, assignedTo) {
     protectedFunctions.updateLeadField(leadId, 'assignedTo', assignedTo);
 };
 
-// Vehicle, Trailer, Driver management functions
+// Vehicle, Trailer, Driver management functions - Use existing card functions
 protectedFunctions.addVehicleToLead = function(leadId) {
     console.log('Add vehicle for lead:', leadId);
-    // Placeholder - can be expanded later
-    alert('Vehicle management coming soon');
+    // Use the existing addVehicle function that creates cards
+    if (window.addVehicle) {
+        window.addVehicle(leadId);
+    } else {
+        // Fallback: create the vehicle manually
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const lead = leads.find(l => String(l.id) === String(leadId));
+        if (lead) {
+            if (!lead.vehicles) lead.vehicles = [];
+            lead.vehicles.push({
+                year: '',
+                make: '',
+                model: '',
+                vin: '',
+                value: '',
+                deductible: '',
+                type: '',
+                gvwr: ''
+            });
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            // Refresh lead profile
+            if (window.showLeadProfile) {
+                window.showLeadProfile(leadId);
+            }
+        }
+    }
 };
 
 protectedFunctions.addTrailerToLead = function(leadId) {
     console.log('Add trailer for lead:', leadId);
-    // Placeholder - can be expanded later
-    alert('Trailer management coming soon');
+    // Use the existing addTrailer function that creates cards
+    if (window.addTrailer) {
+        window.addTrailer(leadId);
+    } else {
+        // Fallback: create the trailer manually
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const lead = leads.find(l => String(l.id) === String(leadId));
+        if (lead) {
+            if (!lead.trailers) lead.trailers = [];
+            lead.trailers.push({
+                year: '',
+                make: '',
+                type: '',
+                vin: '',
+                length: '',
+                value: '',
+                deductible: ''
+            });
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            // Refresh lead profile
+            if (window.showLeadProfile) {
+                window.showLeadProfile(leadId);
+            }
+        }
+    }
 };
 
 protectedFunctions.addDriverToLead = function(leadId) {
     console.log('Add driver for lead:', leadId);
-    // Placeholder - can be expanded later
-    alert('Driver management coming soon');
+    // Use the existing addDriver function that creates cards
+    if (window.addDriver) {
+        window.addDriver(leadId);
+    } else {
+        // Fallback: create the driver manually
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const lead = leads.find(l => String(l.id) === String(leadId));
+        if (lead) {
+            if (!lead.drivers) lead.drivers = [];
+            lead.drivers.push({
+                name: '',
+                license: '',
+                dob: '',
+                hireDate: '',
+                experience: '',
+                violations: ''
+            });
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            // Refresh lead profile
+            if (window.showLeadProfile) {
+                window.showLeadProfile(leadId);
+            }
+        }
+    }
 };
 
 // Quote and Application management functions
@@ -1403,6 +1583,7 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
 
 protectedFunctions.loadQuoteApplications = function(leadId) {
     console.log('📋 Loading quote applications for lead:', leadId);
+    console.log('🆕 PROFILE LOAD - UPDATED CARD FORMAT - NO EDIT BUTTON, NO DATES, NO STATUS');
 
     const applicationsContainer = document.getElementById(`application-submissions-container-${leadId}`);
     if (!applicationsContainer) {
@@ -1419,31 +1600,21 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
         return;
     }
 
-    // Display applications
+    // Display applications using clean format - same as showApplicationSubmissions
     let applicationsHTML = '';
     leadApplications.forEach((app, index) => {
-        const createdDate = new Date(app.createdDate).toLocaleDateString();
-        const createdTime = new Date(app.createdDate).toLocaleTimeString();
-
         applicationsHTML += `
-            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                     <div>
                         <h4 style="margin: 0 0 5px 0; color: #374151; font-size: 14px;">
                             <i class="fas fa-file-signature" style="color: #10b981; margin-right: 8px;"></i>
                             Quote Application #${app.id}
                         </h4>
-                        <p style="margin: 0; color: #6b7280; font-size: 12px;">
-                            <i class="fas fa-clock" style="margin-right: 5px;"></i>
-                            ${createdDate} at ${createdTime}
-                        </p>
                     </div>
                     <div style="display: flex; gap: 5px;">
                         <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-eye"></i> View
-                        </button>
-                        <button onclick="editQuoteApplication('${app.id}')" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            <i class="fas fa-edit"></i> Edit
                         </button>
                         <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-trash"></i> Delete
@@ -1452,22 +1623,17 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; font-size: 12px; color: #6b7280;">
                     <div>
-                        <strong style="color: #374151;">Commodities:</strong> ${app.commodities?.length || 0}
+                        <strong style="color: #374151;">Commodities:</strong> ${app.formData?.commodities?.length || app.commodities?.length || 0}
                     </div>
                     <div>
-                        <strong style="color: #374151;">Drivers:</strong> ${app.drivers?.length || 0}
+                        <strong style="color: #374151;">Drivers:</strong> ${app.formData?.drivers?.length || app.drivers?.length || 0}
                     </div>
                     <div>
-                        <strong style="color: #374151;">Trucks:</strong> ${app.trucks?.length || 0}
+                        <strong style="color: #374151;">Trucks:</strong> ${app.formData?.trucks?.length || app.trucks?.length || 0}
                     </div>
                     <div>
-                        <strong style="color: #374151;">Trailers:</strong> ${app.trailers?.length || 0}
+                        <strong style="color: #374151;">Trailers:</strong> ${app.formData?.trailers?.length || app.trailers?.length || 0}
                     </div>
-                </div>
-                <div style="margin-top: 8px;">
-                    <span style="display: inline-block; background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">
-                        ${app.status?.toUpperCase() || 'DRAFT'}
-                    </span>
                 </div>
             </div>
         `;
@@ -1750,9 +1916,168 @@ window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
 window.sendEmail = protectedFunctions.sendEmail;
 
+// Vehicle, Trailer, Driver management functions
+window.addVehicleToLead = protectedFunctions.addVehicleToLead;
+window.addTrailerToLead = protectedFunctions.addTrailerToLead;
+window.addDriverToLead = protectedFunctions.addDriverToLead;
+
+// Define the individual card management functions directly
+window.addVehicle = function(leadId) {
+    console.log('addVehicle called for lead:', leadId);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead) {
+        if (!lead.vehicles) lead.vehicles = [];
+        lead.vehicles.push({
+            year: '',
+            make: '',
+            model: '',
+            vin: '',
+            value: '',
+            deductible: '',
+            type: '',
+            gvwr: ''
+        });
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        // Refresh the lead profile to show new card
+        if (window.showLeadProfile) {
+            window.showLeadProfile(leadId);
+        }
+        console.log('✅ Vehicle added successfully');
+    }
+};
+
+window.addTrailer = function(leadId) {
+    console.log('addTrailer called for lead:', leadId);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead) {
+        if (!lead.trailers) lead.trailers = [];
+        lead.trailers.push({
+            year: '',
+            make: '',
+            type: '',
+            vin: '',
+            length: '',
+            value: '',
+            deductible: ''
+        });
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        // Refresh the lead profile to show new card
+        if (window.showLeadProfile) {
+            window.showLeadProfile(leadId);
+        }
+        console.log('✅ Trailer added successfully');
+    }
+};
+
+window.addDriver = function(leadId) {
+    console.log('addDriver called for lead:', leadId);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead) {
+        if (!lead.drivers) lead.drivers = [];
+        lead.drivers.push({
+            name: '',
+            license: '',
+            dob: '',
+            hireDate: '',
+            experience: '',
+            violations: ''
+        });
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        // Refresh the lead profile to show new card
+        if (window.showLeadProfile) {
+            window.showLeadProfile(leadId);
+        }
+        console.log('✅ Driver added successfully');
+    }
+};
+
+// Update functions for the cards
+window.updateVehicle = function(leadId, vehicleIndex, field, value) {
+    console.log('updateVehicle:', leadId, vehicleIndex, field, value);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead && lead.vehicles && lead.vehicles[vehicleIndex]) {
+        lead.vehicles[vehicleIndex][field] = value;
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log('✅ Vehicle updated');
+    }
+};
+
+window.updateTrailer = function(leadId, trailerIndex, field, value) {
+    console.log('updateTrailer:', leadId, trailerIndex, field, value);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead && lead.trailers && lead.trailers[trailerIndex]) {
+        lead.trailers[trailerIndex][field] = value;
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log('✅ Trailer updated');
+    }
+};
+
+window.updateDriver = function(leadId, driverIndex, field, value) {
+    console.log('updateDriver:', leadId, driverIndex, field, value);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead && lead.drivers && lead.drivers[driverIndex]) {
+        lead.drivers[driverIndex][field] = value;
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log('✅ Driver updated');
+    }
+};
+
+// Remove functions for the cards
+window.removeVehicle = function(leadId, vehicleIndex) {
+    console.log('removeVehicle:', leadId, vehicleIndex);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead && lead.vehicles && lead.vehicles[vehicleIndex] !== undefined) {
+        lead.vehicles.splice(vehicleIndex, 1);
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        // Refresh the lead profile
+        if (window.showLeadProfile) {
+            window.showLeadProfile(leadId);
+        }
+        console.log('✅ Vehicle removed');
+    }
+};
+
+window.removeTrailer = function(leadId, trailerIndex) {
+    console.log('removeTrailer:', leadId, trailerIndex);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead && lead.trailers && lead.trailers[trailerIndex] !== undefined) {
+        lead.trailers.splice(trailerIndex, 1);
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        // Refresh the lead profile
+        if (window.showLeadProfile) {
+            window.showLeadProfile(leadId);
+        }
+        console.log('✅ Trailer removed');
+    }
+};
+
+window.removeDriver = function(leadId, driverIndex) {
+    console.log('removeDriver:', leadId, driverIndex);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead && lead.drivers && lead.drivers[driverIndex] !== undefined) {
+        lead.drivers.splice(driverIndex, 1);
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        // Refresh the lead profile
+        if (window.showLeadProfile) {
+            window.showLeadProfile(leadId);
+        }
+        console.log('✅ Driver removed');
+    }
+};
+
 // Quote Application Display Function
 window.showApplicationSubmissions = function(leadId) {
     console.log('📋 showApplicationSubmissions called for lead:', leadId);
+    console.log('🆕 UPDATED CARD FORMAT - VERSION 1003 - NO EDIT BUTTON, NO DATES, NO STATUS');
 
     const containerId = `application-submissions-container-${leadId}`;
     const container = document.getElementById(containerId);
@@ -1776,9 +2101,6 @@ window.showApplicationSubmissions = function(leadId) {
     // Display applications using detailed format
     let applicationsHTML = '';
     leadApplications.forEach((app, index) => {
-        const created = new Date(app.created || app.createdDate);
-        const createdDate = created.toLocaleDateString();
-        const createdTime = created.toLocaleTimeString();
         applicationsHTML += `
             <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
@@ -1787,17 +2109,10 @@ window.showApplicationSubmissions = function(leadId) {
                             <i class="fas fa-file-signature" style="color: #10b981; margin-right: 8px;"></i>
                             Quote Application #${app.id}
                         </h4>
-                        <p style="margin: 0; color: #6b7280; font-size: 12px;">
-                            <i class="fas fa-clock" style="margin-right: 5px;"></i>
-                            ${createdDate} at ${createdTime}
-                        </p>
                     </div>
                     <div style="display: flex; gap: 5px;">
                         <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-eye"></i> View
-                        </button>
-                        <button onclick="editQuoteApplication('${app.id}')" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            <i class="fas fa-edit"></i> Edit
                         </button>
                         <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-trash"></i> Delete
@@ -1817,11 +2132,6 @@ window.showApplicationSubmissions = function(leadId) {
                     <div>
                         <strong style="color: #374151;">Trailers:</strong> ${app.formData?.trailers?.length || app.trailers?.length || 0}
                     </div>
-                </div>
-                <div style="margin-top: 8px;">
-                    <span style="display: inline-block; background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">
-                        ${app.status?.toUpperCase() || 'SAVED'}
-                    </span>
                 </div>
             </div>
         `;
@@ -1906,8 +2216,13 @@ window.deleteQuoteApplication = function(appId) {
 
 // Quote Application Supporting Functions
 window.addDriverRow = function() {
+    console.log('🚛 addDriverRow called');
     const container = document.getElementById('drivers-container');
-    if (!container) return;
+    if (!container) {
+        console.log('❌ drivers-container not found');
+        return;
+    }
+    console.log('✅ Found drivers-container, adding row...');
 
     const newRow = document.createElement('div');
     newRow.className = 'driver-row';
