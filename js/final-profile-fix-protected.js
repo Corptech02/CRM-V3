@@ -1400,12 +1400,14 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
                 };
             }
 
-            // Check if reach-out is already completed first (regardless of stage requirement)
-            if (lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) {
-                // COMPLETED REACH-OUT - Always show green regardless of current stage requirement
-                const completedTime = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
-                markReachOutComplete(leadId, completedTime);
-            } else if (hasReachOutTodo) {
+            // Check completion only if stage requires reach-out
+            if (hasReachOutTodo) {
+                // First check if reach-out is already completed
+                if (lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) {
+                    // COMPLETED REACH-OUT - Show green completion status
+                    const completedTime = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
+                    markReachOutComplete(leadId, completedTime);
+                } else {
                 // STAGE REQUIRES REACH-OUT AND NOT COMPLETED - Show red styling
                 todoDiv.style.display = 'block'; // Show TO DO text
 
@@ -1437,6 +1439,7 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
                 // Hide completion timestamp if not completed
                 if (completionDiv) {
                     completionDiv.style.display = 'none';
+                }
                 }
             } else {
                 // STAGE DOESN'T REQUIRE REACH-OUT AND NOT COMPLETED - Show neutral black styling
