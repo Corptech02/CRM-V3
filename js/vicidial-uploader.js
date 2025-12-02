@@ -192,7 +192,8 @@ const vicidialUploader = {
                     console.log(`Sending ${batchLeads.length} actual leads in batch ${i + 1}`);
 
                     const API_URL = window.location.origin;
-                    const batchResponse = await fetch(`${API_URL}/api/vicidial/overwrite?${batchParams}`, {
+                    // Use the new direct upload endpoint that accepts leads data
+                    const batchResponse = await fetch(`${API_URL}/api/vicidial/upload-leads-data`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -200,7 +201,6 @@ const vicidialUploader = {
                         },
                         body: JSON.stringify({
                             list_id: listId,
-                            criteria: criteria,
                             leads: batchLeads
                         }),
                         signal: AbortSignal.timeout(batchTimeout) // Dynamic timeout calculated above
@@ -244,7 +244,8 @@ const vicidialUploader = {
             console.log(`Sending ${allLeads.length} actual leads in single batch`);
 
             const API_URL = window.location.origin;
-            const response = await fetch(`${API_URL}/api/vicidial/overwrite?${params}`, {
+            // Use the new direct upload endpoint that accepts leads data
+            const response = await fetch(`${API_URL}/api/vicidial/upload-leads-data`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -252,7 +253,6 @@ const vicidialUploader = {
                 },
                 body: JSON.stringify({
                     list_id: listId,
-                    criteria: criteria,
                     leads: allLeads
                 }),
                 // Dynamic timeout for large uploads

@@ -1221,7 +1221,7 @@ async def get_vicidial_lists():
             lists = []
 
             # Check common list IDs (you may need to adjust based on your ViciBox setup)
-            for list_id in ["998", "999", "1000", "1001", "101", "102"]:
+            for list_id in ["998", "999", "1000", "1001", "1005", "1006", "101", "102"]:
                 response = await client.get(
                     f"{VICIDIAL_PROTOCOL}://{VICIDIAL_HOST}/vicidial/non_agent_api.php",
                     params={
@@ -1339,6 +1339,121 @@ async def clear_vicidial_list(list_id: str = Query(...)):
         print(f"Error clearing list: {e}")
         return {"success": True, "message": "Clear attempted, proceeding with upload", "error": str(e)}
 
+@app.post("/api/vicidial/upload-leads-data")
+async def upload_leads_data_to_vicidial(
+    request: Request
+):
+    """Upload leads data directly to Vicidial (accepts JSON data)"""
+    try:
+        data = await request.json()
+        list_id = data.get("list_id")
+        leads_data = data.get("leads", [])
+
+        if not list_id or not leads_data:
+            return {
+                "success": False,
+                "error": "list_id and leads data are required"
+            }
+
+        print(f"\n=== VICIDIAL DIRECT UPLOAD ===")
+        print(f"Received {len(leads_data)} leads for list {list_id}")
+
+        # Upload to Vicidial
+        import time
+        start_time = time.time()
+
+        async with httpx.AsyncClient(verify=False, timeout=10.0) as vicidial_client:
+            uploaded = 0
+            errors = []
+            skipped_duplicates = 0
+
+            for idx, lead in enumerate(leads_data):
+                # Show progress every 25 leads
+                if idx > 0 and idx % 25 == 0:
+                    print(f"Progress: {idx}/{len(leads_data)} processed, {uploaded} uploaded")
+
+                # Process each lead for Vicidial
+                phone = str(lead.get('phone', '')).replace("-", "").replace(" ", "").replace("(", "").replace(")", "").replace("+1", "")
+
+                # Use DOT number as phone if no valid phone
+                if not phone or len(phone) < 10:
+                    dot_number = str(lead.get('usdot_number', lead.get('dot_number', ''))).replace("DOT", "").replace("-", "")
+                    phone = "9" + dot_number.zfill(9)[-9:]  # Prefix with 9, pad to 10 digits total
+                elif len(phone) > 10:
+                    phone = phone[-10:]  # Take last 10 digits
+
+                # Get company and insurance info
+                company_name = lead.get('legal_name', lead.get('company_name', lead.get('name', '')))
+                dot_number = str(lead.get('usdot_number', lead.get('dot_number', '')))
+                insurance_company = lead.get('insurance_company', lead.get('insurance_carrier', ''))
+                insurance_expiry = lead.get('insurance_expiry', '')
+                representative_name = lead.get('representative_name', lead.get('contact', ''))
+
+                # Format insurance expiry as date only (remove time if present)
+                if insurance_expiry and ' ' in insurance_expiry:
+                    insurance_expiry = insurance_expiry.split()[0]  # Take only date part
+
+                vicidial_lead = {
+                    "source": "vanguard",
+                    "user": VICIDIAL_USERNAME,
+                    "pass": VICIDIAL_PASSWORD,
+                    "function": "add_lead",
+                    "list_id": list_id,
+                    "phone_number": phone,
+                    "phone_code": "1",
+                    "status": "NEW",
+                    "duplicate_check": "DUPUPDATE",
+                    "first_name": company_name[:30],  # Company name in First field
+                    "last_name": representative_name[:30] if representative_name else "",  # Representative name in Last field, blank if none
+                    "address1": dot_number,  # DOT number only in Address1
+                    "address2": insurance_company[:50],  # Insurance company in Address2
+                    "address3": insurance_expiry,  # Insurance expiry date in Address3
+                    "city": lead.get('city', ''),
+                    "state": lead.get('state', ''),
+                    "postal_code": "",
+                    "email": lead.get('email', lead.get('email_address', '')),
+                    "comments": f"Company: {company_name} | DOT: {dot_number} | Fleet: {lead.get('fleet_size', lead.get('fleet', lead.get('power_units', 0)))}",
+                    "vendor_lead_code": dot_number,
+                    "rank": "99"
+                }
+
+                response = await vicidial_client.post(
+                    f"{VICIDIAL_PROTOCOL}://{VICIDIAL_HOST}/vicidial/non_agent_api.php",
+                    data=vicidial_lead
+                )
+
+                # Log first response for debugging
+                if idx == 0:
+                    print(f"First Vicidial response: {response.text[:200]}")
+
+                if response.status_code == 200 and "SUCCESS" in response.text:
+                    uploaded += 1
+                elif response.status_code == 200 and "DUPLICATE" in response.text:
+                    skipped_duplicates += 1
+                else:
+                    error_msg = f"Lead {lead.get('usdot_number', 'unknown')}: {response.text[:100]}"
+                    errors.append(error_msg)
+                    if len(errors) <= 3:
+                        print(f"Vicidial error: {error_msg}")
+
+            print(f"\n=== UPLOAD COMPLETE ===")
+            print(f"Uploaded: {uploaded} leads")
+            print(f"Duplicates skipped: {skipped_duplicates}")
+            print(f"Errors: {len(errors)}")
+
+            return {
+                "success": True,
+                "uploaded": uploaded,
+                "duplicates": skipped_duplicates,
+                "total": len(leads_data),
+                "list_id": list_id,
+                "message": f"Added {uploaded} new leads to list {list_id} ({skipped_duplicates} duplicates skipped)",
+                "errors": errors[:5] if errors else []
+            }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/vicidial/add-leads")
 async def add_leads_to_vicidial(
     list_id: str = Query(...),
@@ -1352,91 +1467,77 @@ async def add_leads_to_vicidial(
     try:
         # Process ALL leads requested but with reasonable timeout protection
         MAX_TIME = 45  # Allow 45 seconds for upload (nginx timeout is usually 60)
-        # Get leads from database using existing endpoint logic
-        with get_db(FMCSA_DB) as conn:
-            cursor = conn.cursor()
+        # Get leads from the SAME working API that the frontend uses
+        # This avoids the corrupted database issue and ensures consistency
+        print(f"\n=== VICIDIAL UPLOAD VERIFICATION ===")
+        print("Using working Node.js API endpoint instead of corrupted database")
 
-            # Build the query (same as expiring insurance endpoint)
-            query = """
-                SELECT * FROM carriers
-                WHERE insurance_carrier IS NOT NULL
-                AND insurance_carrier != ''
-                AND operating_status = 'Active'
-                AND email_address IS NOT NULL
-                AND email_address != ''
-                AND email_address LIKE '%@%'
-                AND (
-                    representative_1_name IS NOT NULL
-                    OR representative_2_name IS NOT NULL
-                    OR principal_name IS NOT NULL
-                    OR (officers_data IS NOT NULL AND officers_data LIKE '%name%')
-                )
-                AND policy_renewal_date IS NOT NULL
-            """
+        # Call the same API endpoint the frontend uses successfully
+        async with httpx.AsyncClient(verify=False, timeout=30.0) as api_client:
+            api_url = "http://162-220-14-239.nip.io:3001/api/leads/expiring-insurance"
+            params = {
+                "state": state or "",
+                "days": days_until_expiry,
+                "limit": limit,
+                "skip_days": skip_days
+            }
 
-            params = []
-            if state:
-                query += " AND state = ?"
-                params.append(state)
+            print(f"Calling working API: {api_url} with params: {params}")
 
-            if insurance_companies:
-                companies = [c.strip() for c in insurance_companies.split(',')]
-                carrier_conditions = ' OR '.join(['insurance_carrier LIKE ?' for _ in companies])
-                query += f" AND ({carrier_conditions})"
-                params.extend([f'%{c}%' for c in companies])
+            api_response = await api_client.get(api_url, params=params)
 
-            query += " ORDER BY legal_name LIMIT ?"
-            params.append(limit)
-
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-
-            # Format leads for Vicidial - DEDUPLICATE by DOT number
-            leads_to_upload = []
-            seen_dots = set()
-
-            # LOG: Track what we're generating
-            print(f"\n=== VICIDIAL UPLOAD VERIFICATION ===")
-            print(f"Query returned {len(rows)} total rows")
-            print(f"Request parameters: state={state}, companies={insurance_companies}, limit={limit}")
-
-            for row in rows:
-                dot = str(row['dot_number'])
-                # Skip if we've already processed this DOT number
-                if dot in seen_dots:
-                    print(f"Skipping duplicate DOT: {dot}")
-                    continue
-                seen_dots.add(dot)
-
-                lead = {
-                    "phone": row['phone'] or '',
-                    "usdot_number": dot,
-                    "legal_name": row['legal_name'] or row['dba_name'] or '',
-                    "representative_name": row['representative_1_name'] or row['representative_2_name'] or row['principal_name'] or '',
-                    "city": row['city'] or '',
-                    "state": row['state'] or '',
-                    "email": row['email_address'] or '',
-                    "fleet_size": str(row['power_units'] or 0),
-                    "insurance_expiry": row['policy_renewal_date'] or '',
-                    "insurance_carrier": row['insurance_carrier'] or ''  # Add insurance carrier
+            if api_response.status_code != 200:
+                print(f"API call failed: {api_response.status_code} - {api_response.text[:200]}")
+                return {
+                    "success": False,
+                    "error": f"Failed to fetch leads from API: {api_response.status_code}"
                 }
-                leads_to_upload.append(lead)
 
-                # HARD LIMIT to prevent runaway uploads
-                if len(leads_to_upload) >= limit:
-                    print(f"Reached limit of {limit} leads, stopping generation")
-                    break
+            api_data = api_response.json()
+            api_leads = api_data.get('leads', [])
 
-            # Log final lead count before upload
-            print(f"\nTotal unique leads prepared for upload: {len(leads_to_upload)}")
-            print(f"First 3 DOT numbers: {[lead['usdot_number'] for lead in leads_to_upload[:3]]}")
-            print(f"Last 3 DOT numbers: {[lead['usdot_number'] for lead in leads_to_upload[-3:]]}")
+            print(f"API returned {len(api_leads)} leads")
 
-            # Upload to Vicidial in small batches to avoid timeout
-            import time
-            start_time = time.time()
+        # Format leads for Vicidial - DEDUPLICATE by DOT number
+        leads_to_upload = []
+        seen_dots = set()
 
-            async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
+        for lead in api_leads:
+            dot = str(lead.get('usdot_number', lead.get('dot_number', '')))
+            # Skip if we've already processed this DOT number
+            if dot in seen_dots or not dot:
+                continue
+            seen_dots.add(dot)
+
+            formatted_lead = {
+                "phone": lead.get('phone', ''),
+                "usdot_number": dot,
+                "legal_name": lead.get('legal_name', lead.get('name', '')),
+                "representative_name": lead.get('representative_name', lead.get('contact', '')),
+                "city": lead.get('city', ''),
+                "state": lead.get('state', ''),
+                "email": lead.get('email', lead.get('email_address', '')),
+                "fleet_size": str(lead.get('fleet', lead.get('power_units', 0))),
+                "insurance_expiry": lead.get('expiry', lead.get('insurance_expiry', '')),
+                "insurance_carrier": lead.get('insurance_carrier', '')
+            }
+            leads_to_upload.append(formatted_lead)
+
+            # HARD LIMIT to prevent runaway uploads
+            if len(leads_to_upload) >= limit:
+                print(f"Reached limit of {limit} leads, stopping generation")
+                break
+
+        # Log final lead count before upload
+        print(f"\nTotal unique leads prepared for upload: {len(leads_to_upload)}")
+        print(f"First 3 DOT numbers: {[lead['usdot_number'] for lead in leads_to_upload[:3]]}")
+        print(f"Last 3 DOT numbers: {[lead['usdot_number'] for lead in leads_to_upload[-3:]]}")
+
+        # Upload to Vicidial in small batches to avoid timeout
+        import time
+        start_time = time.time()
+
+        async with httpx.AsyncClient(verify=False, timeout=10.0) as vicidial_client:
                 uploaded = 0
                 errors = []
                 skipped_duplicates = 0
@@ -1527,7 +1628,7 @@ async def add_leads_to_vicidial(
                         "rank": "99"  # Add default rank
                     }
 
-                    response = await client.post(
+                    response = await vicidial_client.post(
                         f"{VICIDIAL_PROTOCOL}://{VICIDIAL_HOST}/vicidial/non_agent_api.php",
                         data=vicidial_lead
                     )
@@ -1933,7 +2034,7 @@ if __name__ == "__main__":
     print("="*50)
     print("📊 Connected to 2.2M carrier database")
     print("🔄 All data synchronized across locations")
-    print("🌐 API running at: http://0.0.0.0:8897")
+    print("🌐 API running at: http://0.0.0.0:8898")
     print("="*50 + "\n")
 
-    uvicorn.run(app, host="0.0.0.0", port=8897)
+    uvicorn.run(app, host="0.0.0.0", port=8898)

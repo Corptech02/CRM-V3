@@ -1,18 +1,30 @@
 #!/usr/bin/env node
 
 /**
- * Simple proxy server for port 8897 → 3001
- * Fixes nginx routing for ViciDial API without external dependencies
+ * Simple proxy server for port 8897 → 8898
+ * Proxies frontend requests to the Python Vanguard API server
  */
 
 const http = require('http');
 const url = require('url');
 
-console.log('🔄 Starting simple proxy server 8897 → 3001...');
+console.log('🔄 Starting simple proxy server 8897 → 8898...');
 
 const server = http.createServer((req, res) => {
-    const targetUrl = `http://localhost:3001${req.url}`;
+    const targetUrl = `http://localhost:8898${req.url}`;
 
+    // Log to file for COI requests
+    if (req.url.includes('/api/coi/send-request')) {
+        const fs = require('fs');
+        const debugLog = `🚨🚨🚨 SIMPLE PROXY COI REQUEST ${new Date().toISOString()} 🚨🚨🚨\n` +
+                         `Method: ${req.method}\n` +
+                         `URL: ${req.url}\n` +
+                         `Target: ${targetUrl}\n` +
+                         `Headers: ${JSON.stringify(req.headers, null, 2)}\n\n`;
+        fs.appendFileSync('/var/www/vanguard/coi-debug-final.log', debugLog);
+    }
+
+    console.log(`🚨 SIMPLE PROXY HANDLING REQUEST: ${req.method} ${req.url}`);
     console.log(`📡 Proxying: ${req.method} ${req.url} → ${targetUrl}`);
 
     // Parse target URL
@@ -52,7 +64,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(8897, () => {
     console.log('✅ Simple proxy server running on port 8897');
-    console.log('🔄 All requests will be forwarded to port 3001');
+    console.log('🔄 All requests will be forwarded to port 8898');
 });
 
 server.on('error', (err) => {
