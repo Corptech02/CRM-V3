@@ -407,6 +407,9 @@ function getCompleteGenerateLeadsContent() {
                         <button class="btn-warning" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem; margin-left: 10px;">
                             <i class="fas fa-sms"></i> SMS Blast
                         </button>
+                        <button class="btn-info" onclick="openLeadSplitPopup()" style="padding: 10px 24px; font-size: 1rem; margin-left: 10px;" id="leadSplitBtn">
+                            <i class="fas fa-cut"></i> Lead Split
+                        </button>
                         <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 20px;">
                             <i class="fas fa-redo"></i> Reset Form
                         </button>
@@ -876,6 +879,473 @@ window.viewGeneratedLeads = function() {
     console.log(`Viewing ${window.generatedLeadsData.length} generated leads`);
     // This would typically switch to a table view showing the leads
     alert(`${window.generatedLeadsData.length} leads generated. Export them using the Excel or JSON buttons.`);
+};
+
+// Lead Split functionality
+window.openLeadSplitPopup = function() {
+    // Check if leads have been generated
+    if (!window.generatedLeadsData || window.generatedLeadsData.length === 0) {
+        alert('Please generate leads first before splitting them.');
+        return;
+    }
+
+    // Create modal HTML
+    const modalHtml = `
+        <div id="leadSplitModal" class="modal">
+            <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-cut"></i> Lead Split</h2>
+                    <span class="close" onclick="closeLeadSplitPopup()">&times;</span>
+                </div>
+
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> You have <strong>${window.generatedLeadsData.length}</strong> generated leads ready to split.
+                    </div>
+
+                    <div class="form-section">
+                        <h3><i class="fas fa-scissors"></i> Split Configuration</h3>
+
+                        <div class="form-group">
+                            <label for="splitType">Split Type:</label>
+                            <select id="splitType" class="form-control">
+                                <option value="equal">Equal Split</option>
+                                <option value="percentage">Percentage Split</option>
+                                <option value="count">Split by Count</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="splitOptionsContainer">
+                            <label for="splitParts">Number of Parts:</label>
+                            <input type="number" id="splitParts" class="form-control" value="2" min="2" max="10">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="splitNaming">Naming Convention:</label>
+                            <input type="text" id="splitNaming" class="form-control" value="Split_{index}" placeholder="Use {index} for numbering">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeLeadSplitPopup()">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="performLeadSplit()">
+                        <i class="fas fa-cut"></i> Split Leads
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add modal to page if not exists
+    if (!document.getElementById('leadSplitModal')) {
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Add event listener for split type change
+        document.getElementById('splitType').addEventListener('change', updateSplitOptions);
+    }
+
+    // Show modal
+    document.getElementById('leadSplitModal').style.display = 'block';
+};
+
+// Update split options based on type
+function updateSplitOptions() {
+    const splitType = document.getElementById('splitType').value;
+    const container = document.getElementById('splitOptionsContainer');
+
+    switch(splitType) {
+        case 'equal':
+            container.innerHTML = `
+                <label for="splitParts">Number of Parts:</label>
+                <input type="number" id="splitParts" class="form-control" value="2" min="2" max="10">
+            `;
+            break;
+        case 'percentage':
+            container.innerHTML = `
+                <label>Percentage Split (must total 100%):</label>
+                <div id="percentageInputs">
+                    <div class="input-group mb-2">
+                        <span class="input-group-text">Part 1:</span>
+                        <input type="number" class="form-control percentage-input" value="50" min="1" max="99">
+                        <span class="input-group-text">%</span>
+                    </div>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text">Part 2:</span>
+                        <input type="number" class="form-control percentage-input" value="50" min="1" max="99">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addPercentagePart()">
+                    <i class="fas fa-plus"></i> Add Part
+                </button>
+            `;
+            break;
+        case 'count':
+            container.innerHTML = `
+                <label for="leadsPerPart">Leads per Part:</label>
+                <input type="number" id="leadsPerPart" class="form-control" value="${Math.floor(window.generatedLeadsData.length / 2)}" min="1" max="${window.generatedLeadsData.length - 1}">
+                <small class="form-text text-muted">Remaining leads will go to the last part</small>
+            `;
+            break;
+    }
+}
+
+// Add percentage part
+function addPercentagePart() {
+    const container = document.getElementById('percentageInputs');
+    const partCount = container.children.length + 1;
+
+    const newPart = document.createElement('div');
+    newPart.className = 'input-group mb-2';
+    newPart.innerHTML = `
+        <span class="input-group-text">Part ${partCount}:</span>
+        <input type="number" class="form-control percentage-input" value="10" min="1" max="99">
+        <span class="input-group-text">%</span>
+        <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+
+    container.appendChild(newPart);
+}
+
+// Perform the actual lead split
+function performLeadSplit() {
+    const splitType = document.getElementById('splitType').value;
+    const splitNaming = document.getElementById('splitNaming').value || 'Split_{index}';
+    const leads = [...window.generatedLeadsData];
+
+    let splitParts = [];
+
+    try {
+        switch(splitType) {
+            case 'equal':
+                const parts = parseInt(document.getElementById('splitParts').value);
+
+                // Initialize empty arrays for each part
+                for (let i = 0; i < parts; i++) {
+                    splitParts.push({
+                        name: splitNaming.replace('{index}', i + 1),
+                        leads: [],
+                        count: 0
+                    });
+                }
+
+                // Distribute leads in round-robin fashion to ensure equal renewal date distribution
+                // This way if leads are sorted by renewal date, each split gets every nth lead
+                leads.forEach((lead, index) => {
+                    const partIndex = index % parts;
+                    splitParts[partIndex].leads.push(lead);
+                    splitParts[partIndex].count++;
+                });
+                break;
+
+            case 'percentage':
+                const percentages = Array.from(document.querySelectorAll('.percentage-input')).map(input => parseInt(input.value));
+                const totalPercentage = percentages.reduce((sum, p) => sum + p, 0);
+
+                if (totalPercentage !== 100) {
+                    alert(`Percentages must total 100%. Current total: ${totalPercentage}%`);
+                    return;
+                }
+
+                // Initialize parts with target counts
+                percentages.forEach((percentage, index) => {
+                    splitParts.push({
+                        name: splitNaming.replace('{index}', index + 1),
+                        leads: [],
+                        count: 0,
+                        percentage: percentage,
+                        targetCount: Math.round(leads.length * (percentage / 100))
+                    });
+                });
+
+                // Distribute leads in round-robin fashion until targets are met
+                let currentPartIndex = 0;
+                leads.forEach((lead) => {
+                    // Find next part that hasn't reached its target
+                    let attempts = 0;
+                    while (splitParts[currentPartIndex].count >= splitParts[currentPartIndex].targetCount && attempts < splitParts.length) {
+                        currentPartIndex = (currentPartIndex + 1) % splitParts.length;
+                        attempts++;
+                    }
+
+                    // Add lead to current part
+                    splitParts[currentPartIndex].leads.push(lead);
+                    splitParts[currentPartIndex].count++;
+
+                    // Move to next part for round-robin distribution
+                    currentPartIndex = (currentPartIndex + 1) % splitParts.length;
+                });
+
+                // Remove targetCount property
+                splitParts.forEach(part => delete part.targetCount);
+                break;
+
+            case 'count':
+                const leadsPerPartCount = parseInt(document.getElementById('leadsPerPart').value);
+                let partIndex = 1;
+                let currentPart = {
+                    name: splitNaming.replace('{index}', partIndex),
+                    leads: [],
+                    count: 0
+                };
+
+                leads.forEach((lead, index) => {
+                    // Add lead to current part
+                    currentPart.leads.push(lead);
+                    currentPart.count++;
+
+                    // If current part is full, start a new one
+                    if (currentPart.count === leadsPerPartCount && index < leads.length - 1) {
+                        splitParts.push(currentPart);
+                        partIndex++;
+                        currentPart = {
+                            name: splitNaming.replace('{index}', partIndex),
+                            leads: [],
+                            count: 0
+                        };
+                    }
+                });
+
+                // Add the last part if it has leads
+                if (currentPart.count > 0) {
+                    splitParts.push(currentPart);
+                }
+                break;
+        }
+
+        // Store split results
+        window.leadSplitResults = splitParts;
+
+        // Show results
+        showSplitResults(splitParts);
+
+    } catch (error) {
+        console.error('Error splitting leads:', error);
+        alert('Error splitting leads: ' + error.message);
+    }
+}
+
+// Show split results
+function showSplitResults(splitParts) {
+    const modalBody = document.querySelector('#leadSplitModal .modal-body');
+
+    modalBody.innerHTML = `
+        <div class="split-result">
+            <div class="alert alert-success">
+                <h3><i class="fas fa-check-circle"></i> Leads Split Successfully!</h3>
+            </div>
+
+            <div class="result-summary">
+                <p><strong>Total Leads Split:</strong> ${window.generatedLeadsData.length}</p>
+                <p><strong>Split Into:</strong> ${splitParts.length} parts</p>
+            </div>
+
+            <div class="split-parts">
+                <h4>Split Parts:</h4>
+                ${splitParts.map((part, index) => `
+                    <div class="split-part" style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <h5>${part.name}</h5>
+                        <p><strong>Leads:</strong> ${part.count}</p>
+                        ${part.percentage ? `<p><strong>Percentage:</strong> ${part.percentage}%</p>` : ''}
+                        <button class="btn btn-primary" onclick="exportSplitPartData(${index})" style="padding: 8px 16px; font-size: 0.9rem; margin-right: 10px;" data-lead-split-csv="true">
+                            <i class="fas fa-file-export"></i> Export CSV
+                        </button>
+                        <button class="btn btn-info" onclick="uploadSplitPartToVicidial(${index})" style="padding: 8px 16px; font-size: 0.9rem;">
+                            <i class="fas fa-upload"></i> Upload to Vicidial
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    // Update footer
+    document.querySelector('#leadSplitModal .modal-footer').innerHTML = `
+        <button type="button" class="btn btn-primary" onclick="closeLeadSplitPopup()">
+            Close
+        </button>
+        <button type="button" class="btn btn-success" onclick="exportAllSplitParts()" data-lead-split-csv="true">
+            <i class="fas fa-file-export"></i> Export All Parts
+        </button>
+    `;
+}
+
+// Export a specific split part to CSV
+function exportSplitPartData(partIndex) {
+    const part = window.leadSplitResults[partIndex];
+    if (!part) return;
+
+    console.log('✅ Exporting split part:', part.name, 'with', part.count, 'leads');
+
+    // Convert to CSV format
+    const csvContent = convertLeadsToCSV(part.leads);
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${part.name.replace(/[^a-zA-Z0-9]/g, '_')}_leads_${new Date().toISOString().split('T')[0]}.csv`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    console.log('✅ CSV export completed for:', part.name);
+}
+
+// Export all split parts (individual files with staggered timing)
+function exportAllSplitParts() {
+    window.leadSplitResults.forEach((part, index) => {
+        setTimeout(() => exportSplitPartData(index), index * 800); // Stagger exports
+    });
+}
+
+// Upload split part to Vicidial
+function uploadSplitPartToVicidial(partIndex) {
+    const part = window.leadSplitResults[partIndex];
+    if (!part) return;
+
+    // Store original data and prepare split data
+    const originalData = window.generatedLeadsData;
+
+    console.log(`🎯 Uploading split "${part.name}" with ${part.count} leads to Vicidial`);
+
+    // Perform complete reset of Vicidial uploader to prevent timeout issues
+    if (typeof vicidialUploader !== 'undefined') {
+        // Extract cache before reset if first time
+        if (!vicidialUploader.cachedLists) {
+            const existingModal = document.getElementById('vicidialUploadModal');
+            if (existingModal) {
+                const listElements = existingModal.querySelectorAll('input[name="vicidialList"]');
+                if (listElements.length > 0) {
+                    const extractedLists = Array.from(listElements).map(input => ({
+                        list_id: input.value,
+                        list_name: input.nextElementSibling ? input.nextElementSibling.textContent.trim() : `List ${input.value}`
+                    }));
+                    vicidialUploader.cachedLists = extractedLists;
+                    console.log('💾 Extracted and cached lists before reset:', extractedLists.length, 'lists');
+                }
+            }
+        }
+
+        // Use the new complete reset function
+        if (typeof vicidialUploader.completeReset === 'function') {
+            vicidialUploader.completeReset();
+        } else {
+            // Fallback to manual reset if function doesn't exist
+            console.log('⚠️ Using fallback reset method');
+            vicidialUploader.closeDialog();
+            vicidialUploader.resultsShown = false;
+            vicidialUploader.uploadCriteria = null;
+            vicidialUploader.selectedListId = null;
+
+            const modal = document.getElementById('vicidialUploadModal');
+            if (modal) modal.remove();
+        }
+
+        console.log(`🔄 Vicidial uploader completely reset for split upload #${partIndex + 1}`);
+    }
+
+    // Create criteria object with the split leads (matching the format expected by vicidial-uploader)
+    const splitCriteria = {
+        state: 'Split Upload',
+        insuranceCompanies: [`Split: ${part.name}`],
+        daysUntilExpiry: 'Split',
+        totalLeads: part.count,  // This is the key field the uploader uses
+        leadCount: part.count,   // Keep for compatibility
+        leads: part.leads,
+        splitName: part.name,
+        isSplit: true,
+        limit: part.count
+    };
+
+    // Set the split leads as the current generated data
+    window.generatedLeadsData = part.leads;
+
+    // Add a flag to indicate this is a split upload
+    window.isUploadingSplit = true;
+    window.splitUploadData = {
+        name: part.name,
+        count: part.count,
+        originalCount: originalData ? originalData.length : 0
+    };
+
+    // Wait longer for complete cleanup, then show the fresh upload dialog
+    setTimeout(() => {
+        try {
+            if (typeof vicidialUploader !== 'undefined' && vicidialUploader.showUploadDialog) {
+                console.log(`✅ Opening fresh Vicidial upload dialog for split: ${part.name} (${part.count} leads)`);
+
+                // Double-check that we've cleared the old modal
+                const oldModal = document.getElementById('vicidialUploadModal');
+                if (oldModal) {
+                    console.log('⚠️ Found leftover modal, removing it');
+                    oldModal.remove();
+                }
+
+                // Show the dialog with a completely fresh state
+                vicidialUploader.showUploadDialog(splitCriteria);
+
+                console.log('🚀 Upload dialog launched successfully');
+            } else {
+                throw new Error('Vicidial uploader not available');
+            }
+        } catch (error) {
+            console.error('❌ Failed to open Vicidial upload dialog:', error);
+            alert(`Failed to open upload dialog: ${error.message}. Please try refreshing the page.`);
+
+            // Restore original data on error
+            window.generatedLeadsData = originalData;
+            window.isUploadingSplit = false;
+            window.splitUploadData = null;
+        }
+    }, 200);
+
+    // Restore original data after upload dialog is shown
+    setTimeout(() => {
+        if (window.isUploadingSplit) {
+            console.log('🔄 Restoring original lead data after split upload');
+            window.generatedLeadsData = originalData;
+            window.isUploadingSplit = false;
+            window.splitUploadData = null;
+        }
+    }, 3000);
+}
+
+// Helper function to convert leads to CSV
+function convertLeadsToCSV(leads) {
+    if (!leads || leads.length === 0) return '';
+
+    // Get headers from first lead
+    const headers = Object.keys(leads[0]);
+    const csvHeaders = headers.join(',');
+
+    // Convert leads to CSV rows
+    const csvRows = leads.map(lead => {
+        return headers.map(header => {
+            const value = lead[header];
+            // Escape CSV values that contain commas or quotes
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value || '';
+        }).join(',');
+    });
+
+    return [csvHeaders, ...csvRows].join('\n');
+}
+
+// Close lead split popup
+window.closeLeadSplitPopup = function() {
+    const modal = document.getElementById('leadSplitModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 };
 
 console.log('✅ COMPLETE Lead Generation Interface RESTORED with Day Skip feature!');

@@ -2276,7 +2276,7 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                         <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-eye"></i> View
                         </button>
-                        <button onclick="downloadQuoteApplication('${app.id}')" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <button onclick="downloadQuoteApplication('${app.id}')" data-quote-app-pdf="true" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-download"></i> Download
                         </button>
                         <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
@@ -2917,7 +2917,7 @@ window.showApplicationSubmissions = function(leadId) {
                         <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-eye"></i> View
                         </button>
-                        <button onclick="downloadQuoteApplication('${app.id}')" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <button onclick="downloadQuoteApplication('${app.id}')" data-quote-app-pdf="true" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                             <i class="fas fa-download"></i> Download
                         </button>
                         <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">

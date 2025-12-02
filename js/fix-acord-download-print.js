@@ -266,6 +266,18 @@ document.addEventListener('click', function(e) {
     const element = target.closest('button, a');
 
     if (element) {
+        // Skip quote application PDF buttons
+        if (element.hasAttribute('data-quote-app-pdf')) {
+            console.log('✅ Allowing quote application PDF download');
+            return; // Let the quote application handle its own download
+        }
+
+        // Skip lead split CSV export buttons
+        if (element.hasAttribute('data-lead-split-csv')) {
+            console.log('✅ Allowing lead split CSV export');
+            return; // Let the lead split handle its own export
+        }
+
         // Check for download buttons
         if (element.textContent.includes('Download') ||
             element.innerHTML.includes('fa-download') ||

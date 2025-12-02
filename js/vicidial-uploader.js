@@ -420,8 +420,23 @@ const vicidialUploader = {
         const statusDiv = document.getElementById('vicidialConnectionStatus');
         const listsContainer = document.getElementById('vicidialListsContainer');
         const listSelection = document.getElementById('vicidialListSelection');
-        
-        // Test connection first
+
+        // Check if we have cached lists to avoid re-scanning
+        if (this.cachedLists && this.cachedLists.length > 0 && this.listsAlreadyLoaded) {
+            console.log('💾 Using cached Vicidial lists to avoid timeout:', this.cachedLists.length, 'lists');
+
+            statusDiv.className = 'alert alert-success';
+            statusDiv.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                Connected! Using cached lists (${this.cachedLists.length} found)
+            `;
+
+            // Show list selection with cached data
+            this.displayListSelection(this.cachedLists, listsContainer, listSelection);
+            return;
+        }
+
+        // Test connection first (only if not using cached lists)
         const connectionResult = await this.testConnection();
         
         if (!connectionResult.connected) {
@@ -439,37 +454,16 @@ const vicidialUploader = {
         if (lists && lists.length > 0) {
             statusDiv.className = 'alert alert-success';
             statusDiv.innerHTML = `
-                <i class="fas fa-check-circle"></i> 
+                <i class="fas fa-check-circle"></i>
                 Connected! Found ${lists.length} Vicidial lists
             `;
-            
-            // Show list selection
-            listSelection.style.display = 'block';
-            
-            // Build list selection HTML
-            let listsHtml = '';
-            lists.forEach((list, index) => {
-                listsHtml += `
-                    <div class="list-item" style="
-                        padding: 10px;
-                        margin: 5px 0;
-                        background: white;
-                        border: 2px solid #dee2e6;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        transition: all 0.2s;
-                    " onclick="vicidialUploader.selectList('${list.list_id}', this)">
-                        <input type="radio" name="vicidialList" value="${list.list_id}" 
-                               id="list_${list.list_id}" style="margin-right: 10px;">
-                        <label for="list_${list.list_id}" style="cursor: pointer; margin: 0;">
-                            <strong>List ${list.list_id}</strong> - ${list.list_name || 'Unnamed List'}
-                            ${list.campaign ? `<span style="color: #6c757d; margin-left: 10px;">[Campaign: ${list.campaign}]</span>` : ''}
-                        </label>
-                    </div>
-                `;
-            });
-            
-            listsContainer.innerHTML = listsHtml;
+
+            // Cache the lists for future use
+            this.cachedLists = lists;
+            this.listsAlreadyLoaded = true;
+
+            // Show list selection using helper function
+            this.displayListSelection(lists, listsContainer, listSelection);
         } else {
             statusDiv.className = 'alert alert-warning';
             statusDiv.innerHTML = `
@@ -684,6 +678,37 @@ const vicidialUploader = {
         `;
     },
 
+    // Helper function to display list selection (reusable for cached and fresh lists)
+    displayListSelection: function(lists, listsContainer, listSelection) {
+        // Show list selection
+        listSelection.style.display = 'block';
+
+        // Build list selection HTML
+        let listsHtml = '';
+        lists.forEach((list, index) => {
+            listsHtml += `
+                <div class="list-item" style="
+                    padding: 10px;
+                    margin: 5px 0;
+                    background: white;
+                    border: 2px solid #dee2e6;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                " onclick="vicidialUploader.selectList('${list.list_id}', this)">
+                    <input type="radio" name="vicidialList" value="${list.list_id}"
+                           id="list_${list.list_id}" style="margin-right: 10px;">
+                    <label for="list_${list.list_id}" style="cursor: pointer; margin: 0;">
+                        <strong>List ${list.list_id}</strong> - ${list.list_name || 'Unnamed List'}
+                        ${list.campaign ? `<span style="color: #6c757d; margin-left: 10px;">[Campaign: ${list.campaign}]</span>` : ''}
+                    </label>
+                </div>
+            `;
+        });
+
+        listsContainer.innerHTML = listsHtml;
+    },
+
     // Close dialog
     closeDialog: function() {
         const modal = document.getElementById('vicidialUploadModal');
@@ -692,6 +717,34 @@ const vicidialUploader = {
         }
         // Reset the results shown flag for next upload
         this.resultsShown = false;
+
+        // Preserve cached lists for subsequent uploads
+        // (don't reset cachedLists or listsAlreadyLoaded here)
+    },
+
+    // Complete reset function for split uploads
+    completeReset: function() {
+        console.log('🔄 Performing complete Vicidial uploader reset');
+
+        // Close and remove modal
+        const modal = document.getElementById('vicidialUploadModal');
+        if (modal) {
+            modal.remove();
+        }
+
+        // Reset ALL internal states
+        this.resultsShown = false;
+        this.uploadCriteria = null;
+        this.selectedListId = null;
+
+        // Keep cached lists but reset the loaded flag to force fresh display
+        // Don't clear cachedLists to avoid re-scanning
+        if (this.cachedLists) {
+            console.log('💾 Preserving cached lists but resetting display state');
+            this.listsAlreadyLoaded = true; // Keep this true to use cache
+        }
+
+        console.log('✅ Complete reset finished - ready for fresh upload');
     }
 };
 
