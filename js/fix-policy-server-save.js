@@ -38,15 +38,34 @@ console.log('Policy Server Save Fix: Loading...');
             minimalPolicy.createdAt = policyData.createdAt || new Date().toISOString();
         }
 
+        // CRITICAL: Remove any client-related fields that might have been added by interceptors
+        delete minimalPolicy.client_id;
+        delete minimalPolicy.clientId;
+        delete minimalPolicy.client_name;
+        delete minimalPolicy.clientName;
+
         console.log('🔧 Minimal save payload:', JSON.stringify(minimalPolicy, null, 2));
 
         try {
+            // Create a clean JSON string without client_id fields
+            let cleanPayload = JSON.stringify(minimalPolicy);
+
+            // Double-check: remove any client_id that might have been added during serialization
+            const payloadObj = JSON.parse(cleanPayload);
+            delete payloadObj.client_id;
+            delete payloadObj.clientId;
+            delete payloadObj.client_name;
+            delete payloadObj.clientName;
+            cleanPayload = JSON.stringify(payloadObj);
+
+            console.log('🔧 Final clean payload for minimal save:', cleanPayload);
+
             const response = await fetch(`${API_URL}/api/policies`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(minimalPolicy)
+                body: cleanPayload
             });
 
             if (response.ok) {
@@ -89,9 +108,37 @@ console.log('Policy Server Save Fix: Loading...');
                 showNotification('Policy saved locally (Server database needs fixing)', 'warning');
             }
 
+            // Close the policy edit modal
+            const policyModal = document.querySelector('#policyModal');
+            if (policyModal) {
+                policyModal.style.display = 'none';
+                policyModal.remove();
+            }
+
+            // Close any other policy-related modals
+            document.querySelectorAll('.modal, [id*="modal"], [id*="Modal"]').forEach(modal => {
+                if (modal.style.display !== 'none' &&
+                    (modal.innerHTML.includes('Policy') || modal.innerHTML.includes('Save Policy') || modal.innerHTML.includes('Edit Policy'))) {
+                    modal.style.display = 'none';
+                    modal.remove();
+                }
+            });
+
+            // Navigate back to policies list view
+            if (window.location.hash !== '#policies') {
+                window.location.hash = '#policies';
+            }
+
             // Refresh the view
             if (window.loadPoliciesView) {
                 setTimeout(() => loadPoliciesView(), 500);
+            } else {
+                // Fallback: reload policies section
+                setTimeout(() => {
+                    if (window.loadContent) {
+                        loadContent('#policies');
+                    }
+                }, 500);
             }
 
             // Return a mock success result
@@ -240,12 +287,23 @@ console.log('Policy Server Save Fix: Loading...');
             console.log('🌐 Request method:', method, '(existing policy:', isExistingPolicy, ')');
             console.log('🌐 Request payload (cleaned):', JSON.stringify(serverPolicyData, null, 2));
 
+            // Create a defensive clean payload
+            let cleanServerPayload = JSON.stringify(serverPolicyData);
+            const cleanServerObj = JSON.parse(cleanServerPayload);
+            delete cleanServerObj.client_id;
+            delete cleanServerObj.clientId;
+            delete cleanServerObj.client_name;
+            delete cleanServerObj.clientName;
+            cleanServerPayload = JSON.stringify(cleanServerObj);
+
+            console.log('🌐 Final defensive clean payload:', cleanServerPayload);
+
             const response = await fetch(endpoint, {
                 method: method,
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(serverPolicyData)
+                body: cleanServerPayload
             });
 
             console.log('🌐 Server response status:', response.status, response.statusText);
@@ -295,9 +353,37 @@ console.log('Policy Server Save Fix: Loading...');
                 showNotification('Policy saved to server successfully', 'success');
             }
 
+            // Close the policy edit modal
+            const policyModal = document.querySelector('#policyModal');
+            if (policyModal) {
+                policyModal.style.display = 'none';
+                policyModal.remove();
+            }
+
+            // Close any other policy-related modals
+            document.querySelectorAll('.modal, [id*="modal"], [id*="Modal"]').forEach(modal => {
+                if (modal.style.display !== 'none' &&
+                    (modal.innerHTML.includes('Policy') || modal.innerHTML.includes('Save Policy') || modal.innerHTML.includes('Edit Policy'))) {
+                    modal.style.display = 'none';
+                    modal.remove();
+                }
+            });
+
+            // Navigate back to policies list view
+            if (window.location.hash !== '#policies') {
+                window.location.hash = '#policies';
+            }
+
             // Refresh the view
             if (window.loadPoliciesView) {
                 setTimeout(() => loadPoliciesView(), 500);
+            } else {
+                // Fallback: reload policies section
+                setTimeout(() => {
+                    if (window.loadContent) {
+                        loadContent('#policies');
+                    }
+                }, 500);
             }
 
             return result;

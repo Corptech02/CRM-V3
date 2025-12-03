@@ -1,6 +1,82 @@
 // Enhanced Quote Application Modal with Dynamic Sections
 console.log('📝 Enhanced Quote Application Modal Loading...');
 
+// Loading Overlay System for Application Operations
+function showLoadingOverlay(message = 'Processing...', subMessage = 'Please wait while we complete your request') {
+    // Remove any existing overlay
+    hideLoadingOverlay();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'operation-loading-overlay';
+    overlay.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: rgba(0, 0, 0, 0.8) !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        z-index: 999999 !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    `;
+
+    overlay.innerHTML = `
+        <div style="
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: pulse 2s infinite;
+        ">
+            <div style="color: #3b82f6; font-size: 48px; margin-bottom: 20px;">
+                <div class="loading-spinner" style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #e5e7eb;
+                    border-top: 4px solid #3b82f6;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto;
+                "></div>
+            </div>
+            <h3 style="margin: 0 0 15px 0; color: #1f2937; font-size: 20px;">${message}</h3>
+            <p style="color: #6b7280; margin-bottom: 20px; line-height: 1.5;">${subMessage}</p>
+            <div style="color: #9ca3af; font-size: 12px;">
+                <strong>Important:</strong> Please don't close this window.
+            </div>
+        </div>
+    `;
+
+    // Add CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    `;
+    overlay.appendChild(style);
+
+    document.body.appendChild(overlay);
+    console.log('🔄 Loading overlay shown:', message);
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('operation-loading-overlay');
+    if (overlay) {
+        overlay.remove();
+        console.log('✅ Loading overlay hidden');
+    }
+}
+
 // Define add row functions for the quote application modal
 window.addDriverRow = function() {
     console.log('🚛 addDriverRow called from enhanced modal');
@@ -608,6 +684,8 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$150,000">$150,000</option>
                             <option value="$200,000">$200,000</option>
                             <option value="$250,000">$250,000</option>
+                            <option value="$500,000">$500,000</option>
+                            <option value="$1,000,000">$1,000,000</option>
                         </select>
                     </div>
                     <div>
@@ -619,6 +697,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$2,000">$2,000</option>
                             <option value="$2,500">$2,500</option>
                             <option value="$5,000">$5,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -630,6 +709,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$2,000">$2,000</option>
                             <option value="$2,500">$2,500</option>
                             <option value="$5,000">$5,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -640,6 +720,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$75,000">$75,000</option>
                             <option value="$100,000">$100,000</option>
                             <option value="$150,000">$150,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -650,16 +731,14 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$75,000">$75,000</option>
                             <option value="$100,000">$100,000</option>
                             <option value="$150,000">$150,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="$500">$500</option>
-                            <option value="$1,000" selected>$1,000</option>
-                            <option value="$1,500">$1,500</option>
-                            <option value="$2,000">$2,000</option>
-                            <option value="$2,500">$2,500</option>
+                            <option value="Included">Included</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -681,10 +760,11 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$200,000">$200,000</option>
                             <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Deductible:</label>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Cargo Deductible:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="$500">$500</option>
                             <option value="$1,000" selected>$1,000</option>
@@ -692,6 +772,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$2,000">$2,000</option>
                             <option value="$2,500">$2,500</option>
                             <option value="$5,000">$5,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                 </div>
@@ -944,6 +1025,9 @@ function prefillApplicationForm(applicationData) {
 // Function to save quote application
 window.saveQuoteApplication = async function() {
     console.log('💾 Saving quote application...');
+
+    // Show loading overlay
+    showLoadingOverlay('Saving Application', 'Please wait while we save your application data...');
 
     try {
         // Get the current lead ID from the modal or global state
@@ -1314,6 +1398,9 @@ window.saveQuoteApplication = async function() {
         // Success message removed - no popup needed
         console.log('✅ Quote Application saved successfully');
 
+        // Hide loading overlay
+        hideLoadingOverlay();
+
         // Close the modal and show lead profile FIRST
         closeQuoteApplicationModal();
 
@@ -1376,6 +1463,10 @@ window.saveQuoteApplication = async function() {
 
     } catch (error) {
         console.error('❌ Error saving quote application:', error);
+
+        // Hide loading overlay on error
+        hideLoadingOverlay();
+
         alert('Error saving application. Please try again.');
     }
 };
@@ -1780,37 +1871,37 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured Motorist Property Damage:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$50,000', '$100,000', '$150,000', '$200,000', '$250,000'], getSavedValue('Uninsured Motorist Property Damage', '$100,000'))}
+                            ${generateDropdownOptions(['$50,000', '$100,000', '$150,000', '$200,000', '$250,000', '$500,000', '$1,000,000'], getSavedValue('Uninsured Motorist Property Damage', '$100,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Comprehensive Deductible:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500', '$5,000'], getSavedValue('Comprehensive Deductible', '$1,000'))}
+                            ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500', '$5,000', 'Not Included'], getSavedValue('Comprehensive Deductible', '$1,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Collision Deductible:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500', '$5,000'], getSavedValue('Collision Deductible', '$1,000'))}
+                            ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500', '$5,000', 'Not Included'], getSavedValue('Collision Deductible', '$1,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Non-Owned Trailer Phys Dam:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000'], getSavedValue('Non-Owned Trailer Phys Dam', '$50,000'))}
+                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Non-Owned Trailer Phys Dam', '$50,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000'], getSavedValue('Trailer Interchange', '$50,000'))}
+                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Trailer Interchange', '$50,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500'], getSavedValue('Roadside Assistance', '$1,000'))}
+                            ${generateDropdownOptions(['Included', 'Not Included'], getSavedValue('Roadside Assistance', 'Included'))}
                         </select>
                     </div>
                     <div>
@@ -1822,13 +1913,13 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Cargo Limit:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$50,000', '$100,000', '$150,000', '$200,000', '$250,000', '$500,000'], getSavedValue('Cargo Limit', '$100,000'))}
+                            ${generateDropdownOptions(['$50,000', '$100,000', '$150,000', '$200,000', '$250,000', '$500,000', 'Not Included'], getSavedValue('Cargo Limit', '$100,000'))}
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Deductible:</label>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Cargo Deductible:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500', '$5,000'], getSavedValue('Deductible', '$1,000'))}
+                            ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500', '$5,000', 'Not Included'], getSavedValue('Deductible', '$1,000'))}
                         </select>
                     </div>
                 </div>
@@ -2671,7 +2762,7 @@ function generateApplicationPDF(lead, formData) {
                 <div class="field-value">${formData['Cargo Limit'] || '$100,000'}</div>
             </div>
             <div class="field">
-                <div class="field-label">Deductible:</div>
+                <div class="field-label">Cargo Deductible:</div>
                 <div class="field-value">${formData['Deductible'] || formData['Cargo Deductible'] || '$2,500'}</div>
             </div>
         </div>
@@ -2733,11 +2824,15 @@ function generateApplicationPDF(lead, formData) {
 window.uploadLossRuns = function() {
     console.log('📄 Starting loss runs upload...');
 
+    // Show loading overlay for upload
+    showLoadingOverlay('Uploading Loss Runs', 'Please wait while we upload your PDF file...');
+
     const fileInput = document.getElementById('loss-runs-upload');
     const statusDiv = document.getElementById('loss-runs-status');
     const listDiv = document.getElementById('loss-runs-list');
 
     if (!fileInput.files.length) {
+        hideLoadingOverlay(); // Hide loading if no file selected
         showLossRunsStatus('Please select a PDF file to upload.', 'error');
         return;
     }
@@ -2746,6 +2841,7 @@ window.uploadLossRuns = function() {
 
     // Validate file type
     if (file.type !== 'application/pdf') {
+        hideLoadingOverlay(); // Hide loading on validation error
         showLossRunsStatus('Please select a PDF file only.', 'error');
         return;
     }
@@ -2753,6 +2849,7 @@ window.uploadLossRuns = function() {
     // Validate file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
+        hideLoadingOverlay(); // Hide loading on validation error
         showLossRunsStatus('File size must be less than 10MB.', 'error');
         return;
     }
@@ -2763,6 +2860,7 @@ window.uploadLossRuns = function() {
     // Get current lead ID
     const leadId = window.currentLeadId;
     if (!leadId) {
+        hideLoadingOverlay(); // Hide loading on error
         showLossRunsStatus('Error: No lead ID found. Please save the application first.', 'error');
         return;
     }
@@ -2781,6 +2879,7 @@ window.uploadLossRuns = function() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            hideLoadingOverlay(); // Hide loading on success
             showLossRunsStatus('Loss runs PDF uploaded successfully!', 'success');
             addLossRunsToList(data.filename, data.uploadDate);
             fileInput.value = ''; // Clear the input
@@ -2798,6 +2897,7 @@ window.uploadLossRuns = function() {
     })
     .catch(error => {
         console.error('❌ Loss runs upload error:', error);
+        hideLoadingOverlay(); // Hide loading on error
         showLossRunsStatus('Upload failed: ' + error.message, 'error');
 
         // Fallback: Save file info to localStorage only
@@ -2812,6 +2912,7 @@ window.uploadLossRuns = function() {
         addLossRunsToList(file.name, fileInfo.uploadDate, true);
         showLossRunsStatus('File saved locally (server upload failed)', 'warning');
         fileInput.value = '';
+        // Note: hideLoadingOverlay() already called above in the catch block
     });
 };
 
@@ -2895,6 +2996,9 @@ window.removeLossRuns = function(filename) {
     if (!leadId) return;
 
     if (confirm('Are you sure you want to remove this loss runs file?')) {
+        // Show loading overlay for deletion
+        showLoadingOverlay('Removing Loss Runs', 'Please wait while we delete the selected file...');
+
         // Remove from localStorage
         try {
             let lossRunsData = JSON.parse(localStorage.getItem('lossRunsData') || '{}');
@@ -2921,6 +3025,7 @@ window.removeLossRuns = function(filename) {
             console.warn('⚠️ Server removal failed:', error);
         });
 
+        hideLoadingOverlay(); // Hide loading after completion
         showLossRunsStatus('Loss runs file removed.', 'info');
     }
 };

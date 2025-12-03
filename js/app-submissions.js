@@ -2,6 +2,82 @@
  * App Submissions - View and manage trucking insurance application submissions
  */
 
+// Loading Overlay System for Application Operations
+function showLoadingOverlay(message = 'Processing...', subMessage = 'Please wait while we complete your request') {
+    // Remove any existing overlay
+    hideLoadingOverlay();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'operation-loading-overlay';
+    overlay.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: rgba(0, 0, 0, 0.8) !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        z-index: 999999 !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    `;
+
+    overlay.innerHTML = `
+        <div style="
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: pulse 2s infinite;
+        ">
+            <div style="color: #ef4444; font-size: 48px; margin-bottom: 20px;">
+                <div class="loading-spinner" style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #e5e7eb;
+                    border-top: 4px solid #ef4444;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto;
+                "></div>
+            </div>
+            <h3 style="margin: 0 0 15px 0; color: #1f2937; font-size: 20px;">${message}</h3>
+            <p style="color: #6b7280; margin-bottom: 20px; line-height: 1.5;">${subMessage}</p>
+            <div style="color: #9ca3af; font-size: 12px;">
+                <strong>Important:</strong> Please don't close this window.
+            </div>
+        </div>
+    `;
+
+    // Add CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    `;
+    overlay.appendChild(style);
+
+    document.body.appendChild(overlay);
+    console.log('🔄 Loading overlay shown:', message);
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('operation-loading-overlay');
+    if (overlay) {
+        overlay.remove();
+        console.log('✅ Loading overlay hidden');
+    }
+}
+
 class AppSubmissions {
     constructor() {
         this.submissions = [];
@@ -772,6 +848,9 @@ class AppSubmissions {
 
     async deleteSubmission(submissionId) {
         if (confirm('Are you sure you want to delete this application submission?')) {
+            // Show loading overlay for deletion
+            showLoadingOverlay('Deleting Application', 'Please wait while we remove the application submission...');
+
             try {
                 // Delete from server first
                 const API_URL = window.VANGUARD_API_URL || (window.location.hostname === 'localhost'
@@ -818,8 +897,10 @@ class AppSubmissions {
                     }
                 }
 
+                hideLoadingOverlay(); // Hide loading on success
                 console.log('Application submission deleted:', submissionId);
             } catch (error) {
+                hideLoadingOverlay(); // Hide loading on error
                 console.error('Error deleting submission:', error);
                 alert('Error deleting submission. Please try again.');
             }

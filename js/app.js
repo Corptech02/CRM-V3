@@ -2941,7 +2941,27 @@ function highlightMenuItem(item) {
 function updateClientCount() {
     const clientCount = document.querySelector('.sidebar a[href="#clients"] .count');
     if (clientCount) {
-        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+
+        // Get current user and filter clients for non-admin users
+        const sessionData = sessionStorage.getItem('vanguard_user');
+        if (sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                const currentUser = user.username;
+                const isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+
+                if (!isAdmin) {
+                    clients = clients.filter(client => {
+                        const assignedTo = client.assignedTo || client.agent || 'Grant';
+                        return assignedTo.toLowerCase() === currentUser.toLowerCase();
+                    });
+                }
+            } catch (error) {
+                console.error('Error parsing session data:', error);
+            }
+        }
+
         clientCount.textContent = clients.length;
     }
 
@@ -6363,6 +6383,34 @@ function generateClientRows(page = 1) {
     let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
     console.log(`✅ Loaded ${clients.length} clients from localStorage`);
 
+    // Get current user and check if they are admin
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            console.log(`🔍 Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
+    // Filter clients based on user role
+    if (!isAdmin && currentUser) {
+        const originalCount = clients.length;
+        clients = clients.filter(client => {
+            const assignedTo = client.assignedTo || client.agent || 'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+        console.log(`🔒 Filtered clients: ${originalCount} -> ${clients.length} (showing only ${currentUser}'s clients)`);
+    } else if (isAdmin) {
+        console.log(`👑 Admin user - showing all ${clients.length} clients`);
+    }
+
     // Remove duplicates based on name
     const uniqueClients = [];
     const seenNames = new Set();
@@ -6636,6 +6684,29 @@ function loadClientsView() {
 function updateClientsPagination() {
     let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
 
+    // Get current user and check if they are admin
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
+    // Filter clients based on user role
+    if (!isAdmin && currentUser) {
+        clients = clients.filter(client => {
+            const assignedTo = client.assignedTo || client.agent || 'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+    }
+
     // Remove duplicates
     const uniqueClients = [];
     const seenNames = new Set();
@@ -6899,14 +6970,15 @@ function loadPoliciesView() {
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th style="width: 12%; padding-left: 20px;">Policy #</th>
-                            <th style="width: 18%;">Client</th>
-                            <th style="width: 15%;">Carrier</th>
-                            <th style="width: 12%;">Effective Date</th>
-                            <th style="width: 12%;">Expiration</th>
-                            <th style="width: 10%;">Premium</th>
-                            <th style="width: 10%;">Status</th>
-                            <th style="width: 11%;">Actions</th>
+                            <th style="width: 11%; padding-left: 20px;">Policy #</th>
+                            <th style="width: 16%;">Client</th>
+                            <th style="width: 13%;">Carrier</th>
+                            <th style="width: 11%;">Effective Date</th>
+                            <th style="width: 11%;">Expiration</th>
+                            <th style="width: 9%;">Premium</th>
+                            <th style="width: 12%;">Assigned to</th>
+                            <th style="width: 8%;">Status</th>
+                            <th style="width: 9%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="policyTableBody">
@@ -12541,13 +12613,45 @@ function showNewPolicy() {
 // The new implementation includes tabbed organization and enhanced vehicle/trailer fields
 
 function generatePolicyRows() {
-    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    
+    let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+    // Get current user and check if they are admin
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            console.log(`🔍 Policy filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
+    // Filter policies based on user role
+    if (!isAdmin && currentUser) {
+        const originalCount = policies.length;
+        policies = policies.filter(policy => {
+            const assignedTo = policy.assignedTo ||
+                              policy.agent ||
+                              policy.assignedAgent ||
+                              policy.producer ||
+                              'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+        console.log(`🔒 Filtered policies: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
+    } else if (isAdmin) {
+        console.log(`👑 Admin user - showing all ${policies.length} policies`);
+    }
+
     if (policies.length === 0) {
         // Show message when no policies exist
         return `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
+                <td colspan="8" style="text-align: center; padding: 40px; color: #6b7280;">
                     <i class="fas fa-file-contract" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
                     <p style="font-size: 16px; margin: 0;">No policies found</p>
                     <p style="font-size: 14px; margin-top: 8px;">Click "New Policy" to create your first policy</p>
@@ -12614,6 +12718,13 @@ function generatePolicyRows() {
             console.warn('⚠️ Policy missing ID field:', policy);
         }
 
+        // Get assigned agent - check multiple possible locations
+        const assignedTo = policy.assignedTo ||
+                          policy.agent ||
+                          policy.assignedAgent ||
+                          policy.producer ||
+                          'Grant';
+
         return `
             <tr>
                 <td class="policy-number" style="padding-left: 20px;">${policy.policyNumber}</td>
@@ -12622,6 +12733,7 @@ function generatePolicyRows() {
                 <td>${formatDate(policy.effectiveDate)}</td>
                 <td>${formatDate(policy.expirationDate)}</td>
                 <td>${premium}/yr</td>
+                <td>${assignedTo}</td>
                 <td><span class="status-badge ${statusClass}">${displayStatus}</span></td>
                 <td>
                     <div class="action-buttons">

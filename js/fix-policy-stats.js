@@ -9,9 +9,42 @@
         if (!policyStats) return false;
         
         console.log('📊 Recalculating policy statistics...');
-        
+
         // Get all policies from localStorage
-        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+        // Get current user and check if they are admin - filter policies for non-admin users
+        const sessionData = sessionStorage.getItem('vanguard_user');
+        let currentUser = null;
+        let isAdmin = false;
+
+        if (sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                currentUser = user.username;
+                isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+                console.log(`📊 Policy stats filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+            } catch (error) {
+                console.error('Error parsing session data:', error);
+            }
+        }
+
+        // Filter policies based on user role
+        if (!isAdmin && currentUser) {
+            const originalCount = policies.length;
+            policies = policies.filter(policy => {
+                const assignedTo = policy.assignedTo ||
+                                  policy.agent ||
+                                  policy.assignedAgent ||
+                                  policy.producer ||
+                                  'Grant'; // Default to Grant if no assignment
+                return assignedTo.toLowerCase() === currentUser.toLowerCase();
+            });
+            console.log(`📊 Filtered policy stats: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
+        } else if (isAdmin) {
+            console.log(`📊 Admin user - calculating stats for all ${policies.length} policies`);
+        }
+
         const totalPolicies = policies.length;
         
         // Count active policies
