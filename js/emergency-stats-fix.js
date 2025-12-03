@@ -7,11 +7,11 @@ console.log('🚨 Emergency stats fix - stopping stat value concatenation...');
 (function() {
     'use strict';
 
-    // Clear any existing intervals that might be updating stats
-    let highestIntervalId = setInterval(()=>{}, 0);
-    for (let i = 0; i < highestIntervalId; i++) {
-        clearInterval(i);
-    }
+    // Clear any existing intervals that might be updating stats - DISABLED - This was causing infinite loop flickering!
+    // let highestIntervalId = setInterval(()=>{}, 0);
+    // for (let i = 0; i < highestIntervalId; i++) {
+    //     clearInterval(i);
+    // }
 
     // Override problematic functions
     let updateInProgress = false;
@@ -134,8 +134,8 @@ console.log('🚨 Emergency stats fix - stopping stat value concatenation...');
     // Run the fix immediately
     fixStatsDisplay();
 
-    // Set up a clean interval for updates
-    setInterval(fixStatsDisplay, 15000);
+    // Set up a clean interval for updates - DISABLED to prevent DOM manipulation flickering
+    // setInterval(fixStatsDisplay, 15000);
 
     // Listen for data changes
     window.addEventListener('leadDataChanged', fixStatsDisplay);

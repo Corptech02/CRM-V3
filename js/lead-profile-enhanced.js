@@ -76,7 +76,17 @@ function showLeadProfile(leadId) {
                                     <label>Stage:</label>
                                     <select id="lead-stage" onchange="updateLeadField(${leadId}, 'stage', this.value)">
                                         <option value="new" ${lead.stage === 'new' ? 'selected' : ''}>New</option>
+                                        <option value="contact_attempted" ${lead.stage === 'contact_attempted' ? 'selected' : ''}>Contact Attempted</option>
+                                        <option value="info_requested" ${lead.stage === 'info_requested' ? 'selected' : ''}>Info Requested</option>
+                                        <option value="info_received" ${lead.stage === 'info_received' ? 'selected' : ''}>Info Received</option>
+                                        <option value="loss_runs_requested" ${lead.stage === 'loss_runs_requested' ? 'selected' : ''}>Loss Runs Requested</option>
+                                        <option value="loss_runs_received" ${lead.stage === 'loss_runs_received' ? 'selected' : ''}>Loss Runs Received</option>
+                                        <option value="app_prepared" ${lead.stage === 'app_prepared' ? 'selected' : ''}>App Prepared</option>
+                                        <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>App Sent</option>
+                                        <option value="app_quote_received" ${lead.stage === 'app_quote_received' ? 'selected' : ''}>App Quote Received</option>
+                                        <option value="app_quote_sent" ${lead.stage === 'app_quote_sent' ? 'selected' : ''}>App Quote Sent</option>
                                         <option value="quoted" ${lead.stage === 'quoted' ? 'selected' : ''}>Quoted</option>
+                                        <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
                                         <option value="interested" ${lead.stage === 'interested' ? 'selected' : ''}>Interested</option>
                                         <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
                                         <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
@@ -91,8 +101,8 @@ function showLeadProfile(leadId) {
                                     <input type="text" id="lead-years" value="${lead.yearsInBusiness || ''}" onchange="updateLeadField(${leadId}, 'yearsInBusiness', this.value)">
                                 </div>
                                 <div class="info-item">
-                                    <label>Fleet Size:</label>
-                                    <input type="text" id="lead-fleet" value="${lead.fleetSize || ''}" onchange="updateLeadField(${leadId}, 'fleetSize', this.value)">
+                                    <label>Renewal Date:</label>
+                                    <input type="text" id="lead-renewal" value="${lead.renewalDate || lead.expirationDate || ''}" placeholder="MM/DD/YYYY" onchange="updateLeadField(${leadId}, 'renewalDate', this.value)">
                                 </div>
                             </div>
                         </div>
@@ -305,7 +315,17 @@ function showLeadProfile(leadId) {
                                     <label>Stage:</label>
                                     <select onchange="updateLeadField(${leadId}, 'stage', this.value)">
                                         <option value="new" ${lead.stage === 'new' ? 'selected' : ''}>New</option>
+                                        <option value="contact_attempted" ${lead.stage === 'contact_attempted' ? 'selected' : ''}>Contact Attempted</option>
+                                        <option value="info_requested" ${lead.stage === 'info_requested' ? 'selected' : ''}>Info Requested</option>
+                                        <option value="info_received" ${lead.stage === 'info_received' ? 'selected' : ''}>Info Received</option>
+                                        <option value="loss_runs_requested" ${lead.stage === 'loss_runs_requested' ? 'selected' : ''}>Loss Runs Requested</option>
+                                        <option value="loss_runs_received" ${lead.stage === 'loss_runs_received' ? 'selected' : ''}>Loss Runs Received</option>
+                                        <option value="app_prepared" ${lead.stage === 'app_prepared' ? 'selected' : ''}>App Prepared</option>
+                                        <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>App Sent</option>
+                                        <option value="app_quote_received" ${lead.stage === 'app_quote_received' ? 'selected' : ''}>App Quote Received</option>
+                                        <option value="app_quote_sent" ${lead.stage === 'app_quote_sent' ? 'selected' : ''}>App Quote Sent</option>
                                         <option value="quoted" ${lead.stage === 'quoted' ? 'selected' : ''}>Quoted</option>
+                                        <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
                                         <option value="interested" ${lead.stage === 'interested' ? 'selected' : ''}>Interested</option>
                                         <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
                                         <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>

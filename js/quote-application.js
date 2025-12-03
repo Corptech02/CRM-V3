@@ -172,7 +172,7 @@ class QuoteApplication {
                 right: 0;
                 bottom: 0;
                 background: rgba(0, 0, 0, 0.5);
-                z-index: 10000;
+                z-index: 9999999;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -182,9 +182,8 @@ class QuoteApplication {
             modalContent.style.cssText = `
                 background: white;
                 border-radius: 8px;
-                width: 90%;
-                max-width: 1200px;
-                max-height: 90vh;
+                width: 80vw;
+                height: 80vh;
                 overflow-y: auto;
                 position: relative;
             `;
@@ -313,7 +312,7 @@ class QuoteApplication {
             <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
                 <div style="text-align: center; margin-bottom: 30px;">
                     <h1 style="color: #0066cc;">Vanguard Insurance Group LLC</h1>
-                    <p>Brunswick, OH 44256 • 330-241-7570</p>
+                    <p>Brunswick, OH 44256 • 330-460-0872</p>
                     <h2>TRUCKING APPLICATION</h2>
                 </div>
                 
@@ -545,7 +544,7 @@ function showApplicationFormModal(application, lead) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay active';
     modal.id = 'quoteApplicationModal';
-    modal.style.zIndex = '10000';
+    modal.style.zIndex = '9999999';
     
     const data = application.formData;
     

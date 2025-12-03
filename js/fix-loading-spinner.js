@@ -1,6 +1,9 @@
-// Fix loading spinner for leads view - ONLY on initial navigation
+// Fix loading spinner for leads view - DISABLED to prevent tab switching interference
 (function() {
-    console.log('Loading spinner fix initialized');
+    console.log('Loading spinner fix DISABLED to prevent flashing and tab switching issues');
+
+    // DISABLED - This was interfering with tab switching
+    return;
 
     let currentHash = window.location.hash;
     let hasLoadedLeads = false;

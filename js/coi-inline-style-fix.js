@@ -140,7 +140,7 @@ function fixEmailDisplay() {
 
 // Apply fix immediately and repeatedly
 fixEmailDisplay();
-setInterval(fixEmailDisplay, 1000);
+// setInterval(fixEmailDisplay, 1000); // DISABLED - Causing flickering every 1000ms
 
 // Also monitor for changes
 document.addEventListener('DOMContentLoaded', fixEmailDisplay);

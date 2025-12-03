@@ -68,8 +68,8 @@ console.log('🧹 Removing demo/test leads...');
         console.log(`  - ${lead.name} (${lead.email || 'no email'}) - ${lead.stage || 'no stage'}`);
     });
 
-    // Reload the leads view if on that page
-    if (window.location.hash === '#leads' && typeof loadLeadsView === 'function') {
-        loadLeadsView();
-    }
+    // Reload the leads view if on that page - DISABLED to prevent duplicate tables
+    // if (window.location.hash === '#leads' && typeof loadLeadsView === 'function') {
+    //     loadLeadsView();
+    // }
 })();

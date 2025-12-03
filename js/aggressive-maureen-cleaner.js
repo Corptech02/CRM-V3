@@ -119,8 +119,8 @@
     // Clean immediately
     cleanAllData();
 
-    // Clean every second
-    setInterval(cleanAllData, 1000);
+    // Clean every second - DISABLED - Causing blinking every 1000ms
+    // setInterval(cleanAllData, 1000);
 
     // Override loadClients
     const originalLoadClients = window.loadClients;

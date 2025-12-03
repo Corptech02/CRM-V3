@@ -120,8 +120,8 @@
         console.log('📊 FORCED: Querying matched carriers database with criteria:', criteria);
         console.log('🔍 FORCED: Criteria type and details:', typeof criteria, JSON.stringify(criteria, null, 2));
 
-        // Use the main API CSV endpoint with working representative data
-        const backendUrl = 'http://162-220-14-239.nip.io:3001/api/leads/expiring-insurance?' + new URLSearchParams({
+        // Use our LOCAL enhanced API with 175k+ representative names
+        const backendUrl = window.location.origin + '/api/leads/expiring-insurance?' + new URLSearchParams({
             state: criteria.state || '',
             days: criteria.expiryDays || criteria.daysUntilExpiry || 30,
             limit: Math.min(criteria.limit || 10000, 10000),

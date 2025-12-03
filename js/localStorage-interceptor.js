@@ -173,8 +173,8 @@ console.log('🛡️ localStorage Interceptor - Blocking bad lead data');
         }
     }
 
-    // Run continuous cleanup every 500ms to catch bypass attempts
-    setInterval(continuousCleanup, 500);
+    // Run continuous cleanup every 500ms to catch bypass attempts - DISABLED to prevent blinking
+    // setInterval(continuousCleanup, 500);
 
     console.log('✅ localStorage interceptor active - bad lead data will be blocked');
     console.log('✅ Continuous monitoring active - checking every 500ms');

@@ -39,6 +39,20 @@
                 // ALWAYS update the timestamp for the current stage
                 insurance_leads[insuranceIndex].stageTimestamps[newStage] = currentTimestamp;
 
+                // CRITICAL: Clear reach-out completion when moving to non-reach-out stages
+                const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+                if (!reachOutStages.includes(newStage)) {
+                    // Stage doesn't require reach out - clear completion data
+                    if (insurance_leads[insuranceIndex].reachOut) {
+                        console.log('🔄 Clearing reach-out completion data - stage no longer requires reach out');
+                        insurance_leads[insuranceIndex].reachOut.callsConnected = 0;
+                        insurance_leads[insuranceIndex].reachOut.callAttempts = 0;
+                        insurance_leads[insuranceIndex].reachOut.emailCount = 0;
+                        insurance_leads[insuranceIndex].reachOut.textCount = 0;
+                        insurance_leads[insuranceIndex].reachOut.voicemailCount = 0;
+                    }
+                }
+
                 foundInInsurance = true;
                 console.log('✅ Updated in insurance_leads with timestamp:', currentTimestamp);
             }
@@ -57,6 +71,20 @@
                 }
                 // ALWAYS update the timestamp for the current stage
                 regular_leads[regularIndex].stageTimestamps[newStage] = currentTimestamp;
+
+                // CRITICAL: Clear reach-out completion when moving to non-reach-out stages
+                const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+                if (!reachOutStages.includes(newStage)) {
+                    // Stage doesn't require reach out - clear completion data
+                    if (regular_leads[regularIndex].reachOut) {
+                        console.log('🔄 Clearing reach-out completion data - stage no longer requires reach out');
+                        regular_leads[regularIndex].reachOut.callsConnected = 0;
+                        regular_leads[regularIndex].reachOut.callAttempts = 0;
+                        regular_leads[regularIndex].reachOut.emailCount = 0;
+                        regular_leads[regularIndex].reachOut.textCount = 0;
+                        regular_leads[regularIndex].reachOut.voicemailCount = 0;
+                    }
+                }
 
                 foundInRegular = true;
                 console.log('✅ Updated in leads with timestamp:', currentTimestamp);
@@ -93,6 +121,17 @@
             if (window.leadStore && window.leadStore[leadId]) {
                 window.leadStore[leadId].stage = newStage;
                 window.leadStore[leadId].stageUpdatedAt = new Date().toISOString();
+
+                // Clear reach-out completion in memory store too
+                const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+                if (!reachOutStages.includes(newStage) && window.leadStore[leadId].reachOut) {
+                    console.log('🔄 Clearing reach-out completion data in memory store');
+                    window.leadStore[leadId].reachOut.callsConnected = 0;
+                    window.leadStore[leadId].reachOut.callAttempts = 0;
+                    window.leadStore[leadId].reachOut.emailCount = 0;
+                    window.leadStore[leadId].reachOut.textCount = 0;
+                    window.leadStore[leadId].reachOut.voicemailCount = 0;
+                }
             }
 
             // CRITICAL: Save to server API using PUT method
@@ -102,20 +141,42 @@
                                ? 'http://localhost:3001'
                                : `http://${window.location.hostname}:3001`);
 
-                // Use PUT to update just the stage field
+                // Use PUT to update stage field AND timestamps
+                const currentTimestamp = new Date().toISOString();
+
+                // Get the updated lead data with timestamps from localStorage
+                const updatedLeadData = insurance_leads.find(l => String(l.id) === leadId) ||
+                                       regular_leads.find(l => String(l.id) === leadId);
+
+                const updateData = {
+                    stage: newStage,
+                    stageUpdatedAt: currentTimestamp,
+                    updatedAt: currentTimestamp
+                };
+
+                // CRITICAL: Include stageTimestamps to persist timestamps on server
+                if (updatedLeadData && updatedLeadData.stageTimestamps) {
+                    updateData.stageTimestamps = updatedLeadData.stageTimestamps;
+                    console.log('💾 Including stageTimestamps in server update:', updateData.stageTimestamps);
+                }
+
+                // Include reach out data clearing if needed
+                if (updatedLeadData && updatedLeadData.reachOut) {
+                    updateData.reachOut = updatedLeadData.reachOut;
+                    console.log('💾 Including reachOut data in server update');
+                }
+
                 const response = await fetch(`${apiUrl}/api/leads/${leadId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        stage: newStage,
-                        stageUpdatedAt: new Date().toISOString()
-                    })
+                    body: JSON.stringify(updateData)
                 });
 
                 if (response.ok) {
-                    console.log('✅ Stage updated in API via PUT');
+                    console.log('✅ Stage and timestamps updated in API via PUT');
+                    console.log('✅ Server now has persistent timestamps that survive page refresh');
                 } else {
                     console.warn('API update failed (status: ' + response.status + '), but saved locally');
                 }
@@ -161,14 +222,102 @@
                 showNotification(`Stage updated to "${newStage}"`, 'success');
             }
 
-            // Refresh the view if needed
-            if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
-                setTimeout(() => {
-                    if (window.loadLeadsView) {
-                        window.loadLeadsView();
+            // Update TO DO text in profile and table immediately after stage change
+            setTimeout(() => {
+                console.log('🔄 Updating TO DO text after stage change...');
+
+                // Update profile TO DO text
+                if (window.updateReachOutStatus) {
+                    console.log('🔄 Calling updateReachOutStatus from stage update...');
+                    window.updateReachOutStatus(leadId);
+                } else {
+                    console.log('❌ updateReachOutStatus function not found');
+                }
+
+                // Update leads table if on leads view
+                const currentHash = window.location.hash;
+                if (currentHash === '#leads') {
+                    console.log('🔄 Refreshing leads table after stage change...');
+                    if (window.refreshLeadsTable) {
+                        window.refreshLeadsTable(leadId);
+                    } else {
+                        console.log('❌ refreshLeadsTable function not found');
                     }
-                }, 500);
-            }
+
+                    // CRITICAL: Apply user assignment dulling after any stage change
+                    setTimeout(() => {
+                        if (window.applyUserAssignmentDulling) {
+                            console.log('👤 Applying user assignment dulling after stage change...');
+                            window.applyUserAssignmentDulling();
+
+                            // FINAL GREEN HIGHLIGHT CLEANUP after this dulling call too
+                            setTimeout(() => {
+                                console.log('🧹 STAGE CHANGE CLEANUP: Starting green highlight removal for all rows with TO DO text');
+
+                                const allLeadRows = document.querySelectorAll('tr[data-lead-id]');
+                                let cleanupCount = 0;
+
+                                allLeadRows.forEach(row => {
+                                    const todoCell = row.cells[6];
+                                    if (todoCell) {
+                                        const todoText = todoCell.textContent.trim();
+                                        console.log('🔍 STAGE CLEANUP DEBUG: Checking TO DO cell text:', `"${todoText}"`, 'Length:', todoText.length);
+
+                                        if (todoText && todoText.length > 0 && todoText !== 'Reach out complete') {
+                                            const hasGreenHighlight = row.classList.contains('reach-out-complete') ||
+                                                                     row.style.backgroundColor.includes('16, 185, 129') ||
+                                                                     row.style.backgroundColor.includes('rgb(16, 185, 129)') ||
+                                                                     row.classList.contains('force-green-highlight');
+
+                                            if (hasGreenHighlight) {
+                                                console.log('🧹 STAGE CHANGE CLEANUP: Removing green highlight from row with TO DO text:', todoText);
+
+                                                row.classList.remove('reach-out-complete');
+                                                row.classList.remove('force-green-highlight');
+                                                row.style.removeProperty('background-color');
+                                                row.style.removeProperty('background');
+                                                row.style.removeProperty('border-left');
+                                                row.style.removeProperty('border-right');
+
+                                                const currentStyle = row.style.cssText;
+                                                if (currentStyle.includes('rgb(16, 185, 129)') || currentStyle.includes('16, 185, 129')) {
+                                                    row.style.cssText = '';
+                                                    console.log('🧹 STAGE CHANGE CLEANUP: Cleared inline styles containing green highlight');
+                                                }
+
+                                                cleanupCount++;
+                                            }
+                                        }
+                                    }
+                                });
+
+                                console.log(`🧹 STAGE CHANGE CLEANUP: Complete - cleaned ${cleanupCount} rows`);
+                            }, 50);
+                        }
+                    }, 300); // Delay to ensure all updates are complete
+                }
+
+                // DISABLED: Lead highlighting now handled by refreshLeadsTable() function
+                // console.log('🎨 Updating lead highlighting after stage change...');
+                // if (window.applyLeadHighlighting) {
+                //     console.log('🎨 Calling applyLeadHighlighting from stage update...');
+                //     window.applyLeadHighlighting();
+                // } else if (window.reapplyHighlighting) {
+                //     console.log('🎨 Calling reapplyHighlighting from stage update...');
+                //     window.reapplyHighlighting();
+                // } else {
+                //     console.log('❌ Lead highlighting function not found');
+                // }
+            }, 100);
+
+            // Refresh the view if needed - DISABLED to prevent tab switching issues
+            // if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
+            //     setTimeout(() => {
+            //         if (window.loadLeadsView) {
+            //             window.loadLeadsView();
+            //         }
+            //     }, 500);
+            // }
 
             return true;
 

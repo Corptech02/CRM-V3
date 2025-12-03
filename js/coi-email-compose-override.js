@@ -361,7 +361,7 @@ function overrideAllEmailFunctions() {
 overrideAllEmailFunctions();
 
 // Reapply every 500ms to catch late-loading scripts
-setInterval(overrideAllEmailFunctions, 500);
+// setInterval(overrideAllEmailFunctions, 500); // DISABLED - Causing flickering every 500ms
 
 // Also intercept button clicks directly
 document.addEventListener('click', function(e) {

@@ -13,10 +13,11 @@ console.log('💥 NUCLEAR STATS FIX - Stopping all stats updates and fixing disp
         window.clearTimeout(id);
     }
 
-    id = window.setInterval(function() {}, 0);
-    while (id--) {
-        window.clearInterval(id);
-    }
+    // DISABLED - This was causing infinite loop flickering!
+    // id = window.setInterval(function() {}, 0);
+    // while (id--) {
+    //     window.clearInterval(id);
+    // }
 
     console.log('🛑 Stopped all intervals and timeouts');
 

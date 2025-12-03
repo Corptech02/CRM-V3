@@ -186,23 +186,23 @@
     window.saveLeadToDatabase = saveLeadToDatabase;
     window.deleteLeadFromDatabase = deleteLeadFromDatabase;
 
-    // Automatically load leads from database when the page loads
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(loadLeadsFromDatabase, 1000);
-        });
-    } else {
-        setTimeout(loadLeadsFromDatabase, 1000);
-    }
+    // Automatically load leads from database when the page loads - DISABLED to prevent duplicate tables
+    // if (document.readyState === 'loading') {
+    //     document.addEventListener('DOMContentLoaded', () => {
+    //         setTimeout(loadLeadsFromDatabase, 1000);
+    //     });
+    // } else {
+    //     setTimeout(loadLeadsFromDatabase, 1000);
+    // }
 
-    // Refresh leads from database when navigating to leads page
-    const originalAddEventListener = window.addEventListener;
-    window.addEventListener('hashchange', async function(e) {
-        if (window.location.hash === '#leads') {
-            console.log('🔄 Navigated to leads page - refreshing from database');
-            await loadLeadsFromDatabase();
-        }
-    });
+    // Refresh leads from database when navigating to leads page - DISABLED to prevent duplicate tables
+    // const originalAddEventListener = window.addEventListener;
+    // window.addEventListener('hashchange', async function(e) {
+    //     if (window.location.hash === '#leads') {
+    //         console.log('🔄 Navigated to leads page - refreshing from database');
+    //         await loadLeadsFromDatabase();
+    //     }
+    // });
 
     // Monitor for ViciDial sync completion and save to database
     document.addEventListener('vicidialSyncComplete', async function(e) {
@@ -236,8 +236,8 @@
         }
     }
 
-    // Run cleanup periodically
-    setInterval(cleanupDeletedLeadsFromDatabase, 30000); // Every 30 seconds
+    // Run cleanup periodically - DISABLED to prevent blinking
+    // setInterval(cleanupDeletedLeadsFromDatabase, 30000); // Every 30 seconds
 
     // Also expose the cleanup function globally
     window.cleanupDeletedLeadsFromDatabase = cleanupDeletedLeadsFromDatabase;

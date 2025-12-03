@@ -1866,7 +1866,7 @@ table.data-table td.client-name .client-avatar {
 }
 
 .stage-closed {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background: #9ca3af;
     color: white;
 }
 
@@ -3311,7 +3311,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    z-index: 9999999;
     opacity: 0;
     transition: opacity 0.3s ease;
 }
@@ -3323,9 +3323,8 @@ input:checked + .slider:before {
 .modal-container {
     background: var(--white);
     border-radius: 12px;
-    max-width: 900px;
-    width: 90%;
-    max-height: 90vh;
+    width: 80vw;
+    height: 80vh;
     display: flex;
     flex-direction: column;
     transform: scale(0.9);

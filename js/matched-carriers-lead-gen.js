@@ -179,12 +179,12 @@
         console.log(`✅ Added ${uniqueNewLeads.length} new matched carriers leads`);
         console.log(`   (${newLeads.length - uniqueNewLeads.length} duplicates skipped)`);
 
-        // Refresh the view if on leads page
-        if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
-            if (window.loadLeadsView) {
-                window.loadLeadsView();
-            }
-        }
+        // Refresh the view if on leads page - DISABLED to prevent tab switching issues
+        // if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
+        //     if (window.loadLeadsView) {
+        //         window.loadLeadsView();
+        //     }
+        // }
 
         return uniqueNewLeads;
     }

@@ -106,6 +106,13 @@ function restoreOriginalUI() {
             return true;
         }
 
+        // Check if we have the showLeadProfile function (from lead-profile-enhanced.js)
+        if (typeof window.showLeadProfile === 'function') {
+            console.log('✅ Enhanced showLeadProfile found, using it');
+            window.showLeadProfile(leadId);
+            return true;
+        }
+
         console.log('⚠️ Enhanced profile not available, falling back to original');
 
         // Fallback logic would continue here...

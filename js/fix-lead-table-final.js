@@ -1,5 +1,18 @@
-// FINAL FIX: Override the lead table after everything else loads
-console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
+// FINAL FIX: PARTIAL RE-ENABLE - Only the table generation, not the continuous updates
+console.log('🔧 FINAL LEAD TABLE FIX PARTIALLY RE-ENABLED - table generation only, no continuous updates');
+
+// Helper function to format premium display (avoid double dollar signs)
+function formatPremiumDisplay(premium) {
+    if (!premium || premium === 0 || premium === '0') {
+        return '$0';
+    }
+
+    // Convert to string and clean any existing dollar signs
+    const cleanPremium = String(premium).replace(/[$,]/g, '');
+    const numericPremium = parseFloat(cleanPremium) || 0;
+
+    return `$${numericPremium.toLocaleString()}`;
+}
 
 (function() {
     // Function to get next action based on stage and reach out status
@@ -13,9 +26,8 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                 stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
                 stage === 'interested') {
 
-                // If connected call was made or all methods attempted, reach out is complete
-                if (reachOut.callsConnected > 0 ||
-                    (reachOut.callAttempts > 0 && reachOut.emailCount > 0 && reachOut.textCount > 0)) {
+                // If connected call was made or text sent (final step), reach out is complete
+                if (reachOut.callsConnected > 0 || reachOut.textCount > 0) {
                     return ''; // Empty TO DO when reach out is complete
                 }
             }
@@ -26,8 +38,9 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
             'contact_attempted': 'Follow up with lead',
             'info_requested': 'Reach out to lead',
             'info_received': 'Prepare Quote',
-            'loss_runs_requested': 'Follow up for Loss Runs',
-            'loss_runs_received': 'Analyze Loss Runs & Quote',
+            'loss_runs_requested': 'Reach out to lead',
+            'loss_runs_received': 'Prepare app.',
+            'app_prepared': 'Send application',
             'quoted': 'Email Quote, and make contact',
             'quote_sent': 'Reach out to lead',
             'quote-sent-unaware': 'Reach out to lead',
@@ -39,10 +52,13 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
         return actionMap[stage] || 'Review lead';
     }
 
+    // Make the getNextAction function globally available to fix TO DO text
+    window.getNextAction = getNextActionFixed;
+
     // Store original if it exists
     const originalGenerateSimpleLeadRows = window.generateSimpleLeadRows;
 
-    // Override the generateSimpleLeadRows function completely
+    // RE-ENABLED: This creates the second view with yellow/orange highlighting
     window.generateSimpleLeadRows = function(leads) {
         console.log('🔧 Using FIXED generateSimpleLeadRows function');
 
@@ -95,44 +111,51 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
             let borderColor = null;
             let shouldHighlightForTimestamp = false;
 
-            // Check if lead has TO DO text
-            const hasTodoText = lead.todo && lead.todo.trim() !== '';
+            // Skip timestamp highlighting for closed leads - they should only be gray
+            if (lead.stage !== 'closed') {
+                // Check if lead has TO DO text
+                const hasTodoText = lead.todo && lead.todo.trim() !== '';
 
-            if (hasTodoText && lead.stageTimestamps && lead.stageTimestamps[lead.stage]) {
-                const timestamp = lead.stageTimestamps[lead.stage];
-                const stageDate = new Date(timestamp);
-                const now = new Date();
+                if (hasTodoText && lead.stageTimestamps && lead.stageTimestamps[lead.stage]) {
+                    const timestamp = lead.stageTimestamps[lead.stage];
+                    const stageDate = new Date(timestamp);
+                    const now = new Date();
 
-                // Calculate difference in days
-                const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                const compareDate = new Date(stageDate.getFullYear(), stageDate.getMonth(), stageDate.getDate());
-                const diffTime = nowDate - compareDate;
-                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                    // Calculate difference in days
+                    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const compareDate = new Date(stageDate.getFullYear(), stageDate.getMonth(), stageDate.getDate());
+                    const diffTime = nowDate - compareDate;
+                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-                // Only highlight if timestamp is NOT green (not today)
-                if (diffDays === 1) {
-                    // Yellow for yesterday
-                    timestampColor = '#fef3c7'; // Light yellow background
-                    borderColor = '#f59e0b'; // Yellow border
-                    shouldHighlightForTimestamp = true;
-                } else if (diffDays > 1 && diffDays < 7) {
-                    // Orange for 2-6 days
-                    timestampColor = '#fed7aa'; // Light orange background
-                    borderColor = '#fb923c'; // Orange border
-                    shouldHighlightForTimestamp = true;
-                } else if (diffDays >= 7) {
-                    // Red for 7+ days
-                    timestampColor = '#fecaca'; // Light red background
-                    borderColor = '#ef4444'; // Red border
-                    shouldHighlightForTimestamp = true;
+                    // Only highlight if timestamp is NOT green (not today)
+                    if (diffDays === 1) {
+                        // Yellow for yesterday
+                        timestampColor = '#fef3c7'; // Light yellow background
+                        borderColor = '#f59e0b'; // Yellow border
+                        shouldHighlightForTimestamp = true;
+                    } else if (diffDays > 1 && diffDays < 7) {
+                        // Orange for 2-6 days
+                        timestampColor = '#fed7aa'; // Light orange background
+                        borderColor = '#fb923c'; // Orange border
+                        shouldHighlightForTimestamp = true;
+                    } else if (diffDays >= 7) {
+                        // Red for 7+ days
+                        timestampColor = '#fecaca'; // Light red background
+                        borderColor = '#ef4444'; // Red border
+                        shouldHighlightForTimestamp = true;
+                    }
                 }
             }
 
-            // Determine row styling based on priority: grey out > timestamp highlight > green highlight
+            // Determine row styling based on priority: closed leads > grey out > timestamp highlight > green highlight
             let rowStyle = '';
             let rowClass = '';
 
-            if (isOtherUsersLead) {
+            if (lead.stage === 'closed') {
+                // Gray highlight for closed leads - highest priority
+                rowStyle = 'style="background-color: #f3f4f6 !important; border-left: 4px solid #9ca3af !important; border-right: 2px solid #9ca3af !important; opacity: 0.7;"';
+                rowClass = 'lead-closed';
+            } else if (isOtherUsersLead) {
                 // Grey out leads assigned to other users
                 rowStyle = 'style="opacity: 0.4; background-color: rgba(156, 163, 175, 0.1) !important; filter: grayscale(50%);"';
                 rowClass = 'other-user-lead';
@@ -152,7 +175,7 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                         <input type="checkbox" class="lead-checkbox" value="${lead.id}" onchange="updateBulkDeleteButton()" data-lead='${JSON.stringify(lead).replace(/'/g, '&apos;')}'>
                     </td>
                     <td class="lead-name" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="viewLead(${lead.id})" title="${lead.name}">${displayName}</strong>
+                        <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="viewLead('${lead.id}')" title="${lead.name}">${displayName}</strong>
                     </td>
                     <td>
                         <div class="contact-info" style="display: flex; gap: 10px; align-items: center;">
@@ -165,7 +188,7 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                         </div>
                     </td>
                     <td>${lead.product || 'Not specified'}</td>
-                    <td>$${(lead.premium || 0).toLocaleString()}</td>
+                    <td>${formatPremiumDisplay(lead.premium)}</td>
                     <td>${window.getStageHtml ? window.getStageHtml(lead.stage, lead) : getStageHtmlFixed(lead.stage)}</td>
                     <td>
                         <div style="font-weight: bold; color: black;">
@@ -186,11 +209,11 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
             `;
         }).join('');
 
-        // FORCE highlighting after HTML is generated
-        setTimeout(() => {
-            console.log('💚 Auto-applying highlighting after table generation');
-            forceAllHighlighting();
-        }, 10);
+        // DISABLED - Auto-highlighting that caused flashing
+        // setTimeout(() => {
+        //     console.log('💚 Auto-applying highlighting after table generation');
+        //     forceAllHighlighting();
+        // }, 10);
 
         return html;
     };
@@ -529,53 +552,54 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
         console.log(`🎨 Applied green highlighting to ${highlightCount} reach out complete leads`);
     }
 
+    // DISABLED - Continuous updates that caused flashing
     // Run fix after a short delay to let everything load
-    setTimeout(() => {
-        console.log('🚀 Running initial table fix...');
-        fixLeadTable();
-        setTimeout(applyReachOutCompleteHighlighting, 500);
-    }, 1000);
+    // setTimeout(() => {
+    //     console.log('🚀 Running initial table fix...');
+    //     fixLeadTable();
+    //     setTimeout(applyReachOutCompleteHighlighting, 500);
+    // }, 1000);
 
     // Also run fix after longer delay for async loads
-    setTimeout(() => {
-        console.log('🚀 Running secondary table fix...');
-        fixLeadTable();
-        setTimeout(applyReachOutCompleteHighlighting, 500);
-    }, 3000);
+    // setTimeout(() => {
+    //     console.log('🚀 Running secondary table fix...');
+    //     fixLeadTable();
+    //     setTimeout(applyReachOutCompleteHighlighting, 500);
+    // }, 3000);
 
-    // Monitor for table changes and fix if needed
-    const observer = new MutationObserver((mutations) => {
-        // Check if the table was modified
-        let tableModified = false;
-        mutations.forEach(mutation => {
-            if (mutation.target.id === 'leadsTableBody' ||
-                mutation.target.closest && mutation.target.closest('#leadsTableBody')) {
-                tableModified = true;
-            }
-        });
+    // DISABLED - Monitor for table changes that caused continuous updates and flashing
+    // const observer = new MutationObserver((mutations) => {
+    //     // Check if the table was modified
+    //     let tableModified = false;
+    //     mutations.forEach(mutation => {
+    //         if (mutation.target.id === 'leadsTableBody' ||
+    //             mutation.target.closest && mutation.target.closest('#leadsTableBody')) {
+    //             tableModified = true;
+    //         }
+    //     });
 
-        if (tableModified) {
-            console.log('📋 Table was modified - reapplying highlights!');
-            // Immediate application
-            forceAllHighlighting();
+    //     if (tableModified) {
+    //         console.log('📋 Table was modified - reapplying highlights!');
+    //         // Immediate application
+    //         forceAllHighlighting();
 
-            // Multiple delayed applications to ensure persistence
-            setTimeout(forceAllHighlighting, 1);
-            setTimeout(forceAllHighlighting, 10);
-            setTimeout(forceAllHighlighting, 25);
-            setTimeout(forceAllHighlighting, 50);
-            setTimeout(forceAllHighlighting, 100);
-            setTimeout(forceAllHighlighting, 200);
-            setTimeout(forceAllHighlighting, 300);
-            setTimeout(forceAllHighlighting, 500);
-        }
-    });
+    //         // Multiple delayed applications - DISABLED to prevent blinking
+    //         // setTimeout(forceAllHighlighting, 1);
+    //         // setTimeout(forceAllHighlighting, 10);
+    //         // setTimeout(forceAllHighlighting, 25);
+    //         // setTimeout(forceAllHighlighting, 50);
+    //         // setTimeout(forceAllHighlighting, 100);
+    //         // setTimeout(forceAllHighlighting, 200);
+    //         // setTimeout(forceAllHighlighting, 300);
+    //         setTimeout(forceAllHighlighting, 500);
+    //     }
+    // });
 
-    // Start observing after initial delay
-    setTimeout(() => {
-        observer.observe(document.body, { childList: true, subtree: true });
-        console.log('👀 Monitoring for table changes...');
-    }, 2000);
+    // Start observing after initial delay - DISABLED to prevent blinking
+    // setTimeout(() => {
+    //     observer.observe(document.body, { childList: true, subtree: true });
+    //     console.log('👀 Monitoring for table changes...');
+    // }, 2000);
 
     // Make the function globally available for debugging
     window.applyReachOutCompleteHighlighting = applyReachOutCompleteHighlighting;
@@ -591,27 +615,17 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
             // Call the original sort function
             originalSortLeads(field);
 
-            // IMMEDIATELY reapply green highlighting after sort
-            console.log('🎨 Reapplying green highlighting after sort...');
+            // RE-ENABLED: Apply yellow/orange highlighting after sort
+            console.log('🎨 Reapplying highlighting after sort...');
             setTimeout(() => {
-                forceGreenHighlight();
-            }, 10);
-
-            setTimeout(() => {
-                forceGreenHighlight();
-            }, 50);
-
-            setTimeout(() => {
-                forceGreenHighlight();
+                forceAllHighlighting();
             }, 100);
 
-            setTimeout(() => {
-                forceGreenHighlight();
-            }, 200);
-
-            setTimeout(() => {
-                forceGreenHighlight();
-            }, 500);
+            // DISABLED multiple calls that caused blinking:
+            // setTimeout(() => { forceGreenHighlight(); }, 10);
+            // setTimeout(() => { forceGreenHighlight(); }, 50);
+            // setTimeout(() => { forceGreenHighlight(); }, 200);
+            // setTimeout(() => { forceGreenHighlight(); }, 500);
         };
     }
 
@@ -623,11 +637,12 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
 
             window.sortLeads = function(field) {
                 originalSortLeads(field);
-                setTimeout(forceAllHighlighting, 10);
-                setTimeout(forceAllHighlighting, 50);
-                setTimeout(forceAllHighlighting, 100);
-                setTimeout(forceAllHighlighting, 200);
-                setTimeout(forceAllHighlighting, 500);
+                // DISABLED: Highlighting now built into table generation
+                // setTimeout(forceAllHighlighting, 10);
+                // setTimeout(forceAllHighlighting, 50);
+                // setTimeout(forceAllHighlighting, 100);
+                // setTimeout(forceAllHighlighting, 200);
+                // setTimeout(forceAllHighlighting, 500);
             };
         }
     }, 3000);
@@ -673,7 +688,7 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
         });
     };
 
-    // COMBINED AGGRESSIVE HIGHLIGHTING - TIMESTAMP FIRST, THEN GREEN
+    // RE-ENABLED: This provides the yellow/orange highlighting for the second view
     window.forceAllHighlighting = function() {
         console.log('🔥🔥🔥 FORCING ALL HIGHLIGHTS 🔥🔥🔥');
 
@@ -683,11 +698,26 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
             return;
         }
 
+        // CHECK: If built-in highlighting is already working, don't interfere
+        const builtinHighlightedRows = tableBody.querySelectorAll('tr[data-highlight-source="builtin"]');
+        if (builtinHighlightedRows.length > 0) {
+            console.log(`✅ Built-in highlighting active on ${builtinHighlightedRows.length} rows - using that instead`);
+            return 'BUILTIN_ACTIVE';
+        }
+
         const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
         const rows = tableBody.querySelectorAll('tr');
         console.log(`Found ${rows.length} rows to check`);
 
         rows.forEach((row, rowIndex) => {
+            // ANTI-BLINKING: Skip rows that already have stable highlighting
+            if (row.classList.contains('reach-out-complete') ||
+                row.classList.contains('force-green-highlight') ||
+                row.style.backgroundColor && !row.dataset.needsUpdate) {
+                console.log(`Row ${rowIndex}: Skipping - already properly highlighted`);
+                return;
+            }
+
             const cells = row.querySelectorAll('td');
 
             if (cells.length >= 7) {
@@ -719,15 +749,63 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                     if (nameElement) {
                         const displayName = nameElement.textContent.trim();
 
-                        // Find matching lead
-                        const lead = leads.find(l => {
-                            if (!l.name) return false;
-                            const leadName = l.name.length > 15 ? l.name.substring(0, 15) + '...' : l.name;
-                            return leadName === displayName || l.name === displayName;
-                        });
+                        // IMPROVED: Use row index as primary matching method
+                        let lead = null;
 
-                        if (lead && lead.stageTimestamps && lead.stageTimestamps[lead.stage]) {
-                            const timestamp = lead.stageTimestamps[lead.stage];
+                        // Method 1: Direct index mapping (most reliable)
+                        if (leads[rowIndex]) {
+                            lead = leads[rowIndex];
+                            console.log(`📍 Row ${rowIndex}: Using index mapping for ${lead.name}`);
+                        }
+
+                        // Method 2: Fallback to name matching if index fails
+                        if (!lead) {
+                            lead = leads.find(l => {
+                                if (!l.name) return false;
+                                const leadName = l.name.length > 15 ? l.name.substring(0, 15) + '...' : l.name;
+                                return leadName === displayName || l.name === displayName ||
+                                       l.name.includes(displayName.replace('...', '')) ||
+                                       displayName.includes(l.name.substring(0, 10));
+                            });
+                            if (lead) {
+                                console.log(`📍 Row ${rowIndex}: Using name matching for ${lead.name}`);
+                            }
+                        }
+
+                        // Method 3: Super flexible matching
+                        if (!lead && displayName.length > 3) {
+                            lead = leads.find(l => {
+                                if (!l.name) return false;
+                                const cleanDisplay = displayName.replace('...', '').toLowerCase();
+                                const cleanLead = l.name.toLowerCase();
+                                return cleanDisplay.includes(cleanLead.substring(0, 8)) ||
+                                       cleanLead.includes(cleanDisplay.substring(0, 8));
+                            });
+                            if (lead) {
+                                console.log(`📍 Row ${rowIndex}: Using flexible matching for ${lead.name}`);
+                            }
+                        }
+
+                        if (lead) {
+                            // Get timestamp from available fields
+                            let timestamp = null;
+                            if (lead.stageTimestamps && lead.stageTimestamps[lead.stage]) {
+                                timestamp = lead.stageTimestamps[lead.stage];
+                            } else if (lead.stageUpdatedAt) {
+                                timestamp = lead.stageUpdatedAt;
+                            } else if (lead.updatedAt) {
+                                timestamp = lead.updatedAt;
+                            } else if (lead.createdAt) {
+                                timestamp = lead.createdAt;
+                            } else if (lead.created) {
+                                // Convert from MM/DD/YYYY format
+                                const parts = lead.created.split('/');
+                                if (parts.length === 3) {
+                                    timestamp = new Date(parts[2], parts[0] - 1, parts[1]).toISOString();
+                                }
+                            }
+
+                            if (timestamp) {
                             const stageDate = new Date(timestamp);
                             const now = new Date();
 
@@ -743,6 +821,7 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                                 // YELLOW for 1 day old
                                 console.log(`🟡 APPLYING YELLOW to row ${rowIndex}`);
 
+                                // Force persistent yellow highlighting with multiple methods
                                 row.setAttribute('style',
                                     'background-color: #fef3c7 !important;' +
                                     'background: #fef3c7 !important;' +
@@ -756,6 +835,11 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                                 row.style.setProperty('border-right', '2px solid #f59e0b', 'important');
 
                                 row.classList.add('timestamp-yellow');
+                                row.classList.add('force-persistent-highlight');
+
+                                // Store the highlight in data attribute for persistence
+                                row.setAttribute('data-highlight', 'yellow');
+                                row.setAttribute('data-highlight-applied', 'true');
 
                                 cells.forEach(cell => {
                                     cell.style.backgroundColor = 'transparent';
@@ -766,6 +850,7 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                                 // ORANGE for 2-6 days old
                                 console.log(`🟠 APPLYING ORANGE to row ${rowIndex}`);
 
+                                // Force persistent orange highlighting with multiple methods
                                 row.setAttribute('style',
                                     'background-color: #fed7aa !important;' +
                                     'background: #fed7aa !important;' +
@@ -779,6 +864,11 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                                 row.style.setProperty('border-right', '2px solid #fb923c', 'important');
 
                                 row.classList.add('timestamp-orange');
+                                row.classList.add('force-persistent-highlight');
+
+                                // Store the highlight in data attribute for persistence
+                                row.setAttribute('data-highlight', 'orange');
+                                row.setAttribute('data-highlight-applied', 'true');
 
                                 cells.forEach(cell => {
                                     cell.style.backgroundColor = 'transparent';
@@ -789,6 +879,7 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                                 // RED for 7+ days old
                                 console.log(`🔴 APPLYING RED to row ${rowIndex}`);
 
+                                // Force persistent red highlighting with multiple methods
                                 row.setAttribute('style',
                                     'background-color: #fecaca !important;' +
                                     'background: #fecaca !important;' +
@@ -802,6 +893,11 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                                 row.style.setProperty('border-right', '2px solid #ef4444', 'important');
 
                                 row.classList.add('timestamp-red');
+                                row.classList.add('force-persistent-highlight');
+
+                                // Store the highlight in data attribute for persistence
+                                row.setAttribute('data-highlight', 'red');
+                                row.setAttribute('data-highlight-applied', 'true');
 
                                 cells.forEach(cell => {
                                     cell.style.backgroundColor = 'transparent';
@@ -809,6 +905,7 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                                 });
                                 return; // Skip to next row
                             }
+                            } // Close if (timestamp) block
                         }
                     }
                 }
@@ -839,13 +936,17 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
                 }
             }
         });
+
+        // ADD PERSISTENCE MECHANISM - Watch for style changes and re-apply highlighting
+        console.log('🔒 Setting up highlighting persistence mechanism...');
+
+        // DISABLED PERSISTENCE MECHANISM - Let CSS handle it
+        console.log('🔒 Highlighting applied - CSS will maintain persistence automatically');
     };
 
-    // Keep the old function names for compatibility but point to the new one
+    // RE-ENABLED: These provide the yellow/orange highlighting system
     window.forceGreenHighlight = window.forceAllHighlighting;
     window.forceTimestampHighlight = window.forceAllHighlighting;
-
-    // Simple function that highlights based on empty TO DO
     window.highlightEmptyTodos = window.forceGreenHighlight;
 
     // Debug function to check reach out data
@@ -1149,9 +1250,12 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
     // Run immediately
     setTimeout(runAggressiveHighlighting, 500);
     setTimeout(runAggressiveHighlighting, 1000);
-    setTimeout(runAggressiveHighlighting, 1500);
-    setTimeout(runAggressiveHighlighting, 2000);
-    setTimeout(runAggressiveHighlighting, 3000);
+    // DISABLED multiple aggressive timeouts to prevent blinking
+    // setTimeout(runAggressiveHighlighting, 1500);
+    // setTimeout(runAggressiveHighlighting, 2000);
+    // setTimeout(runAggressiveHighlighting, 3000);
+    // setTimeout(runAggressiveHighlighting, 4000);
+    // setTimeout(runAggressiveHighlighting, 5000);
 
     // Make debug function available
     window.testTimestampHighlight = function() {
@@ -1161,17 +1265,15 @@ console.log('🔧 FINAL LEAD TABLE FIX LOADING...');
 
     // Also expose the combined function directly
     window.forceHighlights = window.forceAllHighlighting;
-    setTimeout(runAggressiveHighlighting, 4000);
-    setTimeout(runAggressiveHighlighting, 5000);
 
-    // Then run every 2 seconds forever
-    setInterval(runAggressiveHighlighting, 2000);
+    // Then run every 2 seconds forever - DISABLED to prevent blinking
+    // setInterval(runAggressiveHighlighting, 2000);
 
     console.log('✅ FINAL LEAD TABLE FIX READY');
 
-    // RUN IMMEDIATELY ONE MORE TIME
-    setTimeout(() => {
-        console.log('🚀 IMMEDIATE FINAL HIGHLIGHT RUN');
-        forceAllHighlighting();
-    }, 100);
+    // RUN IMMEDIATELY ONE MORE TIME - DISABLED to prevent blinking
+    // setTimeout(() => {
+    //     console.log('🚀 IMMEDIATE FINAL HIGHLIGHT RUN');
+    //     forceAllHighlighting();
+    // }, 100);
 })();

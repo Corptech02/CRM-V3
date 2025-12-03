@@ -301,7 +301,7 @@
     }, 2000);
 
     // Keep running
-    setInterval(enhancedAutomaticHighlights, 2000);
+    // setInterval(enhancedAutomaticHighlights, 2000); // DISABLED - Causing flickering every 2000ms
 
     console.log('✅ Fix Missing Highlights loaded');
 })();

@@ -2,45 +2,277 @@
 console.log('Policy Server Save Fix: Loading...');
 
 (function() {
-    // API endpoint configuration
-    const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
+    // API endpoint configuration - handle both with and without /api suffix
+    let API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
 
-    // Override the savePolicy function to save to server
-    window.savePolicy = async function(policyData) {
-        console.log('Saving policy to SERVER:', policyData);
+    // Remove /api suffix if it exists to avoid double /api/api/ paths
+    if (API_URL.endsWith('/api')) {
+        API_URL = API_URL.slice(0, -4);
+    }
+
+    console.log('🔧 API_URL configured as:', API_URL);
+
+    // Store reference to original savePolicy function
+    const originalSavePolicy = window.savePolicy;
+
+    // Fallback function to save minimal data when full save fails
+    async function attemptMinimalSave(policyData, API_URL) {
+        console.log('🔧 Attempting minimal save with only essential fields...');
+
+        // Create minimal policy object with only essential fields
+        const minimalPolicy = {
+            id: policyData.id,
+            policyNumber: policyData.policyNumber,
+            carrier: policyData.carrier,
+            policyStatus: policyData.policyStatus || 'Active',
+            effectiveDate: policyData.effectiveDate,
+            expirationDate: policyData.expirationDate,
+            premium: policyData.premium,
+            agent: policyData.agent,
+            policyType: policyData.policyType,
+            updatedAt: new Date().toISOString()
+        };
+
+        // Add createdAt only if it's a new policy
+        if (!minimalPolicy.id.startsWith('POL-')) {
+            minimalPolicy.createdAt = policyData.createdAt || new Date().toISOString();
+        }
+
+        console.log('🔧 Minimal save payload:', JSON.stringify(minimalPolicy, null, 2));
 
         try {
-            // Ensure policy has an ID
-            if (!policyData.id) {
-                policyData.id = 'policy_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            }
-
-            // Preserve existing client information if not provided
-            if (!policyData.clientName && policyData.clientId) {
-                const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-                const client = clients.find(c => c.id === policyData.clientId);
-                if (client) {
-                    policyData.clientName = client.name || client.companyName || client.businessName || 'N/A';
-                }
-            }
-
-            // Add timestamps
-            if (!policyData.createdAt) {
-                policyData.createdAt = new Date().toISOString();
-            }
-            policyData.updatedAt = new Date().toISOString();
-
-            // Save to server
             const response = await fetch(`${API_URL}/api/policies`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(policyData)
+                body: JSON.stringify(minimalPolicy)
             });
 
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Minimal save successful:', result);
+                return result;
+            } else {
+                const errorText = await response.text();
+                console.error('❌ Minimal save also failed:', errorText);
+                throw new Error(`Minimal save failed: ${response.status} - ${errorText}`);
+            }
+        } catch (error) {
+            console.error('❌ Minimal save error:', error);
+            throw error;
+        }
+    }
+
+    // Fallback function to save only to localStorage when server is completely broken
+    async function saveToLocalStorageOnly(policyData) {
+        console.log('💾 Server is broken - saving to localStorage only...');
+        console.log('💾 This is a temporary workaround until server database is fixed');
+
+        try {
+            // Save to localStorage (existing functionality)
+            let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            const existingIndex = policies.findIndex(p => p.id === policyData.id);
+
+            if (existingIndex >= 0) {
+                policies[existingIndex] = policyData;
+                console.log('💾 Updated existing policy in localStorage');
+            } else {
+                policies.push(policyData);
+                console.log('💾 Added new policy to localStorage');
+            }
+
+            localStorage.setItem('insurance_policies', JSON.stringify(policies));
+
+            // Show success notification with warning
+            if (window.showNotification) {
+                showNotification('Policy saved locally (Server database needs fixing)', 'warning');
+            }
+
+            // Refresh the view
+            if (window.loadPoliciesView) {
+                setTimeout(() => loadPoliciesView(), 500);
+            }
+
+            // Return a mock success result
+            return {
+                id: policyData.id,
+                message: 'Saved to localStorage only (server database error)',
+                saved_at: new Date().toISOString(),
+                storage: 'localStorage_only'
+            };
+
+        } catch (error) {
+            console.error('❌ Even localStorage save failed:', error);
+            throw new Error('Failed to save policy anywhere: ' + error.message);
+        }
+    }
+
+    // Override the savePolicy function to save to server
+    window.savePolicy = async function(policyData) {
+        console.log('🔍 SERVER SAVE DEBUG - Function called with:', policyData);
+        console.log('🔍 SERVER SAVE DEBUG - policyData type:', typeof policyData);
+        console.log('🔍 SERVER SAVE DEBUG - policyData is null:', policyData === null);
+        console.log('🔍 SERVER SAVE DEBUG - policyData is undefined:', policyData === undefined);
+
+        // Early safety check
+        if (policyData === null) {
+            console.error('❌ SERVER SAVE - policyData is null, cannot proceed');
+            throw new Error('Policy data is null');
+        }
+
+        try {
+            // If no policyData is provided, we must collect it from the form
+            if (!policyData) {
+                console.log('No policyData provided, collecting from form...');
+
+                // Try to collect comprehensive policy data from all form tabs
+                console.log('Collecting comprehensive policy data from modal form...');
+
+                // Start with basic overview data
+                policyData = {
+                    policyNumber: document.getElementById('overview-policy-number')?.value || `POL-${Date.now()}`,
+                    carrier: document.getElementById('overview-carrier')?.value || '',
+                    policyStatus: document.getElementById('overview-status')?.value || 'Active',
+                    effectiveDate: document.getElementById('overview-effective-date')?.value || '',
+                    expirationDate: document.getElementById('overview-expiration-date')?.value || '',
+                    premium: document.getElementById('overview-premium')?.value || '',
+                    agent: document.getElementById('overview-agent')?.value || '',
+                    dotNumber: document.getElementById('overview-dot-number')?.value || '',
+                    mcNumber: document.getElementById('overview-mc-number')?.value || '',
+                    timestamp: new Date().toISOString()
+                };
+
+                // Get policy type
+                const policyTypeField = document.getElementById('overview-policy-type');
+                if (policyTypeField && policyTypeField.value) {
+                    const typeMap = {
+                        'Commercial Auto': 'commercial-auto',
+                        'Personal Auto': 'personal-auto',
+                        'Homeowners': 'homeowners',
+                        'Commercial Property': 'commercial-property',
+                        'General Liability': 'general-liability',
+                        'Professional Liability': 'professional-liability',
+                        'Workers Comp': 'workers-comp',
+                        'Umbrella': 'umbrella',
+                        'Life': 'life',
+                        'Health': 'health'
+                    };
+                    policyData.policyType = typeMap[policyTypeField.value] || policyTypeField.value.toLowerCase().replace(/\s+/g, '-');
+                }
+
+                // Check if we're editing an existing policy
+                const isEditing = window.editingPolicyId !== undefined;
+                if (isEditing) {
+                    policyData.id = window.editingPolicyId;
+                }
+
+                // Try to get client association if available
+                if (window.currentClientId || window.currentViewingClientId) {
+                    policyData.clientId = window.currentClientId || window.currentViewingClientId;
+                    console.log('Added client association:', policyData.clientId);
+                }
+
+                // Collect data from other form tabs if they exist
+                const allTabs = document.querySelectorAll('[id$="-content"]');
+                allTabs.forEach(tab => {
+                    const tabId = tab.id.replace('-content', '');
+                    const inputs = tab.querySelectorAll('input, select, textarea');
+
+                    if (inputs.length > 0 && !policyData[tabId]) {
+                        policyData[tabId] = {};
+                    }
+
+                    inputs.forEach(input => {
+                        const label = input.closest('.form-group')?.querySelector('label')?.textContent.replace(' *', '').replace(':', '').trim();
+                        if (label && input.value) {
+                            policyData[tabId][label] = input.value;
+                        }
+                    });
+                });
+
+                console.log('Collected comprehensive policy data:', policyData);
+
+                // Validate that we actually collected data
+                if (!policyData || Object.keys(policyData).length === 0) {
+                    throw new Error('Failed to collect policy data from form - no form fields found or form is empty');
+                }
+            }
+
+            console.log('🔍 SERVER SAVE DEBUG - Final policyData before processing:', policyData);
+            console.log('🔍 SERVER SAVE DEBUG - policyData has id:', !!policyData?.id);
+
+            // Ensure policy has an ID
+            if (!policyData.id) {
+                policyData.id = 'policy_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            }
+
+            // IMPORTANT: Remove client_id and clientName from server payload since database doesn't support it
+            const serverPolicyData = { ...policyData };
+
+            // Check what client-related fields exist before removal
+            const clientFields = Object.keys(serverPolicyData).filter(key =>
+                key.toLowerCase().includes('client')
+            );
+            console.log('🔍 Found client-related fields:', clientFields);
+
+            // Remove all client-related fields
+            delete serverPolicyData.clientId;
+            delete serverPolicyData.clientName;
+            delete serverPolicyData.client_id;
+            delete serverPolicyData.client_name;
+
+            console.log('🔧 Removed all client-related fields for server compatibility');
+
+            // Add timestamps to the server data
+            if (!serverPolicyData.createdAt) {
+                serverPolicyData.createdAt = new Date().toISOString();
+            }
+            serverPolicyData.updatedAt = new Date().toISOString();
+
+            // Determine if this is an existing policy (has an ID that's not auto-generated)
+            const isExistingPolicy = serverPolicyData.id && !serverPolicyData.id.startsWith('POL-');
+            const method = isExistingPolicy ? 'PUT' : 'POST';
+            const endpoint = isExistingPolicy ? `${API_URL}/api/policies/${serverPolicyData.id}` : `${API_URL}/api/policies`;
+
+            // Save to server
+            console.log('🌐 Sending policy data to server:', endpoint);
+            console.log('🌐 Request method:', method, '(existing policy:', isExistingPolicy, ')');
+            console.log('🌐 Request payload (cleaned):', JSON.stringify(serverPolicyData, null, 2));
+
+            const response = await fetch(endpoint, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(serverPolicyData)
+            });
+
+            console.log('🌐 Server response status:', response.status, response.statusText);
+
             if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`);
+                // Try to get more details about the server error
+                let errorDetails = '';
+                try {
+                    const errorText = await response.text();
+                    errorDetails = errorText;
+                    console.error('🌐 Server error details:', errorText);
+
+                    // If it's a client_id column error, try a simplified payload
+                    if (errorText.includes('client_id')) {
+                        console.log('🔧 Attempting fallback with minimal data due to client_id error...');
+                        try {
+                            return await attemptMinimalSave(serverPolicyData, API_URL);
+                        } catch (minimalError) {
+                            console.error('❌ Minimal save also failed, using localStorage only fallback...');
+                            return await saveToLocalStorageOnly(policyData); // Use original full data for localStorage
+                        }
+                    }
+                } catch (e) {
+                    console.error('🌐 Could not read server error details:', e);
+                }
+
+                throw new Error(`Server error: ${response.status} ${response.statusText}${errorDetails ? ' - ' + errorDetails : ''}`);
             }
 
             const result = await response.json();

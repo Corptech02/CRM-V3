@@ -625,12 +625,63 @@ protectedFunctions.openEmailDocumentation = async function(leadId) {
     const usdot = lead.dotNumber || 'NULL';
     const subject = `Renewal: ${renewalDate} - USDOT: ${usdot} - ${companyName}`;
 
-    // Get loss runs files for attachments
-    const lossRuns = JSON.parse(localStorage.getItem('loss_runs') || '{}');
-    const leadLossRuns = lossRuns[leadId] || [];
+    // Get files from both localStorage AND server
+    let allFiles = [];
+
+    // 1. Get files from localStorage first
+    const lossRunsData = JSON.parse(localStorage.getItem('lossRunsData') || '{}');
+    const localFiles = lossRunsData[leadId] || [];
+    allFiles = [...localFiles];
+
+    console.log('📁 Found', localFiles.length, 'local files for lead', leadId);
+
+    // 2. Also try to get files from server
+    try {
+        console.log('🌐 Loading files from server for lead:', leadId);
+        const response = await fetch(`/api/loss-runs-upload?leadId=${encodeURIComponent(leadId)}`);
+        const serverData = await response.json();
+
+        if (serverData.success && serverData.files.length > 0) {
+            console.log('✅ Found', serverData.files.length, 'server files for lead', leadId);
+
+            // Add server files to the list, avoiding duplicates
+            serverData.files.forEach(serverFile => {
+                // Check if file already exists in local files (by filename)
+                const existsLocally = allFiles.some(localFile =>
+                    localFile.filename === serverFile.file_name ||
+                    localFile.originalname === serverFile.file_name ||
+                    localFile.filename === serverFile.filename ||
+                    localFile.originalname === serverFile.filename
+                );
+
+                if (!existsLocally) {
+                    // Convert server file format to match expected format (server uses file_name, file_size, etc.)
+                    const originalName = serverFile.file_name ? serverFile.file_name.replace(/^[a-f0-9]+_[0-9]+_/, '') : serverFile.filename;
+                    const fileSize = serverFile.file_size ? Math.round(serverFile.file_size / 1024) + ' KB' : serverFile.size;
+
+                    allFiles.push({
+                        filename: serverFile.file_name || serverFile.filename,
+                        originalname: originalName,
+                        originalName: originalName, // Also add this for compatibility
+                        size: fileSize,
+                        type: serverFile.content_type || 'application/pdf',
+                        data: serverFile.data || null, // Server might not include data
+                        isServerFile: true,
+                        fileId: serverFile.id
+                    });
+                }
+            });
+        } else {
+            console.log('ℹ️ No server files found or server error for lead', leadId);
+        }
+    } catch (error) {
+        console.warn('⚠️ Failed to load server files, using local files only:', error);
+    }
+
+    console.log('📎 Total attachments for email:', allFiles.length, 'files for lead', leadId);
 
     // Create the email composer modal
-    protectedFunctions.createEmailComposer(lead, subject, leadLossRuns);
+    protectedFunctions.createEmailComposer(lead, subject, allFiles);
 };
 
 // NEW: Create dedicated email composer modal
@@ -669,26 +720,11 @@ We are looking to get a quote for the following commercial auto account:
 ACCOUNT DETAILS:
 • Company: ${lead.name || 'NULL'}
 • USDOT Number: ${lead.dotNumber || 'NULL'}
-• MC Number: ${lead.mcNumber || 'NULL'}
 • Renewal Date: ${lead.renewalDate || 'NULL'}
-• Contact: ${lead.contact || 'NULL'}
-• Phone: ${lead.phone || 'NULL'}
-• Email: ${lead.email || 'NULL'}
-
-OPERATION DETAILS:
-• Radius of Operation: ${lead.radiusOfOperation || 'NULL'}
-• Commodity Hauled: ${lead.commodityHauled || 'NULL'}
-• Operating States: ${lead.operatingStates || 'NULL'}
-• Years in Business: ${lead.yearsInBusiness || 'NULL'}
 
 ${attachments.length > 0 ? `ATTACHED DOCUMENTATION:\n${attachments.map(file => `• ${file.originalName || file.filename}`).join('\n')}\n\n` : 'Please let us know what additional documentation you may need for quoting.\n\n'}Please provide your most competitive rates and let us know if you need any additional information.
 
-Thank you,
-
-VIG Insurance Agency
-Grant Corp
-contact@vigagency.com
-Phone: (555) 123-4567`;
+Thank you,`;
 
     emailModal.innerHTML = `
         <div style="background: white; border-radius: 12px; width: 95%; max-width: 1200px; max-height: 95vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px; position: relative;">
@@ -704,7 +740,7 @@ Phone: (555) 123-4567`;
                 <!-- To Field -->
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; color: #374151;">To:</label>
-                    <input type="email" id="email-to-field" value="${lead.email || ''}" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    <input type="email" id="email-to-field" value="" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                 </div>
 
                 <!-- Subject Field -->
@@ -2125,6 +2161,7 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                             <option value="$2,500">$2,500</option>
                             <option value="$5,000">$5,000</option>
                             <option value="$10,000">$10,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -2136,6 +2173,7 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                             <option value="$2,500">$2,500</option>
                             <option value="$5,000">$5,000</option>
                             <option value="$10,000">$10,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -2146,7 +2184,7 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                             <option value="$100,000">$100,000</option>
                             <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
-                            <option value="Not Needed">Not Needed</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -2157,15 +2195,15 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                             <option value="$100,000">$100,000</option>
                             <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
-                            <option value="Not Needed">Not Needed</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
                             <option value="">Select Coverage</option>
-                            <option value="Yes">Yes - Include</option>
-                            <option value="No">No - Decline</option>
+                            <option value="Included">Included</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -2187,10 +2225,11 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
                             <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
                             <option value="$1,000,000">$1,000,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Deductible:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Cargo Deductible:</label>
                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
                             <option value="">Select Deductible</option>
                             <option value="$1,000">$1,000</option>
@@ -2464,38 +2503,205 @@ protectedFunctions.sendEmail = async function(leadId) {
     }
 
     try {
-        // Get lead data for attachments
-        const lossRuns = JSON.parse(localStorage.getItem('loss_runs') || '{}');
-        const leadLossRuns = lossRuns[leadId] || [];
+        // Get files from both localStorage AND server (same as openEmailDocumentation)
+        let allFiles = [];
 
-        // Prepare attachments from loss runs
+        // 1. Get files from localStorage first
+        const lossRunsData = JSON.parse(localStorage.getItem('lossRunsData') || '{}');
+        const localFiles = lossRunsData[leadId] || [];
+        allFiles = [...localFiles];
+
+        console.log('📧 Email send - Found', localFiles.length, 'local files for lead', leadId);
+
+        // 2. Also get files from server
+        try {
+            console.log('🌐 Email send - Loading files from server for lead:', leadId);
+            const response = await fetch(`/api/loss-runs-upload?leadId=${encodeURIComponent(leadId)}`);
+            const serverData = await response.json();
+
+            if (serverData.success && serverData.files.length > 0) {
+                console.log('✅ Email send - Found', serverData.files.length, 'server files for lead', leadId);
+
+                // Add server files to the list, avoiding duplicates
+                serverData.files.forEach(serverFile => {
+                    const existsLocally = allFiles.some(localFile =>
+                        localFile.filename === serverFile.file_name ||
+                        localFile.originalname === serverFile.file_name ||
+                        localFile.filename === serverFile.filename ||
+                        localFile.originalname === serverFile.filename
+                    );
+
+                    if (!existsLocally) {
+                        // Convert server file format to match expected format (server uses file_name, file_size, etc.)
+                        const originalName = serverFile.file_name ? serverFile.file_name.replace(/^[a-f0-9]+_[0-9]+_/, '') : serverFile.filename;
+                        const fileSize = serverFile.file_size ? Math.round(serverFile.file_size / 1024) + ' KB' : serverFile.size;
+
+                        allFiles.push({
+                            filename: serverFile.file_name || serverFile.filename,
+                            originalname: originalName,
+                            originalName: originalName, // Also add this for compatibility
+                            size: fileSize,
+                            type: serverFile.content_type || 'application/pdf',
+                            data: serverFile.data || null,
+                            isServerFile: true,
+                            fileId: serverFile.id
+                        });
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn('⚠️ Email send - Failed to load server files, using local files only:', error);
+        }
+
+        console.log('📧 Email send - Total files to attach:', allFiles.length, 'files for lead', leadId);
+
+        // Prepare attachments from all files
         const attachments = [];
 
-        for (const file of leadLossRuns) {
-            if (file.data) {
-                // Convert Base64 data to proper format for API
-                const base64Data = file.data.includes(',') ? file.data.split(',')[1] : file.data;
+        console.log('📧 Processing attachments for sending:');
+        console.log('📊 All files to process:', allFiles.map((f, i) => `${i + 1}. ${f.originalname || f.filename} (Server: ${f.isServerFile}, ID: ${f.fileId})`));
 
-                attachments.push({
-                    filename: file.originalName || file.filename,
-                    name: file.originalName || file.filename,
+        let totalSize = 0;
+        let successCount = 0;
+        let failureReasons = [];
+
+        for (let i = 0; i < allFiles.length; i++) {
+            const file = allFiles[i];
+            console.log(`\n🔄 Processing file ${i + 1}/${allFiles.length}:`, {
+                filename: file.filename,
+                originalname: file.originalname,
+                isServerFile: file.isServerFile,
+                hasData: !!file.data,
+                fileId: file.fileId,
+                size: file.size
+            });
+
+            let fileData = file.data;
+            let arrayBuffer = null;
+
+            // If it's a server file without data, fetch it
+            if (file.isServerFile && !fileData && file.fileId) {
+                try {
+                    console.log(`🔽 Fetching server file data for: ${file.filename} (ID: ${file.fileId})`);
+                    const fileResponse = await fetch(`/api/loss-runs-download?fileId=${encodeURIComponent(file.fileId)}`);
+
+                    console.log(`Server response status for ${file.filename}:`, fileResponse.status, fileResponse.statusText);
+
+                    if (fileResponse.ok) {
+                        arrayBuffer = await fileResponse.arrayBuffer();
+
+                        // Convert large files to base64 in chunks to avoid call stack overflow
+                        const uint8Array = new Uint8Array(arrayBuffer);
+                        let binaryString = '';
+                        const chunkSize = 8192; // Process 8KB at a time
+
+                        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                            const chunk = uint8Array.slice(i, i + chunkSize);
+                            binaryString += String.fromCharCode.apply(null, chunk);
+                        }
+
+                        fileData = btoa(binaryString);
+                        console.log(`✅ Downloaded server file data for: ${file.filename} (${arrayBuffer.byteLength} bytes, converted to base64: ${fileData.length} chars)`);
+                    } else {
+                        const reason = `HTTP ${fileResponse.status}: ${fileResponse.statusText}`;
+                        console.error(`❌ Failed to download server file: ${file.filename} - ${reason}`);
+                        failureReasons.push(`${file.originalname || file.filename}: ${reason}`);
+                        console.log('❌ SKIPPING FILE:', file.filename);
+                        continue; // Skip this attachment
+                    }
+                } catch (error) {
+                    const reason = `Network error: ${error.message}`;
+                    console.error(`❌ Error downloading server file: ${file.filename}`, error);
+                    failureReasons.push(`${file.originalname || file.filename}: ${reason}`);
+                    console.log('❌ SKIPPING FILE:', file.filename);
+                    continue; // Skip this attachment
+                }
+            }
+
+            if (fileData) {
+                // Convert Base64 data to proper format for API
+                const base64Data = fileData.includes(',') ? fileData.split(',')[1] : fileData;
+
+                const attachment = {
+                    filename: file.originalname || file.filename,
+                    name: file.originalname || file.filename,
                     content: base64Data,
                     contentType: file.type || 'application/pdf',
                     encoding: 'base64'
-                });
-                console.log('📎 Added attachment:', file.originalName || file.filename);
+                };
+
+                attachments.push(attachment);
+                successCount++;
+                totalSize += (arrayBuffer ? arrayBuffer.byteLength : 0);
+                console.log(`📎 Successfully added attachment ${attachments.length}:`, attachment.filename);
+            } else {
+                const reason = 'No file data available';
+                console.warn(`⚠️ No file data available for: ${file.filename} - SKIPPING`);
+                failureReasons.push(`${file.originalname || file.filename}: ${reason}`);
             }
         }
 
-        // Convert body to HTML format
+        console.log(`📧 ATTACHMENT PROCESSING SUMMARY:`);
+        console.log(`   ✅ Successfully processed: ${successCount}/${allFiles.length} files`);
+        console.log(`   📎 Final attachment count: ${attachments.length}`);
+        console.log(`   📊 Total size: ~${Math.round(totalSize / 1024)}KB`);
+        if (failureReasons.length > 0) {
+            console.log(`   ❌ Failed files:`, failureReasons);
+        }
+
+        // Convert body to HTML format with new professional signature
         const htmlBody = body.replace(/\n/g, '<br>') + `
             <br><br>
-            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
-                <strong>Vanguard Insurance Agency</strong><br>
-                Email: contact@vigagency.com<br>
-                Phone: (555) 123-4567
-                ${attachments.length > 0 ? `<br><br><strong>Attachments:</strong> ${attachments.length} file(s)` : ''}
-            </div>
+            <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; font-family: Arial, Helvetica, sans-serif; color:#0B1D3A; width:100%;">
+                <tbody valign="middle">
+                    <tr valign="inherit">
+                        <td style="padding:12px 0 10px 0;" valign="inherit">
+
+                            <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; width: 100%;">
+                                <tbody valign="middle">
+                                    <tr valign="inherit">
+                                        <td style="vertical-align:top;" valign="top">
+                                            <div style="font-size:18px;line-height:22px;font-weight:bold;color:#1F4F8D;">Vanguard Insurance Group LLC</div>
+                                            <div style="font-size:12px;line-height:16px;color:#4B5563;padding-top:2px;">Commercial Insurance Services</div>
+                                        </td>
+                                    </tr>
+                                    <tr valign="inherit">
+                                        <td style="padding-top:10px;" valign="inherit"><span style="font-size:14px;line-height:20px;">&nbsp; <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwQjFEM0EiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMiAxNi45MnYzYTIgMiAwIDAgMS0yLjE4IDJBMTkuODYgMTkuODYgMCAwIDEgMTEuMTkgMTguODVBMTkuNSAxOS41IDAgMCAxIDUuMTkgMTIuODkgMTkuODYgMTkuODYgMCAwIDEgMi4wOCA0LjE4QTIgMiAwIDAgMSA0LjA2IDJoM2EyIDIgMCAwIDEgMiAxLjcyYy4xMi45LjMxIDEuNzcuNTcgMi42MWEyIDIgMCAwIDEtLjQ1IDIuMTFMOCA5LjkxYTE2IDE2IDAgMCAwIDYgNmwxLjQ2LTEuMDlhMiAyIDAgMCAxIDIuMTEtLjQ1Yy44NC4yNiAxLjcxLjQ1IDIuNjEuNTdhMiAyIDAgMCAxIDEuODIgMS45MnoiLz48L3N2Zz4=" width="16" height="16" style="vertical-align: middle; margin-right: 6px;"> <a href="tel:+13304606887" style="color:#0B1D3A;text-decoration:none;">330-460-6887</a> &bull; <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwQjFEM0EiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik00IDRoMTZhMiAyIDAgMCAxIDIgMnYxMmEyIDIgMCAwIDEtMiAySDRhMiAyIDAgMCAxLTItMlY2YTIgMiAwIDAgMSAyLTJ6Ii8+PHBvbHlsaW5lIHBvaW50cz0iMjIsNiAxMiwxMyAyLDYiLz48L3N2Zz4=" width="16" height="16" style="vertical-align: middle; margin-right: 6px;"> <a href="mailto:contact@vigagency.com" style="color:#0B1D3A;text-decoration:none;">contact@vigagency.com</a> &bull; <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwQjFEM0EiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PGxpbmUgeDE9IjIiIHkxPSIxMiIgeDI9IjIyIiB5Mj0iMTIiLz48cGF0aCBkPSJNMTIgMmMzIDMuNSAzIDE0IDAgMjBNMTIgMmMtMyAzLjUtMyAxNCAwIDIwIi8+PC9zdmc+" width="16" height="16" style="vertical-align: middle; margin-right: 6px;"> <a href="https://vigagency.com" target="_blank" style="color:#0B1D3A;text-decoration:none;">vigagency.com</a>&nbsp;</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr valign="inherit">
+                        <td style="height:2px;background:#1F4F8D;font-size:0;line-height:0;" height="2" valign="inherit">&nbsp;</td>
+                    </tr>
+                    <tr valign="inherit">
+                        <td style="padding-top:4px;" valign="inherit">
+
+                            <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background: rgb(235, 235, 236); border-right: 1px solid rgb(235, 235, 236); border-bottom: 1px solid rgb(235, 235, 236); border-left: 1px solid rgb(235, 235, 236); width: 100%;">
+                                <tbody valign="middle">
+                                    <tr valign="inherit">
+                                        <td style="padding:12px 12px;" valign="inherit">
+
+                                            <table cellpadding="0" cellspacing="0" width="100%">
+                                                <tbody valign="middle">
+                                                    <tr valign="inherit">
+                                                        <td style="padding:0; vertical-align:middle;" valign="middle"><img src="https://permanent-assets-download.flockmail.com/signature/8306917/2025-10-29_e41d4e2a4c914f21beca_55689" style="width: 249px; display: inline-block; vertical-align: bottom; margin-right: 5px; margin-left: 5px;"></td>
+                                                        <td align="right" style="vertical-align:middle;" valign="middle"><a href="https://vigagency.com" target="_blank" style="background:#1F4F8D;color:#ffffff;text-decoration:none;font-size:13px;line-height:18px;border-radius:999px;padding:10px 16px;display:inline-block;">&nbsp;Visit vigagency.com&nbsp;</a></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr valign="inherit">
+                        <td style="font-size:10px;line-height:14px;color:#6B7280;padding-top:8px;" valign="inherit">Coverage cannot be bound or altered via email unless confirmed in writing by an authorized representative. &copy; Vanguard Insurance Group LLC.${attachments.length > 0 ? ` | Attachments: ${attachments.length} file(s)` : ''}</td>
+                    </tr>
+                </tbody>
+            </table>
         `;
 
         console.log('📧 Sending email via Titan API with', attachments.length, 'attachments');

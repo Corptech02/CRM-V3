@@ -3,13 +3,14 @@ function loadLeadsView_backup() {
     // This is the current broken version - keeping for reference
 }
 
-function loadLeadsView() {
+// DISABLED - This was overriding the real loadLeadsView function
+/* function loadLeadsView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) {
         alert('Dashboard content not found');
         return;
     }
-    
+
     // Simple test to see if we can set ANY content
     dashboardContent.innerHTML = `
         <div class="leads-view">
@@ -17,4 +18,4 @@ function loadLeadsView() {
             <p>If you can see this, the basic function works.</p>
         </div>
     `;
-}
+} */

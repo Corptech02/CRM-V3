@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Migrate Quote Applications to Server</title>
+</head>
+<body>
+    <h1>Migrate Quote Applications to Server</h1>
+    <button onclick="migrateApplications()">Migrate localStorage Applications to Server</button>
+    <div id="status"></div>
+
+    <script>
+        async function migrateApplications() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<p>🔄 Starting migration...</p>';
+
+            try {
+                // Get applications from localStorage
+                const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+
+                if (applications.length === 0) {
+                    statusDiv.innerHTML = '<p>✅ No applications found in localStorage to migrate.</p>';
+                    return;
+                }
+
+                statusDiv.innerHTML = `<p>📋 Found ${applications.length} applications in localStorage. Migrating...</p>`;
+
+                let migrated = 0;
+                let errors = 0;
+
+                for (const app of applications) {
+                    try {
+                        const response = await fetch('/api/quote-applications', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                leadId: app.leadId,
+                                applicationData: app
+                            })
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            migrated++;
+                            console.log(`✅ Migrated application ${app.id} for lead ${app.leadId}`);
+                        } else {
+                            errors++;
+                            console.error(`❌ Failed to migrate application ${app.id}:`, result.error);
+                        }
+                    } catch (error) {
+                        errors++;
+                        console.error(`❌ Error migrating application ${app.id}:`, error);
+                    }
+                }
+
+                statusDiv.innerHTML = `
+                    <h2>Migration Complete</h2>
+                    <p>✅ Successfully migrated: ${migrated} applications</p>
+                    <p>❌ Errors: ${errors} applications</p>
+                    ${errors === 0 ? '<p><button onclick="clearLocalStorage()">Clear localStorage (recommended)</button></p>' : ''}
+                `;
+
+            } catch (error) {
+                statusDiv.innerHTML = `<p>❌ Migration failed: ${error.message}</p>`;
+            }
+        }
+
+        function clearLocalStorage() {
+            localStorage.removeItem('quote_applications');
+            document.getElementById('status').innerHTML += '<p>🗑️ localStorage cleared successfully!</p>';
+        }
+    </script>
+</body>
+</html>

@@ -10,7 +10,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeAPIIntegration() {
-    // Override existing functions to use the new API service
+    // Override existing functions to use the new API service - DISABLED to prevent tab switching issues
+
+    // DISABLED - These overrides were causing tab switching conflicts
+    console.log('API Integration DISABLED to prevent tab switching issues');
+    return;
 
     // Override lead loading function
     if (window.loadLeadsView) {

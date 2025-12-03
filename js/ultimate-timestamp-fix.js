@@ -94,7 +94,7 @@
     setTimeout(ultimateHighlight, 1000);
     setTimeout(ultimateHighlight, 2000);
 
-    // Keep running forever
+    // Keep running forever - RE-ENABLED to restore original functionality
     setInterval(ultimateHighlight, 3000);
 
     // Expose globally

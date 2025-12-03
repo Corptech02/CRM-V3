@@ -1,8 +1,11 @@
-// Fix ViciDial lead display after import - fetch from server
+// Fix ViciDial lead display after import - DISABLED to prevent tab switching issues
 (function() {
     'use strict';
 
-    console.log('🔧 Fixing ViciDial lead display after import...');
+    console.log('🔧 ViciDial lead display fix DISABLED - was causing tab switching conflicts');
+
+    // DISABLED - This was overriding loadLeadsView and causing tab switching to fail
+    return;
 
     // Store original loadLeadsView
     const originalLoadLeadsView = window.loadLeadsView;

@@ -29,8 +29,30 @@ console.log('Fixing Assigned To column sorting...');
             window.currentSort.direction = 'asc';
         }
 
-        // Enhanced sorting with proper assignedTo handling
+        // Enhanced sorting with user sectioning - current user's leads always on top
         leads.sort((a, b) => {
+            // FIRST: Always prioritize current user's leads regardless of field being sorted
+            let currentUser = '';
+            const userData = sessionStorage.getItem('vanguard_user');
+            if (userData) {
+                try {
+                    const user = JSON.parse(userData);
+                    // Capitalize username to match assignedTo format (grant -> Grant)
+                    currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+                } catch (e) {
+                    console.error('Error parsing user data:', e);
+                }
+            }
+
+            // Check if leads belong to current user
+            const aIsCurrentUser = currentUser && (a.assignedTo === currentUser);
+            const bIsCurrentUser = currentUser && (b.assignedTo === currentUser);
+
+            // If one belongs to current user and other doesn't, current user goes first
+            if (aIsCurrentUser && !bIsCurrentUser) return -1;
+            if (bIsCurrentUser && !aIsCurrentUser) return 1;
+
+            // SECOND: If both leads have same user assignment (both current user's OR both other users'), sort by the selected field
             let aVal = a[field];
             let bVal = b[field];
 

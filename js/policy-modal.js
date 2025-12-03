@@ -383,7 +383,12 @@ function generateTabContent(tabId, policyType) {
                         </div>
                         <div class="form-group">
                             <label>Agent</label>
-                            <input type="text" class="form-control" id="overview-agent">
+                            <select class="form-control" id="overview-agent">
+                                <option value="">Select Agent</option>
+                                <option value="Grant">Grant</option>
+                                <option value="Hunter">Hunter</option>
+                                <option value="Carson">Carson</option>
+                            </select>
                         </div>
                     </div>
                     ${policyType === 'commercial-auto' ? `
@@ -1096,7 +1101,54 @@ async function savePolicy() {
         const isEditing = window.editingPolicyId !== undefined;
 
         // Start with the existing policy data as base (if editing) OR the initial data (if creating new)
-        const policyData = isEditing ? {...currentPolicyData} : {...currentPolicyData, ...window.currentPolicyData};
+        let policyData = isEditing ? {...currentPolicyData} : {...currentPolicyData, ...window.currentPolicyData};
+
+        // Debug: Check if policyData is empty or missing key fields
+        console.log('DEBUG: Initial policyData:', policyData);
+        console.log('DEBUG: currentPolicyData:', currentPolicyData);
+        console.log('DEBUG: window.currentPolicyData:', window.currentPolicyData);
+        console.log('DEBUG: isEditing:', isEditing);
+
+        // If policyData is empty or missing essential fields, try to reconstruct from form
+        if (!policyData || Object.keys(policyData).length === 0 || !policyData.policyNumber) {
+            console.log('DEBUG: Policy data is empty, reconstructing from current form state');
+
+            // Get basic fields from overview tab if it exists
+            const overviewTab = document.getElementById('overview-content');
+            if (overviewTab) {
+                policyData = {
+                    policyNumber: document.getElementById('overview-policy-number')?.value || `POL-${Date.now()}`,
+                    carrier: document.getElementById('overview-carrier')?.value || '',
+                    policyStatus: document.getElementById('overview-status')?.value || 'Active',
+                    effectiveDate: document.getElementById('overview-effective-date')?.value || '',
+                    expirationDate: document.getElementById('overview-expiration-date')?.value || '',
+                    premium: document.getElementById('overview-premium')?.value || '',
+                    agent: document.getElementById('overview-agent')?.value || '',
+                    dotNumber: document.getElementById('overview-dot-number')?.value || '',
+                    mcNumber: document.getElementById('overview-mc-number')?.value || ''
+                };
+
+                // Get policy type from dropdown
+                const policyTypeField = document.getElementById('overview-policy-type');
+                if (policyTypeField && policyTypeField.value) {
+                    const typeMap = {
+                        'Commercial Auto': 'commercial-auto',
+                        'Personal Auto': 'personal-auto',
+                        'Homeowners': 'homeowners',
+                        'Commercial Property': 'commercial-property',
+                        'General Liability': 'general-liability',
+                        'Professional Liability': 'professional-liability',
+                        'Workers Comp': 'workers-comp',
+                        'Umbrella': 'umbrella',
+                        'Life': 'life',
+                        'Health': 'health'
+                    };
+                    policyData.policyType = typeMap[policyTypeField.value] || policyTypeField.value.toLowerCase().replace(/\s+/g, '-');
+                }
+            }
+
+            console.log('DEBUG: Reconstructed policyData:', policyData);
+        }
 
         // IMPORTANT: Ensure client association is preserved
         if (!policyData.clientId && (window.currentClientId || window.currentViewingClientId)) {
@@ -1199,6 +1251,10 @@ async function savePolicy() {
                         if (input.id === 'overview-premium') {
                             console.log('Setting premium from overview-premium field:', input.value);
                             policyData.premium = input.value;
+                        }
+                        if (input.id === 'overview-agent') {
+                            console.log('Capturing agent from overview dropdown:', input.value);
+                            policyData.agent = input.value;
                         }
                         if (input.id === 'overview-dot-number') policyData.dotNumber = input.value;
                         if (input.id === 'overview-mc-number') policyData.mcNumber = input.value;
@@ -1535,6 +1591,10 @@ function savePolicyDraft() {
                         if (input.id === 'overview-premium') {
                             console.log('Setting premium from overview-premium field:', input.value);
                             policyData.premium = input.value;
+                        }
+                        if (input.id === 'overview-agent') {
+                            console.log('Capturing agent from overview dropdown:', input.value);
+                            policyData.agent = input.value;
                         }
                         if (input.id === 'overview-dot-number') policyData.dotNumber = input.value;
                         if (input.id === 'overview-mc-number') policyData.mcNumber = input.value;
@@ -1948,7 +2008,16 @@ function populatePolicyForm(policyData) {
         document.getElementById('overview-premium').value = policyData.premium || policyData.monthlyPremium || '';
     }
     if (document.getElementById('overview-agent')) {
-        document.getElementById('overview-agent').value = policyData.agent || '';
+        const agentSelect = document.getElementById('overview-agent');
+        const agentValue = policyData.agent || '';
+
+        // Set the dropdown value
+        agentSelect.value = agentValue;
+
+        // If the value doesn't match any option, log it for debugging
+        if (agentValue && agentSelect.value !== agentValue) {
+            console.log(`Agent value "${agentValue}" not found in dropdown options`);
+        }
     }
     
     // Populate Commercial Auto specific fields in Overview

@@ -86,8 +86,8 @@ console.log('🔧 Fixing 60-Day View text to be persistent...');
         };
     }
 
-    // Continuous monitor - check every 500ms
-    setInterval(updateTo60DayView, 500);
+    // Continuous monitor - check every 500ms - DISABLED to prevent blinking
+    // setInterval(updateTo60DayView, 500);
 
     // Monitor for DOM changes
     const observer = new MutationObserver(function(mutations) {

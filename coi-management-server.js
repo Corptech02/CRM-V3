@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
 
 const app = express();
 const PORT = 3003;
@@ -16,6 +17,15 @@ const COI_STORAGE_DIR = '/var/www/vanguard/coi-templates';
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Configure multer for file uploads (memory storage for email attachments)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit per file
+        files: 10 // Maximum 10 files
+    }
+});
 
 // Create storage directory if it doesn't exist
 async function ensureStorageDir() {
@@ -568,6 +578,141 @@ async function sendCOIEmail(recipientEmail, policyNumber, certificateHolder, pdf
         throw error;
     }
 }
+
+// Send general documentation email
+app.post('/api/coi/send-request', (req, res, next) => {
+    upload.array('attachment', 10)(req, res, (err) => {
+        if (err) {
+            console.log('🚨 COI Server multer error:', err.message);
+            return res.status(400).json({
+                success: false,
+                error: 'File upload error: ' + err.message
+            });
+        }
+        next();
+    });
+}, async (req, res) => {
+    try {
+        console.log('🚨🚨🚨 COI MANAGEMENT SERVER HANDLING /api/coi/send-request 🚨🚨🚨');
+        console.log('📧 Processing documentation email request');
+        console.log('   req.body:', req.body);
+        console.log('   req.files:', req.files?.length || 0, 'files');
+        console.log('   req.headers user-agent:', req.headers['user-agent']);
+        console.log('   Full request details:', {
+            method: req.method,
+            url: req.url,
+            contentType: req.headers['content-type']
+        });
+
+        const { to, subject, message, leadId } = req.body;
+
+        console.log('   To:', to);
+        console.log('   Subject:', subject);
+        console.log('   Lead ID:', leadId);
+
+        if (!to) {
+            return res.status(400).json({
+                success: false,
+                error: 'Recipient email is required'
+            });
+        }
+
+        if (!subject) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email subject is required'
+            });
+        }
+
+        // Create email transporter (same config as COI emails)
+        const transporter = nodemailer.createTransport({
+            host: 'smtpout.secureserver.net',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'contact@vigagency.com',
+                pass: '25nickc124!' // This should be in environment variables
+            },
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+
+        // Prepare attachments from uploaded files
+        const attachments = [];
+
+        // Process uploaded files from multer
+        if (req.files && req.files.length > 0) {
+            console.log(`📎 Processing ${req.files.length} uploaded files`);
+
+            req.files.forEach((file, index) => {
+                attachments.push({
+                    filename: file.originalname || `document_${index + 1}`,
+                    content: file.buffer,
+                    contentType: file.mimetype
+                });
+
+                console.log(`📎 Added attachment: ${file.originalname} (${file.buffer.length} bytes, ${file.mimetype})`);
+            });
+        }
+
+        // Prepare email options
+        const mailOptions = {
+            from: 'contact@vigagency.com',
+            to: to,
+            subject: subject,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #0066cc 0%, #004499 100%); color: white; padding: 20px; text-align: center;">
+                        <h1 style="margin: 0; font-size: 24px;">Vanguard Insurance Agency</h1>
+                        <p style="margin: 5px 0 0 0; opacity: 0.9;">Documentation Request</p>
+                    </div>
+
+                    <div style="padding: 30px; background: #f9f9f9;">
+                        <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <div style="color: #333; line-height: 1.6;">
+                                ${message.replace(/\n/g, '<br>')}
+                            </div>
+
+                            ${attachments.length > 0 ? `
+                            <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                                <h3 style="color: #374151; margin: 0 0 10px 0; font-size: 16px;">Attached Documents:</h3>
+                                <ul style="color: #6b7280; margin: 0; padding-left: 20px;">
+                                    ${attachments.map(att => `<li>${att.filename}</li>`).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div style="background: #374151; color: white; padding: 20px; text-align: center; font-size: 14px;">
+                        <p style="margin: 0;">Best regards,<br><strong>Vanguard Insurance Agency</strong></p>
+                        <p style="margin: 10px 0 0 0; opacity: 0.8;">contact@vigagency.com</p>
+                    </div>
+                </div>
+            `,
+            attachments: attachments
+        };
+
+        // Send the email
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ Documentation email sent successfully:', info.messageId);
+
+        res.json({
+            success: true,
+            messageId: info.messageId,
+            attachmentCount: attachments.length
+        });
+
+    } catch (error) {
+        console.error('❌ Documentation email error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to send documentation email',
+            details: error.message
+        });
+    }
+});
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {

@@ -120,10 +120,10 @@
 
                 console.log(`✅ BULLETPROOF: Lead ${leadId} successfully deleted from server, localStorage, and UI`);
 
-                // Refresh the view
-                if (window.location.hash === '#leads' && typeof window.loadLeadsView === 'function') {
-                    setTimeout(() => window.loadLeadsView(), 500);
-                }
+                // Refresh the view - DISABLED to prevent duplicate tables
+                // if (window.location.hash === '#leads' && typeof window.loadLeadsView === 'function') {
+                //     setTimeout(() => window.loadLeadsView(), 500);
+                // }
 
                 alert('Lead permanently deleted!');
 
@@ -173,10 +173,10 @@
         console.log(`🗑️ BULLETPROOF BULK: Complete - ${successCount} deleted, ${failCount} failed`);
         alert(`Bulk delete complete: ${successCount} deleted, ${failCount} failed`);
 
-        // Refresh the view
-        if (window.location.hash === '#leads' && typeof window.loadLeadsView === 'function') {
-            setTimeout(() => window.loadLeadsView(), 500);
-        }
+        // Refresh the view - DISABLED to prevent duplicate tables
+        // if (window.location.hash === '#leads' && typeof window.loadLeadsView === 'function') {
+        //     setTimeout(() => window.loadLeadsView(), 500);
+        // }
     };
 
     // IMMEDIATELY test and override any existing deleteLead functions

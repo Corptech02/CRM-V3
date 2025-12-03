@@ -595,6 +595,28 @@ class FreshViciDialSync:
                 renewal_date = f"{int(month)}/{int(day)}/{current_year}"
                 print(f"  📅 Extracted renewal date from comments: {renewal_date}")
 
+        # If still no date, check address3 field for renewal date
+        if not renewal_date and current_carrier:
+            # Check for various date formats in address3
+            # MM/DD/YYYY format
+            date_match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', current_carrier)
+            if date_match:
+                month, day, year = date_match.groups()
+                renewal_date = f"{int(month)}/{int(day)}/{year}"
+                print(f"  📅 Extracted renewal date from address3: {renewal_date}")
+            else:
+                # MMDD format (e.g., "1020" for October 20)
+                mmdd_match = re.search(r'\b(\d{4})\b', current_carrier)
+                if mmdd_match and len(mmdd_match.group(1)) == 4:
+                    date_str = mmdd_match.group(1)
+                    month = date_str[:2]
+                    day = date_str[2:4]
+                    # Validate month and day ranges
+                    if 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
+                        current_year = datetime.now().year
+                        renewal_date = f"{int(month)}/{int(day)}/{current_year}"
+                        print(f"  📅 Extracted renewal date from address3 (MMDD): {renewal_date}")
+
         # Use lead details for names if available, otherwise use from initial scan
         full_name = vicidial_lead.get('full_name', '')
         first_name = lead_details.get('first_name') or vicidial_lead.get('first_name', '')

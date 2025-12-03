@@ -362,175 +362,6 @@ async def get_carrier_profile(dot_number: int):
             "inspection_summary": inspection_summary
         }
 
-@app.get("/api/leads/expiring-insurance")
-async def get_expiring_insurance_leads(
-    days: int = Query(30, description="Days until insurance expiry"),
-    limit: int = Query(2000, description="Maximum number of leads"),
-    state: Optional[str] = Query(None, description="State filter"),
-    min_premium: Optional[float] = Query(0, description="Minimum premium"),
-    insurance_companies: Optional[str] = Query(None, description="Insurance companies filter"),
-    skip_days: Optional[int] = Query(0, description="Skip first N days (for 5/30 filter)")
-):
-    """Get HIGH QUALITY leads from database - ONLY real data, NO simulation"""
-    print(f"Getting insurance leads: days={days}, skip_days={skip_days}, state={state}, companies={insurance_companies}")
-
-    with get_db(FMCSA_DB) as conn:
-        cursor = conn.cursor()
-
-        from datetime import datetime, timedelta
-        today = datetime.now().date()
-
-        # Pull carriers from database - relaxed filtering for more results
-        # Prefer carriers with email but not required
-
-        # Calculate date range for filtering
-        start_date = today + timedelta(days=skip_days if skip_days > 0 else 0)
-        end_date = today + timedelta(days=days)
-
-        # Get ALL carriers with emails first, then filter by rep presence
-        query = """
-            SELECT dot_number, legal_name, dba_name,
-                   street, city, state, zip_code,
-                   phone, drivers, power_units, insurance_carrier,
-                   bipd_insurance_required_amount, bipd_insurance_on_file_amount,
-                   entity_type, operating_status, email_address,
-                   policy_renewal_date,
-                   representative_1_name, representative_2_name, principal_name, officers_data,
-                   mcs150_date, created_at
-            FROM carriers
-            WHERE insurance_carrier IS NOT NULL
-            AND insurance_carrier != ''
-            AND operating_status = 'Active'
-            AND email_address IS NOT NULL
-            AND email_address != ''
-            AND email_address LIKE '%@%'
-            AND (
-                representative_1_name IS NOT NULL
-                OR representative_2_name IS NOT NULL
-                OR principal_name IS NOT NULL
-                OR (officers_data IS NOT NULL AND officers_data LIKE '%name%')
-            )
-            AND policy_renewal_date IS NOT NULL
-        """
-
-        # Add state filter if provided
-        if state:
-            query += " AND state = ?"
-
-        # Add insurance company filter with LIKE matching
-        if insurance_companies:
-            companies = [c.strip() for c in insurance_companies.split(',')]
-            carrier_conditions = ' OR '.join(['insurance_carrier LIKE ?' for _ in companies])
-            query += f" AND ({carrier_conditions})"
-
-        # Order by name for consistent results
-        query += " ORDER BY legal_name"
-
-        # Build parameters
-        params = []
-        if state:
-            params.append(state)
-        if insurance_companies:
-            # Add % wildcards for LIKE matching
-            companies = [c.strip() for c in insurance_companies.split(',')]
-            like_companies = [f'%{c}%' for c in companies]
-            params.extend(like_companies)
-
-        # Debug the actual query
-        print(f"DEBUG: Query length: {len(query)}")
-        # Print query in chunks
-        print("DEBUG: Full query:")
-        for i in range(0, min(len(query), 500), 100):
-            print(f"  {query[i:i+100]}")
-        print(f"DEBUG: Query params: {params}")
-        print(f"DEBUG: Searching for state={state}, companies={insurance_companies}")
-
-        cursor.execute(query, params)
-        all_carriers = cursor.fetchall()
-
-        # Debug logging
-        print(f"DEBUG: Query returned {len(all_carriers)} total carriers from database")
-
-        # Check for specific carriers
-        dots_found = [c['dot_number'] for c in all_carriers]
-        for dot in ['3436361', '2482178', '4030578']:
-            if dot in dots_found:
-                print(f"DEBUG: Found {dot} in query results")
-            else:
-                print(f"DEBUG: Missing {dot} from query results")
-
-        # Filter results by date range (handling year inconsistencies)
-        results = []
-        import json
-
-        for row in all_carriers:
-            carrier = dict(row)
-
-            # Check specific known carriers for debugging
-            if carrier.get('dot_number') in ['3436361', '2482178', '4030578']:
-                print(f"DEBUG: Processing known carrier {carrier.get('dot_number')}: {carrier.get('legal_name')}, renewal: {carrier.get('policy_renewal_date')}")
-
-            # Check if renewal date falls within our window
-            renewal_date = carrier.get('policy_renewal_date')
-            if renewal_date:
-                try:
-                    # Extract month-day and check against current year window
-                    month_day = renewal_date[5:10]  # MM-DD portion
-
-                    # Test with current year, previous year, and next year
-                    # This handles database entries with incorrect years
-                    for year in [today.year - 1, today.year, today.year + 1]:
-                        test_date_str = f"{year}-{month_day}"
-                        try:
-                            test_date = datetime.strptime(test_date_str, '%Y-%m-%d').date()
-                            days_diff = (test_date - today).days
-
-                            # Check if within our date range
-                            if skip_days <= days_diff <= days:
-                                carrier['days_until_expiry'] = days_diff
-
-                                # Extract representative name from any field
-                                rep_name = carrier.get('representative_1_name') or carrier.get('representative_2_name') or carrier.get('principal_name')
-
-                                # Try to get from officers_data if no direct rep
-                                if not rep_name and carrier.get('officers_data'):
-                                    try:
-                                        officers = json.loads(carrier['officers_data'])
-                                        if 'representatives' in officers and officers['representatives']:
-                                            rep_name = officers['representatives'][0].get('name', '')
-                                    except:
-                                        pass
-
-                                # Set representative name and quality score
-                                carrier['representative_name'] = rep_name or ''
-                                carrier['quality_score'] = 'HIGH' if rep_name else 'MEDIUM'
-
-                                # Add premium if available
-                                if carrier.get('bipd_insurance_on_file_amount'):
-                                    carrier['premium'] = carrier['bipd_insurance_on_file_amount']
-
-                                results.append(carrier)
-                                break  # Found valid date, move to next carrier
-                        except:
-                            continue
-                except:
-                    continue
-
-        # Sort by legal name for consistent results
-        results.sort(key=lambda x: x.get('legal_name', ''))
-
-        # Apply limit
-        results = results[:limit]
-
-        return {
-            "leads": results,
-            "total": len(results),
-            "criteria": {
-                "days": days,
-                "state": state,
-                "insurance_companies": insurance_companies
-            }
-        }
 
 @app.post("/api/leads")
 async def create_lead(lead: LeadCreate):
@@ -558,6 +389,135 @@ async def create_lead(lead: LeadCreate):
         conn.commit()
 
         return {"message": "Lead created", "lead_id": lead_id}
+
+@app.get("/api/leads/expiring-insurance")
+async def get_expiring_insurance_leads(
+    state: str = Query(""),
+    days: int = Query(30),
+    limit: int = Query(1000),
+    skip_days: int = Query(0)
+):
+    """
+    Enhanced leads API that returns leads WITH representative names
+    Serves our locally enhanced database data with 52.5% rep coverage
+    """
+    try:
+        print(f"\n=== ENHANCED LEADS API CALL ===")
+        print(f"State: {state}, Days: {days}, Limit: {limit}, Skip: {skip_days}")
+
+        with get_db(SYSTEM_DB) as conn:
+            cursor = conn.cursor()
+
+            # Build query for enhanced leads
+            base_query = """
+            SELECT
+                dot_number as usdot_number,
+                legal_name,
+                contact_person as representative_name,
+                email_address,
+                phone,
+                city,
+                state,
+                power_units,
+                insurance_carrier,
+                insurance_expiration_date,
+                days_until_expiry
+            FROM fmcsa_enhanced
+            WHERE operating_status = 'Active'
+            AND email_address IS NOT NULL
+            AND email_address != ''
+            AND insurance_expiration_date IS NOT NULL
+            """
+
+            params = []
+
+            # Add state filter
+            if state and state.upper() != 'ALL':
+                base_query += " AND state = ?"
+                params.append(state.upper())
+
+            # Add expiry days filter
+            if days > 0:
+                base_query += " AND days_until_expiry <= ?"
+                params.append(days)
+
+            # Add skip days filter
+            if skip_days > 0:
+                base_query += " AND days_until_expiry > ?"
+                params.append(skip_days)
+
+            # Order and limit
+            base_query += " ORDER BY days_until_expiry ASC LIMIT ?"
+            params.append(limit)
+
+            print(f"Query: {base_query}")
+            print(f"Params: {params}")
+
+            cursor.execute(base_query, params)
+            rows = cursor.fetchall()
+
+            # Format leads for frontend
+            leads = []
+            for row in rows:
+                lead = {
+                    "usdot_number": str(row[0]),
+                    "mc_number": "",  # Not in our enhanced DB
+                    "company_name": row[1] or "",
+                    "representative_name": row[2] or "",  # This is the enhanced data!
+                    "representative_title": "Representative",
+                    "street_address": "",
+                    "city": row[5] or "",
+                    "state": row[6] or "",
+                    "zip_code": "",
+                    "full_address": f"{row[5] or ''}, {row[6] or ''}",
+                    "phone": row[4] or "",
+                    "cell_phone": "",
+                    "fax": "",
+                    "email": row[3] or "",
+                    "fleet_size": row[7] or 0,
+                    "drivers": "",
+                    "insurance_amount": "",
+                    "insurance_expiry": row[9] or "",
+                    "insurance_company": row[8] or "",
+                    "safety_rating": "",
+                    "operating_status": "Active",
+                    "business_type": "",
+                    "cargo_carried": "",
+                    "dot_number": str(row[0]),
+                    "legal_name": row[1] or "",
+                    "email_address": row[3] or "",
+                    "power_units": row[7] or 0,
+                    "days_until_expiry": row[10] or 0
+                }
+                leads.append(lead)
+
+            print(f"Returning {len(leads)} enhanced leads with rep names")
+
+            # Log sample of representative names found
+            rep_count = len([l for l in leads if l['representative_name']])
+            print(f"Enhanced leads with rep names: {rep_count}/{len(leads)} ({rep_count/len(leads)*100:.1f}%)")
+
+            return {
+                "success": True,
+                "count": len(leads),
+                "total": len(leads),
+                "leads": leads,
+                "metadata": {
+                    "source": "Enhanced Local Database",
+                    "rep_coverage": f"{rep_count}/{len(leads)} ({rep_count/len(leads)*100:.1f}%)",
+                    "state": state,
+                    "days": days,
+                    "limit": limit
+                }
+            }
+
+    except Exception as e:
+        print(f"Error in enhanced leads API: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "leads": []
+        }
 
 @app.get("/api/leads/{lead_id}")
 async def get_lead(lead_id: str):
@@ -1453,6 +1413,7 @@ async def upload_leads_data_to_vicidial(
 
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 
 @app.post("/api/vicidial/add-leads")
 async def add_leads_to_vicidial(

@@ -124,12 +124,12 @@
         setTimeout(makeFieldsEditable, 1000);
     };
 
-    // Also run periodically
-    setInterval(() => {
-        if (document.querySelector('h2')?.textContent?.includes('Commercial Auto Lead Profile')) {
-            makeFieldsEditable();
-        }
-    }, 2000);
+    // Also run periodically - DISABLED to prevent DOM manipulation flickering
+    // setInterval(() => {
+    //     if (document.querySelector('h2')?.textContent?.includes('Commercial Auto Lead Profile')) {
+    //         makeFieldsEditable();
+    //     }
+    // }, 2000);
 
     console.log('MAKE FIELDS EDITABLE loaded');
 })();

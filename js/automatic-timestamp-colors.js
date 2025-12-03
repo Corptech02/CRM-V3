@@ -1,5 +1,8 @@
 (function() {
-    console.log('🎯🎯🎯 AUTOMATIC TIMESTAMP COLORS LOADING 🎯🎯🎯');
+    console.log('🚫 AUTOMATIC TIMESTAMP COLORS DISABLED - was causing continuous flashing');
+
+    // DISABLED - This was causing continuous DOM manipulation and flashing
+    return;
 
     // This is the REAL fix that will work automatically
     window.automaticTimestampColors = function() {
@@ -169,7 +172,7 @@
     };
 
     // Run every second to ensure it works
-    setInterval(automaticTimestampColors, 1000);
+    // setInterval(automaticTimestampColors, 1000); // DISABLED - Causing flickering every 1000ms
 
     // Also run immediately
     setTimeout(automaticTimestampColors, 100);

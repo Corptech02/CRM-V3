@@ -143,13 +143,14 @@ console.log('Fixing lead stage update...');
         }
         
         // Refresh the view
-        setTimeout(() => {
-            if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
-                if (window.loadLeadsView) {
-                    window.loadLeadsView();
-                }
-            }
-        }, 500);
+        // DISABLED to prevent duplicate tables
+        // setTimeout(() => {
+        //     if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
+        //         if (window.loadLeadsView) {
+        //             window.loadLeadsView();
+        //         }
+        //     }
+        // }, 500);
     };
     
     // Fix updateLeadPriority
@@ -222,13 +223,14 @@ console.log('Fixing lead stage update...');
         }
         
         // Refresh if on leads page
-        setTimeout(() => {
-            if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
-                if (window.loadLeadsView) {
-                    window.loadLeadsView();
-                }
-            }
-        }, 500);
+        // DISABLED to prevent duplicate tables
+        // setTimeout(() => {
+        //     if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
+        //         if (window.loadLeadsView) {
+        //             window.loadLeadsView();
+        //         }
+        //     }
+        // }, 500);
     };
     
     console.log('Lead stage/status update functions fixed');

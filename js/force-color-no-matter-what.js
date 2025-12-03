@@ -116,14 +116,14 @@
     // Run immediately
     forceColorNoMatterWhat();
 
-    // Run multiple times
-    setTimeout(forceColorNoMatterWhat, 100);
-    setTimeout(forceColorNoMatterWhat, 500);
-    setTimeout(forceColorNoMatterWhat, 1000);
-    setTimeout(forceColorNoMatterWhat, 2000);
+    // Run multiple times - DISABLED to prevent blinking
+    // setTimeout(forceColorNoMatterWhat, 100);
+    // setTimeout(forceColorNoMatterWhat, 500);
+    // setTimeout(forceColorNoMatterWhat, 1000);
+    // setTimeout(forceColorNoMatterWhat, 2000);
 
-    // Keep running
-    setInterval(forceColorNoMatterWhat, 3000);
+    // Keep running - DISABLED to prevent blinking
+    // setInterval(forceColorNoMatterWhat, 3000);
 
     // Expose globally
     window.forceColors = forceColorNoMatterWhat;

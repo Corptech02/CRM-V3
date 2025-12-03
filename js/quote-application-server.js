@@ -215,7 +215,7 @@ class QuoteApplicationServer {
             <body>
                 <div class="header-info">
                     <h1>VANGUARD INSURANCE GROUP LLC</h1>
-                    <p>Brunswick, OH 44256 • Tel: 330-241-7570</p>
+                    <p>Brunswick, OH 44256 • Tel: 330-460-0872</p>
                     <h2>TRUCKING QUOTE APPLICATION</h2>
                 </div>
 

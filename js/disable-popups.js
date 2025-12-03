@@ -33,8 +33,8 @@ function removeExistingNotifications() {
 // Clean up on load
 document.addEventListener('DOMContentLoaded', removeExistingNotifications);
 
-// Clean up periodically
-setInterval(removeExistingNotifications, 5000);
+// Clean up periodically - DISABLED to prevent DOM manipulation flickering
+// setInterval(removeExistingNotifications, 5000);
 
 // Also hide notification styles if they're too intrusive
 const style = document.createElement('style');

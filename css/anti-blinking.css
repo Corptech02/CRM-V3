@@ -1,0 +1,45 @@
+/* ANTI-BLINKING CSS - Disable all transitions and animations to stop blinking */
+*, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+    animation-duration: 0s !important;
+    animation-fill-mode: none !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+}
+
+/* Disable hover effects that might be causing blinking */
+*:hover {
+    transition: none !important;
+}
+
+/* Prevent any visual state changes that could cause blinking */
+button:hover, .btn:hover, .btn-icon:hover, th:hover {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Stabilize table rows and cells */
+tr, td, th {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Stabilize all highlighted elements */
+.reach-out-complete, .force-green-highlight, .timestamp-highlight, .priority-lead, [style*="background-color"] {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Override any Font Awesome animations */
+.fa, .fas, .far, .fab {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* Disable all CSS animations globally */
+@keyframes * {
+    0%, 100% {
+        animation-play-state: paused !important;
+    }
+}

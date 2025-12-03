@@ -219,16 +219,16 @@ window.checkTable = function() {
     return leads;
 };
 
-// Auto-fix on load
-document.addEventListener('DOMContentLoaded', function() {
+// Auto-fix on load - DISABLED to prevent duplicate table creation
+/* document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         const leads = JSON.parse(localStorage.getItem('leads') || '[]');
         const vicidialCount = leads.filter(l => l.source && l.source.includes('Vicidial')).length;
-        
+
         if (vicidialCount < 6) {
             console.log(`Only ${vicidialCount} Vicidial leads found. Adding all 6...`);
             fixLeadTable();
-            
+
             // Auto-refresh if on leads page
             if (document.querySelector('.leads-view')) {
                 setTimeout(() => {
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }, 1000);
-});
+}); */
 
 console.log('✅ Lead table fix loaded!');
 console.log('Commands:');

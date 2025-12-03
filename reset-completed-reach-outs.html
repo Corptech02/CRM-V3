@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Completed Reach Outs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #dc2626;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background: #b91c1c;
+        }
+        .button.safe {
+            background: #059669;
+        }
+        .button.safe:hover {
+            background: #047857;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .warning {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            color: #991b1b;
+        }
+        .success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            color: #166534;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Reset Completed Reach Outs</h1>
+
+        <div class="warning">
+            <h3>⚠️ Important Notice</h3>
+            <p>This tool will reset all currently completed reach outs back to their appropriate TO DO stage. This is needed because the timestamp fix was just implemented and existing completed reach outs don't have proper completion timestamps.</p>
+            <p><strong>What this does:</strong></p>
+            <ul>
+                <li>Finds all leads with completed reach outs (callsConnected > 0 OR textCount > 0)</li>
+                <li>Resets their reach out counts to put them back in TO DO state</li>
+                <li>Removes any old completion timestamps</li>
+                <li>Allows them to be properly completed again with new timestamps</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button safe" onclick="scanLeads()">📊 Scan for Completed Reach Outs</button>
+            <button class="button" onclick="resetAllCompleted()" id="resetBtn" disabled>🔄 Reset All Completed Reach Outs</button>
+        </div>
+
+        <div class="log" id="logOutput"></div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button safe" onclick="window.location.reload()">🔄 Refresh Page</button>
+            <button class="button safe" onclick="goBackToApp()">← Back to Vanguard</button>
+        </div>
+    </div>
+
+    <script>
+        let completedLeads = [];
+
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleString();
+            logOutput.innerHTML += `[${timestamp}] ${message}\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(message);
+        }
+
+        function scanLeads() {
+            log('🔍 Starting scan for completed reach outs...');
+            completedLeads = [];
+
+            try {
+                // Get all leads from both storage locations
+                const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+                log(`📊 Found ${insuranceLeads.length} insurance leads and ${regularLeads.length} regular leads`);
+
+                // Check insurance leads
+                let completedCount = 0;
+                insuranceLeads.forEach((lead, index) => {
+                    if (isReachOutCompleted(lead)) {
+                        completedLeads.push({
+                            type: 'insurance',
+                            index: index,
+                            lead: lead,
+                            storage: 'insurance_leads'
+                        });
+                        completedCount++;
+                        log(`✅ COMPLETED: ${lead.name} (Insurance) - Calls: ${lead.reachOut?.callsConnected || 0}, Texts: ${lead.reachOut?.textCount || 0}`);
+                    }
+                });
+
+                // Check regular leads
+                regularLeads.forEach((lead, index) => {
+                    if (isReachOutCompleted(lead)) {
+                        completedLeads.push({
+                            type: 'regular',
+                            index: index,
+                            lead: lead,
+                            storage: 'leads'
+                        });
+                        completedCount++;
+                        log(`✅ COMPLETED: ${lead.name} (Regular) - Calls: ${lead.reachOut?.callsConnected || 0}, Texts: ${lead.reachOut?.textCount || 0}`);
+                    }
+                });
+
+                if (completedCount === 0) {
+                    log('✨ No completed reach outs found! All leads are already in TO DO state.');
+                    document.getElementById('resetBtn').disabled = true;
+                } else {
+                    log(`🎯 Found ${completedCount} leads with completed reach outs that need resetting`);
+                    document.getElementById('resetBtn').disabled = false;
+                    document.getElementById('resetBtn').textContent = `🔄 Reset ${completedCount} Completed Reach Outs`;
+                }
+
+            } catch (error) {
+                log(`❌ Error during scan: ${error.message}`);
+            }
+        }
+
+        function isReachOutCompleted(lead) {
+            // Check if lead has reach out data and is in a stage that requires reach out
+            const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+            if (!reachOutStages.includes(lead.stage) || !lead.reachOut) {
+                return false;
+            }
+
+            // Check if reach out is completed (connected call OR text sent)
+            return (lead.reachOut.callsConnected > 0) || (lead.reachOut.textCount > 0);
+        }
+
+        function resetAllCompleted() {
+            if (completedLeads.length === 0) {
+                log('❌ No completed reach outs to reset. Run scan first.');
+                return;
+            }
+
+            const confirmed = confirm(`Are you sure you want to reset ${completedLeads.length} completed reach outs back to TO DO stage?`);
+            if (!confirmed) {
+                log('❌ Reset cancelled by user');
+                return;
+            }
+
+            log('🔄 Starting reset process...');
+
+            try {
+                // Get fresh data from localStorage
+                let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                let regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+                let resetCount = 0;
+
+                completedLeads.forEach(item => {
+                    const { type, index, lead, storage } = item;
+
+                    log(`🔄 Resetting: ${lead.name} (${type})`);
+
+                    // Get the correct leads array
+                    const leadsArray = storage === 'insurance_leads' ? insuranceLeads : regularLeads;
+
+                    if (leadsArray[index]) {
+                        // Reset reach out completion data
+                        if (leadsArray[index].reachOut) {
+                            log(`   📊 BEFORE: Calls Connected: ${leadsArray[index].reachOut.callsConnected || 0}, Texts: ${leadsArray[index].reachOut.textCount || 0}`);
+
+                            // Reset completion indicators but keep attempt counts
+                            leadsArray[index].reachOut.callsConnected = 0;
+                            leadsArray[index].reachOut.textCount = 0;
+
+                            // Remove old completion timestamp if it exists
+                            if (leadsArray[index].reachOut.reachOutCompletedAt) {
+                                delete leadsArray[index].reachOut.reachOutCompletedAt;
+                                log(`   🗑️  Removed old completion timestamp`);
+                            }
+
+                            // Reset checkbox states
+                            leadsArray[index].reachOut.emailSent = false;
+                            leadsArray[index].reachOut.textSent = false;
+                            leadsArray[index].reachOut.callMade = false;
+
+                            log(`   📊 AFTER: Calls Connected: ${leadsArray[index].reachOut.callsConnected}, Texts: ${leadsArray[index].reachOut.textCount}`);
+                            resetCount++;
+                        }
+                    }
+                });
+
+                // Save updated data back to localStorage
+                localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+                localStorage.setItem('leads', JSON.stringify(regularLeads));
+
+                log(`✅ Successfully reset ${resetCount} completed reach outs!`);
+                log(`🎯 All reach outs are now back in TO DO stage and will capture proper timestamps when completed again.`);
+
+                // Clear the completed leads array
+                completedLeads = [];
+                document.getElementById('resetBtn').disabled = true;
+
+            } catch (error) {
+                log(`❌ Error during reset: ${error.message}`);
+            }
+        }
+
+        function goBackToApp() {
+            window.location.href = '/';
+        }
+
+        // Auto-scan on page load
+        window.onload = function() {
+            log('🚀 Reset Completed Reach Outs Tool Loaded');
+            log('👆 Click "Scan for Completed Reach Outs" to begin');
+        };
+    </script>
+</body>
+</html>

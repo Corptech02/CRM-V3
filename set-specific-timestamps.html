@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Specific Timestamps</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #059669;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background: #047857;
+        }
+        .button.danger {
+            background: #dc2626;
+        }
+        .button.danger:hover {
+            background: #b91c1c;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .lead-list {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+        }
+        .lead-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            border-left: 4px solid #ef4444;
+        }
+        .date-input {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 Set Specific Reach Out Completion Timestamps</h1>
+
+        <div class="lead-list">
+            <h3>🎯 Target Leads to Update:</h3>
+            <div class="lead-item">DMA LOGISTICS I... - Info Requested - Grant</div>
+            <div class="lead-item">D & D NYE TRUCK... / ASHFOXX TRANSPO... - Info Requested - Hunter</div>
+            <div class="lead-item">MID-OHIO TRANSP... - Quote Sent - Hunter</div>
+            <div class="lead-item">KAYA TRUCKING L... - Info Requested - Hunter</div>
+            <div class="lead-item">KCH CONSTRUCTIO... - Info Requested - Hunter</div>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <label>Set Completion Date: </label>
+            <input type="date" id="targetDate" value="2024-11-22" class="date-input">
+            <input type="time" id="targetTime" value="10:00" class="date-input">
+            <br><br>
+            <button class="button" onclick="findTargetLeads()">🔍 Find Target Leads</button>
+            <button class="button danger" onclick="updateTimestamps()" id="updateBtn" disabled>📅 Update Timestamps</button>
+        </div>
+
+        <div class="log" id="logOutput"></div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button" onclick="window.location.reload()">🔄 Refresh Page</button>
+            <button class="button" onclick="goBackToApp()">← Back to Vanguard</button>
+        </div>
+    </div>
+
+    <script>
+        let targetLeads = [];
+        const leadPatterns = [
+            'DMA LOGISTICS',
+            'D & D NYE',
+            'ASHFOXX',
+            'MID-OHIO',
+            'KAYA TRUCKING',
+            'KCH CONSTRUCTION'
+        ];
+
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleString();
+            logOutput.innerHTML += `[${timestamp}] ${message}\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(message);
+        }
+
+        function findTargetLeads() {
+            log('🔍 Searching for target leads...');
+            targetLeads = [];
+
+            try {
+                // Get all leads from both storage locations
+                const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+                log(`📊 Scanning ${insuranceLeads.length} insurance leads and ${regularLeads.length} regular leads`);
+
+                // Check insurance leads
+                insuranceLeads.forEach((lead, index) => {
+                    if (isTargetLead(lead)) {
+                        targetLeads.push({
+                            type: 'insurance',
+                            index: index,
+                            lead: lead,
+                            storage: 'insurance_leads'
+                        });
+                        log(`✅ FOUND: ${lead.name} (Insurance) - Stage: ${lead.stage} - Assigned: ${lead.assignedTo}`);
+
+                        // Check current reach out status
+                        if (lead.reachOut) {
+                            log(`   📊 Current reach out: Calls: ${lead.reachOut.callsConnected || 0}, Texts: ${lead.reachOut.textCount || 0}`);
+                            if (lead.reachOut.reachOutCompletedAt) {
+                                const currentTimestamp = new Date(lead.reachOut.reachOutCompletedAt).toLocaleString();
+                                log(`   ⏰ Current completion timestamp: ${currentTimestamp}`);
+                            } else {
+                                log(`   ❌ No completion timestamp found`);
+                            }
+                        }
+                    }
+                });
+
+                // Check regular leads
+                regularLeads.forEach((lead, index) => {
+                    if (isTargetLead(lead)) {
+                        targetLeads.push({
+                            type: 'regular',
+                            index: index,
+                            lead: lead,
+                            storage: 'leads'
+                        });
+                        log(`✅ FOUND: ${lead.name} (Regular) - Stage: ${lead.stage} - Assigned: ${lead.assignedTo}`);
+
+                        // Check current reach out status
+                        if (lead.reachOut) {
+                            log(`   📊 Current reach out: Calls: ${lead.reachOut.callsConnected || 0}, Texts: ${lead.reachOut.textCount || 0}`);
+                            if (lead.reachOut.reachOutCompletedAt) {
+                                const currentTimestamp = new Date(lead.reachOut.reachOutCompletedAt).toLocaleString();
+                                log(`   ⏰ Current completion timestamp: ${currentTimestamp}`);
+                            } else {
+                                log(`   ❌ No completion timestamp found`);
+                            }
+                        }
+                    }
+                });
+
+                if (targetLeads.length === 0) {
+                    log('❌ No target leads found! Check if the lead names match the patterns.');
+                    document.getElementById('updateBtn').disabled = true;
+                } else {
+                    log(`🎯 Found ${targetLeads.length} target leads ready for timestamp update`);
+                    document.getElementById('updateBtn').disabled = false;
+                    document.getElementById('updateBtn').textContent = `📅 Update ${targetLeads.length} Timestamps`;
+                }
+
+            } catch (error) {
+                log(`❌ Error during search: ${error.message}`);
+            }
+        }
+
+        function isTargetLead(lead) {
+            if (!lead.name) return false;
+
+            const leadName = lead.name.toUpperCase();
+
+            // Check if lead name contains any of our target patterns
+            return leadPatterns.some(pattern => leadName.includes(pattern.toUpperCase()));
+        }
+
+        function updateTimestamps() {
+            if (targetLeads.length === 0) {
+                log('❌ No target leads found. Run search first.');
+                return;
+            }
+
+            const targetDate = document.getElementById('targetDate').value;
+            const targetTime = document.getElementById('targetTime').value;
+
+            if (!targetDate || !targetTime) {
+                log('❌ Please select both date and time');
+                return;
+            }
+
+            // Create the target timestamp
+            const targetTimestamp = new Date(`${targetDate}T${targetTime}:00`).toISOString();
+            const displayTimestamp = new Date(targetTimestamp).toLocaleString();
+
+            const confirmed = confirm(`Set completion timestamp to ${displayTimestamp} for ${targetLeads.length} leads?`);
+            if (!confirmed) {
+                log('❌ Update cancelled by user');
+                return;
+            }
+
+            log(`🔄 Starting timestamp update to: ${displayTimestamp}`);
+
+            try {
+                // Get fresh data from localStorage
+                let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                let regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+                let updateCount = 0;
+
+                targetLeads.forEach(item => {
+                    const { type, index, lead, storage } = item;
+
+                    log(`📅 Updating: ${lead.name} (${type})`);
+
+                    // Get the correct leads array
+                    const leadsArray = storage === 'insurance_leads' ? insuranceLeads : regularLeads;
+
+                    if (leadsArray[index]) {
+                        // Initialize reachOut if it doesn't exist
+                        if (!leadsArray[index].reachOut) {
+                            leadsArray[index].reachOut = {
+                                callAttempts: 0,
+                                callsConnected: 0,
+                                emailCount: 0,
+                                textCount: 0,
+                                voicemailCount: 0
+                            };
+                        }
+
+                        // Ensure the lead shows as completed (set completion indicators)
+                        if (leadsArray[index].reachOut.callsConnected === 0 && leadsArray[index].reachOut.textCount === 0) {
+                            // Make it show as completed via connected call
+                            leadsArray[index].reachOut.callsConnected = 1;
+                            leadsArray[index].reachOut.callAttempts = 1;
+                            log(`   📞 Set as completed via connected call`);
+                        }
+
+                        // Set the specific completion timestamp
+                        const oldTimestamp = leadsArray[index].reachOut.reachOutCompletedAt;
+                        leadsArray[index].reachOut.reachOutCompletedAt = targetTimestamp;
+
+                        if (oldTimestamp) {
+                            const oldDisplay = new Date(oldTimestamp).toLocaleString();
+                            log(`   🔄 CHANGED: ${oldDisplay} → ${displayTimestamp}`);
+                        } else {
+                            log(`   ✅ SET: ${displayTimestamp} (was not set before)`);
+                        }
+
+                        updateCount++;
+                    }
+                });
+
+                // Save updated data back to localStorage
+                localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+                localStorage.setItem('leads', JSON.stringify(regularLeads));
+
+                log(`✅ Successfully updated ${updateCount} lead timestamps!`);
+                log(`🎯 All target leads now show completion timestamp: ${displayTimestamp}`);
+
+                // Clear the target leads array
+                targetLeads = [];
+                document.getElementById('updateBtn').disabled = true;
+
+            } catch (error) {
+                log(`❌ Error during update: ${error.message}`);
+            }
+        }
+
+        function goBackToApp() {
+            window.location.href = '/';
+        }
+
+        // Auto-load on page start
+        window.onload = function() {
+            log('🚀 Specific Timestamp Update Tool Loaded');
+            log('🎯 Target date set to November 22, 2024');
+            log('👆 Click "Find Target Leads" to locate the specified leads');
+        };
+    </script>
+</body>
+</html>

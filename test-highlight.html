@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Highlighting</title>
+</head>
+<body>
+    <h1>Testing Lead Highlighting</h1>
+    <div id="output"></div>
+
+    <script>
+        async function testHighlighting() {
+            const output = document.getElementById('output');
+            output.innerHTML += '<p>🔍 Testing highlight functions...</p>';
+
+            // Test if we can reach the main app
+            try {
+                const response = await fetch('/index.html');
+                if (response.ok) {
+                    output.innerHTML += '<p>✅ Can reach main app</p>';
+                } else {
+                    output.innerHTML += '<p>❌ Cannot reach main app</p>';
+                }
+            } catch (e) {
+                output.innerHTML += '<p>❌ Error reaching main app: ' + e.message + '</p>';
+            }
+
+            // Try to test localStorage data
+            try {
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                output.innerHTML += '<p>📊 Found ' + leads.length + ' leads in localStorage</p>';
+
+                if (leads.length > 0) {
+                    const firstLead = leads[0];
+                    output.innerHTML += '<p>🔍 First lead data:</p>';
+                    output.innerHTML += '<pre>' + JSON.stringify(firstLead, null, 2) + '</pre>';
+                }
+            } catch (e) {
+                output.innerHTML += '<p>❌ Error reading localStorage: ' + e.message + '</p>';
+            }
+        }
+
+        testHighlighting();
+    </script>
+</body>
+</html>

@@ -110,8 +110,8 @@ console.log('☢️ NUCLEAR: Forcing 60-day text replacement everywhere...');
         characterData: true
     });
 
-    // Run replacement continuously
-    setInterval(replaceAll30With60, 200);
+    // Run replacement continuously - DISABLED - Causing blinking every 200ms
+    // setInterval(replaceAll30With60, 200);
 
     // Also override specific functions if they exist
     if (window.generateMonthView) {

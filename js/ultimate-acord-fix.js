@@ -177,7 +177,7 @@ function forceOverride() {
 
 // Start overriding immediately
 forceOverride();
-setInterval(forceOverride, 1000);
+// setInterval(forceOverride, 1000); // DISABLED to prevent DOM manipulation flickering
 
 // Also override when DOM is ready
 if (document.readyState === 'loading') {
@@ -219,8 +219,8 @@ function replaceOnclicks() {
     });
 }
 
-// Replace onclicks repeatedly
-setInterval(replaceOnclicks, 500);
+// Replace onclicks repeatedly - DISABLED to prevent DOM manipulation flickering
+// setInterval(replaceOnclicks, 500);
 setTimeout(replaceOnclicks, 100);
 setTimeout(replaceOnclicks, 1000);
 setTimeout(replaceOnclicks, 2000);

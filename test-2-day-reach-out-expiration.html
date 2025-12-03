@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test 2-Day Reach Out Expiration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #059669;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background: #047857;
+        }
+        .button.warning {
+            background: #f59e0b;
+        }
+        .button.warning:hover {
+            background: #d97706;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .test-result {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .test-passed {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+        .test-failed {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+        .lead-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test 2-Day Reach Out Expiration</h1>
+
+        <div class="warning" style="background: #fef2f2; border: 1px solid #fecaca; padding: 15px; margin: 20px 0; border-radius: 6px; color: #991b1b;">
+            <h3>⚠️ Test Information</h3>
+            <p>This test will verify that the 2-day reach out expiration feature is working correctly. It will:</p>
+            <ul>
+                <li>Create test leads with reach out completion timestamps from different dates</li>
+                <li>Test both the TODO list generation (getNextAction) and profile display</li>
+                <li>Verify that leads with completion timestamps older than 2 days trigger new reach outs</li>
+                <li>Clean up test data when complete</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button" onclick="runExpirationTests()">🧪 Run Expiration Tests</button>
+            <button class="button warning" onclick="cleanupTestData()">🧹 Cleanup Test Data</button>
+            <button class="button" onclick="window.location.href = '/'">← Back to Vanguard</button>
+        </div>
+
+        <div class="log" id="logOutput"></div>
+
+        <div id="testResults"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleString();
+            logOutput.innerHTML += `[${timestamp}] ${message}\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(message);
+        }
+
+        function showTestResult(testName, passed, details) {
+            const resultsDiv = document.getElementById('testResults');
+            const resultClass = passed ? 'test-passed' : 'test-failed';
+            const emoji = passed ? '✅' : '❌';
+
+            resultsDiv.innerHTML += `
+                <div class="${resultClass} test-result">
+                    ${emoji} ${testName}: ${passed ? 'PASSED' : 'FAILED'}
+                    ${details ? `<div style="font-weight: normal; margin-top: 5px;">${details}</div>` : ''}
+                </div>
+            `;
+        }
+
+        function createTestLead(id, name, completedDaysAgo, stage = 'quoted') {
+            const lead = {
+                id: `test_expiry_${id}`,
+                name: name,
+                phone: `555-000-${id.toString().padStart(4, '0')}`,
+                email: `test${id}@test.com`,
+                stage: stage,
+                timestamp: new Date().toISOString(),
+                reachOut: {
+                    callAttempts: 1,
+                    callsConnected: 1,
+                    emailCount: 1,
+                    textCount: 1,
+                    emailSent: true,
+                    textSent: true,
+                    callMade: true,
+                    reachOutCompletedAt: new Date(Date.now() - (completedDaysAgo * 24 * 60 * 60 * 1000)).toISOString()
+                }
+            };
+            return lead;
+        }
+
+        async function runExpirationTests() {
+            log('🧪 Starting 2-Day Reach Out Expiration Tests...');
+            document.getElementById('testResults').innerHTML = '';
+
+            try {
+                // Backup existing leads
+                const originalInsuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const originalRegularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+                // Create test leads with different completion dates
+                const testLeads = [
+                    createTestLead(1, 'Test Lead - 1 Day Ago', 1),
+                    createTestLead(2, 'Test Lead - 2.5 Days Ago', 2.5),
+                    createTestLead(3, 'Test Lead - 3 Days Ago', 3),
+                    createTestLead(4, 'Test Lead - 1 Week Ago', 7),
+                    createTestLead(5, 'Test Lead - Just Completed', 0.1)
+                ];
+
+                log(`📝 Created ${testLeads.length} test leads with various completion timestamps`);
+
+                // Add test leads to storage
+                const updatedLeads = [...originalInsuranceLeads, ...testLeads];
+                localStorage.setItem('insurance_leads', JSON.stringify(updatedLeads));
+                log('💾 Test leads saved to localStorage');
+
+                // Load the app.js functions
+                if (typeof window.getNextAction !== 'function') {
+                    log('⚠️  getNextAction function not found, loading from external script...');
+                    await loadScript('/js/app.js');
+                }
+
+                // Test 1: getNextAction function for TODO list
+                log('\n🧪 TEST 1: TODO List Generation (getNextAction)');
+                let test1Passed = true;
+                let test1Details = '';
+
+                for (let i = 0; i < testLeads.length; i++) {
+                    const lead = testLeads[i];
+                    const todoAction = window.getNextAction(lead.stage, lead);
+                    const expectedExpired = lead.name.includes('2.5 Days') || lead.name.includes('3 Days') || lead.name.includes('1 Week');
+
+                    log(`  Lead: ${lead.name}`);
+                    log(`    Completion: ${new Date(lead.reachOut.reachOutCompletedAt).toLocaleString()}`);
+                    log(`    TODO Action: "${todoAction}"`);
+                    log(`    Expected Expired: ${expectedExpired}`);
+
+                    if (expectedExpired) {
+                        if (todoAction === '') {
+                            test1Passed = false;
+                            test1Details += `${lead.name}: Expected TODO action but got empty string. `;
+                            log(`    ❌ FAIL: Should have TODO action for expired reach out`);
+                        } else {
+                            log(`    ✅ PASS: Has TODO action for expired reach out`);
+                        }
+                    } else {
+                        if (todoAction !== '') {
+                            test1Passed = false;
+                            test1Details += `${lead.name}: Expected empty TODO but got "${todoAction}". `;
+                            log(`    ❌ FAIL: Should have empty TODO for non-expired reach out`);
+                        } else {
+                            log(`    ✅ PASS: Empty TODO for non-expired reach out`);
+                        }
+                    }
+                }
+
+                showTestResult('TODO List Generation', test1Passed, test1Details);
+
+                // Test 2: Profile display function
+                log('\n🧪 TEST 2: Profile Display (getReachOutStatus)');
+                let test2Passed = true;
+                let test2Details = '';
+
+                if (typeof window.getReachOutStatus === 'function') {
+                    for (let i = 0; i < testLeads.length; i++) {
+                        const lead = testLeads[i];
+                        const profileStatus = window.getReachOutStatus(lead);
+                        const expectedExpired = lead.name.includes('2.5 Days') || lead.name.includes('3 Days') || lead.name.includes('1 Week');
+
+                        log(`  Lead: ${lead.name}`);
+                        log(`    Profile Status: "${profileStatus}"`);
+
+                        if (expectedExpired) {
+                            if (!profileStatus.includes('EXPIRED')) {
+                                test2Passed = false;
+                                test2Details += `${lead.name}: Expected EXPIRED status. `;
+                                log(`    ❌ FAIL: Should show EXPIRED status`);
+                            } else {
+                                log(`    ✅ PASS: Shows EXPIRED status`);
+                            }
+                        } else {
+                            if (profileStatus.includes('EXPIRED')) {
+                                test2Passed = false;
+                                test2Details += `${lead.name}: Should not show EXPIRED status. `;
+                                log(`    ❌ FAIL: Should not show EXPIRED status`);
+                            } else {
+                                log(`    ✅ PASS: Does not show EXPIRED status`);
+                            }
+                        }
+                    }
+                } else {
+                    test2Passed = false;
+                    test2Details = 'getReachOutStatus function not found';
+                    log('❌ getReachOutStatus function not found');
+                }
+
+                showTestResult('Profile Display', test2Passed, test2Details);
+
+                // Test 3: Automatic expiration reset
+                log('\n🧪 TEST 3: Automatic Expiration Reset');
+
+                // Get updated leads from storage (should be modified by getNextAction calls)
+                const updatedStorageLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const expiredLeadIds = ['test_expiry_2', 'test_expiry_3', 'test_expiry_4']; // 2.5, 3, and 7 days ago
+
+                let test3Passed = true;
+                let test3Details = '';
+
+                for (const leadId of expiredLeadIds) {
+                    const updatedLead = updatedStorageLeads.find(l => l.id === leadId);
+                    if (updatedLead) {
+                        if (updatedLead.reachOut.reachOutCompletedAt) {
+                            test3Passed = false;
+                            test3Details += `${updatedLead.name}: Timestamp not reset. `;
+                            log(`  ❌ ${updatedLead.name}: Completion timestamp not reset`);
+                        } else {
+                            log(`  ✅ ${updatedLead.name}: Completion timestamp properly reset`);
+                        }
+
+                        if (updatedLead.reachOut.callsConnected > 0 || updatedLead.reachOut.textCount > 0) {
+                            test3Passed = false;
+                            test3Details += `${updatedLead.name}: Counters not reset. `;
+                            log(`  ❌ ${updatedLead.name}: Completion counters not reset`);
+                        } else {
+                            log(`  ✅ ${updatedLead.name}: Completion counters properly reset`);
+                        }
+                    }
+                }
+
+                showTestResult('Automatic Expiration Reset', test3Passed, test3Details);
+
+                log('\n✅ All tests completed!');
+
+            } catch (error) {
+                log(`❌ Test failed with error: ${error.message}`);
+                showTestResult('Test Execution', false, error.message);
+            }
+        }
+
+        async function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function cleanupTestData() {
+            log('🧹 Cleaning up test data...');
+
+            try {
+                // Remove test leads from insurance_leads
+                let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const originalCount = insuranceLeads.length;
+                insuranceLeads = insuranceLeads.filter(lead => !lead.id.startsWith('test_expiry_'));
+                localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+
+                // Remove test leads from regular leads just in case
+                let regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+                regularLeads = regularLeads.filter(lead => !lead.id.startsWith('test_expiry_'));
+                localStorage.setItem('leads', JSON.stringify(regularLeads));
+
+                const removedCount = originalCount - insuranceLeads.length;
+                log(`✅ Cleanup complete! Removed ${removedCount} test leads`);
+                document.getElementById('testResults').innerHTML = '';
+
+            } catch (error) {
+                log(`❌ Cleanup failed: ${error.message}`);
+            }
+        }
+
+        window.onload = function() {
+            log('🚀 2-Day Reach Out Expiration Test Tool Loaded');
+            log('👆 Click "Run Expiration Tests" to test the 2-day expiration functionality');
+        };
+    </script>
+</body>
+</html>

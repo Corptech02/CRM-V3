@@ -3,11 +3,11 @@
 
 console.log('🔧 Running immediate stats fix...');
 
-// Stop all timers
-let id = window.setTimeout(function() {}, 0);
-while (id--) { window.clearTimeout(id); }
-id = window.setInterval(function() {}, 0);
-while (id--) { window.clearInterval(id); }
+// Stop all timers - DISABLED - These were causing infinite loop flickering!
+// let id = window.setTimeout(function() {}, 0);
+// while (id--) { window.clearTimeout(id); }
+// id = window.setInterval(function() {}, 0);
+// while (id--) { window.clearInterval(id); }
 
 // Get data and calculate stats
 const leads = JSON.parse(localStorage.getItem('leads') || '[]');

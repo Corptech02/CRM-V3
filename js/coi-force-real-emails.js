@@ -315,8 +315,8 @@ window.addEventListener('hashchange', () => {
     }
 });
 
-// Check every 2 seconds if on COI tab
-setInterval(() => {
+// Check every 2 seconds if on COI tab - DISABLED to prevent blinking
+/* setInterval(() => {
     if (window.location.hash === '#coi') {
         const coiInbox = document.getElementById('coiInbox');
         if (coiInbox && (coiInbox.innerHTML.includes('demo') || coiInbox.innerHTML.includes('Mock'))) {
@@ -324,7 +324,7 @@ setInterval(() => {
             loadRealEmails();
         }
     }
-}, 2000);
+}, 2000); */
 
 // Override any function that might load demo data
 const originalLoadCOIView = window.loadCOIView;

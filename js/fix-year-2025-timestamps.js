@@ -232,8 +232,8 @@
         window.synchronizedHighlightingFixed();
     }, 2000);
 
-    // Keep running
-    setInterval(window.synchronizedHighlightingFixed, 2000);
+    // Keep running - DISABLED to prevent blinking
+    // setInterval(window.synchronizedHighlightingFixed, 2000);
 
     console.log('✅ Year 2025 fix loaded. Use window.fixYear2025() to manually fix dates');
 })();

@@ -524,8 +524,9 @@ window.connectToCarrierAPI = function() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Add import button when on appropriate pages
-    setInterval(addCarrierImportButton, 1000);
+    // Add import button when on appropriate pages - DISABLED to prevent DOM manipulation flickering
+    // setInterval(addCarrierImportButton, 1000);
+    addCarrierImportButton(); // Run once instead
 });
 
 // Also try to add button immediately

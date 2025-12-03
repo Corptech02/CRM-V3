@@ -18,14 +18,14 @@ window.testQuoteModal = function() {
         right: 0;
         bottom: 0;
         background: rgba(0, 0, 0, 0.5);
-        z-index: 99999;
+        z-index: 10000000;
         display: flex;
         align-items: center;
         justify-content: center;
     `;
     
     modal.innerHTML = `
-        <div style="background: white; padding: 30px; border-radius: 8px; max-width: 600px;">
+        <div style="background: white; padding: 30px; border-radius: 8px; width: 80vw; height: 80vh; overflow-y: auto;">
             <h2>Quote Application Test</h2>
             <p>If you can see this, the modal system works!</p>
             <button onclick="document.getElementById('test-quote-modal').remove()" 
@@ -75,7 +75,7 @@ window.createQuoteApplicationSimple = function(leadId) {
         width: 100%;
         height: 100%;
         background: rgba(0, 0, 0, 0.7);
-        z-index: 999999;
+        z-index: 10000000;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -86,9 +86,8 @@ window.createQuoteApplicationSimple = function(leadId) {
         background: white;
         padding: 20px;
         border-radius: 8px;
-        width: 90%;
-        max-width: 800px;
-        max-height: 80vh;
+        width: 80vw;
+        height: 80vh;
         overflow-y: auto;
         position: relative;
     `;
@@ -104,7 +103,7 @@ window.createQuoteApplicationSimple = function(leadId) {
             </button>
             <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
                 <h2 style="margin: 0; color: #0066cc;">Vanguard Insurance Group LLC</h2>
-                <p style="margin: 5px 0;">Brunswick, OH 44256 • 330-241-7570</p>
+                <p style="margin: 5px 0;">Brunswick, OH 44256 • 330-460-0872</p>
                 <h3 style="margin: 10px 0 0 0;">TRUCKING APPLICATION</h3>
             </div>
         </div>

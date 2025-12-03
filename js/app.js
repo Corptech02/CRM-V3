@@ -1537,6 +1537,35 @@ function formatDate(dateInput) {
     }
 }
 
+// Format Policy Premium Helper (avoid NaN display)
+function formatPolicyPremium(premium) {
+    if (!premium || premium === 0 || premium === '0') {
+        return '$0/yr';
+    }
+
+    // Handle different premium field names and formats
+    let premiumValue = premium;
+
+    // Check if it's an object with nested premium values
+    if (typeof premium === 'object' && premium !== null) {
+        premiumValue = premium.annualPremium ||
+                      premium.premium ||
+                      premium.annual ||
+                      premium.yearly ||
+                      0;
+    }
+
+    // Convert to string and clean any existing dollar signs and text
+    const cleanPremium = String(premiumValue).replace(/[$,/yr/mo]/g, '');
+    const numericPremium = parseFloat(cleanPremium) || 0;
+
+    if (numericPremium === 0) {
+        return '$0/yr';
+    }
+
+    return `$${numericPremium.toLocaleString()}/yr`;
+}
+
 // Telnyx Phone System Configuration
 const TELNYX_API_KEY = 'YOUR_API_KEY_HERE';
 const TELNYX_API_URL = 'https://api.telnyx.com/v2';
@@ -6439,13 +6468,6 @@ function generateClientRows(page = 1) {
                 </td>
                 <td>${client.phone}</td>
                 <td>${client.email}</td>
-                <td>
-                    <select class="assigned-select" onchange="updateClientAssignment('${client.id}', this.value)" style="padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px;">
-                        <option value="">Unassigned</option>
-                        <option value="Grant" ${client.assignedTo === 'Grant' ? 'selected' : ''}>Grant</option>
-                        <option value="Hunter" ${client.assignedTo === 'Hunter' ? 'selected' : ''}>Hunter</option>
-                    </select>
-                </td>
                 <td>${policyCount}</td>
                 <td>${premiumDisplay}</td>
                 <td>
@@ -6510,12 +6532,6 @@ function loadClientsView() {
                             <th>Client Name <i class="fas fa-sort"></i></th>
                             <th>Phone</th>
                             <th>Email</th>
-                            <th class="sortable" onclick="sortLeads('assignedTo')" data-sort="assignedTo">
-                                Assigned To
-                                <span class="sort-arrow" id="sort-assignedTo">
-                                    <i class="fas fa-sort"></i>
-                                </span>
-                            </th>
                             <th>Policies</th>
                             <th>Premium</th>
                             <th>Actions</th>
@@ -11763,11 +11779,7 @@ async function viewClient(id) {
                             </div>
                             <div class="info-item">
                                 <label>Assigned To</label>
-                                <select class="form-control" onchange="updateClientAssignment('${id}', this.value)" style="padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px; background: white;">
-                                    <option value="">Unassigned</option>
-                                    <option value="Grant" ${clientData.assignedTo === 'Grant' || clientData.accountManager === 'Grant' ? 'selected' : ''}>Grant</option>
-                                    <option value="Hunter" ${clientData.assignedTo === 'Hunter' || clientData.accountManager === 'Hunter' ? 'selected' : ''}>Hunter</option>
-                                </select>
+                                <p>${clientData.assignedTo || clientData.accountManager || 'Unassigned'}</p>
                             </div>
                             ${clientData.representative ? `
                             <div class="info-item">
@@ -12222,8 +12234,12 @@ function generateViewTabContent(tabId, policy) {
                         <div class="view-item">
                             <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">Premium</label>
                             <p style="font-size: 17px; margin: 0; color: #374151; font-weight: 600;">
-                                ${policy.premium ? `$${parseFloat(policy.premium).toLocaleString()}/yr` : '$0/yr'}
+                                ${formatPolicyPremium(policy.premium)}
                             </p>
+                        </div>
+                        <div class="view-item">
+                            <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">Agent</label>
+                            <p style="font-size: 17px; margin: 0; color: #374151;">${policy.agent || 'N/A'}</p>
                         </div>
                         ${policy.clientName ? `
                         <div class="view-item">

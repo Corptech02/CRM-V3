@@ -28,7 +28,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # CORS configuration (restrictive)
-CORS(app, origins=['https://yourdomain.com', 'http://localhost:*'])
+CORS(app, origins=['https://yourdomain.com', 'http://localhost:*', 'http://127.0.0.1:*', 'http://162.220.14.239:*'],
+     supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 
 # Rate limiting
 limiter = Limiter(
@@ -428,6 +429,118 @@ def health_check():
         'service': 'vanguard-secure-auth',
         'timestamp': datetime.now().isoformat()
     }), 200
+
+# Loss Runs Upload Endpoints
+@app.route('/api/upload-loss-runs', methods=['POST'])
+def upload_loss_runs():
+    """Upload loss runs PDF for a lead"""
+    try:
+        # Check if file was uploaded
+        if 'lossRunsPdf' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+
+        file = request.files['lossRunsPdf']
+        lead_id = request.form.get('leadId')
+
+        if not file.filename:
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+        if not lead_id:
+            return jsonify({'success': False, 'error': 'No lead ID provided'}), 400
+
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'success': False, 'error': 'Only PDF files are allowed'}), 400
+
+        # Create loss runs directory
+        loss_runs_dir = '/var/www/vanguard/loss_runs'
+        lead_dir = os.path.join(loss_runs_dir, str(lead_id))
+        os.makedirs(lead_dir, exist_ok=True)
+
+        # Generate unique filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        original_name = file.filename
+        safe_name = ''.join(c for c in original_name if c.isalnum() or c in '._-')
+        filename = f"{timestamp}_{safe_name}"
+        file_path = os.path.join(lead_dir, filename)
+
+        # Save the file
+        file.save(file_path)
+
+        # Log the upload
+        app.logger.info(f"Loss runs uploaded: {filename} for lead {lead_id}")
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'originalName': original_name,
+            'uploadDate': datetime.now().isoformat(),
+            'message': 'Loss runs PDF uploaded successfully'
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error uploading loss runs: {str(e)}")
+        return jsonify({'success': False, 'error': 'Upload failed'}), 500
+
+@app.route('/api/view-loss-runs/<lead_id>/<filename>', methods=['GET'])
+def view_loss_runs(lead_id, filename):
+    """View loss runs PDF"""
+    try:
+        file_path = os.path.join('/var/www/vanguard/loss_runs', str(lead_id), filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+
+        # Return the PDF file
+        from flask import send_file
+        return send_file(file_path, mimetype='application/pdf')
+
+    except Exception as e:
+        app.logger.error(f"Error viewing loss runs: {str(e)}")
+        return jsonify({'error': 'Error accessing file'}), 500
+
+@app.route('/api/download-loss-runs/<lead_id>/<filename>', methods=['GET'])
+def download_loss_runs(lead_id, filename):
+    """Download loss runs PDF"""
+    try:
+        file_path = os.path.join('/var/www/vanguard/loss_runs', str(lead_id), filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+
+        # Get original filename from database or filename
+        original_name = filename.split('_', 1)[1] if '_' in filename else filename
+
+        # Return the PDF file as download
+        from flask import send_file
+        return send_file(file_path, as_attachment=True, download_name=original_name, mimetype='application/pdf')
+
+    except Exception as e:
+        app.logger.error(f"Error downloading loss runs: {str(e)}")
+        return jsonify({'error': 'Error downloading file'}), 500
+
+@app.route('/api/remove-loss-runs', methods=['POST'])
+def remove_loss_runs():
+    """Remove loss runs PDF"""
+    try:
+        data = request.json
+        lead_id = data.get('leadId')
+        filename = data.get('filename')
+
+        if not lead_id or not filename:
+            return jsonify({'success': False, 'error': 'Missing lead ID or filename'}), 400
+
+        file_path = os.path.join('/var/www/vanguard/loss_runs', str(lead_id), filename)
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            app.logger.info(f"Loss runs removed: {filename} for lead {lead_id}")
+
+        return jsonify({'success': True, 'message': 'File removed successfully'}), 200
+
+    except Exception as e:
+        app.logger.error(f"Error removing loss runs: {str(e)}")
+        return jsonify({'success': False, 'error': 'Error removing file'}), 500
 
 if __name__ == '__main__':
     # Initialize database

@@ -225,8 +225,8 @@ console.log('☢️ NUCLEAR: Using timestamps as source of truth for checkboxes.
         }
     };
 
-    // Continuous protection - monitor for unwanted changes
-    setInterval(() => {
+    // Continuous protection - monitor for unwanted changes - DISABLED - Causing flickering every 200ms
+    // setInterval(() => {
         if (checkboxProtectionActive && currentPolicyNumber) {
             const storageKey = `renewalTasks_${currentPolicyNumber}`;
             const savedData = localStorage.getItem(storageKey);
@@ -265,7 +265,7 @@ console.log('☢️ NUCLEAR: Using timestamps as source of truth for checkboxes.
                 }
             }
         }
-    }, 200);
+    // }, 200); // DISABLED ABOVE - Causing flickering every 200ms
 
     // Override saveTaskNote
     window.saveTaskNote = function(taskId, note) {

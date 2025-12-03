@@ -1,4 +1,18 @@
 // Complete fix for lead creation issues
+
+// Helper function to format premium display (avoid double dollar signs)
+function formatPremiumDisplay(premium) {
+    if (!premium || premium === 0 || premium === '0') {
+        return '$0';
+    }
+
+    // Convert to string and clean any existing dollar signs
+    const cleanPremium = String(premium).replace(/[$,]/g, '');
+    const numericPremium = parseFloat(cleanPremium) || 0;
+
+    return `$${numericPremium.toLocaleString()}`;
+}
+
 (function() {
     'use strict';
 
@@ -211,9 +225,9 @@
         }
     };
 
-    // Fix the lead table generation to ensure IDs are included
-    const originalGenerateRows = window.generateSimpleLeadRows;
-    window.generateSimpleLeadRows = function(leads) {
+    // DISABLED: Don't override generateSimpleLeadRows to preserve TO DO text and highlighting
+    // const originalGenerateRows = window.generateSimpleLeadRows;
+    /* window.generateSimpleLeadRows = function(leads) {
         if (!leads || leads.length === 0) {
             return '<tr><td colspan="10" style="text-align: center; padding: 2rem;">No leads found</td></tr>';
         }
@@ -259,7 +273,7 @@
                         </div>
                     </td>
                     <td>${lead.product || 'Commercial Auto'}</td>
-                    <td>$${(lead.premium || 0).toLocaleString()}</td>
+                    <td>${formatPremiumDisplay(lead.premium)}</td>
                     <td>${window.getStageHtml ? window.getStageHtml(lead.stage || 'new') : lead.stage || 'new'}</td>
                     <td>${lead.renewalDate || 'N/A'}</td>
                     <td>${lead.assignedTo || 'Unassigned'}</td>
@@ -282,6 +296,7 @@
             `;
         }).join('');
     };
+    */
 
     console.log('✅ Complete lead creation fix loaded successfully!');
 })();

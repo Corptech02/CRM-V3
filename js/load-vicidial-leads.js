@@ -346,11 +346,11 @@ console.log('Loading Vicidial leads into system...');
     
     setTimeout(() => {
         notification.remove();
-        // Refresh the view if on leads page
-        if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
-            if (window.loadLeadsView) {
-                window.loadLeadsView();
-            }
-        }
+        // Refresh the view if on leads page - DISABLED to prevent duplicate tables
+        // if (window.location.hash === '#leads' || window.location.hash === '#leads-management') {
+        //     if (window.loadLeadsView) {
+        //         window.loadLeadsView();
+        //     }
+        // }
     }, 3000);
 })();

@@ -211,7 +211,7 @@ window.loadLeadsView = function() {
                             <input type="checkbox" class="lead-checkbox" value="\${lead.id}" data-lead='\${JSON.stringify(lead).replace(/'/g, '&apos;')}'>
                         </td>
                         <td class="lead-name" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline;" onclick="viewLead(\${lead.id})" title="\${lead.name}">\${displayName}</strong>
+                            <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline;" onclick="viewLead('\${lead.id}')" title="\${lead.name}">\${displayName}</strong>
                         </td>
                         <td>
                             <div class="contact-info" style="display: flex; gap: 10px; align-items: center;">

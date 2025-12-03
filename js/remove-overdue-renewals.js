@@ -97,8 +97,8 @@
         filterRenewalDisplays();
     }
 
-    // Apply filtering every second to catch dynamic updates
-    setInterval(filterRenewalDisplays, 1000);
+    // Apply filtering every second to catch dynamic updates - DISABLED to prevent DOM manipulation flickering
+    // setInterval(filterRenewalDisplays, 1000);
 
     console.log('✅ Overdue renewals filter initialized - will remove policies with 0 days or less');
 })();

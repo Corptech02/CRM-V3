@@ -169,18 +169,21 @@
         setTimeout(addSaveButton, 100);
     }
 
-    // Keep trying every 500ms
-    const interval = setInterval(() => {
-        if (addSaveButton()) {
-            // Successfully added, can stop checking so frequently
-            clearInterval(interval);
+    // Keep trying every 500ms - DISABLED to prevent DOM manipulation flickering
+    // const interval = setInterval(() => {
+    //     if (addSaveButton()) {
+    //         // Successfully added, can stop checking so frequently
+    //         clearInterval(interval);
+    //
+    //         // But still check occasionally in case the UI gets rebuilt
+    //         setInterval(() => {
+    //             addSaveButton();
+    //         }, 2000);
+    //     }
+    // }, 500);
 
-            // But still check occasionally in case the UI gets rebuilt
-            setInterval(() => {
-                addSaveButton();
-            }, 2000);
-        }
-    }, 500);
+    // Run once instead
+    addSaveButton();
 
     // Also monitor for DOM changes
     const observer = new MutationObserver((mutations) => {

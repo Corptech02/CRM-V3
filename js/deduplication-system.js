@@ -226,15 +226,15 @@
         }, 1000);
     });
     
-    // Deduplicate when hash changes (navigating between views)
-    window.addEventListener('hashchange', function() {
-        if (window.location.hash === '#leads') {
-            setTimeout(() => {
-                console.log('Navigated to leads view - running deduplication...');
-                window.deduplicateData();
-            }, 100);
-        }
-    });
+    // Deduplicate when hash changes (navigating between views) - DISABLED to prevent flashing
+    // window.addEventListener('hashchange', function() {
+    //     if (window.location.hash === '#leads') {
+    //         setTimeout(() => {
+    //             console.log('Navigated to leads view - running deduplication...');
+    //             window.deduplicateData();
+    //         }, 100);
+    //     }
+    // });
     
     // Provide a manual deduplication function for debugging
     window.manualDeduplicate = function() {

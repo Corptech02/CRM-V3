@@ -170,21 +170,21 @@ function applyHoverFix() {
 }
 
 // Apply fix aggressively
-setInterval(applyHoverFix, 500);
+// setInterval(applyHoverFix, 500); // DISABLED - Causing blinking every 500ms
 
 // Also apply on DOM changes
 const observer = new MutationObserver(() => {
     applyHoverFix();
 });
 
-// Start observing when inbox exists
-const checkInbox = setInterval(() => {
-    const coiInbox = document.getElementById('coiInbox');
-    if (coiInbox) {
-        observer.observe(coiInbox, { childList: true, subtree: true });
-        applyHoverFix();
-    }
-}, 100);
+// Start observing when inbox exists - DISABLED - Causing blinking every 100ms
+// const checkInbox = setInterval(() => {
+//     const coiInbox = document.getElementById('coiInbox');
+//     if (coiInbox) {
+//         observer.observe(coiInbox, { childList: true, subtree: true });
+//         applyHoverFix();
+//     }
+// }, 100);
 
 // Apply on hash change
 window.addEventListener('hashchange', () => {

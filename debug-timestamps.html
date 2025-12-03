@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Timestamps</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #059669;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background: #047857;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .lead-debug {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+        }
+        .completed-lead {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 Debug Timestamp Issue</h1>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button" onclick="debugAllCompletedLeads()">🔍 Debug All Completed Reach Outs</button>
+            <button class="button" onclick="testReachOutStatus()">🧪 Test getReachOutStatus Function</button>
+            <button class="button" onclick="forceFixTimestamps()">🔧 Force Fix All Timestamps</button>
+        </div>
+
+        <div class="log" id="logOutput"></div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button" onclick="window.location.reload()">🔄 Refresh Page</button>
+            <button class="button" onclick="goBackToApp()">← Back to Vanguard</button>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleString();
+            logOutput.innerHTML += `[${timestamp}] ${message}\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(message);
+        }
+
+        function debugAllCompletedLeads() {
+            log('🐛 Starting comprehensive debug of completed reach outs...');
+
+            try {
+                // Get all leads from both storage locations
+                const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+                log(`📊 Found ${insuranceLeads.length} insurance leads and ${regularLeads.length} regular leads`);
+
+                let completedCount = 0;
+
+                // Check insurance leads
+                insuranceLeads.forEach((lead, index) => {
+                    if (isCompleted(lead)) {
+                        completedCount++;
+                        debugLead(lead, 'insurance', index);
+                    }
+                });
+
+                // Check regular leads
+                regularLeads.forEach((lead, index) => {
+                    if (isCompleted(lead)) {
+                        completedCount++;
+                        debugLead(lead, 'regular', index);
+                    }
+                });
+
+                log(`🎯 Found ${completedCount} completed reach outs to debug`);
+
+            } catch (error) {
+                log(`❌ Error during debug: ${error.message}`);
+                console.error('Full error:', error);
+            }
+        }
+
+        function isCompleted(lead) {
+            // Check if lead has reach out data and is in a stage that requires reach out
+            const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+            if (!reachOutStages.includes(lead.stage) || !lead.reachOut) {
+                return false;
+            }
+
+            // Check if reach out is completed (connected call OR text sent)
+            return (lead.reachOut.callsConnected > 0) || (lead.reachOut.textCount > 0);
+        }
+
+        function debugLead(lead, type, index) {
+            log(`\n━━━ DEBUGGING: ${lead.name} (${type} #${index}) ━━━`);
+            log(`Stage: ${lead.stage}`);
+            log(`Assigned To: ${lead.assignedTo}`);
+
+            if (lead.reachOut) {
+                log(`Reach Out Data:`);
+                log(`  • callsConnected: ${lead.reachOut.callsConnected || 0}`);
+                log(`  • textCount: ${lead.reachOut.textCount || 0}`);
+                log(`  • callAttempts: ${lead.reachOut.callAttempts || 0}`);
+                log(`  • emailCount: ${lead.reachOut.emailCount || 0}`);
+
+                if (lead.reachOut.reachOutCompletedAt) {
+                    const storedTime = new Date(lead.reachOut.reachOutCompletedAt);
+                    log(`  • ✅ STORED COMPLETION TIMESTAMP: ${lead.reachOut.reachOutCompletedAt}`);
+                    log(`  • 📅 FORMATTED TIMESTAMP: ${storedTime.toLocaleString()}`);
+                } else {
+                    log(`  • ❌ NO COMPLETION TIMESTAMP STORED`);
+                }
+            } else {
+                log(`❌ No reach out data found`);
+            }
+
+            // Test what the function actually returns
+            if (typeof window.getReachOutStatus === 'function') {
+                const result = window.getReachOutStatus ? window.getReachOutStatus(lead) : 'Function not available';
+                log(`🧪 getReachOutStatus() returns: "${result}"`);
+            } else {
+                log(`❌ getReachOutStatus function not available`);
+            }
+
+            log(`━━━ END DEBUG FOR ${lead.name} ━━━\n`);
+        }
+
+        function testReachOutStatus() {
+            log('🧪 Testing getReachOutStatus function availability...');
+
+            if (typeof window.getReachOutStatus === 'function') {
+                log('✅ window.getReachOutStatus is available');
+
+                // Create a test lead
+                const testLead = {
+                    id: 'test123',
+                    name: 'TEST LEAD',
+                    stage: 'info_requested',
+                    reachOut: {
+                        callsConnected: 1,
+                        textCount: 0,
+                        callAttempts: 1,
+                        emailCount: 0,
+                        reachOutCompletedAt: '2024-11-22T15:00:00.000Z'
+                    }
+                };
+
+                log('🧪 Testing with sample completed lead:');
+                log(JSON.stringify(testLead, null, 2));
+
+                const result = window.getReachOutStatus(testLead);
+                log(`🎯 Function returned: "${result}"`);
+
+            } else {
+                log('❌ window.getReachOutStatus is NOT available');
+                log('Available window functions:');
+                Object.keys(window).filter(key => key.toLowerCase().includes('reach')).forEach(key => {
+                    log(`  • ${key}: ${typeof window[key]}`);
+                });
+            }
+        }
+
+        function forceFixTimestamps() {
+            log('🔧 Force fixing all completed reach out timestamps...');
+
+            try {
+                // Get all leads from both storage locations
+                let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                let regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+                let fixedCount = 0;
+                const fixTimestamp = new Date().toISOString();
+
+                // Fix insurance leads
+                insuranceLeads.forEach((lead, index) => {
+                    if (isCompleted(lead) && lead.reachOut && !lead.reachOut.reachOutCompletedAt) {
+                        lead.reachOut.reachOutCompletedAt = fixTimestamp;
+                        fixedCount++;
+                        log(`🔧 FIXED: ${lead.name} (insurance) - Set timestamp to ${fixTimestamp}`);
+                    }
+                });
+
+                // Fix regular leads
+                regularLeads.forEach((lead, index) => {
+                    if (isCompleted(lead) && lead.reachOut && !lead.reachOut.reachOutCompletedAt) {
+                        lead.reachOut.reachOutCompletedAt = fixTimestamp;
+                        fixedCount++;
+                        log(`🔧 FIXED: ${lead.name} (regular) - Set timestamp to ${fixTimestamp}`);
+                    }
+                });
+
+                // Save the updated data
+                localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+                localStorage.setItem('leads', JSON.stringify(regularLeads));
+
+                log(`✅ Fixed ${fixedCount} leads with missing completion timestamps`);
+                log(`🕐 All fixed leads now have completion timestamp: ${new Date(fixTimestamp).toLocaleString()}`);
+
+            } catch (error) {
+                log(`❌ Error during force fix: ${error.message}`);
+                console.error('Full error:', error);
+            }
+        }
+
+        function goBackToApp() {
+            window.location.href = '/';
+        }
+
+        // Auto-load on page start
+        window.onload = function() {
+            log('🐛 Debug Timestamps Tool Loaded');
+            log('👆 Click buttons above to debug the timestamp issue');
+
+            // Check if getReachOutStatus is available immediately
+            setTimeout(() => {
+                if (typeof window.getReachOutStatus === 'function') {
+                    log('✅ getReachOutStatus function detected');
+                } else {
+                    log('❌ getReachOutStatus function NOT detected');
+                    log('This might be why timestamps are not working properly');
+                }
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

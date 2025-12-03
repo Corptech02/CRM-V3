@@ -57,7 +57,6 @@ window.loadClientsView = function() {
                             <th>Client Name <i class="fas fa-sort"></i></th>
                             <th>Phone</th>
                             <th>Email</th>
-                            <th>Assigned To</th>
                             <th>Policies</th>
                             <th>Premium</th>
                             <th>Actions</th>
@@ -183,16 +182,6 @@ function generateClientRowsWithPremium() {
                 </td>
                 <td>${client.phone || '-'}</td>
                 <td>${client.email || '-'}</td>
-                <td>
-                    <select class="assigned-select" onchange="updateClientAssignment('${client.id}', this.value)" style="padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 14px;">
-                        <option value="">Unassigned</option>
-                        <option value="John Smith" ${client.assignedTo === 'John Smith' ? 'selected' : ''}>John Smith</option>
-                        <option value="Sarah Johnson" ${client.assignedTo === 'Sarah Johnson' ? 'selected' : ''}>Sarah Johnson</option>
-                        <option value="Mike Wilson" ${client.assignedTo === 'Mike Wilson' ? 'selected' : ''}>Mike Wilson</option>
-                        <option value="Lisa Anderson" ${client.assignedTo === 'Lisa Anderson' ? 'selected' : ''}>Lisa Anderson</option>
-                        <option value="David Brown" ${client.assignedTo === 'David Brown' ? 'selected' : ''}>David Brown</option>
-                    </select>
-                </td>
                 <td>${policyCount}</td>
                 <td>${premiumDisplay}</td>
                 <td>

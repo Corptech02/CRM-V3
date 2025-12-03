@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test User-Sectioned Sorting</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #059669;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background: #047857;
+        }
+        .button.warning {
+            background: #f59e0b;
+        }
+        .button.warning:hover {
+            background: #d97706;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .test-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .test-table th, .test-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .test-table th {
+            background-color: #f2f2f2;
+            cursor: pointer;
+        }
+        .test-table th:hover {
+            background-color: #e6e6e6;
+        }
+        .current-user-lead {
+            background-color: #f0f9ff;
+            font-weight: bold;
+        }
+        .other-user-lead {
+            background-color: #f9f9f9;
+        }
+        .user-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test User-Sectioned Sorting</h1>
+
+        <div class="user-info">
+            <h3>Current User Information</h3>
+            <div id="userInfo">Loading...</div>
+        </div>
+
+        <div class="warning" style="background: #fef2f2; border: 1px solid #fecaca; padding: 15px; margin: 20px 0; border-radius: 6px; color: #991b1b;">
+            <h3>⚠️ Test Information</h3>
+            <p>This test will verify that the lead sorting properly sections leads by user assignment. It will:</p>
+            <ul>
+                <li>Create test leads assigned to different users (Hunter, Grant, etc.)</li>
+                <li>Test sorting by different fields (stage, premium, renewal date, etc.)</li>
+                <li>Verify that the current user's leads always appear at the top</li>
+                <li>Verify that other users' leads appear below current user's leads</li>
+                <li>Clean up test data when complete</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button" onclick="createTestData()">🧪 Create Test Data</button>
+            <button class="button" onclick="testSorting()">📊 Test Sorting</button>
+            <button class="button warning" onclick="cleanupTestData()">🧹 Cleanup Test Data</button>
+            <button class="button" onclick="window.location.href = '/'">← Back to Vanguard</button>
+        </div>
+
+        <div class="log" id="logOutput"></div>
+
+        <table class="test-table" id="testTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th onclick="testSortField('name')">Lead Name 🔽</th>
+                    <th onclick="testSortField('assignedTo')">Assigned To 🔽</th>
+                    <th onclick="testSortField('stage')">Stage 🔽</th>
+                    <th onclick="testSortField('premium')">Premium 🔽</th>
+                    <th onclick="testSortField('renewalDate')">Renewal Date 🔽</th>
+                    <th onclick="testSortField('created')">Created 🔽</th>
+                </tr>
+            </thead>
+            <tbody id="testTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let testLeads = [];
+        let currentUser = '';
+
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleString();
+            logOutput.innerHTML += `[${timestamp}] ${message}\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(message);
+        }
+
+        function getCurrentUser() {
+            const userData = sessionStorage.getItem('vanguard_user');
+            if (userData) {
+                try {
+                    const user = JSON.parse(userData);
+                    // Capitalize username to match assignedTo format (grant -> Grant)
+                    currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+                    return currentUser;
+                } catch (e) {
+                    console.error('Error parsing user data:', e);
+                }
+            }
+            return 'Unknown';
+        }
+
+        function createTestData() {
+            log('🧪 Creating test data...');
+
+            currentUser = getCurrentUser();
+            const otherUser = currentUser === 'Hunter' ? 'Grant' : 'Hunter';
+
+            testLeads = [
+                // Current user's leads
+                {
+                    id: 'test_sort_1',
+                    name: `${currentUser} Lead 1 - Stage A`,
+                    assignedTo: currentUser,
+                    stage: 'new',
+                    premium: 1500,
+                    renewalDate: '2024-12-15',
+                    created: '2024-11-01T10:00:00Z'
+                },
+                {
+                    id: 'test_sort_2',
+                    name: `${currentUser} Lead 2 - Stage B`,
+                    assignedTo: currentUser,
+                    stage: 'quoted',
+                    premium: 2500,
+                    renewalDate: '2024-11-20',
+                    created: '2024-11-02T11:00:00Z'
+                },
+                {
+                    id: 'test_sort_3',
+                    name: `${currentUser} Lead 3 - Stage C`,
+                    assignedTo: currentUser,
+                    stage: 'interested',
+                    premium: 800,
+                    renewalDate: '2024-12-01',
+                    created: '2024-11-03T09:00:00Z'
+                },
+                // Other user's leads
+                {
+                    id: 'test_sort_4',
+                    name: `${otherUser} Lead 1 - Stage A`,
+                    assignedTo: otherUser,
+                    stage: 'new',
+                    premium: 1200,
+                    renewalDate: '2024-12-10',
+                    created: '2024-11-01T12:00:00Z'
+                },
+                {
+                    id: 'test_sort_5',
+                    name: `${otherUser} Lead 2 - Stage B`,
+                    assignedTo: otherUser,
+                    stage: 'quoted',
+                    premium: 3000,
+                    renewalDate: '2024-11-25',
+                    created: '2024-11-02T13:00:00Z'
+                },
+                {
+                    id: 'test_sort_6',
+                    name: `${otherUser} Lead 3 - Stage C`,
+                    assignedTo: otherUser,
+                    stage: 'closed',
+                    premium: 1800,
+                    renewalDate: '2024-12-05',
+                    created: '2024-11-03T14:00:00Z'
+                }
+            ];
+
+            // Add test leads to localStorage
+            const existingLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const filteredExisting = existingLeads.filter(lead => !lead.id.startsWith('test_sort_'));
+            const updatedLeads = [...filteredExisting, ...testLeads];
+            localStorage.setItem('insurance_leads', JSON.stringify(updatedLeads));
+
+            log(`✅ Created ${testLeads.length} test leads`);
+            log(`📊 Current user: ${currentUser}, Other user: ${otherUser}`);
+
+            displayTestTable();
+        }
+
+        function displayTestTable() {
+            document.getElementById('testTable').style.display = 'table';
+            updateTableDisplay(testLeads);
+        }
+
+        function updateTableDisplay(leads) {
+            const tbody = document.getElementById('testTableBody');
+            tbody.innerHTML = '';
+
+            leads.forEach(lead => {
+                const row = tbody.insertRow();
+                const isCurrentUser = lead.assignedTo === currentUser;
+                row.className = isCurrentUser ? 'current-user-lead' : 'other-user-lead';
+
+                row.innerHTML = `
+                    <td>${lead.name}</td>
+                    <td>${lead.assignedTo}</td>
+                    <td>${lead.stage}</td>
+                    <td>$${lead.premium}</td>
+                    <td>${lead.renewalDate}</td>
+                    <td>${new Date(lead.created).toLocaleDateString()}</td>
+                `;
+            });
+        }
+
+        function testSortField(field) {
+            log(`🧪 Testing sort by: ${field}`);
+
+            // Get current leads from localStorage
+            const allLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const currentTestLeads = allLeads.filter(lead => lead.id.startsWith('test_sort_'));
+
+            // Apply the same sorting logic as the main application
+            const sortedLeads = sortLeadsWithUserSectioning(currentTestLeads, field);
+
+            log(`📊 Sorted ${sortedLeads.length} leads by ${field}`);
+
+            // Verify the sorting is correct
+            verifySorting(sortedLeads, field);
+
+            // Update the display
+            updateTableDisplay(sortedLeads);
+        }
+
+        function sortLeadsWithUserSectioning(leads, field) {
+            const sortedLeads = [...leads];
+
+            sortedLeads.sort((a, b) => {
+                // FIRST: Always prioritize current user's leads regardless of field being sorted
+                const aIsCurrentUser = currentUser && (a.assignedTo === currentUser);
+                const bIsCurrentUser = currentUser && (b.assignedTo === currentUser);
+
+                // If one belongs to current user and other doesn't, current user goes first
+                if (aIsCurrentUser && !bIsCurrentUser) return -1;
+                if (bIsCurrentUser && !aIsCurrentUser) return 1;
+
+                // SECOND: If both leads have same user assignment, sort by the selected field
+                let aVal = a[field];
+                let bVal = b[field];
+
+                // Handle different field types
+                if (field === 'premium') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                } else if (field === 'renewalDate' || field === 'created') {
+                    aVal = new Date(aVal || '2099-12-31');
+                    bVal = new Date(bVal || '2099-12-31');
+                } else if (field === 'stage') {
+                    const stageOrder = {
+                        'new': 1,
+                        'quoted': 2,
+                        'interested': 3,
+                        'closed': 4
+                    };
+                    aVal = stageOrder[aVal] || 999;
+                    bVal = stageOrder[bVal] || 999;
+                } else {
+                    aVal = String(aVal || '').toLowerCase();
+                    bVal = String(bVal || '').toLowerCase();
+                }
+
+                // Compare values (always ascending for this test)
+                if (aVal < bVal) return -1;
+                if (aVal > bVal) return 1;
+                return 0;
+            });
+
+            return sortedLeads;
+        }
+
+        function verifySorting(sortedLeads, field) {
+            let currentUserLeadsCount = 0;
+            let otherUserLeadsCount = 0;
+            let currentUserSectionEnded = false;
+
+            log(`🔍 Verifying sort by ${field}:`);
+
+            for (let i = 0; i < sortedLeads.length; i++) {
+                const lead = sortedLeads[i];
+                const isCurrentUser = lead.assignedTo === currentUser;
+
+                if (isCurrentUser) {
+                    if (currentUserSectionEnded) {
+                        log(`❌ FAIL: Found current user's lead after other user's leads at position ${i}`);
+                        return false;
+                    }
+                    currentUserLeadsCount++;
+                    log(`  ${i + 1}. ✅ ${lead.name} (${lead.assignedTo}) - ${lead[field]}`);
+                } else {
+                    currentUserSectionEnded = true;
+                    otherUserLeadsCount++;
+                    log(`  ${i + 1}. 👤 ${lead.name} (${lead.assignedTo}) - ${lead[field]}`);
+                }
+            }
+
+            log(`✅ Sorting verified: ${currentUserLeadsCount} current user leads, ${otherUserLeadsCount} other user leads`);
+            log(`✅ Current user's leads properly sectioned at the top`);
+            return true;
+        }
+
+        function testSorting() {
+            if (testLeads.length === 0) {
+                log('❌ No test data found. Please create test data first.');
+                return;
+            }
+
+            log('🧪 Testing sorting by all fields...');
+
+            const fields = ['name', 'assignedTo', 'stage', 'premium', 'renewalDate', 'created'];
+
+            for (const field of fields) {
+                testSortField(field);
+            }
+
+            log('✅ All sorting tests completed!');
+        }
+
+        function cleanupTestData() {
+            log('🧹 Cleaning up test data...');
+
+            try {
+                // Remove test leads from insurance_leads
+                let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const originalCount = insuranceLeads.length;
+                insuranceLeads = insuranceLeads.filter(lead => !lead.id.startsWith('test_sort_'));
+                localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+
+                const removedCount = originalCount - insuranceLeads.length;
+                log(`✅ Cleanup complete! Removed ${removedCount} test leads`);
+
+                testLeads = [];
+                document.getElementById('testTable').style.display = 'none';
+
+            } catch (error) {
+                log(`❌ Cleanup failed: ${error.message}`);
+            }
+        }
+
+        window.onload = function() {
+            log('🚀 User-Sectioned Sorting Test Tool Loaded');
+
+            // Display current user info
+            const user = getCurrentUser();
+            document.getElementById('userInfo').innerHTML = `
+                <strong>Current User:</strong> ${user}<br>
+                <strong>Test Scenario:</strong> ${user}'s leads should appear at top, other users' leads below
+            `;
+
+            log(`👤 Current user: ${user}`);
+            log('👆 Click "Create Test Data" to begin testing');
+        };
+    </script>
+</body>
+</html>

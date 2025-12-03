@@ -134,8 +134,8 @@
         }
     }
 
-    // Run cleanup periodically
-    setInterval(cleanupDeletedLeads, 3000);
+    // Run cleanup periodically - DISABLED to prevent blinking
+    // setInterval(cleanupDeletedLeads, 3000);
 
     // Initial cleanup
     cleanupDeletedLeads();

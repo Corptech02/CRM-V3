@@ -1,5 +1,6 @@
 (function() {
-    console.log('🔄🔄🔄 SYNCHRONIZED TIMESTAMP COLORS LOADING 🔄🔄🔄');
+    console.log('🚫 SYNCHRONIZED TIMESTAMP COLORS DISABLED - was causing continuous flashing');
+    return;
 
     // EXACT SAME LOGIC AS PROFILE for calculating days
     function calculateDaysOld(timestamp) {
@@ -250,8 +251,8 @@
     // Run immediately
     setTimeout(synchronizedHighlighting, 100);
 
-    // Run regularly
-    setInterval(synchronizedHighlighting, 1500);
+    // Run regularly - DISABLED to prevent blinking
+    // setInterval(synchronizedHighlighting, 1500);
 
     console.log('✅ Synchronized timestamp colors loaded!');
     console.log('Use window.checkColorMismatch() to debug mismatches');

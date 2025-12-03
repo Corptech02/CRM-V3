@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Leads Data</title>
+</head>
+<body>
+    <h1>Debug Leads Data</h1>
+    <div id="debug-info"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const debugDiv = document.getElementById('debug-info');
+
+            // Check localStorage leads
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+            debugDiv.innerHTML = `
+                <h2>Found ${leads.length} leads in localStorage</h2>
+                <pre>${JSON.stringify(leads.slice(0, 3), null, 2)}</pre>
+
+                <h2>First lead properties:</h2>
+                <ul>
+                    <li>id: ${leads[0]?.id || 'undefined'}</li>
+                    <li>name: ${leads[0]?.name || 'undefined'}</li>
+                    <li>company: ${leads[0]?.company || 'undefined'}</li>
+                    <li>product: ${leads[0]?.product || 'undefined'}</li>
+                    <li>insuranceType: ${leads[0]?.insuranceType || 'undefined'}</li>
+                    <li>type: ${leads[0]?.type || 'undefined'}</li>
+                </ul>
+
+                <h2>Template test:</h2>
+                <p>lead.product: ${leads[0]?.product}</p>
+                <p>Fallback: ${leads[0]?.product || leads[0]?.insuranceType || leads[0]?.type || 'Commercial Auto'}</p>
+            `;
+        });
+    </script>
+</body>
+</html>

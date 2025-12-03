@@ -168,8 +168,21 @@ console.log('Policy-to-Client Auto-Sync System: Loading...');
         window.savePolicy = async function(policyData) {
             console.log('Auto-sync: Policy save detected, syncing client from Named Insured');
 
-            // Save the policy first
-            const result = await originalSavePolicy(policyData);
+            // If no policyData provided, let the original savePolicy collect it
+            let result;
+
+            if (policyData) {
+                // We have policy data, pass it along
+                result = await originalSavePolicy(policyData);
+            } else {
+                // No policy data provided - let original function collect from form
+                result = await originalSavePolicy();
+
+                // If the result contains policy data, use it for syncing
+                if (result && typeof result === 'object' && result.id) {
+                    policyData = result;
+                }
+            }
 
             // Then sync the client from the policy Named Insured data
             if (result && policyData) {
