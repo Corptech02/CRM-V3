@@ -2656,7 +2656,7 @@ app.post('/api/loss-runs-upload', upload.array('files'), (req, res) => {
 });
 
 // Get files endpoint
-app.get('/api/loss-runs-upload', (req, res) => {
+app.get('/api/loss-runs-upload', async (req, res) => {
     const leadId = req.query.leadId;
 
     if (!leadId) {
@@ -2666,30 +2666,36 @@ app.get('/api/loss-runs-upload', (req, res) => {
         });
     }
 
-    db.all(`
-        SELECT id, lead_id, file_name, file_size, file_type, uploaded_date, status, notes
-        FROM loss_runs
-        WHERE lead_id = ?
-        ORDER BY uploaded_date DESC
-    `, [leadId], (err, rows) => {
-        if (err) {
-            console.error('Database query error:', err);
-            return res.status(500).json({
-                success: false,
-                error: err.message
-            });
-        }
+    try {
+        console.log(`📋 Loading documents for lead ${leadId}...`);
 
+        const rows = await retryDatabaseOperation((callback) => {
+            db.all(`
+                SELECT id, lead_id, file_name, file_size, file_type, uploaded_date, status, notes
+                FROM loss_runs
+                WHERE lead_id = ?
+                ORDER BY uploaded_date DESC
+            `, [leadId], callback);
+        });
+
+        console.log(`✅ Successfully loaded ${rows.length} documents for lead ${leadId}`);
         res.json({
             success: true,
             files: rows,
             count: rows.length
         });
-    });
+
+    } catch (err) {
+        console.error(`❌ Error loading documents for lead ${leadId}:`, err);
+        return res.status(500).json({
+            success: false,
+            error: err.message || 'Database error occurred'
+        });
+    }
 });
 
 // Delete file endpoint
-app.delete('/api/loss-runs-upload', (req, res) => {
+app.delete('/api/loss-runs-upload', async (req, res) => {
     const fileId = req.body.fileId;
 
     if (!fileId) {
@@ -2699,14 +2705,13 @@ app.delete('/api/loss-runs-upload', (req, res) => {
         });
     }
 
-    // Get file info first
-    db.get('SELECT file_name FROM loss_runs WHERE id = ?', [fileId], (err, row) => {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                error: err.message
-            });
-        }
+    try {
+        console.log(`🗑️ Deleting document ${fileId}...`);
+
+        // Get file info first
+        const row = await retryDatabaseOperation((callback) => {
+            db.get('SELECT file_name FROM loss_runs WHERE id = ?', [fileId], callback);
+        });
 
         if (!row) {
             return res.status(404).json({
@@ -2722,20 +2727,23 @@ app.delete('/api/loss-runs-upload', (req, res) => {
         }
 
         // Delete from database
-        db.run('DELETE FROM loss_runs WHERE id = ?', [fileId], function(err) {
-            if (err) {
-                return res.status(500).json({
-                    success: false,
-                    error: err.message
-                });
-            }
-
-            res.json({
-                success: true,
-                message: 'File deleted successfully'
-            });
+        await retryDatabaseOperation((callback) => {
+            db.run('DELETE FROM loss_runs WHERE id = ?', [fileId], callback);
         });
-    });
+
+        console.log(`✅ Successfully deleted document ${fileId}`);
+        res.json({
+            success: true,
+            message: 'File deleted successfully'
+        });
+
+    } catch (err) {
+        console.error(`❌ Error deleting document ${fileId}:`, err);
+        return res.status(500).json({
+            success: false,
+            error: err.message || 'Database error occurred'
+        });
+    }
 });
 
 // Download file endpoint
