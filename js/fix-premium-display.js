@@ -59,6 +59,7 @@ window.loadClientsView = function() {
                             <th>Email</th>
                             <th>Policies</th>
                             <th>Premium</th>
+                            <th>Assigned to</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -76,6 +77,22 @@ function generateClientRowsWithPremium() {
     // Get clients from localStorage
     let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
 
+    // Get current user and check if they are admin - filter clients for non-admin users
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            console.log(`🔒 Client filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
     // Remove duplicates based on name
     const uniqueClients = [];
     const seenNames = new Set();
@@ -91,10 +108,26 @@ function generateClientRowsWithPremium() {
     clients = uniqueClients;
     console.log('Found unique clients:', clients.length);
 
+    // Filter clients based on user role
+    if (!isAdmin && currentUser) {
+        const originalCount = clients.length;
+        clients = clients.filter(client => {
+            const assignedTo = client.assignedTo ||
+                              client.agent ||
+                              client.assignedAgent ||
+                              client.producer ||
+                              'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+        console.log(`🔒 Filtered clients: ${originalCount} -> ${clients.length} (showing only ${currentUser}'s clients)`);
+    } else if (isAdmin) {
+        console.log(`🔒 Admin user - showing all ${clients.length} clients`);
+    }
+
     if (clients.length === 0) {
         return `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
+                <td colspan="8" style="text-align: center; padding: 40px; color: #6b7280;">
                     <i class="fas fa-users" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
                     <p style="font-size: 16px; margin: 0;">No clients found</p>
                     <p style="font-size: 14px; margin-top: 8px;">Convert leads or add new clients to get started</p>
@@ -108,6 +141,23 @@ function generateClientRowsWithPremium() {
 
     // Generate rows for each client
     return clients.map(client => {
+        // Ensure client has an ID - generate one if missing
+        if (!client.id) {
+            // Generate a unique ID based on name and timestamp
+            const nameId = (client.name || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '_');
+            client.id = `client_${nameId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            console.log(`📝 Generated ID for client ${client.name}: ${client.id}`);
+
+            // Update localStorage to persist the ID
+            const allClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+            const clientIndex = allClients.findIndex(c => c.name === client.name);
+            if (clientIndex !== -1) {
+                allClients[clientIndex].id = client.id;
+                localStorage.setItem('insurance_clients', JSON.stringify(allClients));
+                console.log(`💾 Saved ID for ${client.name} to localStorage`);
+            }
+        }
+
         // Get initials for avatar
         const nameParts = (client.name || 'Unknown').split(' ').filter(n => n);
         const initials = nameParts.map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'UN';
@@ -174,6 +224,12 @@ function generateClientRowsWithPremium() {
         const premiumDisplay = totalPremium > 0 ? `$${totalPremium.toLocaleString()}/yr` : '-';
         console.log(`Client ${client.name}: Total Premium = ${totalPremium} -> Display = ${premiumDisplay}`);
 
+        // Get assigned agent
+        const assignedTo = client.assignedTo || client.agent || client.assignedAgent || client.producer || 'Grant';
+
+        // Debug client ID for viewClient functionality
+        console.log(`👤 Generating button for client: ${client.name} with ID: ${client.id} (type: ${typeof client.id})`);
+
         return `
             <tr>
                 <td class="client-name">
@@ -184,9 +240,10 @@ function generateClientRowsWithPremium() {
                 <td>${client.email || '-'}</td>
                 <td>${policyCount}</td>
                 <td>${premiumDisplay}</td>
+                <td>${assignedTo}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-icon" onclick="viewClient('${client.id}')" title="View Client"><i class="fas fa-eye"></i></button>
+                        <button class="btn-icon" onclick="console.log('🔍 Eye button clicked for client:', '${client.id}'); viewClient('${client.id}')" title="View Client"><i class="fas fa-eye"></i></button>
                         <button class="btn-icon" onclick="editClient('${client.id}')" title="Edit Client"><i class="fas fa-edit"></i></button>
                         <button class="btn-icon" onclick="emailClient('${client.id}')" title="Email Client"><i class="fas fa-envelope"></i></button>
                         <button class="btn-icon" onclick="deleteClient('${client.id}')" title="Delete Client" style="color: #dc2626;"><i class="fas fa-trash"></i></button>

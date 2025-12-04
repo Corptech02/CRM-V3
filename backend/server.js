@@ -48,6 +48,20 @@ const db = new sqlite3.Database('/var/www/vanguard/vanguard.db', (err) => {
         console.error('Error opening database:', err);
     } else {
         console.log('Connected to SQLite database');
+
+        // Configure busy timeout to handle concurrent access
+        // Wait up to 30 seconds for database locks to be released
+        db.configure("busyTimeout", 30000);
+
+        // Enable WAL mode for better concurrent access
+        db.exec("PRAGMA journal_mode = WAL;", (err) => {
+            if (err) {
+                console.error('Error enabling WAL mode:', err);
+            } else {
+                console.log('✅ SQLite WAL mode enabled for better concurrent access');
+            }
+        });
+
         initializeDatabase();
     }
 });
@@ -2820,7 +2834,7 @@ app.post('/api/quote-applications', (req, res) => {
 });
 
 // Get quote applications for a lead
-app.get('/api/quote-applications', (req, res) => {
+app.get('/api/quote-applications', async (req, res) => {
     const leadId = req.query.leadId;
 
     if (!leadId) {
@@ -2830,19 +2844,17 @@ app.get('/api/quote-applications', (req, res) => {
         });
     }
 
-    db.all(`
-        SELECT id, lead_id, form_data, status, created_at, updated_at
-        FROM quote_submissions
-        WHERE lead_id = ?
-        ORDER BY created_at DESC
-    `, [leadId], (err, rows) => {
-        if (err) {
-            console.error('Database query error:', err);
-            return res.status(500).json({
-                success: false,
-                error: err.message
-            });
-        }
+    try {
+        console.log(`📋 Loading quote applications for lead ${leadId}...`);
+
+        const rows = await retryDatabaseOperation((callback) => {
+            db.all(`
+                SELECT id, lead_id, form_data, status, created_at, updated_at
+                FROM quote_submissions
+                WHERE lead_id = ?
+                ORDER BY created_at DESC
+            `, [leadId], callback);
+        });
 
         // Parse form_data for each application
         const applications = rows.map(row => {
@@ -2860,32 +2872,62 @@ app.get('/api/quote-applications', (req, res) => {
             };
         });
 
+        console.log(`✅ Successfully loaded ${applications.length} applications for lead ${leadId}`);
         res.json({
             success: true,
             applications: applications,
             count: applications.length
         });
-    });
+
+    } catch (err) {
+        console.error(`❌ Error loading applications for lead ${leadId}:`, err);
+        return res.status(500).json({
+            success: false,
+            error: err.message || 'Database error occurred'
+        });
+    }
 });
 
-// Get single quote application by ID
-app.get('/api/quote-applications/:id', (req, res) => {
-    const applicationId = req.params.id;
+// Helper function for database retry logic
+function retryDatabaseOperation(operation, maxRetries = 3, delay = 1000) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
 
-    db.get(`
-        SELECT id, lead_id, form_data, status, created_at, updated_at
-        FROM quote_submissions
-        WHERE id = ?
-    `, [applicationId], (err, row) => {
-        if (err) {
-            console.error('Database query error:', err);
-            return res.status(500).json({
-                success: false,
-                error: err.message
+        function attempt() {
+            attempts++;
+            operation((err, result) => {
+                if (err && err.code === 'SQLITE_BUSY' && attempts < maxRetries) {
+                    console.log(`🔄 Database busy, retrying in ${delay}ms... (attempt ${attempts}/${maxRetries})`);
+                    setTimeout(attempt, delay);
+                } else if (err) {
+                    reject(err);
+                } else {
+                    resolve(result);
+                }
             });
         }
 
+        attempt();
+    });
+}
+
+// Get single quote application by ID
+app.get('/api/quote-applications/:id', async (req, res) => {
+    const applicationId = req.params.id;
+
+    try {
+        console.log(`📄 Loading quote application ${applicationId}...`);
+
+        const row = await retryDatabaseOperation((callback) => {
+            db.get(`
+                SELECT id, lead_id, form_data, status, created_at, updated_at
+                FROM quote_submissions
+                WHERE id = ?
+            `, [applicationId], callback);
+        });
+
         if (!row) {
+            console.log(`❌ Application ${applicationId} not found`);
             return res.status(404).json({
                 success: false,
                 error: 'Application not found'
@@ -2906,11 +2948,19 @@ app.get('/api/quote-applications/:id', (req, res) => {
             updatedAt: row.updated_at
         };
 
+        console.log(`✅ Successfully loaded application ${applicationId}`);
         res.json({
             success: true,
             application: application
         });
-    });
+
+    } catch (err) {
+        console.error(`❌ Error loading application ${applicationId}:`, err);
+        return res.status(500).json({
+            success: false,
+            error: err.message || 'Database error occurred'
+        });
+    }
 });
 
 // Update quote application

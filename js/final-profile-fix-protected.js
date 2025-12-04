@@ -1438,12 +1438,68 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
 
             // Check completion only if stage requires reach-out
             if (hasReachOutTodo) {
-                // First check if reach-out is already completed
-                if (lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) {
-                    // COMPLETED REACH-OUT - Show green completion status
+                // First check if reach-out is already completed - MUST verify actual completion actions
+                let isCompleted = false;
+                const hasActuallyCompleted = (lead.reachOut.callsConnected > 0) || (lead.reachOut.textCount > 0);
+
+                // Clean up orphaned completion timestamps (timestamps without actual completion)
+                if ((lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) && !hasActuallyCompleted) {
+                    console.log(`🧹 CLEANING UP ORPHANED TIMESTAMPS: Lead ${leadId} has completion timestamp but no actual completion (connected: ${lead.reachOut.callsConnected}, texts: ${lead.reachOut.textCount})`);
+
+                    // Remove orphaned timestamps
+                    delete lead.reachOut.completedAt;
+                    delete lead.reachOut.reachOutCompletedAt;
+
+                    // Save the updated lead data
+                    if (window.updateLeadInStorage) {
+                        window.updateLeadInStorage(lead);
+                    }
+
+                    // Mark as not completed
+                    isCompleted = false;
+                } else if ((lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) && hasActuallyCompleted) {
                     const completedTime = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
-                    markReachOutComplete(leadId, completedTime);
-                } else {
+
+                    // NEW: Check if reach-out has expired (older than 2 days) - SAME LOGIC AS getNextAction
+                    if (lead.reachOut.reachOutCompletedAt) {
+                        const completedDateTime = new Date(lead.reachOut.reachOutCompletedAt);
+                        const currentTime = new Date();
+                        const timeDifferenceMs = currentTime.getTime() - completedDateTime.getTime();
+                        const timeDifferenceDays = timeDifferenceMs / (1000 * 60 * 60 * 24);
+
+                        // If more than 2 days have passed, reach out has EXPIRED - reset and show as incomplete
+                        if (timeDifferenceDays > 2) {
+                            console.log(`🔄 PROFILE DISPLAY - REACH OUT EXPIRED: Lead ${leadId} - ${lead.name}, completed ${timeDifferenceDays.toFixed(1)} days ago`);
+
+                            // Reset reach out completion status to trigger new reach out (same as getNextAction)
+                            lead.reachOut.callsConnected = 0;
+                            lead.reachOut.textCount = 0;
+                            lead.reachOut.emailSent = false;
+                            lead.reachOut.textSent = false;
+                            lead.reachOut.callMade = false;
+                            delete lead.reachOut.reachOutCompletedAt;
+
+                            // Save the updated lead data
+                            if (window.updateLeadInStorage) {
+                                window.updateLeadInStorage(lead);
+                            }
+
+                            // Mark as not completed - will show red TO DO styling
+                            isCompleted = false;
+                        } else {
+                            // COMPLETED REACH-OUT and NOT EXPIRED - Show green completion status
+                            markReachOutComplete(leadId, completedTime);
+                            isCompleted = true;
+                        }
+                    } else {
+                        // COMPLETED REACH-OUT but no expiry timestamp to check - Show green completion status
+                        markReachOutComplete(leadId, completedTime);
+                        isCompleted = true;
+                    }
+                }
+
+                // If not completed (either never completed or expired), show red incomplete styling
+                if (!isCompleted) {
                 // STAGE REQUIRES REACH-OUT AND NOT COMPLETED - Show red styling
                 todoDiv.style.display = 'block'; // Show TO DO text
 
@@ -3694,12 +3750,71 @@ window.viewLead = protectedFunctions.viewLead;
 window.createEnhancedProfile = protectedFunctions.createEnhancedProfile;
 window.showLeadProfile = protectedFunctions.showLeadProfile;
 
+// Add getReachOutStatus function for compatibility with test files and external access
+window.getReachOutStatus = function(lead) {
+    console.log(`🔍 getReachOutStatus called for lead ${lead.id} - ${lead.name}`);
+
+    if (!lead || !lead.reachOut) {
+        return '<span style="color: #dc2626;">TO DO - Call Lead</span>';
+    }
+
+    const reachOut = lead.reachOut;
+
+    // Check if stage requires reach out
+    const stageRequiresReachOut = (
+        lead.stage === 'quoted' || lead.stage === 'info_requested' || lead.stage === 'Info Requested' ||
+        lead.stage === 'loss_runs_requested' || lead.stage === 'Loss Runs Requested' ||
+        lead.stage === 'app_sent' || lead.stage === 'App Sent' ||
+        lead.stage === 'quote_sent' || lead.stage === 'quote-sent-unaware' || lead.stage === 'quote-sent-aware' ||
+        lead.stage === 'interested' || lead.stage === 'Interested'
+    );
+
+    if (!stageRequiresReachOut) {
+        return ''; // No reach out required for this stage
+    }
+
+    // Check if reach out is completed - MUST verify actual completion actions
+    const hasActuallyCompleted = (reachOut.callsConnected > 0) || (reachOut.textCount > 0);
+
+    if ((reachOut.completedAt || reachOut.reachOutCompletedAt) && hasActuallyCompleted) {
+        // Check if reach out has EXPIRED (older than 2 days) - SAME LOGIC AS getNextAction
+        if (reachOut.reachOutCompletedAt) {
+            const completedTime = new Date(reachOut.reachOutCompletedAt);
+            const currentTime = new Date();
+            const timeDifferenceMs = currentTime.getTime() - completedTime.getTime();
+            const timeDifferenceDays = timeDifferenceMs / (1000 * 60 * 60 * 24);
+
+            // If more than 2 days have passed, reach out has expired
+            if (timeDifferenceDays > 2) {
+                console.log(`🔄 getReachOutStatus - REACH OUT EXPIRED: Lead ${lead.id}, completed ${timeDifferenceDays.toFixed(1)} days ago`);
+                return '<span style="color: #dc2626;">EXPIRED - Reach Out Required</span>';
+            }
+        }
+
+        // Not expired - show as complete
+        const completedTimestamp = new Date(reachOut.reachOutCompletedAt || reachOut.completedAt).toLocaleString();
+        return `<span style="color: #10b981;">REACH OUT COMPLETE - ${completedTimestamp}</span>`;
+    }
+
+    // Not completed (either no completion timestamp or no actual completion) - show what's needed
+    if (reachOut.textCount > 0) {
+        return '<span style="color: #10b981;">REACH OUT COMPLETE</span>';
+    } else if (reachOut.emailCount > 0) {
+        return '<span style="color: #dc2626;">TO DO - Text Lead</span>';
+    } else if (reachOut.callAttempts > 0) {
+        return '<span style="color: #dc2626;">TO DO - Email Lead</span>';
+    } else {
+        return '<span style="color: #dc2626;">TO DO - Call Lead</span>';
+    }
+};
+
 console.log('🔥 PROTECTED FUNCTIONS NOW ACTIVE - Enhanced profile with Reach Out section should load');
 console.log('🚨 FINAL-PROFILE-FIX-PROTECTED SCRIPT LOADED - VERSION 1000');
 console.log('🔍 Current functions on window:', {
     viewLead: typeof window.viewLead,
     showLeadProfile: typeof window.showLeadProfile,
-    createEnhancedProfile: typeof window.createEnhancedProfile
+    createEnhancedProfile: typeof window.createEnhancedProfile,
+    getReachOutStatus: typeof window.getReachOutStatus
 });
 
 // ULTIMATE PROTECTION: Use Object.defineProperty to make functions non-configurable and non-writable

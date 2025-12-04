@@ -6508,6 +6508,13 @@ function generateClientRows(page = 1) {
         const premiumDisplay = totalPremium > 0 ? `$${totalPremium.toLocaleString()}/yr` : 'N/A';
         console.log(`  Total Premium: ${totalPremium} -> ${premiumDisplay}`);
 
+        // Get assigned agent - check multiple possible locations
+        const assignedTo = client.assignedTo ||
+                          client.agent ||
+                          client.assignedAgent ||
+                          client.producer ||
+                          'Grant'; // Default to Grant if no assignment
+
         return `
             <tr>
                 <td class="client-name">
@@ -6518,6 +6525,7 @@ function generateClientRows(page = 1) {
                 <td>${client.email}</td>
                 <td>${policyCount}</td>
                 <td>${premiumDisplay}</td>
+                <td>${assignedTo}</td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn-icon" onclick="viewClient('${client.id}')" title="View Client"><i class="fas fa-eye"></i></button>
@@ -6582,6 +6590,7 @@ function loadClientsView() {
                             <th>Email</th>
                             <th>Policies</th>
                             <th>Premium</th>
+                            <th>Assigned to</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -16720,22 +16729,28 @@ function getNextAction(stage, lead) {
             stage === 'interested' || stage === 'Interested') {
             console.log(`🔍 STAGE CHECK: ✅ STAGE MATCHED - proceeding to completion check`);
 
-            // Reach out is complete when:
-            // 1. Lead answered call (completedAt exists), OR
-            // 2. Connected call was made, OR
-            // 3. Text has been sent (final step in sequence)
+            // Reach out is complete when ACTUAL completion actions happened:
+            // 1. Connected call was made, OR
+            // 2. Text has been sent (final step in sequence)
+            // MUST have BOTH timestamp AND actual completion actions
             console.log(`🔍 COMPLETION CHECK VALUES: completedAt=${!!reachOut.completedAt}, reachOutCompletedAt=${!!reachOut.reachOutCompletedAt}, callsConnected=${reachOut.callsConnected}, textCount=${reachOut.textCount}`);
             console.log(`🔍 COMPLETION CHECK TYPES: completedAt=${typeof reachOut.completedAt}, reachOutCompletedAt=${typeof reachOut.reachOutCompletedAt}, callsConnected=${typeof reachOut.callsConnected}, textCount=${typeof reachOut.textCount}`);
 
-            const condition1 = reachOut.completedAt;
-            const condition2 = reachOut.reachOutCompletedAt;
-            const condition3 = reachOut.callsConnected > 0;
-            const condition4 = reachOut.textCount > 0;
-            const finalCondition = condition1 || condition2 || condition3 || condition4;
+            const hasTimestamp = reachOut.completedAt || reachOut.reachOutCompletedAt;
+            const hasActualCompletion = reachOut.callsConnected > 0 || reachOut.textCount > 0;
+            const isActuallyCompleted = hasTimestamp && hasActualCompletion;
 
-            console.log(`🔍 INDIVIDUAL CONDITIONS: 1=${condition1}, 2=${condition2}, 3=${condition3}, 4=${condition4}, FINAL=${finalCondition}`);
+            console.log(`🔍 COMPLETION CONDITIONS: hasTimestamp=${hasTimestamp}, hasActualCompletion=${hasActualCompletion}, isActuallyCompleted=${isActuallyCompleted}`);
 
-            if (finalCondition) {
+            // Clean up orphaned timestamps (timestamp without actual completion)
+            if (hasTimestamp && !hasActualCompletion) {
+                console.log(`🧹 CLEANING UP ORPHANED TIMESTAMP: Lead ${lead.id} has completion timestamp but no actual completion (connected: ${reachOut.callsConnected}, texts: ${reachOut.textCount})`);
+                delete reachOut.completedAt;
+                delete reachOut.reachOutCompletedAt;
+                updateLeadInStorage(lead);
+            }
+
+            if (isActuallyCompleted) {
                 console.log(`🔍 REACH-OUT COMPLETE CHECK - Lead ${lead.id}: completedAt=${!!reachOut.completedAt}, reachOutCompletedAt=${!!reachOut.reachOutCompletedAt}, callsConnected=${reachOut.callsConnected}, textCount=${reachOut.textCount}`);
                 // NEW: Check if reach out completion has expired (older than 2 days)
                 if (reachOut.reachOutCompletedAt) {

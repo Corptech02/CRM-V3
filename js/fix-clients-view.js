@@ -43,11 +43,39 @@ window.generateClientRows = async function() {
 
     console.log('Total clients:', allClients.length);
     
+    // Get current user and check if they are admin - filter clients for non-admin users
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            console.log(`🔍 Fix-clients-view filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
+    // Filter clients based on user role
+    if (!isAdmin && currentUser) {
+        const originalCount = allClients.length;
+        allClients = allClients.filter(client => {
+            const assignedTo = client.assignedTo || client.agent || 'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+        console.log(`🔒 Fix-clients-view filtered: ${originalCount} -> ${allClients.length} (showing only ${currentUser}'s clients)`);
+    } else if (isAdmin) {
+        console.log(`👑 Fix-clients-view admin user - showing all ${allClients.length} clients`);
+    }
+
     // If no clients, show a message
     if (allClients.length === 0) {
         return `
             <tr>
-                <td colspan="6" style="text-align: center; padding: 40px; color: #6b7280;">
+                <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
                     <i class="fas fa-users" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
                     <p style="font-size: 16px; margin: 0;">No clients found</p>
                     <p style="font-size: 14px; margin-top: 8px;">Convert leads or add new clients to get started</p>
@@ -81,7 +109,14 @@ window.generateClientRows = async function() {
         
         // Format type
         const clientType = client.type || client.policyType || 'Personal Lines';
-        
+
+        // Get assigned agent - check multiple possible locations
+        const assignedTo = client.assignedTo ||
+                          client.agent ||
+                          client.assignedAgent ||
+                          client.producer ||
+                          'Grant'; // Default to Grant if no assignment
+
         return `
             <tr>
                 <td>
@@ -99,6 +134,7 @@ window.generateClientRows = async function() {
                 <td>${client.email || 'N/A'}</td>
                 <td><span class="policy-count">${policyCount}</span></td>
                 <td>${formattedPremium}</td>
+                <td>${assignedTo}</td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn-icon" onclick="viewClient('${client.id}')" title="View Profile">
