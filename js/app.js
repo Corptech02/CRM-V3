@@ -3975,7 +3975,7 @@ async function loadLeadsView() {
                     }
 
                     // PROTECT VICIDIAL LEADS: Don't filter out ViciDial leads from deleted list
-                    const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('8') && String(lead.id).length === 8);
+                    const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('88') && String(lead.id).length === 9);
                     if (isViciDialLead) {
                         console.log(`🔓 VICIDIAL PROTECTION ACTIVE: Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name} (source: ${lead.source})`);
                         return true; // Don't filter out ViciDial leads
@@ -6415,8 +6415,8 @@ async function deleteLead(leadId) {
     if (confirm('Are you sure you want to delete this lead?')) {
         console.log('Deleting lead:', leadId);
 
-        // VICIDIAL PROTECTION: Don't track ViciDial leads as deleted
-        const isViciDialLead = String(leadId).startsWith('8') && String(leadId).length === 8;
+        // VICIDIAL PROTECTION: Don't track ViciDial leads as deleted (9-digit IDs starting with '88')
+        const isViciDialLead = String(leadId).startsWith('88') && String(leadId).length === 9;
         if (isViciDialLead) {
             console.log(`🔓 VICIDIAL DELETE PROTECTION: Preventing ViciDial lead ${leadId} from being marked as deleted`);
         } else {
@@ -16592,7 +16592,7 @@ window.bulkDeleteLeads = async function() {
 
     // VICIDIAL PROTECTION: Filter out ViciDial leads from being tracked as deleted
     const nonViciDialLeads = leadIds.filter(id => {
-        const isViciDialLead = String(id).startsWith('8') && String(id).length === 8;
+        const isViciDialLead = String(id).startsWith('88') && String(id).length === 9;
         if (isViciDialLead) {
             console.log(`🔓 BULK VICIDIAL DELETE PROTECTION: Skipping ViciDial lead ${id} from deleted list`);
             return false;
