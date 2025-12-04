@@ -690,7 +690,7 @@ function formatPremiumDisplay(premium) {
 
     // RE-ENABLED: This provides the yellow/orange highlighting for the second view
     window.forceAllHighlighting = function() {
-        console.log('🔥🔥🔥 FORCING ALL HIGHLIGHTS 🔥🔥🔥');
+        console.log('🔥🔥🔥 FORCING ALL HIGHLIGHTS - DEBUGGING MODE 🔥🔥🔥');
 
         const tableBody = document.getElementById('leadsTableBody');
         if (!tableBody) {
@@ -846,8 +846,8 @@ function formatPremiumDisplay(premium) {
                                     cell.style.background = 'transparent';
                                 });
                                 return; // Skip to next row
-                            } else if (diffDays > 1 && diffDays < 7) {
-                                // ORANGE for 2-6 days old
+                            } else if (diffDays === 2) {
+                                // ORANGE for 2 days old
                                 console.log(`🟠 APPLYING ORANGE to row ${rowIndex}`);
 
                                 // Force persistent orange highlighting with multiple methods
@@ -875,8 +875,8 @@ function formatPremiumDisplay(premium) {
                                     cell.style.background = 'transparent';
                                 });
                                 return; // Skip to next row
-                            } else if (diffDays >= 7) {
-                                // RED for 7+ days old
+                            } else if (diffDays >= 3) {
+                                // RED for 3+ days old
                                 console.log(`🔴 APPLYING RED to row ${rowIndex}`);
 
                                 // Force persistent red highlighting with multiple methods

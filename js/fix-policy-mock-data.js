@@ -124,7 +124,7 @@ console.log('🔨 Aggressively removing mock policy data...');
                             row.className = `policy-row ${statusClass}`;
                             row.innerHTML = `
                                 <td><strong>${policy.policyNumber || policy.id || 'N/A'}</strong></td>
-                                <td>${policy.clientName || policy.insured?.['Name/Business Name'] || 'Unknown'}</td>
+                                <td>${policy.insured?.['Name/Business Name'] || policy.clientName || 'Unknown'}</td>
                                 <td><span class="policy-type">${policy.policyType || 'Commercial Auto'}</span></td>
                                 <td>${coverage}</td>
                                 <td>

@@ -258,7 +258,7 @@ function replacePrepareCOI() {
         doc.setFont(undefined, 'bold');
         doc.text('INSURED', 112, 40);
         doc.setFont(undefined, 'normal');
-        const insuredName = policy.clientName || policy.insured?.['Name/Business Name'] || 'Unknown';
+        const insuredName = policy.insured?.['Name/Business Name'] || policy.clientName || 'Unknown';
         doc.text(insuredName, 112, 45);
         if (policy.insured?.['Mailing Address']) {
             const addr = policy.insured['Mailing Address'].split(',');

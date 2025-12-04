@@ -284,7 +284,7 @@ window.generateRealACORDNow = function(policyId) {
     doc.text('INSURED', 112, 45);
     doc.setFont(undefined, 'normal');
     doc.setFontSize(7);
-    const insuredName = policy.clientName || policy.insured?.['Name/Business Name'] || policy.insured?.['Primary Named Insured'] || 'Unknown';
+    const insuredName = policy.insured?.['Name/Business Name'] || policy.insured?.['Primary Named Insured'] || policy.clientName || 'Unknown';
     doc.text(insuredName, 112, 50);
     if (policy.insured?.['Mailing Address']) {
         const addr = policy.insured['Mailing Address'].split(',');

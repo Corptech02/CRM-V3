@@ -90,6 +90,126 @@ async function loadLeadsFromServer() {
     }
 }
 
+// Function to load clients from server and sync with localStorage
+async function loadClientsFromServer(limit = 500) {
+    try {
+        console.log('Loading clients from server...');
+        const response = await fetch(`/api/clients?limit=${limit}&offset=0`);
+        if (response.ok) {
+            const data = await response.json();
+
+            // Handle both old format (array) and new format (object with clients array)
+            let serverClients;
+            let totalCount;
+
+            if (Array.isArray(data)) {
+                // Old format - direct array
+                serverClients = data;
+                totalCount = data.length;
+            } else {
+                // New paginated format
+                serverClients = data.clients || [];
+                totalCount = data.total || serverClients.length;
+            }
+
+            console.log(`Loaded ${serverClients.length} clients from server (total: ${totalCount})`);
+
+            // Store in localStorage for caching
+            localStorage.setItem('insurance_clients', JSON.stringify(serverClients));
+
+            // Store pagination info for later use
+            if (data.total) {
+                localStorage.setItem('clients_total_count', data.total.toString());
+                localStorage.setItem('clients_has_more', data.hasMore ? 'true' : 'false');
+            }
+
+            console.log('Server clients synchronized successfully');
+            return serverClients;
+        } else {
+            console.log('Failed to load clients from server, using localStorage');
+            return JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        }
+    } catch (error) {
+        console.error('Failed to load clients from server:', error);
+        // Fall back to localStorage data if server fails
+        return JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    }
+}
+
+// Function to update the clients footer information
+function updateClientsFooterInfo() {
+    const showingInfo = document.getElementById('clientsShowingInfo');
+    const pagination = document.getElementById('clientsPagination');
+
+    if (!showingInfo) return;
+
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const totalCount = localStorage.getItem('clients_total_count');
+    const hasMore = localStorage.getItem('clients_has_more') === 'true';
+
+    const displayedCount = clients.length;
+    const totalText = totalCount ? ` of ${parseInt(totalCount).toLocaleString()}` : '';
+
+    showingInfo.textContent = `Showing ${displayedCount.toLocaleString()}${totalText} clients`;
+
+    // Add "Load More" button if there are more clients to load
+    if (pagination && hasMore && totalCount && displayedCount < parseInt(totalCount)) {
+        pagination.innerHTML = `
+            <button class="btn-secondary" onclick="loadMoreClients()" id="loadMoreClientsBtn">
+                <i class="fas fa-plus"></i> Load More Clients
+            </button>
+        `;
+    } else if (pagination) {
+        pagination.innerHTML = '';
+    }
+}
+
+// Function to load more clients from server
+async function loadMoreClients() {
+    const currentClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const loadMoreBtn = document.getElementById('loadMoreClientsBtn');
+
+    if (loadMoreBtn) {
+        loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading More...';
+        loadMoreBtn.disabled = true;
+    }
+
+    try {
+        const response = await fetch(`/api/clients?limit=500&offset=${currentClients.length}`);
+        if (response.ok) {
+            const data = await response.json();
+            const newClients = data.clients || [];
+
+            if (newClients.length > 0) {
+                // Append new clients to existing ones
+                const allClients = [...currentClients, ...newClients];
+                localStorage.setItem('insurance_clients', JSON.stringify(allClients));
+
+                // Update pagination info
+                localStorage.setItem('clients_has_more', data.hasMore ? 'true' : 'false');
+
+                // Refresh the table
+                const tbody = document.getElementById('clientsTableBody');
+                if (tbody) {
+                    tbody.innerHTML = generateClientRows(1);
+                }
+
+                // Update footer info
+                updateClientsFooterInfo();
+
+                console.log(`Loaded ${newClients.length} more clients. Total: ${allClients.length}`);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load more clients:', error);
+    }
+
+    if (loadMoreBtn) {
+        loadMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Load More Clients';
+        loadMoreBtn.disabled = false;
+    }
+}
+
 // Global function to clean up any duplicate leads
 function cleanupDuplicateLeads() {
     console.log('Running global duplicate cleanup...');
@@ -426,7 +546,7 @@ function loadPolicyList() {
                         return `
                             <tr class="policy-row" data-policy-id="${policy.id}">
                                 <td><strong>${policy.policyNumber || policy.policy_number || policy.id || 'N/A'}</strong></td>
-                                <td>${policy.clientName || policy.insured?.['Name/Business Name'] || policy.company_name || 'Unknown'}</td>
+                                <td>${policy.insured?.['Name/Business Name'] || policy.clientName || policy.company_name || 'Unknown'}</td>
                                 <td><span class="policy-type">${policy.policyType || policy.policy_type || policy.type || 'Commercial Auto'}</span></td>
                                 <td>${coverage}</td>
                                 <td>
@@ -3788,8 +3908,10 @@ async function loadLeadsView() {
         console.log(`Found ${archivedIds.size} archived leads to exclude from active view`);
 
         // Get leads from BOTH storage keys and clean them
+        // NOTE: Re-reading localStorage after loadLeadsFromServer() to get fresh server data
         let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
         let regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+        console.log('📊 Reading localStorage after server sync - insurance_leads:', insuranceLeads.length, 'regular leads:', regularLeads.length);
 
         // REMOVE ALL MOCK/TEST DATA FROM BOTH SOURCES
         const mockPatterns = ['Test Lead', 'Test Company', 'Test Trucking', 'Robert Thompson', 'Jennifer Martin',
@@ -3850,10 +3972,16 @@ async function loadLeadsView() {
                     if (createdAt > fiveMinutesAgo) {
                         console.log(`🔓 Allowing recently imported lead: ${lead.id} - ${lead.name} (created: ${createdAt.toISOString()})`);
                         return true; // Don't filter out recently imported leads
-                    } else {
-                        console.log(`🚫 Filtering out deleted lead: ${lead.id} - ${lead.name}`);
-                        return false;
                     }
+
+                    // PROTECT VICIDIAL LEADS: Don't filter out ViciDial leads from deleted list
+                    if (lead.source === 'ViciDial' || String(lead.id).startsWith('8') && String(lead.id).length === 8) {
+                        console.log(`🔓 Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name}`);
+                        return true; // Don't filter out ViciDial leads
+                    }
+
+                    console.log(`🚫 Filtering out deleted lead: ${lead.id} - ${lead.name}`);
+                    return false;
                 }
                 return true;
             });
@@ -3866,7 +3994,22 @@ async function loadLeadsView() {
         localStorage.setItem('leads', JSON.stringify(leads));
 
         // STRICT FILTER: Remove ANY lead that matches archived criteria
+        // BUT exempt recently imported ViciDial leads for 10 minutes after import
         leads = allLeads.filter(lead => {
+            // Check if this is a recently imported ViciDial lead (within 10 minutes)
+            const isRecentViciDial = lead.source === 'ViciDial' && lead.createdAt;
+            let isRecentlyImported = false;
+
+            if (isRecentViciDial) {
+                const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+                const createdAt = new Date(lead.createdAt);
+                isRecentlyImported = createdAt > tenMinutesAgo;
+
+                if (isRecentlyImported) {
+                    console.log(`🔓 Protecting recently imported ViciDial lead from archiving: ${lead.id} - ${lead.name} (imported: ${createdAt.toISOString()})`);
+                }
+            }
+
             // Check if lead is marked as archived
             if (lead.archived === true) {
                 console.log(`Excluding archived lead: ${lead.id} - ${lead.name}`);
@@ -3875,6 +4018,10 @@ async function loadLeadsView() {
 
             // Check if lead ID is in archived list
             if (archivedIds.has(String(lead.id))) {
+                if (isRecentlyImported) {
+                    console.log(`🔓 Keeping recently imported ViciDial lead despite archived ID match: ${lead.id} - ${lead.name}`);
+                    return true;
+                }
                 console.log(`Excluding lead with archived ID: ${lead.id} - ${lead.name}`);
                 // Also mark it as archived in the main list for consistency
                 lead.archived = true;
@@ -3883,6 +4030,10 @@ async function loadLeadsView() {
 
             // Check if name matches an archived lead
             if (lead.name && archivedNames.has(lead.name.toLowerCase())) {
+                if (isRecentlyImported) {
+                    console.log(`🔓 Keeping recently imported ViciDial lead despite archived name match: ${lead.id} - ${lead.name}`);
+                    return true;
+                }
                 console.log(`Excluding lead with archived name: ${lead.id} - ${lead.name}`);
                 lead.archived = true;
                 return false;
@@ -3892,6 +4043,10 @@ async function loadLeadsView() {
             if (lead.phone) {
                 const cleanPhone = lead.phone.replace(/\D/g, '');
                 if (cleanPhone && archivedPhones.has(cleanPhone)) {
+                    if (isRecentlyImported) {
+                        console.log(`🔓 Keeping recently imported ViciDial lead despite archived phone match: ${lead.id} - ${lead.name}`);
+                        return true;
+                    }
                     console.log(`Excluding lead with archived phone: ${lead.id} - ${lead.name}`);
                     lead.archived = true;
                     return false;
@@ -3900,6 +4055,10 @@ async function loadLeadsView() {
 
             // Check if email matches an archived lead
             if (lead.email && archivedEmails.has(lead.email.toLowerCase())) {
+                if (isRecentlyImported) {
+                    console.log(`🔓 Keeping recently imported ViciDial lead despite archived email match: ${lead.id} - ${lead.name}`);
+                    return true;
+                }
                 console.log(`Excluding lead with archived email: ${lead.id} - ${lead.name}`);
                 lead.archived = true;
                 return false;
@@ -3995,6 +4154,17 @@ async function loadLeadsView() {
         <div class="leads-view">
             <header class="content-header">
                 <h1>Lead Management</h1>
+
+                <!-- Lead Management Tabs -->
+                <div class="lead-tabs" style="display: flex; gap: 0; margin: 20px 0 10px 0; border-bottom: 2px solid #e5e7eb;">
+                    <button class="lead-tab active" onclick="switchLeadTab('active')" style="padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 6px 6px 0 0; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+                        <i class="fas fa-users"></i> Active Leads
+                    </button>
+                    <button class="lead-tab" onclick="switchLeadTab('archived')" style="padding: 12px 24px; background: #f3f4f6; color: #6b7280; border: none; border-radius: 6px 6px 0 0; cursor: pointer; font-weight: 600; margin-left: 2px; transition: all 0.2s;">
+                        <i class="fas fa-archive"></i> Archived Leads
+                    </button>
+                </div>
+
                 <div class="header-actions">
                     <button class="btn-secondary" onclick="toggleAdvancedFilters()" style="background: #6366f1; border-color: #6366f1; color: white;">
                         <i class="fas fa-filter"></i> Advanced Filters
@@ -4017,6 +4187,9 @@ async function loadLeadsView() {
                     </button>
                 </div>
             </header>
+
+            <!-- Active Leads Tab Content -->
+            <div id="active-leads-tab" class="tab-content active">
 
             <!-- Advanced Filters Panel -->
             <div id="advancedFiltersPanel" style="display: none; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -4402,6 +4575,64 @@ async function loadLeadsView() {
                     </tbody>
                 </table>
             </div>
+            </div>
+            <!-- End Active Leads Tab -->
+
+            <!-- Archived Leads Tab Content -->
+            <div id="archived-leads-tab" class="tab-content" style="display: none;">
+                <div class="archived-leads-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0;">
+                        <div>
+                            <h3 style="margin: 0; color: #374151;">Archived Leads</h3>
+                            <p style="color: #6b7280; margin: 5px 0 0 0;">Leads that have been archived from the active pipeline</p>
+                        </div>
+                        <div class="archived-actions">
+                            <button class="btn-secondary" onclick="exportArchivedLeads()" style="background: #10b981; border-color: #10b981; color: white;">
+                                <i class="fas fa-download"></i> Export Current Month
+                            </button>
+                            <button class="btn-secondary" onclick="exportAllArchivedLeads()" style="background: #6366f1; border-color: #6366f1; color: white; margin-left: 10px;">
+                                <i class="fas fa-download"></i> Export All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Archive Tabs -->
+                    <div class="monthly-archive-tabs" id="monthlyArchiveTabs" style="display: flex; gap: 2px; margin: 20px 0 10px 0; border-bottom: 2px solid #e5e7eb; overflow-x: auto; white-space: nowrap; padding-bottom: 2px;">
+                        <!-- Monthly tabs will be populated here -->
+                    </div>
+
+                    <!-- Archive Summary Stats -->
+                    <div class="archive-stats" id="archiveStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">
+                        <!-- Stats will be populated here -->
+                    </div>
+
+                    <!-- Archived Leads Table -->
+                    <div class="table-container">
+                        <table class="data-table" id="archivedLeadsTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" id="selectAllArchived" onclick="toggleAllArchived(this)">
+                                    </th>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Product Interest</th>
+                                    <th>Premium</th>
+                                    <th>Final Stage</th>
+                                    <th>Assigned To</th>
+                                    <th>Archived Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="archivedLeadsTableBody">
+                                ${generateArchivedLeadRows()}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- End Archived Leads Tab -->
+
         </div>
     `;
         
@@ -6539,9 +6770,10 @@ function generateClientRows(page = 1) {
     }).join('');
 }
 
-function loadClientsView() {
+async function loadClientsView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
+
     dashboardContent.innerHTML = `
         <div class="clients-view">
             <header class="content-header">
@@ -6555,7 +6787,7 @@ function loadClientsView() {
                     </button>
                 </div>
             </header>
-            
+
             <div class="filters-bar">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
@@ -6580,7 +6812,7 @@ function loadClientsView() {
                     </button>
                 </div>
             </div>
-            
+
             <div class="data-table-container">
                 <table class="data-table">
                     <thead>
@@ -6595,14 +6827,14 @@ function loadClientsView() {
                         </tr>
                     </thead>
                     <tbody id="clientsTableBody">
-                        <!-- Client rows will be dynamically loaded here -->
+                        <tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading clients from server...</td></tr>
                     </tbody>
                 </table>
             </div>
-            
+
             <div class="table-footer">
-                <div class="showing-info">
-                    Showing 1-10 of 2,847 clients
+                <div class="showing-info" id="clientsShowingInfo">
+                    Loading clients...
                 </div>
                 <div class="pagination" id="clientsPagination">
                     <!-- Pagination buttons will be generated dynamically -->
@@ -6610,7 +6842,10 @@ function loadClientsView() {
             </div>
         </div>
     `;
-    
+
+    // Load clients from server first, then populate table
+    await loadClientsFromServer();
+
     // Populate the table with actual client data
     const tbody = document.getElementById('clientsTableBody');
     if (tbody) {
@@ -6619,6 +6854,9 @@ function loadClientsView() {
 
     // Update count and pagination
     updateClientsPagination();
+
+    // Update the footer info with actual counts
+    updateClientsFooterInfo();
     
     // Scan for clickable phone numbers and emails with aggressive retry
     const scanContent = () => {
@@ -17028,3 +17266,4 @@ function renderLeadsList(leads) {
 }
 
 // Cache bust: Sun Sep 29 v52 - FORCE REFRESH - Fixed original working flow
+

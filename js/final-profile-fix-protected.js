@@ -850,12 +850,24 @@ protectedFunctions.uploadLossRunsFiles = function(leadId, files) {
         formData.append('files', file);
     });
 
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.error('❌ Upload timed out after 30 seconds');
+    }, 30000); // 30 second timeout for file uploads
+
     // Upload to server
     fetch('/api/loss-runs-upload', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal
     })
-    .then(response => response.json())
+    .then(response => {
+        clearTimeout(timeoutId);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             console.log('✅ Files uploaded successfully to server:', data.count, 'files');
@@ -870,9 +882,18 @@ protectedFunctions.uploadLossRunsFiles = function(leadId, files) {
         }
     })
     .catch(error => {
-        console.error('❌ Upload error:', error);
-        alert('Upload error. Please try again.');
-        protectedFunctions.loadLossRuns(leadId);
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            console.error('❌ File upload timed out');
+            alert('File upload timed out. Please try again with smaller files or check your connection.');
+            if (container) {
+                container.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Upload timed out. <button onclick="protectedFunctions.uploadLossRuns(\'' + leadId + '\')" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-left: 8px;">Retry</button></p>';
+            }
+        } else {
+            console.error('❌ Upload error:', error);
+            alert('Upload error. Please try again.');
+            protectedFunctions.loadLossRuns(leadId);
+        }
     });
 };
 
@@ -1825,499 +1846,499 @@ protectedFunctions.createQuoteApplication = function(leadId) {
     // End of function - enhanced modal will be used instead
 };
 
-protectedFunctions.loadQuoteApplications = function(leadId) {
-    console.log('📋 Loading quote applications for lead:', leadId);
-
-    const applicationsContainer = document.getElementById(`application-submissions-container-${leadId}`);
-    if (!applicationsContainer) {
-        console.log('❌ Applications container not found');
-        return;
-    }
-
-    const content = document.createElement('div');
-    content.style.cssText = `
-        background: white;
-        padding: 20px;
-        border-radius: 12px;
-        width: 90vw;
-        height: 90vh;
-        overflow-y: auto;
-        position: relative;
-        box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px;
-    `;
-
-    content.innerHTML = `
-        <div style="position: relative;">
-            <button onclick="document.getElementById('quote-application-modal').remove();"
-                    style="position: absolute; top: -10px; right: -10px; background: white; border: 2px solid #ccc; border-radius: 50%; width: 35px; height: 35px; font-size: 24px; cursor: pointer; color: #666; z-index: 10; display: flex; align-items: center; justify-content: center; line-height: 1;"
-                    onmouseover="this.style.backgroundColor='#f0f0f0'; this.style.color='#000'"
-                    onmouseout="this.style.backgroundColor='white'; this.style.color='#666'"
-                    title="Close">
-                <span style="margin-top: -2px;">&times;</span>
-            </button>
-            <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
-                <h2 style="margin: 0; color: #0066cc;">Vanguard Insurance Group LLC</h2>
-                <p style="margin: 5px 0;">Brunswick, OH 44256 • 330-460-0872</p>
-                <h3 style="margin: 10px 0 0 0;">TRUCKING APPLICATION</h3>
-            </div>
-        </div>
-
-        <form style="font-size: 14px;">
-            <!-- GENERAL INFORMATION -->
-            <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
-                <h4 style="margin: 0 0 15px 0; color: #0066cc;">GENERAL INFORMATION</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Effective Date:</label>
-                        <input type="date" value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Insured's Name:</label>
-                        <input type="text" value="${lead.name || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">USDOT Number:</label>
-                        <input type="text" value="${lead.dotNumber || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">MC Number:</label>
-                        <input type="text" value="${lead.mcNumber || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Contact Person:</label>
-                        <input type="text" value="${lead.contact || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Phone:</label>
-                        <input type="text" value="${lead.phone || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
-                    <div style="grid-column: 1 / -1;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Email:</label>
-                        <input type="email" value="${lead.email || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
-                </div>
-            </div>
-
-            <!-- DESCRIPTION OF OPERATION SECTION -->
-            <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
-                <h4 style="margin: 0 0 15px 0; color: #0066cc;">DESCRIPTION OF OPERATION</h4>
-
-                <!-- Haul for Hire Section -->
-                <div style="margin-bottom: 20px;">
-                    <h5 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">Operation Type:</h5>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Haul for Hire:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Non-Trucking:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Other:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Percentage of Loads by Distance -->
-                <div style="margin-bottom: 20px;">
-                    <h5 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">PERCENTAGE OF LOADS:</h5>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">0-100 miles:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">101-300 miles:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">301-500 miles:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">500+ miles:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Class of Risk -->
-                <div style="margin-bottom: 15px;">
-                    <h5 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">CLASS OF RISK:</h5>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Dry Van:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Dump Truck:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Flat Bed:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Van/Buses:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Auto Hauler:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Box Truck:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Reefer:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Other:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- COMMODITIES SECTION -->
-            <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h4 style="margin: 0; color: #0066cc;">COMMODITIES</h4>
-                    <button type="button" onclick="addCommodityRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
-                        <i class="fas fa-plus"></i> Add Commodity
-                    </button>
-                </div>
-                <div id="commodities-container">
-                    <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Commodity:</label>
-                            <select style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                                <option value="">Select Commodity</option>
-                                <option value="General Freight">General Freight</option>
-                                <option value="Machinery">Machinery</option>
-                                <option value="Building Materials">Building Materials</option>
-                                <option value="Food Products">Food Products</option>
-                                <option value="Chemicals">Chemicals</option>
-                                <option value="Automobiles">Automobiles</option>
-                                <option value="Electronics">Electronics</option>
-                                <option value="Textiles">Textiles</option>
-                                <option value="Paper Products">Paper Products</option>
-                                <option value="Metal Products">Metal Products</option>
-                                <option value="Coal/Minerals">Coal/Minerals</option>
-                                <option value="Petroleum Products">Petroleum Products</option>
-                                <option value="Lumber">Lumber</option>
-                                <option value="Grain/Agricultural">Grain/Agricultural</option>
-                                <option value="Waste Materials">Waste Materials</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">% of Loads:</label>
-                            <input type="text" placeholder="%" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div style="display: flex; align-items: end;">
-                            <button type="button" onclick="removeCommodityRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- DRIVERS SECTION -->
-            <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h4 style="margin: 0; color: #0066cc;">DRIVERS INFORMATION</h4>
-                    <button type="button" onclick="addDriverRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
-                        <i class="fas fa-plus"></i> Add Driver
-                    </button>
-                </div>
-                <div id="drivers-container">
-                    <div class="driver-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 2fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Name:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Date of Birth:</label>
-                            <input type="date" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">License #:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">State:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Years Exp:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Hire Date:</label>
-                            <input type="date" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Accidents/Violations:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div style="display: flex; align-items: end;">
-                            <button type="button" onclick="removeDriverRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TRUCKS SECTION -->
-            <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h4 style="margin: 0; color: #0066cc;">TRUCKS</h4>
-                    <button type="button" onclick="addTruckRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
-                        <i class="fas fa-plus"></i> Add Truck
-                    </button>
-                </div>
-                <div id="trucks-container">
-                    <div class="truck-row" style="display: grid; grid-template-columns: 1fr 2fr 1fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Year:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Make/Model:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Type:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">VIN:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Value:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Radius:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div style="display: flex; align-items: end;">
-                            <button type="button" onclick="removeTruckRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TRAILERS SECTION -->
-            <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h4 style="margin: 0; color: #0066cc;">TRAILERS</h4>
-                    <button type="button" onclick="addTrailerRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
-                        <i class="fas fa-plus"></i> Add Trailer
-                    </button>
-                </div>
-                <div id="trailers-container">
-                    <div class="trailer-row" style="display: grid; grid-template-columns: 1fr 2fr 1fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Year:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Make/Model:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Type:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">VIN:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Value:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Radius:</label>
-                            <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div style="display: flex; align-items: end;">
-                            <button type="button" onclick="removeTrailerRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- COVERAGES SECTION -->
-            <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
-                <h4 style="margin: 0 0 15px 0; color: #0066cc;">COVERAGE INFORMATION</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Auto Liability:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Limit</option>
-                            <option value="$1,000,000">$1,000,000</option>
-                            <option value="$2,000,000">$2,000,000</option>
-                            <option value="$5,000,000">$5,000,000</option>
-                            <option value="$10,000,000">$10,000,000</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Medical Payments:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Amount</option>
-                            <option value="$5,000">$5,000</option>
-                            <option value="$10,000">$10,000</option>
-                            <option value="$15,000">$15,000</option>
-                            <option value="$25,000">$25,000</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Uninsured/Underinsured Bodily Injury:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Coverage</option>
-                            <option value="$1,000,000">$1,000,000</option>
-                            <option value="$2,000,000">$2,000,000</option>
-                            <option value="$5,000,000">$5,000,000</option>
-                            <option value="Match Liability">Match Auto Liability</option>
-                            <option value="Rejected">Rejected</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Uninsured Motorist Property Damage:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Coverage</option>
-                            <option value="$100,000">$100,000</option>
-                            <option value="$250,000">$250,000</option>
-                            <option value="$500,000">$500,000</option>
-                            <option value="$1,000,000">$1,000,000</option>
-                            <option value="Rejected">Rejected</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Comprehensive Deductible:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Deductible</option>
-                            <option value="$500">$500</option>
-                            <option value="$1,000">$1,000</option>
-                            <option value="$2,500">$2,500</option>
-                            <option value="$5,000">$5,000</option>
-                            <option value="$10,000">$10,000</option>
-                            <option value="Not Included">Not Included</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Collision Deductible:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Deductible</option>
-                            <option value="$500">$500</option>
-                            <option value="$1,000">$1,000</option>
-                            <option value="$2,500">$2,500</option>
-                            <option value="$5,000">$5,000</option>
-                            <option value="$10,000">$10,000</option>
-                            <option value="Not Included">Not Included</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Non-Owned Trailer Phys Dam:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Coverage</option>
-                            <option value="$50,000">$50,000</option>
-                            <option value="$100,000">$100,000</option>
-                            <option value="$250,000">$250,000</option>
-                            <option value="$500,000">$500,000</option>
-                            <option value="Not Included">Not Included</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Trailer Interchange:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Coverage</option>
-                            <option value="$50,000">$50,000</option>
-                            <option value="$100,000">$100,000</option>
-                            <option value="$250,000">$250,000</option>
-                            <option value="$500,000">$500,000</option>
-                            <option value="Not Included">Not Included</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Roadside Assistance:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Coverage</option>
-                            <option value="Included">Included</option>
-                            <option value="Not Included">Not Included</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">General Liability:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Limit</option>
-                            <option value="$1,000,000">$1,000,000</option>
-                            <option value="$2,000,000">$2,000,000</option>
-                            <option value="$5,000,000">$5,000,000</option>
-                            <option value="$10,000,000">$10,000,000</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Cargo Limit:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Limit</option>
-                            <option value="$50,000">$50,000</option>
-                            <option value="$100,000">$100,000</option>
-                            <option value="$250,000">$250,000</option>
-                            <option value="$500,000">$500,000</option>
-                            <option value="$1,000,000">$1,000,000</option>
-                            <option value="Not Included">Not Included</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Cargo Deductible:</label>
-                        <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Select Deductible</option>
-                            <option value="$1,000">$1,000</option>
-                            <option value="$2,500">$2,500</option>
-                            <option value="$5,000">$5,000</option>
-                            <option value="$10,000">$10,000</option>
-                        </select>
-                    </div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Additional Coverage Notes:</label>
-                    <textarea style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical;" placeholder="Enter any special coverage requirements, exclusions, or additional notes..."></textarea>
-                </div>
-            </div>
-
-            <!-- SAVE BUTTON -->
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
-                <button type="button" onclick="saveQuoteApplication('${leadId}')" style="background: #0066cc; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600;">
-                    <i class="fas fa-save"></i> Save Quote Application
-                </button>
-                <button type="button" onclick="document.getElementById('quote-application-modal').remove();" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; margin-left: 15px;">
-                    <i class="fas fa-times"></i> Cancel
-                </button>
-            </div>
-        </form>
-    `;
-
-    modal.appendChild(content);
-    document.body.appendChild(modal);
-
-    console.log('✅ Quote application modal created for lead:', lead.name);
-};
+// OLD_REMOVED: protectedFunctions.loadQuoteApplications = function(leadId) {
+// OLD_REMOVED:     console.log('📋 Loading quote applications for lead:', leadId);
+// OLD_REMOVED: 
+// OLD_REMOVED:     const applicationsContainer = document.getElementById(`application-submissions-container-${leadId}`);
+// OLD_REMOVED:     if (!applicationsContainer) {
+// OLD_REMOVED:         console.log('❌ Applications container not found');
+// OLD_REMOVED:         return;
+// OLD_REMOVED:     }
+// OLD_REMOVED: 
+// OLD_REMOVED:     const content = document.createElement('div');
+// OLD_REMOVED:     content.style.cssText = `
+// OLD_REMOVED:         background: white;
+// OLD_REMOVED:         padding: 20px;
+// OLD_REMOVED:         border-radius: 12px;
+// OLD_REMOVED:         width: 90vw;
+// OLD_REMOVED:         height: 90vh;
+// OLD_REMOVED:         overflow-y: auto;
+// OLD_REMOVED:         position: relative;
+// OLD_REMOVED:         box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px;
+// OLD_REMOVED:     `;
+// OLD_REMOVED: 
+// OLD_REMOVED:     content.innerHTML = `
+// OLD_REMOVED:         <div style="position: relative;">
+// OLD_REMOVED:             <button onclick="document.getElementById('quote-application-modal').remove();"
+// OLD_REMOVED:                     style="position: absolute; top: -10px; right: -10px; background: white; border: 2px solid #ccc; border-radius: 50%; width: 35px; height: 35px; font-size: 24px; cursor: pointer; color: #666; z-index: 10; display: flex; align-items: center; justify-content: center; line-height: 1;"
+// OLD_REMOVED:                     onmouseover="this.style.backgroundColor='#f0f0f0'; this.style.color='#000'"
+// OLD_REMOVED:                     onmouseout="this.style.backgroundColor='white'; this.style.color='#666'"
+// OLD_REMOVED:                     title="Close">
+// OLD_REMOVED:                 <span style="margin-top: -2px;">&times;</span>
+// OLD_REMOVED:             </button>
+// OLD_REMOVED:             <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
+// OLD_REMOVED:                 <h2 style="margin: 0; color: #0066cc;">Vanguard Insurance Group LLC</h2>
+// OLD_REMOVED:                 <p style="margin: 5px 0;">Brunswick, OH 44256 • 330-460-0872</p>
+// OLD_REMOVED:                 <h3 style="margin: 10px 0 0 0;">TRUCKING APPLICATION</h3>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED:         </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:         <form style="font-size: 14px;">
+// OLD_REMOVED:             <!-- GENERAL INFORMATION -->
+// OLD_REMOVED:             <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
+// OLD_REMOVED:                 <h4 style="margin: 0 0 15px 0; color: #0066cc;">GENERAL INFORMATION</h4>
+// OLD_REMOVED:                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Effective Date:</label>
+// OLD_REMOVED:                         <input type="date" value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Insured's Name:</label>
+// OLD_REMOVED:                         <input type="text" value="${lead.name || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">USDOT Number:</label>
+// OLD_REMOVED:                         <input type="text" value="${lead.dotNumber || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">MC Number:</label>
+// OLD_REMOVED:                         <input type="text" value="${lead.mcNumber || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Contact Person:</label>
+// OLD_REMOVED:                         <input type="text" value="${lead.contact || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Phone:</label>
+// OLD_REMOVED:                         <input type="text" value="${lead.phone || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div style="grid-column: 1 / -1;">
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Email:</label>
+// OLD_REMOVED:                         <input type="email" value="${lead.email || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:             <!-- DESCRIPTION OF OPERATION SECTION -->
+// OLD_REMOVED:             <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
+// OLD_REMOVED:                 <h4 style="margin: 0 0 15px 0; color: #0066cc;">DESCRIPTION OF OPERATION</h4>
+// OLD_REMOVED: 
+// OLD_REMOVED:                 <!-- Haul for Hire Section -->
+// OLD_REMOVED:                 <div style="margin-bottom: 20px;">
+// OLD_REMOVED:                     <h5 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">Operation Type:</h5>
+// OLD_REMOVED:                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Haul for Hire:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Non-Trucking:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Other:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:                 <!-- Percentage of Loads by Distance -->
+// OLD_REMOVED:                 <div style="margin-bottom: 20px;">
+// OLD_REMOVED:                     <h5 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">PERCENTAGE OF LOADS:</h5>
+// OLD_REMOVED:                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">0-100 miles:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">101-300 miles:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">301-500 miles:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">500+ miles:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:                 <!-- Class of Risk -->
+// OLD_REMOVED:                 <div style="margin-bottom: 15px;">
+// OLD_REMOVED:                     <h5 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">CLASS OF RISK:</h5>
+// OLD_REMOVED:                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Dry Van:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Dump Truck:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Flat Bed:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Van/Buses:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Auto Hauler:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Box Truck:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Reefer:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Other:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:             <!-- COMMODITIES SECTION -->
+// OLD_REMOVED:             <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
+// OLD_REMOVED:                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+// OLD_REMOVED:                     <h4 style="margin: 0; color: #0066cc;">COMMODITIES</h4>
+// OLD_REMOVED:                     <button type="button" onclick="addCommodityRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
+// OLD_REMOVED:                         <i class="fas fa-plus"></i> Add Commodity
+// OLD_REMOVED:                     </button>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:                 <div id="commodities-container">
+// OLD_REMOVED:                     <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Commodity:</label>
+// OLD_REMOVED:                             <select style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                                 <option value="">Select Commodity</option>
+// OLD_REMOVED:                                 <option value="General Freight">General Freight</option>
+// OLD_REMOVED:                                 <option value="Machinery">Machinery</option>
+// OLD_REMOVED:                                 <option value="Building Materials">Building Materials</option>
+// OLD_REMOVED:                                 <option value="Food Products">Food Products</option>
+// OLD_REMOVED:                                 <option value="Chemicals">Chemicals</option>
+// OLD_REMOVED:                                 <option value="Automobiles">Automobiles</option>
+// OLD_REMOVED:                                 <option value="Electronics">Electronics</option>
+// OLD_REMOVED:                                 <option value="Textiles">Textiles</option>
+// OLD_REMOVED:                                 <option value="Paper Products">Paper Products</option>
+// OLD_REMOVED:                                 <option value="Metal Products">Metal Products</option>
+// OLD_REMOVED:                                 <option value="Coal/Minerals">Coal/Minerals</option>
+// OLD_REMOVED:                                 <option value="Petroleum Products">Petroleum Products</option>
+// OLD_REMOVED:                                 <option value="Lumber">Lumber</option>
+// OLD_REMOVED:                                 <option value="Grain/Agricultural">Grain/Agricultural</option>
+// OLD_REMOVED:                                 <option value="Waste Materials">Waste Materials</option>
+// OLD_REMOVED:                                 <option value="Other">Other</option>
+// OLD_REMOVED:                             </select>
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">% of Loads:</label>
+// OLD_REMOVED:                             <input type="text" placeholder="%" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div style="display: flex; align-items: end;">
+// OLD_REMOVED:                             <button type="button" onclick="removeCommodityRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
+// OLD_REMOVED:                                 <i class="fas fa-times"></i>
+// OLD_REMOVED:                             </button>
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:             <!-- DRIVERS SECTION -->
+// OLD_REMOVED:             <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
+// OLD_REMOVED:                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+// OLD_REMOVED:                     <h4 style="margin: 0; color: #0066cc;">DRIVERS INFORMATION</h4>
+// OLD_REMOVED:                     <button type="button" onclick="addDriverRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
+// OLD_REMOVED:                         <i class="fas fa-plus"></i> Add Driver
+// OLD_REMOVED:                     </button>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:                 <div id="drivers-container">
+// OLD_REMOVED:                     <div class="driver-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 2fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Name:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Date of Birth:</label>
+// OLD_REMOVED:                             <input type="date" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">License #:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">State:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Years Exp:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Hire Date:</label>
+// OLD_REMOVED:                             <input type="date" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Accidents/Violations:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div style="display: flex; align-items: end;">
+// OLD_REMOVED:                             <button type="button" onclick="removeDriverRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
+// OLD_REMOVED:                                 <i class="fas fa-times"></i>
+// OLD_REMOVED:                             </button>
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:             <!-- TRUCKS SECTION -->
+// OLD_REMOVED:             <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
+// OLD_REMOVED:                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+// OLD_REMOVED:                     <h4 style="margin: 0; color: #0066cc;">TRUCKS</h4>
+// OLD_REMOVED:                     <button type="button" onclick="addTruckRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
+// OLD_REMOVED:                         <i class="fas fa-plus"></i> Add Truck
+// OLD_REMOVED:                     </button>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:                 <div id="trucks-container">
+// OLD_REMOVED:                     <div class="truck-row" style="display: grid; grid-template-columns: 1fr 2fr 1fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Year:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Make/Model:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Type:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">VIN:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Value:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Radius:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div style="display: flex; align-items: end;">
+// OLD_REMOVED:                             <button type="button" onclick="removeTruckRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
+// OLD_REMOVED:                                 <i class="fas fa-times"></i>
+// OLD_REMOVED:                             </button>
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:             <!-- TRAILERS SECTION -->
+// OLD_REMOVED:             <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
+// OLD_REMOVED:                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+// OLD_REMOVED:                     <h4 style="margin: 0; color: #0066cc;">TRAILERS</h4>
+// OLD_REMOVED:                     <button type="button" onclick="addTrailerRow()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
+// OLD_REMOVED:                         <i class="fas fa-plus"></i> Add Trailer
+// OLD_REMOVED:                     </button>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:                 <div id="trailers-container">
+// OLD_REMOVED:                     <div class="trailer-row" style="display: grid; grid-template-columns: 1fr 2fr 1fr 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb;">
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Year:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Make/Model:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Type:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">VIN:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Value:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div>
+// OLD_REMOVED:                             <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #374151;">Radius:</label>
+// OLD_REMOVED:                             <input type="text" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                         <div style="display: flex; align-items: end;">
+// OLD_REMOVED:                             <button type="button" onclick="removeTrailerRow(this)" style="background: #ef4444; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer;">
+// OLD_REMOVED:                                 <i class="fas fa-times"></i>
+// OLD_REMOVED:                             </button>
+// OLD_REMOVED:                         </div>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:             <!-- COVERAGES SECTION -->
+// OLD_REMOVED:             <div style="background: #f0f4f8; padding: 15px; margin-bottom: 15px; border-left: 4px solid #0066cc; border-radius: 6px;">
+// OLD_REMOVED:                 <h4 style="margin: 0 0 15px 0; color: #0066cc;">COVERAGE INFORMATION</h4>
+// OLD_REMOVED:                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Auto Liability:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Limit</option>
+// OLD_REMOVED:                             <option value="$1,000,000">$1,000,000</option>
+// OLD_REMOVED:                             <option value="$2,000,000">$2,000,000</option>
+// OLD_REMOVED:                             <option value="$5,000,000">$5,000,000</option>
+// OLD_REMOVED:                             <option value="$10,000,000">$10,000,000</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Medical Payments:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Amount</option>
+// OLD_REMOVED:                             <option value="$5,000">$5,000</option>
+// OLD_REMOVED:                             <option value="$10,000">$10,000</option>
+// OLD_REMOVED:                             <option value="$15,000">$15,000</option>
+// OLD_REMOVED:                             <option value="$25,000">$25,000</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Uninsured/Underinsured Bodily Injury:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Coverage</option>
+// OLD_REMOVED:                             <option value="$1,000,000">$1,000,000</option>
+// OLD_REMOVED:                             <option value="$2,000,000">$2,000,000</option>
+// OLD_REMOVED:                             <option value="$5,000,000">$5,000,000</option>
+// OLD_REMOVED:                             <option value="Match Liability">Match Auto Liability</option>
+// OLD_REMOVED:                             <option value="Rejected">Rejected</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Uninsured Motorist Property Damage:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Coverage</option>
+// OLD_REMOVED:                             <option value="$100,000">$100,000</option>
+// OLD_REMOVED:                             <option value="$250,000">$250,000</option>
+// OLD_REMOVED:                             <option value="$500,000">$500,000</option>
+// OLD_REMOVED:                             <option value="$1,000,000">$1,000,000</option>
+// OLD_REMOVED:                             <option value="Rejected">Rejected</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Comprehensive Deductible:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Deductible</option>
+// OLD_REMOVED:                             <option value="$500">$500</option>
+// OLD_REMOVED:                             <option value="$1,000">$1,000</option>
+// OLD_REMOVED:                             <option value="$2,500">$2,500</option>
+// OLD_REMOVED:                             <option value="$5,000">$5,000</option>
+// OLD_REMOVED:                             <option value="$10,000">$10,000</option>
+// OLD_REMOVED:                             <option value="Not Included">Not Included</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Collision Deductible:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Deductible</option>
+// OLD_REMOVED:                             <option value="$500">$500</option>
+// OLD_REMOVED:                             <option value="$1,000">$1,000</option>
+// OLD_REMOVED:                             <option value="$2,500">$2,500</option>
+// OLD_REMOVED:                             <option value="$5,000">$5,000</option>
+// OLD_REMOVED:                             <option value="$10,000">$10,000</option>
+// OLD_REMOVED:                             <option value="Not Included">Not Included</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Non-Owned Trailer Phys Dam:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Coverage</option>
+// OLD_REMOVED:                             <option value="$50,000">$50,000</option>
+// OLD_REMOVED:                             <option value="$100,000">$100,000</option>
+// OLD_REMOVED:                             <option value="$250,000">$250,000</option>
+// OLD_REMOVED:                             <option value="$500,000">$500,000</option>
+// OLD_REMOVED:                             <option value="Not Included">Not Included</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Trailer Interchange:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Coverage</option>
+// OLD_REMOVED:                             <option value="$50,000">$50,000</option>
+// OLD_REMOVED:                             <option value="$100,000">$100,000</option>
+// OLD_REMOVED:                             <option value="$250,000">$250,000</option>
+// OLD_REMOVED:                             <option value="$500,000">$500,000</option>
+// OLD_REMOVED:                             <option value="Not Included">Not Included</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Roadside Assistance:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Coverage</option>
+// OLD_REMOVED:                             <option value="Included">Included</option>
+// OLD_REMOVED:                             <option value="Not Included">Not Included</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">General Liability:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Limit</option>
+// OLD_REMOVED:                             <option value="$1,000,000">$1,000,000</option>
+// OLD_REMOVED:                             <option value="$2,000,000">$2,000,000</option>
+// OLD_REMOVED:                             <option value="$5,000,000">$5,000,000</option>
+// OLD_REMOVED:                             <option value="$10,000,000">$10,000,000</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Cargo Limit:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Limit</option>
+// OLD_REMOVED:                             <option value="$50,000">$50,000</option>
+// OLD_REMOVED:                             <option value="$100,000">$100,000</option>
+// OLD_REMOVED:                             <option value="$250,000">$250,000</option>
+// OLD_REMOVED:                             <option value="$500,000">$500,000</option>
+// OLD_REMOVED:                             <option value="$1,000,000">$1,000,000</option>
+// OLD_REMOVED:                             <option value="Not Included">Not Included</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                     <div>
+// OLD_REMOVED:                         <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Cargo Deductible:</label>
+// OLD_REMOVED:                         <select style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+// OLD_REMOVED:                             <option value="">Select Deductible</option>
+// OLD_REMOVED:                             <option value="$1,000">$1,000</option>
+// OLD_REMOVED:                             <option value="$2,500">$2,500</option>
+// OLD_REMOVED:                             <option value="$5,000">$5,000</option>
+// OLD_REMOVED:                             <option value="$10,000">$10,000</option>
+// OLD_REMOVED:                         </select>
+// OLD_REMOVED:                     </div>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:                 <div style="margin-top: 15px;">
+// OLD_REMOVED:                     <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #374151;">Additional Coverage Notes:</label>
+// OLD_REMOVED:                     <textarea style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical;" placeholder="Enter any special coverage requirements, exclusions, or additional notes..."></textarea>
+// OLD_REMOVED:                 </div>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED: 
+// OLD_REMOVED:             <!-- SAVE BUTTON -->
+// OLD_REMOVED:             <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+// OLD_REMOVED:                 <button type="button" onclick="saveQuoteApplication('${leadId}')" style="background: #0066cc; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600;">
+// OLD_REMOVED:                     <i class="fas fa-save"></i> Save Quote Application
+// OLD_REMOVED:                 </button>
+// OLD_REMOVED:                 <button type="button" onclick="document.getElementById('quote-application-modal').remove();" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; margin-left: 15px;">
+// OLD_REMOVED:                     <i class="fas fa-times"></i> Cancel
+// OLD_REMOVED:                 </button>
+// OLD_REMOVED:             </div>
+// OLD_REMOVED:         </form>
+// OLD_REMOVED:     `;
+// OLD_REMOVED: 
+// OLD_REMOVED:     modal.appendChild(content);
+// OLD_REMOVED:     document.body.appendChild(modal);
+// OLD_REMOVED: 
+// OLD_REMOVED:     console.log('✅ Quote application modal created for lead:', lead.name);
+// OLD_REMOVED: };
 
 protectedFunctions.loadQuoteApplications = function(leadId) {
     console.log('📋 Loading quote applications for lead:', leadId);
@@ -2329,13 +2350,51 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
         return;
     }
 
+    // Cancel any existing request for this lead
+    const existingController = window.quoteApplicationControllers?.[leadId];
+    if (existingController) {
+        console.log('🚫 Aborting existing request for lead:', leadId);
+        existingController.abort();
+        delete window.quoteApplicationControllers[leadId];
+    }
+
+    // Initialize request tracking
+    if (!window.quoteApplicationControllers) {
+        window.quoteApplicationControllers = {};
+    }
+
+    // Prevent duplicate requests if already loading
+    if (applicationsContainer.dataset.loading === 'true') {
+        console.log('⏳ Already loading applications, skipping duplicate request');
+        return;
+    }
+    applicationsContainer.dataset.loading = 'true';
+
     // Show loading message
     applicationsContainer.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">⏳ Loading applications...</p>';
 
+    // Create abort controller for timeout with shorter timeout initially
+    const controller = new AbortController();
+    window.quoteApplicationControllers[leadId] = controller;
+    const timeoutId = setTimeout(() => {
+        console.log('⏰ Request timed out after 5 seconds for lead:', leadId);
+        controller.abort();
+    }, 5000); // Reduced to 5 second timeout for faster feedback
+
     // Get saved applications for this lead from server
-    fetch(`/api/quote-applications?leadId=${encodeURIComponent(leadId)}`)
-    .then(response => response.json())
+    fetch(`/api/quote-applications?leadId=${encodeURIComponent(leadId)}`, {
+        signal: controller.signal
+    })
+    .then(response => {
+        clearTimeout(timeoutId);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    })
     .then(data => {
+        clearTimeout(timeoutId);
+        applicationsContainer.dataset.loading = 'false';
+        delete window.quoteApplicationControllers[leadId];
+
         if (data.success) {
             const leadApplications = data.applications;
 
@@ -2350,55 +2409,83 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
         }
     })
     .catch(error => {
-        console.error('Error loading applications:', error);
-        applicationsContainer.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Error loading applications</p>';
+        clearTimeout(timeoutId);
+        applicationsContainer.dataset.loading = 'false';
+        delete window.quoteApplicationControllers[leadId];
+
+        if (error.name === 'AbortError') {
+            console.error('❌ Quote applications request timed out for lead:', leadId);
+            applicationsContainer.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Network seems slow. <button onclick="protectedFunctions.loadQuoteApplications(\'' + leadId + '\')" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-left: 8px;">Try Again</button></p>';
+        } else {
+            console.error('Error loading applications for lead:', leadId, error);
+            applicationsContainer.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Connection error. <button onclick="protectedFunctions.loadQuoteApplications(\'' + leadId + '\')" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-left: 8px;">Try Again</button></p>';
+        }
     });
 
     function displayApplications(leadApplications, container) {
-        // Display applications using clean format - same as showApplicationSubmissions
-        let applicationsHTML = '';
-        leadApplications.forEach((app, index) => {
-        applicationsHTML += `
-            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                    <div>
-                        <h4 style="margin: 0 0 5px 0; color: #374151; font-size: 14px;">
-                            <i class="fas fa-file-signature" style="color: #10b981; margin-right: 8px;"></i>
-                            Quote Application #${app.id}
-                        </h4>
-                    </div>
-                    <div style="display: flex; gap: 5px;">
-                        <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            <i class="fas fa-eye"></i> View
-                        </button>
-                        <button onclick="downloadQuoteApplication('${app.id}')" data-quote-app-pdf="true" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            <i class="fas fa-download"></i> Download
-                        </button>
-                        <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; font-size: 12px; color: #6b7280;">
-                    <div>
-                        <strong style="color: #374151;">Commodities:</strong> ${app.formData?.commodities?.length || app.commodities?.length || 0}
-                    </div>
-                    <div>
-                        <strong style="color: #374151;">Drivers:</strong> ${app.formData?.drivers?.length || app.drivers?.length || 0}
-                    </div>
-                    <div>
-                        <strong style="color: #374151;">Trucks:</strong> ${app.formData?.trucks?.length || app.trucks?.length || 0}
-                    </div>
-                    <div>
-                        <strong style="color: #374151;">Trailers:</strong> ${app.formData?.trailers?.length || app.trailers?.length || 0}
-                    </div>
-                </div>
-            </div>
-        `;
-    });
+        // Use DocumentFragment for better performance with large lists
+        const fragment = document.createDocumentFragment();
 
-        container.innerHTML = applicationsHTML;
+        // Process applications in chunks to prevent UI blocking
+        const processChunk = (startIndex) => {
+            const chunkSize = 10; // Process 10 applications at a time
+            const endIndex = Math.min(startIndex + chunkSize, leadApplications.length);
+
+            for (let i = startIndex; i < endIndex; i++) {
+                const app = leadApplications[i];
+                const appElement = document.createElement('div');
+                appElement.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+
+                appElement.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #374151; font-size: 14px;">
+                                <i class="fas fa-file-signature" style="color: #10b981; margin-right: 8px;"></i>
+                                Quote Application #${app.id}
+                            </h4>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                            <button onclick="downloadQuoteApplication('${app.id}')" data-quote-app-pdf="true" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                            <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; font-size: 12px; color: #6b7280;">
+                        <div>
+                            <strong style="color: #374151;">Commodities:</strong> ${app.formData?.commodities?.length || app.commodities?.length || 0}
+                        </div>
+                        <div>
+                            <strong style="color: #374151;">Drivers:</strong> ${app.formData?.drivers?.length || app.drivers?.length || 0}
+                        </div>
+                        <div>
+                            <strong style="color: #374151;">Trucks:</strong> ${app.formData?.trucks?.length || app.trucks?.length || 0}
+                        </div>
+                        <div>
+                            <strong style="color: #374151;">Trailers:</strong> ${app.formData?.trailers?.length || app.trailers?.length || 0}
+                        </div>
+                    </div>
+                `;
+                fragment.appendChild(appElement);
+            }
+
+            // If there are more applications to process, schedule next chunk
+            if (endIndex < leadApplications.length) {
+                setTimeout(() => processChunk(endIndex), 0);
+            }
+        };
+
+        // Clear container and start processing
+        container.innerHTML = '';
+        processChunk(0);
+
         console.log(`✅ Loaded ${leadApplications.length} quote applications for lead ${leadId}`);
+        container.appendChild(fragment);
     }
 };
 
@@ -3214,6 +3301,15 @@ window.showApplicationSubmissions = function(leadId) {
 window.viewQuoteApplication = function(appId) {
     console.log('📄 Viewing quote application:', appId);
 
+    // Clean up any existing modals before creating new ones
+    const existingModals = document.querySelectorAll('[id*="quote"], [id*="application"], .modal-overlay');
+    existingModals.forEach(modal => {
+        if (modal.id !== 'quote-application-modal' || modal.style.display === 'none') {
+            modal.remove();
+            console.log('🧹 Cleaned up existing modal:', modal.id || modal.className);
+        }
+    });
+
     // Get the application data from server
     fetch(`/api/quote-applications/${appId}`)
         .then(response => response.json())
@@ -3227,11 +3323,20 @@ window.viewQuoteApplication = function(appId) {
                 window.editingApplicationData = application;
 
                 // Open the original quote application form
+                console.log('📋 Attempting to open view for leadId:', application.leadId);
                 if (typeof window.createQuoteApplicationSimple === 'function') {
-                    window.createQuoteApplicationSimple(application.leadId);
+                    console.log('✅ createQuoteApplicationSimple found, opening view...');
+                    try {
+                        window.createQuoteApplicationSimple(application.leadId);
+                        console.log('✅ View opened successfully');
+                    } catch (error) {
+                        console.error('❌ Error opening view:', error);
+                        alert('Error opening application view. Please try again.');
+                    }
                 } else {
-                    console.error('createQuoteApplicationSimple function not available');
-                    alert('Unable to open application form');
+                    console.error('❌ createQuoteApplicationSimple function not available');
+                    console.log('Available window functions:', Object.keys(window).filter(key => key.includes('Quote')));
+                    alert('Unable to open application form. Function not found.');
                 }
             } else {
                 alert('Application not found');
@@ -3246,6 +3351,15 @@ window.viewQuoteApplication = function(appId) {
 window.downloadQuoteApplication = function(appId) {
     console.log('📥 Downloading quote application:', appId);
 
+    // Clean up any existing modals before creating new ones
+    const existingModals = document.querySelectorAll('[id*="quote"], [id*="application"], .modal-overlay');
+    existingModals.forEach(modal => {
+        if (modal.id !== 'quote-application-modal' || modal.style.display === 'none') {
+            modal.remove();
+            console.log('🧹 Cleaned up existing modal:', modal.id || modal.className);
+        }
+    });
+
     // Get the application data from server
     fetch(`/api/quote-applications/${appId}`)
         .then(response => response.json())
@@ -3259,38 +3373,77 @@ window.downloadQuoteApplication = function(appId) {
                 window.editingApplicationData = application;
 
                 // Open the application first
+                console.log('📋 Checking if createQuoteApplicationSimple function exists...');
                 if (typeof window.createQuoteApplicationSimple === 'function') {
-                    window.createQuoteApplicationSimple(application.leadId);
+                    console.log('✅ createQuoteApplicationSimple found, opening modal...');
+                    try {
+                        window.createQuoteApplicationSimple(application.leadId);
+                        console.log('✅ Modal creation called successfully');
+                    } catch (error) {
+                        console.error('❌ Error opening modal:', error);
+                        alert('Error opening application modal. Please try again.');
+                        return;
+                    }
 
-                    // Wait a moment for the modal to open, then trigger direct download
+                    // Wait a moment for the modal to open, then trigger direct download with timeout
+                    let downloadTimeout;
+                    let downloadCompleted = false;
+
+                    downloadTimeout = setTimeout(() => {
+                        if (!downloadCompleted) {
+                            console.error('⏰ Download process timed out after 10 seconds');
+                            alert('Download is taking too long. Please try again or use the View button first.');
+                        }
+                    }, 10000);
+
                     setTimeout(() => {
                         console.log('📥 Triggering direct download after modal opened...');
 
                         // Call the application download directly, bypassing any ACORD conflicts
                         const modal = document.getElementById('quote-application-modal');
+                        console.log('📋 Modal element found:', !!modal);
+                        console.log('📋 downloadQuoteApplicationPDF function exists:', typeof window.downloadQuoteApplicationPDF);
+
                         if (modal && typeof window.downloadQuoteApplicationPDF === 'function') {
-                            // Temporarily disable any ACORD functions that might interfere
-                            const originalDownloadACORD = window.downloadACORD;
-                            window.downloadACORD = function() {
-                                console.log('🚫 ACORD download blocked during application download');
-                                return false;
-                            };
+                            console.log('✅ Both modal and download function available, proceeding...');
+                            try {
+                                // Temporarily disable any ACORD functions that might interfere
+                                const originalDownloadACORD = window.downloadACORD;
+                                window.downloadACORD = function() {
+                                    console.log('🚫 ACORD download blocked during application download');
+                                    return false;
+                                };
 
-                            // Call the application download
-                            window.downloadQuoteApplicationPDF();
+                                // Call the application download
+                                window.downloadQuoteApplicationPDF();
+                                console.log('✅ Download function called successfully');
+                                downloadCompleted = true;
+                                clearTimeout(downloadTimeout);
 
-                            // Restore ACORD function after a delay
-                            setTimeout(() => {
-                                window.downloadACORD = originalDownloadACORD;
-                            }, 3000);
+                                // Restore ACORD function after a delay
+                                setTimeout(() => {
+                                    window.downloadACORD = originalDownloadACORD;
+                                    console.log('🔄 ACORD function restored');
+                                }, 3000);
+                            } catch (error) {
+                                console.error('❌ Error during download process:', error);
+                                downloadCompleted = true;
+                                clearTimeout(downloadTimeout);
+                                alert('Error during download. Please try again.');
+                            }
                         } else {
-                            console.error('Quote application modal not found or download function not available');
+                            console.error('❌ Quote application modal not found or download function not available');
+                            console.log('Modal:', modal);
+                            console.log('Download function type:', typeof window.downloadQuoteApplicationPDF);
+                            downloadCompleted = true;
+                            clearTimeout(downloadTimeout);
                             alert('Download function not available. Please try viewing the application first.');
                         }
                     }, 500);
                 } else {
-                    console.error('createQuoteApplicationSimple function not available');
-                    alert('Unable to open application for download');
+                    console.error('❌ createQuoteApplicationSimple function not available');
+                    console.log('Available window functions:', Object.keys(window).filter(key => key.includes('Quote')));
+                    alert('Unable to open application for download. Function not found.');
                 }
             } else {
                 alert('Application not found');
@@ -3323,8 +3476,40 @@ window.deleteQuoteApplication = function(appId) {
                 // Refresh the applications display
                 const leadProfileModal = document.getElementById('lead-profile-container');
                 const currentLead = window.currentViewingLead || (leadProfileModal && leadProfileModal.dataset.leadId);
+                console.log('🔄 Attempting to refresh applications for lead:', currentLead);
+
                 if (currentLead) {
-                    protectedFunctions.loadQuoteApplications(currentLead);
+                    console.log('🔄 Calling protectedFunctions.loadQuoteApplications...');
+
+                    // Add timeout for refresh operation to prevent hanging
+                    let refreshCompleted = false;
+                    const refreshTimeout = setTimeout(() => {
+                        if (!refreshCompleted) {
+                            console.error('⏰ Refresh operation timed out after 8 seconds');
+                            alert('Application deleted but refresh took too long. Please close and reopen the profile to see changes.');
+                        }
+                    }, 8000);
+
+                    try {
+                        protectedFunctions.loadQuoteApplications(currentLead);
+                        console.log('✅ Successfully called loadQuoteApplications');
+
+                        // Mark as completed after a short delay
+                        setTimeout(() => {
+                            refreshCompleted = true;
+                            clearTimeout(refreshTimeout);
+                            console.log('✅ Refresh operation completed successfully');
+                        }, 1000);
+
+                    } catch (error) {
+                        console.error('❌ Error in loadQuoteApplications:', error);
+                        refreshCompleted = true;
+                        clearTimeout(refreshTimeout);
+                        alert('Application deleted but failed to refresh the list. Please close and reopen the profile.');
+                    }
+                } else {
+                    console.warn('⚠️ No current lead found to refresh applications');
+                    alert('Application deleted successfully. Please close and reopen the profile to see changes.');
                 }
             } else {
                 alert('Error deleting application: ' + data.error);
@@ -3859,6 +4044,82 @@ setTimeout(() => {
     console.log('🛡️ FINAL OVERRIDE: Last chance protection of functions');
     lockFunctions();
 }, 1000);
+
+// Add periodic DOM cleanup to prevent memory accumulation
+function cleanupOrphanedElements() {
+    // Remove hidden or orphaned modal elements
+    const hiddenModals = document.querySelectorAll('.modal-overlay[style*="display: none"], .modal-overlay:not([style*="display"]):empty');
+    hiddenModals.forEach(modal => {
+        modal.remove();
+        console.log('🧹 Removed orphaned modal element');
+    });
+
+    // Remove duplicate modal elements (keep only the visible one)
+    const quoteModals = document.querySelectorAll('#quote-application-modal');
+    if (quoteModals.length > 1) {
+        for (let i = 1; i < quoteModals.length; i++) {
+            quoteModals[i].remove();
+            console.log('🧹 Removed duplicate quote modal');
+        }
+    }
+
+    // Remove empty containers that might be leftover
+    const emptyContainers = document.querySelectorAll('div:empty:not([id]):not([class]), span:empty:not([id]):not([class])');
+    emptyContainers.forEach(container => {
+        if (container.parentNode && !container.hasChildNodes()) {
+            container.remove();
+        }
+    });
+}
+
+// Add network connection cleanup function
+function clearPendingConnections() {
+    // Cancel all pending quote application requests
+    if (window.quoteApplicationControllers) {
+        Object.keys(window.quoteApplicationControllers).forEach(leadId => {
+            const controller = window.quoteApplicationControllers[leadId];
+            if (controller) {
+                console.log('🚫 Clearing pending request for lead:', leadId);
+                controller.abort();
+            }
+        });
+        window.quoteApplicationControllers = {};
+    }
+
+    // Reset loading states
+    const loadingContainers = document.querySelectorAll('[data-loading="true"]');
+    loadingContainers.forEach(container => {
+        container.dataset.loading = 'false';
+        console.log('🔄 Reset loading state for container');
+    });
+}
+
+// Run DOM cleanup every 30 seconds
+setInterval(cleanupOrphanedElements, 30000);
+
+// Run network cleanup every 20 seconds to clear stuck connections
+setInterval(clearPendingConnections, 20000);
+
+// Add manual cleanup function for debugging
+window.forceCleanup = function() {
+    console.log('🧹 FORCE CLEANUP: Clearing all pending requests and DOM elements');
+
+    // Clear all pending requests
+    clearPendingConnections();
+
+    // Clear all modals
+    const allModals = document.querySelectorAll('.modal-overlay, [id*="modal"]');
+    allModals.forEach(modal => modal.remove());
+
+    // Clear DOM elements
+    cleanupOrphanedElements();
+
+    console.log('✅ Force cleanup completed');
+    return 'Cleanup completed - try your action again';
+};
+
+console.log('✅ DOM and network cleanup systems initialized');
+console.log('💡 Tip: If requests are stuck, type forceCleanup() in console');
 
 // Set up periodic monitoring to detect and prevent function override
 setInterval(() => {

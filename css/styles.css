@@ -5005,3 +5005,171 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
 }
+
+
+/* ============================================
+   ARCHIVED LEADS TAB STYLES
+   ============================================ */
+
+.lead-tabs {
+    display: flex;
+    gap: 2px;
+    margin: 20px 0 10px 0;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.lead-tab {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.lead-tab:hover {
+    background: #3b82f6 !important;
+    color: white !important;
+}
+
+.lead-tab.active {
+    background: #3b82f6 !important;
+    color: white !important;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.archived-leads-content {
+    opacity: 1;
+}
+
+.archived-leads-content .data-table {
+    opacity: 0.95;
+}
+
+.archived-lead-checkbox {
+    accent-color: #3b82f6;
+}
+
+/* Archived lead row styles */
+#archivedLeadsTable tr {
+    transition: opacity 0.2s;
+}
+
+#archivedLeadsTable tr:hover {
+    opacity: 1 !important;
+    background-color: #f8fafc !important;
+}
+
+.archived-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Tab content container */
+#active-leads-tab,
+#archived-leads-tab {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Monthly Archive Tabs */
+.monthly-tabs-container {
+    margin: 20px 0;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.monthly-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: -2px;
+}
+
+.monthly-tab {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #64748b;
+    transition: all 0.2s ease;
+    position: relative;
+    min-width: 120px;
+    text-align: center;
+}
+
+.monthly-tab:hover {
+    background: #f1f5f9;
+    color: #475569;
+    transform: translateY(-1px);
+}
+
+.monthly-tab.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.monthly-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #3b82f6;
+}
+
+.archive-stats {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.stat-value {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #3b82f6;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: #64748b;
+    font-weight: 500;
+}
+

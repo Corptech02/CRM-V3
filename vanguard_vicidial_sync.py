@@ -173,6 +173,65 @@ class VanguardViciDialSync:
         else:
             return phone
 
+    def format_renewal_date(self, raw_date):
+        """Format renewal date from ViciDial address3 field to M/D/YYYY format"""
+        if not raw_date:
+            return ""
+
+        # Clean up the raw date string
+        raw_date = raw_date.strip()
+
+        # Try various date formats that might be in address3
+        date_patterns = [
+            r'(\d{1,2})/(\d{1,2})/(\d{4})',  # M/D/YYYY or MM/DD/YYYY
+            r'(\d{1,2})-(\d{1,2})-(\d{4})',  # M-D-YYYY or MM-DD-YYYY
+            r'(\d{4})-(\d{1,2})-(\d{1,2})',  # YYYY-MM-DD
+            r'(\d{1,2})/(\d{1,2})/(\d{2})',  # M/D/YY or MM/DD/YY
+        ]
+
+        for pattern in date_patterns:
+            match = re.search(pattern, raw_date)
+            if match:
+                if len(match.group(3)) == 4:  # Full year
+                    if pattern == r'(\d{4})-(\d{1,2})-(\d{1,2})':  # YYYY-MM-DD format
+                        year, month, day = match.groups()
+                        return f"{int(month)}/{int(day)}/{year}"
+                    else:  # M/D/YYYY or M-D-YYYY format
+                        month, day, year = match.groups()
+                        return f"{int(month)}/{int(day)}/{year}"
+                else:  # 2-digit year, assume 20XX
+                    month, day, year = match.groups()
+                    full_year = f"20{year}"
+                    return f"{int(month)}/{int(day)}/{full_year}"
+
+        # If no standard date pattern found, look for month names
+        month_names = {
+            'jan': '1', 'january': '1',
+            'feb': '2', 'february': '2',
+            'mar': '3', 'march': '3',
+            'apr': '4', 'april': '4',
+            'may': '5',
+            'jun': '6', 'june': '6',
+            'jul': '7', 'july': '7',
+            'aug': '8', 'august': '8',
+            'sep': '9', 'september': '9',
+            'oct': '10', 'october': '10',
+            'nov': '11', 'november': '11',
+            'dec': '12', 'december': '12'
+        }
+
+        raw_lower = raw_date.lower()
+        for month_name, month_num in month_names.items():
+            if month_name in raw_lower:
+                # Extract year and day if possible
+                year_match = re.search(r'(\d{4})', raw_date)
+                day_match = re.search(r'\b(\d{1,2})\b', raw_date)
+                if year_match and day_match:
+                    return f"{month_num}/{day_match.group(1)}/{year_match.group(1)}"
+
+        # If nothing matches, return the original string
+        return raw_date
+
     def extract_policy_from_comments(self, comments):
         """Extract insurance policy details from comments/notes"""
         policy_info = {
@@ -227,6 +286,14 @@ class VanguardViciDialSync:
         comments = lead_details.get('comments', '') if lead_details else ''
         policy_info = self.extract_policy_from_comments(comments)
 
+        # Extract renewal date from address3 field (where ViciDial stores renewal date)
+        renewal_date = ""
+        if lead_details and 'address3' in lead_details:
+            raw_renewal = lead_details['address3'].strip()
+            if raw_renewal:
+                # Try to format the renewal date to match existing format (M/D/YYYY)
+                renewal_date = self.format_renewal_date(raw_renewal)
+
         # Create lead data matching existing format
         lead_data = {
             "id": lead_id,
@@ -239,7 +306,7 @@ class VanguardViciDialSync:
             "status": "hot_lead",
             "assignedTo": "Sales Team",
             "created": datetime.now().strftime("%-m/%-d/%Y"),
-            "renewalDate": "",
+            "renewalDate": renewal_date,
             "premium": policy_info['quoted_premium'],
             "dotNumber": vicidial_lead.get('vendor_code', ''),
             "mcNumber": "",

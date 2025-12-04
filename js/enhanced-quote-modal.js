@@ -189,6 +189,27 @@ window.removeTruckRow = function(button) {
     if (row) {
         row.remove();
         console.log('✅ Removed truck row');
+
+        // Clear any existing data for the removed truck to ensure it doesn't persist
+        const modal = document.getElementById('quote-application-modal');
+        if (modal && window.editingApplicationData && window.editingApplicationData.formData) {
+            // Force a data refresh by collecting current truck data immediately
+            const currentTrucks = [];
+            modal.querySelectorAll('#trucks-container .truck-row').forEach((truckRow, index) => {
+                const inputs = truckRow.querySelectorAll('input');
+                const year = inputs[0]?.value?.trim() || '';
+                const make = inputs[1]?.value?.trim() || '';
+                const type = inputs[2]?.value?.trim() || '';
+                const vin = inputs[3]?.value?.trim() || '';
+                if (year || make || type || vin) {
+                    currentTrucks.push({ year, make, type, vin });
+                }
+            });
+
+            // Update the current editing data to reflect the deletion
+            window.editingApplicationData.formData.trucks = currentTrucks;
+            console.log('🔄 Updated editing data - trucks remaining:', currentTrucks.length);
+        }
     }
 };
 
@@ -244,6 +265,27 @@ window.removeTrailerRow = function(button) {
     if (row) {
         row.remove();
         console.log('✅ Removed trailer row');
+
+        // Clear any existing data for the removed trailer to ensure it doesn't persist
+        const modal = document.getElementById('quote-application-modal');
+        if (modal && window.editingApplicationData && window.editingApplicationData.formData) {
+            // Force a data refresh by collecting current trailer data immediately
+            const currentTrailers = [];
+            modal.querySelectorAll('#trailers-container .trailer-row').forEach((trailerRow, index) => {
+                const inputs = trailerRow.querySelectorAll('input');
+                const year = inputs[0]?.value?.trim() || '';
+                const make = inputs[1]?.value?.trim() || '';
+                const type = inputs[2]?.value?.trim() || '';
+                const vin = inputs[3]?.value?.trim() || '';
+                if (year || make || type || vin) {
+                    currentTrailers.push({ year, make, type, vin });
+                }
+            });
+
+            // Update the current editing data to reflect the deletion
+            window.editingApplicationData.formData.trailers = currentTrailers;
+            console.log('🔄 Updated editing data - trailers remaining:', currentTrailers.length);
+        }
     }
 };
 
@@ -258,7 +300,7 @@ window.addCommodityRow = function() {
 
     const newRow = document.createElement('div');
     newRow.className = 'commodity-row';
-    newRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
+    newRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
 
     newRow.innerHTML = `
         <div>
@@ -267,10 +309,6 @@ window.addCommodityRow = function() {
         </div>
         <div>
             <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">% of Loads:</label>
-            <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Max Value:</label>
             <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
         </div>
         <div>
@@ -496,17 +534,13 @@ window.createQuoteApplicationSimple = function(leadId) {
                     <button type="button" onclick="addCommodityRow()" style="background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">Add Commodity</button>
                 </div>
                 <div id="commodities-container">
-                    <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+                    <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
                         <div>
                             <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Commodity:</label>
                             <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">% of Loads:</label>
-                            <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Max Value:</label>
                             <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                         </div>
                         <div>
@@ -942,12 +976,12 @@ function prefillApplicationForm(applicationData) {
                 if (driverRows[index]) {
                     const inputs = driverRows[index].querySelectorAll('input');
                     if (inputs[0]) inputs[0].value = driver.name || '';
-                    if (inputs[1]) inputs[1].value = driver.licenseNumber || '';
-                    if (inputs[2]) inputs[2].value = driver.licenseState || '';
-                    if (inputs[3]) inputs[3].value = driver.dateOfBirth || '';
-                    if (inputs[4]) inputs[4].value = driver.hireDate || '';
-                    if (inputs[5]) inputs[5].value = driver.experience || '';
-                    if (inputs[6]) inputs[6].value = driver.mvr || '';
+                    if (inputs[1]) inputs[1].value = driver.dob || driver.dateOfBirth || '';
+                    if (inputs[2]) inputs[2].value = driver.license || driver.licenseNumber || '';
+                    if (inputs[3]) inputs[3].value = driver.state || driver.licenseState || '';
+                    if (inputs[4]) inputs[4].value = driver.experience || '';
+                    if (inputs[5]) inputs[5].value = driver.hireDate || '';
+                    if (inputs[6]) inputs[6].value = driver.accidents || driver.mvr || '';
                 }
             }, 50 * (index + 1));
         });
@@ -1153,14 +1187,12 @@ window.saveQuoteApplication = async function() {
         modal.querySelectorAll('#commodities-container .commodity-row').forEach((row, index) => {
             const commodity = row.querySelector('input[placeholder*="Commodity"], input')?.value?.trim() || '';
             const percentage = row.querySelectorAll('input')[1]?.value?.trim() || '';
-            const maxValue = row.querySelectorAll('input')[2]?.value?.trim() || '';
 
-            if (commodity || percentage || maxValue) {
-                commodities.push({ commodity, percentage, maxValue });
+            if (commodity || percentage) {
+                commodities.push({ commodity, percentage });
                 // Also store in old format for compatibility
                 formData[`Commodity_${index}`] = commodity;
                 formData[`% of Loads_${index}`] = percentage;
-                formData[`Max Value_${index}`] = maxValue;
             }
         });
 
@@ -1351,16 +1383,33 @@ window.saveQuoteApplication = async function() {
 
         // Save to server as primary method
         try {
-            const response = await fetch('/api/quote-applications', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    leadId: leadId,
-                    applicationData: applicationSubmission
-                })
-            });
+            let response;
+            if (isEditing) {
+                // Update existing application using PUT
+                console.log('🔄 Updating existing application with PUT:', window.editingApplicationId);
+                response = await fetch(`/api/quote-applications/${window.editingApplicationId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        applicationData: applicationSubmission
+                    })
+                });
+            } else {
+                // Create new application using POST
+                console.log('✨ Creating new application with POST');
+                response = await fetch('/api/quote-applications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        leadId: leadId,
+                        applicationData: applicationSubmission
+                    })
+                });
+            }
 
             const result = await response.json();
 
@@ -1368,24 +1417,32 @@ window.saveQuoteApplication = async function() {
                 throw new Error(result.error || 'Server save failed');
             }
 
-            console.log('✅ Quote application saved to server:', result.applicationId);
-
-            // Store the original frontend ID before updating
-            const originalId = applicationSubmission.id;
-
-            // Update application with server-generated ID
-            applicationSubmission.id = result.applicationId;
-
-            // Update localStorage with correct server ID
             if (isEditing) {
+                console.log('✅ Quote application updated on server:', window.editingApplicationId);
+            } else {
+                console.log('✅ Quote application saved to server:', result.applicationId);
+            }
+
+            // Handle response based on operation type
+            if (isEditing) {
+                // For updates, keep the same ID and update localStorage
                 const existingIndex = allSubmissions.findIndex(app => app.id === window.editingApplicationId);
                 if (existingIndex !== -1) {
                     allSubmissions[existingIndex] = applicationSubmission;
+                    console.log('✅ Updated application in localStorage at index:', existingIndex);
+                } else {
+                    console.warn('⚠️ Could not find existing application in localStorage, adding as new');
+                    allSubmissions.push(applicationSubmission);
                 }
             } else {
+                // For new applications, use server-generated ID
+                const originalId = applicationSubmission.id;
+                applicationSubmission.id = result.applicationId;
+
                 // Remove the local ID version and add server ID version
                 allSubmissions = allSubmissions.filter(app => app.id !== originalId);
                 allSubmissions.push(applicationSubmission);
+                console.log('✅ Added new application to localStorage with server ID:', result.applicationId);
             }
             localStorage.setItem('quote_applications', JSON.stringify(allSubmissions));
         } catch (error) {
@@ -1705,7 +1762,7 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <button type="button" onclick="addCommodityRow()" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">+ Add Commodity</button>
                 </div>
                 <div id="commodities-container">
-                    <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+                    <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
                         <div>
                             <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Commodity:</label>
                             <input type="text" value="${getSavedValue('Commodity', '')}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
@@ -1713,10 +1770,6 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                         <div>
                             <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">% of Loads:</label>
                             <input type="text" value="${getSavedValue('% of Loads', '')}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Max Value:</label>
-                            <input type="text" value="${getSavedValue('Max Value', '')}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                         </div>
                         <div>
                             <button type="button" onclick="removeCommodityRow(this)" style="background: #dc2626; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Delete</button>
@@ -1984,18 +2037,16 @@ function populateArrayDataFromSaved(savedData) {
 
             // Reconstruct commodity data if needed
             if (commodityData.length === 0) {
-                const commodityKeys = keys.filter(k => k.startsWith('Commodity') && !k.includes('% of Loads') && !k.includes('Max Value')).sort();
+                const commodityKeys = keys.filter(k => k.startsWith('Commodity') && !k.includes('% of Loads')).sort();
                 const percentageKeys = keys.filter(k => k.includes('% of Loads')).sort();
-                const maxValueKeys = keys.filter(k => k.includes('Max Value')).sort();
 
-                const maxCommodityItems = Math.max(commodityKeys.length, percentageKeys.length, maxValueKeys.length);
+                const maxCommodityItems = Math.max(commodityKeys.length, percentageKeys.length);
                 for (let i = 0; i < maxCommodityItems; i++) {
                     const commodity = savedData[commodityKeys[i]] || '';
                     const percentage = savedData[percentageKeys[i]] || '';
-                    const maxValue = savedData[maxValueKeys[i]] || '';
 
-                    if (commodity || percentage || maxValue) {
-                        commodityData.push({ commodity, percentage, maxValue });
+                    if (commodity || percentage) {
+                        commodityData.push({ commodity, percentage });
                     }
                 }
             }
@@ -2086,7 +2137,7 @@ function populateCommodityRows(commodityData) {
     commodityData.forEach((item, index) => {
         const row = document.createElement('div');
         row.className = 'commodity-row';
-        row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
+        row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;';
         row.innerHTML = `
             <div>
                 <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Commodity:</label>
@@ -2095,10 +2146,6 @@ function populateCommodityRows(commodityData) {
             <div>
                 <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">% of Loads:</label>
                 <input type="text" value="${item.percentage}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-            </div>
-            <div>
-                <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Max Value:</label>
-                <input type="text" value="${item.maxValue}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
             </div>
             <div>
                 <button type="button" onclick="removeCommodityRow(this)" style="background: #dc2626; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Delete</button>
@@ -2261,11 +2308,9 @@ window.downloadQuoteApplicationPDF = function() {
         modal.querySelectorAll('#commodities-container .commodity-row').forEach((row, index) => {
             const commodity = row.querySelector('input')?.value?.trim() || '';
             const percentage = row.querySelectorAll('input')[1]?.value?.trim() || '';
-            const maxValue = row.querySelectorAll('input')[2]?.value?.trim() || '';
 
             formData[`Commodity_${index}`] = commodity;
             formData[`% of Loads_${index}`] = percentage;
-            formData[`Max Value_${index}`] = maxValue;
         });
 
         modal.querySelectorAll('#drivers-container .driver-row').forEach((row, index) => {
@@ -2370,7 +2415,6 @@ function generateApplicationPDF(lead, formData) {
                 arraySectionsHTML += `<div class="array-item"><div class="array-item-grid">
                     <div class="field"><div class="field-label">Commodity:</div><div class="field-value">${item.commodity || 'N/A'}</div></div>
                     <div class="field"><div class="field-label">% of Loads:</div><div class="field-value">${item.percentage || 'N/A'}</div></div>
-                    <div class="field"><div class="field-label">Max Value:</div><div class="field-value">${item.maxValue || 'N/A'}</div></div>
                 </div></div>`;
             });
             arraySectionsHTML += '</div>';
@@ -2436,17 +2480,14 @@ function generateApplicationPDF(lead, formData) {
             if (arrayType === 'commodities') {
                 // Look for indexed commodity data
                 while (formData[`Commodity_${index}`] !== undefined ||
-                       formData[`% of Loads_${index}`] !== undefined ||
-                       formData[`Max Value_${index}`] !== undefined) {
+                       formData[`% of Loads_${index}`] !== undefined) {
 
                     const commodity = formData[`Commodity_${index}`] || '';
                     const percentage = formData[`% of Loads_${index}`] || '';
-                    const maxValue = formData[`Max Value_${index}`] || '';
 
                     arrayItems.push({
                         commodity: commodity,
-                        percentage: percentage,
-                        maxValue: maxValue
+                        percentage: percentage
                     });
                     index++;
                 }

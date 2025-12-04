@@ -49,8 +49,9 @@
             });
         });
 
-        // Remove high z-index loading elements
-        document.querySelectorAll('*').forEach(el => {
+        // Remove high z-index loading elements (optimized to avoid querying all DOM elements)
+        const highZElements = document.querySelectorAll('[style*="z-index"], .modal, .overlay, .popup, .loading-container');
+        highZElements.forEach(el => {
             const style = window.getComputedStyle(el);
             const zIndex = parseInt(style.zIndex);
             if (zIndex > 1000 && style.position !== 'static') {
@@ -69,8 +70,8 @@
     // Run immediately
     removeLoadingOverlays();
 
-    // Run periodically to catch dynamically created overlays
-    setInterval(removeLoadingOverlays, 500);
+    // Run periodically to catch dynamically created overlays (reduced frequency for performance)
+    setInterval(removeLoadingOverlays, 3000);
 
     // Observer to catch new loading overlays as they're added
     const observer = new MutationObserver(function(mutations) {

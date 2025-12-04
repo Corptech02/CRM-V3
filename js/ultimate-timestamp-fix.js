@@ -62,12 +62,12 @@
                             console.log('🟡 APPLYING YELLOW');
                             row.style.cssText = 'background-color: #fef3c7 !important; border-left: 4px solid #f59e0b !important;';
                             yellowCount++;
-                        } else if (diffDays > 1 && diffDays < 7) {
+                        } else if (diffDays === 2) {
                             // ORANGE
                             console.log('🟠 APPLYING ORANGE');
                             row.style.cssText = 'background-color: #fed7aa !important; border-left: 4px solid #fb923c !important;';
                             orangeCount++;
-                        } else if (diffDays >= 7) {
+                        } else if (diffDays >= 3) {
                             // RED
                             console.log('🔴 APPLYING RED');
                             row.style.cssText = 'background-color: #fecaca !important; border-left: 4px solid #ef4444 !important;';

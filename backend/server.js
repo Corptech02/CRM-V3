@@ -94,6 +94,17 @@ function initializeDatabase() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Archived leads table
+    db.run(`CREATE TABLE IF NOT EXISTS archived_leads (
+        id TEXT PRIMARY KEY,
+        original_lead_id TEXT NOT NULL,
+        data TEXT NOT NULL,
+        archived_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        archived_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // Settings table for global app data
     db.run(`CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -149,17 +160,108 @@ function initializeDatabase() {
     console.log('Database tables initialized');
 }
 
+// Helper functions for ViciDial lead processing
+function formatRenewalDate(rawDate) {
+    if (!rawDate) return '';
+
+    const cleanDate = rawDate.trim();
+
+    // Try various date formats that might be in address3
+    const datePatterns = [
+        /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // M/D/YYYY or MM/DD/YYYY
+        /(\d{1,2})-(\d{1,2})-(\d{4})/,   // M-D-YYYY or MM-DD-YYYY
+        /(\d{4})-(\d{1,2})-(\d{1,2})/,   // YYYY-MM-DD
+        /(\d{1,2})\/(\d{1,2})\/(\d{2})/  // M/D/YY or MM/DD/YY
+    ];
+
+    for (const pattern of datePatterns) {
+        const match = cleanDate.match(pattern);
+        if (match) {
+            if (match[3] && match[3].length === 4) { // Full year
+                if (pattern === /(\d{4})-(\d{1,2})-(\d{1,2})/) { // YYYY-MM-DD format
+                    const [, year, month, day] = match;
+                    return `${parseInt(month)}/${parseInt(day)}/${year}`;
+                } else { // M/D/YYYY or M-D-YYYY format
+                    const [, month, day, year] = match;
+                    return `${parseInt(month)}/${parseInt(day)}/${year}`;
+                }
+            } else { // 2-digit year, assume 20XX
+                const [, month, day, year] = match;
+                const fullYear = `20${year}`;
+                return `${parseInt(month)}/${parseInt(day)}/${fullYear}`;
+            }
+        }
+    }
+
+    // If no standard date pattern found, look for month names
+    const monthNames = {
+        jan: '1', january: '1', feb: '2', february: '2', mar: '3', march: '3',
+        apr: '4', april: '4', may: '5', jun: '6', june: '6', jul: '7', july: '7',
+        aug: '8', august: '8', sep: '9', september: '9', oct: '10', october: '10',
+        nov: '11', november: '11', dec: '12', december: '12'
+    };
+
+    const lowerDate = cleanDate.toLowerCase();
+    for (const [monthName, monthNum] of Object.entries(monthNames)) {
+        if (lowerDate.includes(monthName)) {
+            const yearMatch = cleanDate.match(/(\d{4})/);
+            const dayMatch = cleanDate.match(/\b(\d{1,2})\b/);
+            if (yearMatch && dayMatch) {
+                return `${monthNum}/${dayMatch[1]}/${yearMatch[1]}`;
+            }
+        }
+    }
+
+    // If nothing matches, return the original string
+    return cleanDate;
+}
+
+function formatPhoneNumber(phone) {
+    if (!phone) return '';
+
+    // Remove all non-digits
+    const digits = phone.replace(/\D/g, '');
+
+    if (digits.length === 10) {
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11 && digits[0] === '1') {
+        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    } else {
+        return phone; // Return original if format is unclear
+    }
+}
+
 // API Routes
 
 // Get all clients
 app.get('/api/clients', (req, res) => {
-    db.all('SELECT * FROM clients', (err, rows) => {
+    const limit = req.query.limit ? parseInt(req.query.limit) : 500; // Default limit of 500 clients
+    const offset = req.query.offset ? parseInt(req.query.offset) : 0; // Default offset of 0
+
+    console.log(`Fetching clients: limit=${limit}, offset=${offset}`);
+
+    db.all('SELECT * FROM clients ORDER BY updated_at DESC LIMIT ? OFFSET ?', [limit, offset], (err, rows) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
         const clients = rows.map(row => JSON.parse(row.data));
-        res.json(clients);
+
+        // Also get total count for pagination info
+        db.get('SELECT COUNT(*) as total FROM clients', (countErr, countRow) => {
+            if (countErr) {
+                console.error('Error getting client count:', countErr);
+                res.json(clients); // Return clients without count info
+            } else {
+                res.json({
+                    clients: clients,
+                    total: countRow.total,
+                    limit: limit,
+                    offset: offset,
+                    hasMore: offset + limit < countRow.total
+                });
+            }
+        });
     });
 });
 
@@ -394,6 +496,169 @@ app.post('/api/cleanup-invalid-leads', (req, res) => {
         }
         console.log(`✅ CLEANUP: Removed ${this.changes} invalid leads`);
         res.json({ success: true, deleted: this.changes });
+    });
+});
+
+// ============================================
+// ARCHIVED LEADS API ENDPOINTS
+// ============================================
+
+// Get all archived leads
+app.get('/api/archived-leads', (req, res) => {
+    db.all('SELECT * FROM archived_leads ORDER BY archived_date DESC', (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        const archivedLeads = rows.map(row => ({
+            ...JSON.parse(row.data),
+            archivedDate: row.archived_date,
+            archivedBy: row.archived_by,
+            archiveId: row.id,
+            originalLeadId: row.original_lead_id
+        }));
+        res.json({ success: true, archivedLeads });
+    });
+});
+
+// Archive a lead (move from active to archived)
+app.post('/api/archive-lead/:id', (req, res) => {
+    const leadId = req.params.id;
+    const archivedBy = req.body.archivedBy || 'System';
+
+    console.log(`📦 Archiving lead ${leadId} by ${archivedBy}`);
+
+    // First get the lead from active leads
+    db.get('SELECT data FROM leads WHERE id = ?', [leadId], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (!row) {
+            res.status(404).json({ error: 'Lead not found' });
+            return;
+        }
+
+        const leadData = JSON.parse(row.data);
+        const archiveId = `archived_${leadId}_${Date.now()}`;
+
+        // Insert into archived_leads table
+        db.run(`INSERT INTO archived_leads (id, original_lead_id, data, archived_by) VALUES (?, ?, ?, ?)`,
+            [archiveId, leadId, row.data, archivedBy],
+            function(err) {
+                if (err) {
+                    res.status(500).json({ error: err.message });
+                    return;
+                }
+
+                // Remove from active leads
+                db.run('DELETE FROM leads WHERE id = ?', [leadId], function(err) {
+                    if (err) {
+                        res.status(500).json({ error: err.message });
+                        return;
+                    }
+
+                    console.log(`✅ Lead ${leadId} archived successfully`);
+                    res.json({ success: true, archivedId: archiveId });
+                });
+            }
+        );
+    });
+});
+
+// Restore a lead from archive to active
+app.post('/api/restore-lead/:archiveId', (req, res) => {
+    const archiveId = req.params.archiveId;
+
+    console.log(`📤 Restoring lead ${archiveId}`);
+
+    // Get the archived lead
+    db.get('SELECT original_lead_id, data FROM archived_leads WHERE id = ?', [archiveId], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (!row) {
+            res.status(404).json({ error: 'Archived lead not found' });
+            return;
+        }
+
+        const originalLeadId = row.original_lead_id;
+        const leadData = row.data;
+
+        // Insert back into active leads
+        db.run(`INSERT INTO leads (id, data) VALUES (?, ?)
+                ON CONFLICT(id) DO UPDATE SET data = ?, updated_at = CURRENT_TIMESTAMP`,
+            [originalLeadId, leadData, leadData],
+            function(err) {
+                if (err) {
+                    res.status(500).json({ error: err.message });
+                    return;
+                }
+
+                // Remove from archived leads
+                db.run('DELETE FROM archived_leads WHERE id = ?', [archiveId], function(err) {
+                    if (err) {
+                        res.status(500).json({ error: err.message });
+                        return;
+                    }
+
+                    console.log(`✅ Lead ${originalLeadId} restored successfully`);
+                    res.json({ success: true, restoredId: originalLeadId });
+                });
+            }
+        );
+    });
+});
+
+// Permanently delete an archived lead
+app.delete('/api/archived-leads/:archiveId', (req, res) => {
+    const archiveId = req.params.archiveId;
+
+    console.log(`🗑️ Permanently deleting archived lead ${archiveId}`);
+
+    db.run('DELETE FROM archived_leads WHERE id = ?', [archiveId], function(err) {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (this.changes === 0) {
+            res.status(404).json({ error: 'Archived lead not found' });
+            return;
+        }
+
+        console.log(`✅ Archived lead ${archiveId} permanently deleted`);
+        res.json({ success: true, deleted: true });
+    });
+});
+
+// Get single archived lead by archive ID
+app.get('/api/archived-leads/:archiveId', (req, res) => {
+    const archiveId = req.params.archiveId;
+
+    db.get('SELECT * FROM archived_leads WHERE id = ?', [archiveId], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (!row) {
+            res.status(404).json({ error: 'Archived lead not found' });
+            return;
+        }
+
+        const archivedLead = {
+            ...JSON.parse(row.data),
+            archivedDate: row.archived_date,
+            archivedBy: row.archived_by,
+            archiveId: row.id,
+            originalLeadId: row.original_lead_id
+        };
+
+        res.json({ success: true, lead: archivedLead });
     });
 });
 
@@ -981,23 +1246,63 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
             // Get transcription data if available
             const transcriptionData = transcriptionResults[lead.id] || transcriptionResults[leadId] || {};
 
-            // Ensure lead has required fields
+            // Extract renewal date from address3 field (where ViciDial stores renewal date)
+            let renewalDate = '';
+            if (lead.address3) {
+                renewalDate = formatRenewalDate(lead.address3);
+            }
+
+            // Format phone number
+            const formattedPhone = formatPhoneNumber(lead.phone || '');
+
+            // Ensure lead has required fields in proper Vanguard format
             const leadToSave = {
                 id: leadId,
                 name: lead.name || lead.companyName || 'Unknown Company',
                 contact: lead.contact || '',
-                phone: lead.phone || '',
+                phone: formattedPhone,
                 email: lead.email || '',
-                state: lead.state || 'OH',
-                city: lead.city || '',
+                product: "Commercial Auto",
+                stage: "new",
+                status: "hot_lead",
+                assignedTo: "Sales Team",
+                created: new Date().toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "numeric"
+                }),
+                renewalDate: renewalDate,
+                premium: 0,
                 dotNumber: lead.dotNumber || '',
                 mcNumber: lead.mcNumber || '',
-                status: lead.status || 'SALE',
-                stage: 'new',
+                yearsInBusiness: "Unknown",
+                fleetSize: "Unknown",
+                address: "",
+                city: (lead.city || '').toUpperCase(),
+                state: lead.state || 'OH',
+                zip: "",
+                radiusOfOperation: "Regional",
+                commodityHauled: "",
+                operatingStates: [lead.state || 'OH'],
+                annualRevenue: "",
+                safetyRating: "Satisfactory",
+                currentCarrier: "",
+                currentPremium: "",
+                needsCOI: false,
+                insuranceLimits: {
+                    liability: "$1,000,000",
+                    cargo: "$100,000"
+                },
                 source: 'ViciDial',
-                listId: lead.listId || '999',
-                lastCallDate: lead.lastCallDate || new Date().toISOString(),
-                notes: lead.notes || `Imported from ViciDial list ${lead.listId}`,
+                leadScore: 85,
+                lastContactDate: new Date().toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "numeric"
+                }),
+                followUpDate: "",
+                notes: `SALE from ViciDial list ${lead.listId || '999'}. ${lead.notes || ''}`,
+                tags: ["ViciDial", "Sale", `List-${lead.listId || '999'}`],
                 transcriptText: transcriptionData.transcriptText || lead.transcriptText || '',
                 hasTranscription: !!transcriptionData.transcriptText,
                 structuredData: transcriptionData.structured_data || {},

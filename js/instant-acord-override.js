@@ -258,7 +258,7 @@ window.generateACORDPDFNow = function(policyId) {
     // Insured box
     doc.rect(110, 30, 90, 30);
     doc.text('INSURED', 112, 35);
-    const insuredName = policy.clientName || policy.insured?.['Name/Business Name'] || 'Unknown';
+    const insuredName = policy.insured?.['Name/Business Name'] || policy.clientName || 'Unknown';
     doc.text(insuredName, 112, 40);
 
     // Coverage section

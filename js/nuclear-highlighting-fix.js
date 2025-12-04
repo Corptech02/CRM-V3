@@ -128,13 +128,13 @@
                         rowClass = 'timestamp-yellow nuclear-highlight';
                         highlightColor = 'yellow';
                         console.log(`🟡 NUCLEAR: ${lead.name} -> YELLOW`);
-                    } else if (diffDays > 1 && diffDays < 7) {
+                    } else if (diffDays === 2) {
                         // ORANGE
                         rowStyle = 'style="background-color: #fed7aa !important; border-left: 4px solid #fb923c !important; border-right: 2px solid #fb923c !important;"';
                         rowClass = 'timestamp-orange nuclear-highlight';
                         highlightColor = 'orange';
                         console.log(`🟠 NUCLEAR: ${lead.name} -> ORANGE`);
-                    } else if (diffDays >= 7) {
+                    } else if (diffDays >= 3) {
                         // RED
                         rowStyle = 'style="background-color: #fecaca !important; border-left: 4px solid #ef4444 !important; border-right: 2px solid #ef4444 !important;"';
                         rowClass = 'timestamp-red nuclear-highlight';

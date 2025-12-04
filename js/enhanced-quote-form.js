@@ -11,17 +11,13 @@ function addCommodityRow() {
     }
 
     const rowHtml = `
-        <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+        <div class="commodity-row" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
             <div>
                 <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Commodity:</label>
                 <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
             </div>
             <div>
                 <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">% of Loads:</label>
-                <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-            </div>
-            <div>
-                <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Max Value:</label>
                 <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
             </div>
             <div>
