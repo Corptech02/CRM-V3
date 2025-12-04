@@ -3975,8 +3975,9 @@ async function loadLeadsView() {
                     }
 
                     // PROTECT VICIDIAL LEADS: Don't filter out ViciDial leads from deleted list
-                    if (lead.source === 'ViciDial' || String(lead.id).startsWith('8') && String(lead.id).length === 8) {
-                        console.log(`🔓 Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name}`);
+                    const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('8') && String(lead.id).length === 8);
+                    if (isViciDialLead) {
+                        console.log(`🔓 VICIDIAL PROTECTION ACTIVE: Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name} (source: ${lead.source})`);
                         return true; // Don't filter out ViciDial leads
                     }
 
@@ -6414,11 +6415,17 @@ async function deleteLead(leadId) {
     if (confirm('Are you sure you want to delete this lead?')) {
         console.log('Deleting lead:', leadId);
 
-        // Track deleted leads to prevent them from reappearing
-        const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
-        if (!deletedLeads.includes(String(leadId))) {
-            deletedLeads.push(String(leadId));
-            localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeads));
+        // VICIDIAL PROTECTION: Don't track ViciDial leads as deleted
+        const isViciDialLead = String(leadId).startsWith('8') && String(leadId).length === 8;
+        if (isViciDialLead) {
+            console.log(`🔓 VICIDIAL DELETE PROTECTION: Preventing ViciDial lead ${leadId} from being marked as deleted`);
+        } else {
+            // Track deleted leads to prevent them from reappearing
+            const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
+            if (!deletedLeads.includes(String(leadId))) {
+                deletedLeads.push(String(leadId));
+                localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeads));
+            }
         }
 
         // Delete from server first
@@ -16583,14 +16590,26 @@ window.bulkDeleteLeads = async function() {
 
     console.log(`Bulk deleting ${leadIds.length} leads...`);
 
-    // Track deleted leads to prevent them from reappearing
-    const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
-    leadIds.forEach(id => {
-        if (!deletedLeads.includes(String(id))) {
-            deletedLeads.push(String(id));
+    // VICIDIAL PROTECTION: Filter out ViciDial leads from being tracked as deleted
+    const nonViciDialLeads = leadIds.filter(id => {
+        const isViciDialLead = String(id).startsWith('8') && String(id).length === 8;
+        if (isViciDialLead) {
+            console.log(`🔓 BULK VICIDIAL DELETE PROTECTION: Skipping ViciDial lead ${id} from deleted list`);
+            return false;
         }
+        return true;
     });
-    localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeads));
+
+    // Track deleted leads to prevent them from reappearing (excluding ViciDial leads)
+    if (nonViciDialLeads.length > 0) {
+        const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
+        nonViciDialLeads.forEach(id => {
+            if (!deletedLeads.includes(String(id))) {
+                deletedLeads.push(String(id));
+            }
+        });
+        localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeads));
+    }
 
     // Delete from server
     const apiUrl = window.location.hostname === 'localhost'
