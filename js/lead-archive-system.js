@@ -95,22 +95,39 @@
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
         console.log('Lead removed from active list, total active leads remaining:', leads.length);
 
-        // IMPORTANT: Save to server to persist the archive status
-        // Save the archived lead (with archived flag) to server
-        fetch('/api/leads', {
+        // IMPORTANT: Save to server using proper archive endpoint
+        // Use the backend archive system for persistence
+        fetch(`/api/archive-lead/${leadId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(archivedLead)
+            body: JSON.stringify({
+                archivedBy: localStorage.getItem('currentUser') || 'Admin'
+            })
         })
         .then(response => response.json())
         .then(data => {
-            console.log('Lead archive status saved to server:', data);
+            console.log('Lead archived to server:', data);
+            if (data.success) {
+                console.log('✅ Lead successfully archived in backend system');
+
+                // If archived leads tab is currently active, refresh it to show the new archived lead
+                const archivedTab = document.getElementById('archived-leads-tab');
+                if (archivedTab && archivedTab.style.display !== 'none') {
+                    console.log('🔄 Refreshing archived leads view to show newly archived lead');
+                    if (typeof loadArchivedLeads === 'function') {
+                        loadArchivedLeads();
+                    }
+                }
+            } else {
+                console.error('❌ Backend archive failed:', data.error);
+                showNotification('Warning: Archive may not persist after refresh', 'warning');
+            }
         })
         .catch(error => {
-            console.error('Failed to save archive status to server:', error);
-            showNotification('Warning: Archive status may not persist after refresh', 'warning');
+            console.error('Failed to archive lead to server:', error);
+            showNotification('Warning: Archive may not persist after refresh', 'warning');
         });
         
         showNotification(`Lead "${lead.name}" archived successfully`, 'success');
