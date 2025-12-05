@@ -35,31 +35,55 @@
     // Ensure getStageHtml exists
     if (!window.getStageHtml) {
         window.getStageHtml = function(stage) {
-            const stageColors = {
-                'new': '#3b82f6',
-                'info_requested': '#fb923c',
-                'info_received': '#10b981',
-                'quoted': '#a855f7',
-                'quote_sent': '#3b82f6',
-                'interested': '#f59e0b',
-                'not-interested': '#ef4444',
-                'closed': '#6b7280'
+            const stageClasses = {
+                'new': 'stage-new',
+                'contact_attempted': 'stage-contact-attempted',
+                'info_requested': 'stage-info-requested',
+                'info_received': 'stage-info-received',
+                'loss_runs_requested': 'stage-loss-runs-requested',
+                'loss_runs_received': 'stage-loss-runs-received',
+                'quoted': 'stage-quoted',
+                'quote_sent': 'stage-quote-sent',
+                'quote-sent-unaware': 'stage-quote-sent-unaware',
+                'quote-sent-aware': 'stage-quote-sent-aware',
+                'interested': 'stage-interested',
+                'not-interested': 'stage-not-interested',
+                'closed': 'stage-closed',
+                'contacted': 'stage-contacted',
+                'reviewed': 'stage-reviewed',
+                'converted': 'stage-converted',
+                'qualified': 'stage-qualified',
+                'negotiation': 'stage-negotiation',
+                'qualification': 'stage-qualification',
+                'lead': 'stage-lead'
             };
 
             const stageLabels = {
                 'new': 'New',
+                'contact_attempted': 'Contact Attempted',
                 'info_requested': 'Info Requested',
                 'info_received': 'Info Received',
+                'loss_runs_requested': 'Loss Runs Requested',
+                'loss_runs_received': 'Loss Runs Received',
                 'quoted': 'Quoted',
                 'quote_sent': 'Quote Sent',
+                'quote-sent-unaware': 'Quote Sent (Unaware)',
+                'quote-sent-aware': 'Quote Sent (Aware)',
                 'interested': 'Interested',
                 'not-interested': 'Not Interested',
-                'closed': 'Closed'
+                'closed': 'Closed',
+                'contacted': 'Contacted',
+                'reviewed': 'Reviewed',
+                'converted': 'Converted',
+                'qualified': 'Qualified',
+                'negotiation': 'Negotiation',
+                'qualification': 'Qualification',
+                'lead': 'Lead'
             };
 
-            const color = stageColors[stage] || '#6b7280';
+            const cssClass = stageClasses[stage] || 'stage-default';
             const label = stageLabels[stage] || stage || 'unknown';
-            return `<span style="background: ${color}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px;">${label}</span>`;
+            return `<span class="stage-badge ${cssClass}">${label}</span>`;
         };
     }
 

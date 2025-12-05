@@ -1920,6 +1920,36 @@ table.data-table td.client-name .client-avatar {
     color: #fff;
 }
 
+.stage-quote-sent-unaware {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #fff;
+}
+
+.stage-quote-sent-aware {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+}
+
+.stage-qualified {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: #fff;
+}
+
+.stage-negotiation {
+    background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+    color: #fff;
+}
+
+.stage-qualification {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    color: #fff;
+}
+
+.stage-lead {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: #fff;
+}
+
 /* Lead Profile Styles */
 .lead-profile .profile-grid {
     display: grid;
@@ -2215,38 +2245,6 @@ table.data-table td.client-name .client-avatar {
     color: #7b1fa2;
 }
 
-.stage-badge {
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: capitalize;
-}
-
-.stage-badge.new {
-    background: #e1f5fe;
-    color: #0277bd;
-}
-
-.stage-badge.contacted {
-    background: #fff9c4;
-    color: #f57f17;
-}
-
-.stage-badge.quoted {
-    background: #f3e5f5;
-    color: #6a1b9a;
-}
-
-.stage-badge.reviewed {
-    background: #ffe0b2;
-    color: #e65100;
-}
-
-.stage-badge.converted {
-    background: #c8e6c9;
-    color: #2e7d32;
-}
 
 .bulk-actions {
     position: fixed;
