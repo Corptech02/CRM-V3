@@ -4450,7 +4450,7 @@ async function loadLeadsView() {
                                         'quote_sent': 'Reach out to lead',
                                         'quote-sent-unaware': 'Reach out to lead',
                                         'quote-sent-aware': 'Follow up with lead',
-                                        'interested': 'Close the deal',
+                                        'interested': 'Reach out',
                                         'not-interested': 'Archive lead',
                                         'closed': 'Process complete'
                                     };
@@ -17082,7 +17082,7 @@ function getNextAction(stage, lead) {
         'quote_sent': 'Reach out',
         'quote-sent-unaware': 'Reach out',
         'quote-sent-aware': 'Follow up with lead',
-        'interested': 'Close the deal',
+        'interested': 'Reach out',
         'not-interested': 'Archive lead',
         'closed': 'Process complete',
 
@@ -17099,7 +17099,7 @@ function getNextAction(stage, lead) {
         'Quote Sent': 'Reach out',
         'Quote Sent Unaware': 'Reach out',
         'Quote Sent Aware': 'Follow up with lead',
-        'Interested': 'Close the deal',
+        'Interested': 'Reach out',
         'Not Interested': 'Archive lead',
         'Closed': 'Process complete'
     };
@@ -17126,7 +17126,7 @@ function getReachOutAction(stage) {
         'quote_sent': 'Reach out to lead',
         'quote-sent-unaware': 'Reach out to lead',
         'quote-sent-aware': 'Follow up with lead',
-        'interested': 'Close the deal'
+        'interested': 'Reach out'
     };
     return reachOutActionMap[stage] || 'Reach out to lead';
 }

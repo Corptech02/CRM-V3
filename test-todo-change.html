@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stage TODO Change Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        button { padding: 8px 16px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { margin-top: 20px; max-height: 400px; overflow-y: auto; }
+        .todo-test { font-size: 18px; font-weight: bold; color: #007bff; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1 class="todo-test">📋 STAGE TODO CHANGE TEST</h1>
+    <p><strong>Testing that "Interested" stage now shows "Reach out" instead of "Close the deal"</strong></p>
+
+    <div>
+        <button onclick="testTodoMappings()">📋 Test TODO Mappings</button>
+        <button onclick="testSpecificStages()">🎯 Test Specific Stages</button>
+        <button onclick="checkAllMappings()">🔍 Check All Mappings</button>
+        <button onclick="clearResults()">📄 Clear</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script src="/js/app.js"></script>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function testTodoMappings() {
+            addResult('📋 <strong>Testing Stage TODO Mappings</strong>', 'info');
+
+            // Test the key change: Interested should now map to "Reach out"
+            const testCases = [
+                { stage: 'new', expectedTodo: 'Assign Stage', description: 'New stage (unchanged)' },
+                { stage: 'interested', expectedTodo: 'Reach out', description: 'Interested stage (CHANGED from "Close the deal")' },
+                { stage: 'Interested', expectedTodo: 'Reach out', description: 'Interested stage (capitalized)' }
+            ];
+
+            testCases.forEach(testCase => {
+                addResult(`🧪 Testing: ${testCase.description}`, 'info');
+
+                // Try different function names that might exist
+                let actualTodo = null;
+
+                if (typeof window.getNextAction === 'function') {
+                    try {
+                        actualTodo = window.getNextAction(testCase.stage, {});
+                        addResult(`  getNextAction("${testCase.stage}") = "${actualTodo}"`, 'info');
+                    } catch (e) {
+                        addResult(`  getNextAction error: ${e.message}`, 'warning');
+                    }
+                }
+
+                if (typeof window.getNextActionFixed === 'function') {
+                    try {
+                        actualTodo = window.getNextActionFixed(testCase.stage, {});
+                        addResult(`  getNextActionFixed("${testCase.stage}") = "${actualTodo}"`, 'info');
+                    } catch (e) {
+                        addResult(`  getNextActionFixed error: ${e.message}`, 'warning');
+                    }
+                }
+
+                // Check result
+                if (actualTodo === testCase.expectedTodo) {
+                    addResult(`  ✅ PASS: Got expected TODO "${testCase.expectedTodo}"`, 'success');
+                } else if (actualTodo && actualTodo !== testCase.expectedTodo) {
+                    addResult(`  ❌ FAIL: Expected "${testCase.expectedTodo}", got "${actualTodo}"`, 'error');
+                } else {
+                    addResult(`  ⚠️ Could not test - function not found`, 'warning');
+                }
+            });
+        }
+
+        function testSpecificStages() {
+            addResult('🎯 <strong>Testing Interested Stage Specifically</strong>', 'info');
+
+            // Test both lowercase and capitalized versions
+            const interestedVariants = ['interested', 'Interested', 'INTERESTED'];
+
+            interestedVariants.forEach(variant => {
+                addResult(`🔍 Testing stage: "${variant}"`, 'info');
+
+                // Check if we can find TODO mappings in the source
+                const scriptTags = document.querySelectorAll('script');
+                let foundInSource = false;
+
+                scriptTags.forEach(script => {
+                    if (script.src && script.src.includes('app.js')) {
+                        addResult(`  📄 Found app.js script loaded`, 'info');
+                    }
+                });
+
+                // Test with mock lead data
+                const mockLead = {
+                    stage: variant,
+                    reachOut: null
+                };
+
+                // Try to get TODO for this stage
+                let todoResult = 'Function not available';
+
+                if (typeof window.getNextAction === 'function') {
+                    try {
+                        todoResult = window.getNextAction(variant, mockLead);
+                    } catch (e) {
+                        todoResult = `Error: ${e.message}`;
+                    }
+                }
+
+                addResult(`  📋 TODO for "${variant}": "${todoResult}"`,
+                    todoResult === 'Reach out' ? 'success' :
+                    todoResult.includes('Error') ? 'error' : 'warning');
+
+                if (todoResult === 'Reach out') {
+                    addResult(`  🎉 SUCCESS: "${variant}" correctly shows "Reach out"!`, 'success');
+                } else if (todoResult === 'Close the deal') {
+                    addResult(`  ❌ FAILED: "${variant}" still shows old "Close the deal"`, 'error');
+                }
+            });
+        }
+
+        function checkAllMappings() {
+            addResult('🔍 <strong>Checking All Stage Mappings</strong>', 'info');
+
+            const commonStages = [
+                'new', 'contact_attempted', 'info_requested', 'info_received',
+                'loss_runs_requested', 'loss_runs_received', 'app_prepared',
+                'quoted', 'quote_sent', 'interested', 'not-interested', 'closed'
+            ];
+
+            addResult('<table><thead><tr><th>Stage</th><th>TODO</th><th>Status</th></tr></thead><tbody id="mappingTable"></tbody></table>', 'info');
+
+            const tableBody = document.getElementById('mappingTable');
+
+            commonStages.forEach(stage => {
+                let todo = 'Unknown';
+                let status = 'Not tested';
+
+                if (typeof window.getNextAction === 'function') {
+                    try {
+                        todo = window.getNextAction(stage, {});
+                        status = stage === 'interested' && todo === 'Reach out' ? '✅ Correct' :
+                                stage === 'interested' && todo === 'Close the deal' ? '❌ Old value' :
+                                '✓ OK';
+                    } catch (e) {
+                        todo = `Error: ${e.message}`;
+                        status = '⚠️ Error';
+                    }
+                }
+
+                const row = `<tr>
+                    <td><strong>${stage}</strong></td>
+                    <td>${todo}</td>
+                    <td>${status}</td>
+                </tr>`;
+
+                if (tableBody) {
+                    tableBody.innerHTML += row;
+                }
+            });
+
+            addResult('📊 Mapping table generated above', 'info');
+        }
+
+        // Auto-run basic test on load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('📋 Stage TODO Change Test Loaded', 'success');
+            addResult('🔄 Change Made: "Interested" stage TODO changed from "Close the deal" to "Reach out"', 'info');
+            addResult('📝 Files Updated:', 'info');
+            addResult('  • /js/app.js (4 instances)', 'info');
+            addResult('  • /js/fix-lead-table-final.js (1 instance)', 'info');
+
+            // Run basic test automatically
+            setTimeout(() => {
+                testTodoMappings();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

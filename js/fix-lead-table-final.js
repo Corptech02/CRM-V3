@@ -45,7 +45,7 @@ function formatPremiumDisplay(premium) {
             'quote_sent': 'Reach out to lead',
             'quote-sent-unaware': 'Reach out to lead',
             'quote-sent-aware': 'Follow up with lead',
-            'interested': 'Close the deal',
+            'interested': 'Reach out',
             'not-interested': 'Archive lead',
             'closed': 'Process complete'
         };
