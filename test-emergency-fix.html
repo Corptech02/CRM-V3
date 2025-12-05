@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency ViciDial Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        button { padding: 8px 16px; margin: 5px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #c82333; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        #results { margin-top: 20px; max-height: 400px; overflow-y: auto; }
+        .nuclear { font-size: 18px; font-weight: bold; color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1 class="nuclear">🚨 EMERGENCY VICIDIAL FIX TEST</h1>
+    <p><strong>This tests the nuclear option fix for ViciDial lead persistence.</strong></p>
+
+    <div>
+        <button onclick="testEmergencyFix()">🚨 Test Emergency Fix</button>
+        <button onclick="manualForce()" class="success">💉 Manual Force ViciDial</button>
+        <button onclick="simulateRefreshTest()">🔄 Simulate Refresh</button>
+        <button onclick="clearLocalStorage()">🧹 Clear localStorage</button>
+        <button onclick="clearResults()">📄 Clear Results</button>
+    </div>
+
+    <div id="results"></div>
+
+    <!-- Load the emergency fix script -->
+    <script src="/js/force-vicidial-leads.js"></script>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function clearLocalStorage() {
+            localStorage.removeItem('insurance_leads');
+            localStorage.removeItem('archivedLeads');
+            addResult('🧹 localStorage cleared completely', 'warning');
+        }
+
+        async function testEmergencyFix() {
+            addResult('🚨 <strong>TESTING EMERGENCY FIX</strong>', 'error');
+
+            // Test 1: Check if emergency script loaded
+            if (typeof window.forceViciDialLeads === 'function') {
+                addResult('✅ Emergency script loaded - forceViciDialLeads available', 'success');
+            } else {
+                addResult('❌ Emergency script NOT loaded - function missing', 'error');
+                return;
+            }
+
+            // Test 2: Check API data
+            try {
+                const response = await fetch('/api/leads');
+                const apiLeads = await response.json();
+                const vicidialInAPI = apiLeads.filter(l => l.source === 'ViciDial');
+
+                addResult(`📊 API Status: ${apiLeads.length} total leads, ${vicidialInAPI.length} ViciDial leads`,
+                    vicidialInAPI.length > 0 ? 'success' : 'warning');
+
+                if (vicidialInAPI.length === 0) {
+                    addResult('⚠️ No ViciDial leads in API - cannot test persistence', 'warning');
+                    return;
+                }
+
+                // Test 3: Check localStorage BEFORE force
+                let currentLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                let vicidialInStorage = currentLeads.filter(l => l.source === 'ViciDial');
+
+                addResult(`📦 localStorage BEFORE: ${currentLeads.length} total, ${vicidialInStorage.length} ViciDial`,
+                    vicidialInStorage.length > 0 ? 'info' : 'warning');
+
+                // Test 4: Run emergency force function
+                addResult('💉 Running emergency force function...', 'info');
+                const forceResult = await window.forceViciDialLeads();
+
+                // Test 5: Check localStorage AFTER force
+                currentLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                vicidialInStorage = currentLeads.filter(l => l.source === 'ViciDial');
+
+                addResult(`📦 localStorage AFTER: ${currentLeads.length} total, ${vicidialInStorage.length} ViciDial`,
+                    vicidialInStorage.length >= vicidialInAPI.length ? 'success' : 'error');
+
+                if (vicidialInStorage.length >= vicidialInAPI.length) {
+                    addResult('🎉 EMERGENCY FIX WORKING! ViciDial leads forced into localStorage', 'success');
+                    vicidialInStorage.forEach(lead => {
+                        addResult(`  ✓ ${lead.id} - ${lead.name}`, 'success');
+                    });
+                } else {
+                    addResult('❌ EMERGENCY FIX FAILED - ViciDial leads not in localStorage', 'error');
+                }
+
+            } catch (error) {
+                addResult(`❌ Error testing emergency fix: ${error.message}`, 'error');
+            }
+        }
+
+        async function manualForce() {
+            if (typeof window.forceViciDialLeads === 'function') {
+                addResult('💉 Manually forcing ViciDial leads...', 'info');
+                const result = await window.forceViciDialLeads();
+                if (result > 0) {
+                    addResult(`✅ Forced ${result} ViciDial leads into localStorage`, 'success');
+                } else {
+                    addResult('⚠️ No ViciDial leads to force', 'warning');
+                }
+            } else {
+                addResult('❌ Emergency force function not available', 'error');
+            }
+        }
+
+        async function simulateRefreshTest() {
+            addResult('🔄 <strong>SIMULATING REFRESH CYCLE</strong>', 'info');
+
+            // Step 1: Clear localStorage completely
+            localStorage.removeItem('insurance_leads');
+            localStorage.removeItem('archivedLeads');
+            addResult('1️⃣ Cleared localStorage (simulating fresh page)', 'info');
+
+            // Step 2: Wait for emergency script to detect and fix
+            addResult('2️⃣ Waiting for emergency script to detect missing leads...', 'info');
+
+            // Force immediate check
+            if (typeof window.forceViciDialLeads === 'function') {
+                await window.forceViciDialLeads();
+                addResult('3️⃣ Emergency script executed', 'info');
+            }
+
+            // Step 3: Check results
+            const leadsAfterRefresh = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const vicidialAfterRefresh = leadsAfterRefresh.filter(l => l.source === 'ViciDial');
+
+            addResult(`4️⃣ Results after refresh simulation:`, 'info');
+            addResult(`  📦 Total leads: ${leadsAfterRefresh.length}`, 'info');
+            addResult(`  🎯 ViciDial leads: ${vicidialAfterRefresh.length}`,
+                vicidialAfterRefresh.length > 0 ? 'success' : 'error');
+
+            if (vicidialAfterRefresh.length > 0) {
+                addResult('🎉 REFRESH TEST PASSED! ViciDial leads persist after refresh', 'success');
+            } else {
+                addResult('❌ REFRESH TEST FAILED! ViciDial leads still disappearing', 'error');
+            }
+        }
+
+        // Auto-run basic test on load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('🚨 Emergency ViciDial Fix Test Loaded', 'error');
+            addResult('This tests the nuclear option localStorage protection', 'info');
+
+            // Wait a moment for scripts to load, then test
+            setTimeout(testEmergencyFix, 2000);
+        });
+    </script>
+</body>
+</html>
