@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ViciDial Lead Persistence Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 8px 16px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { margin-top: 20px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>ViciDial Lead Persistence Test</h1>
+    <p>This test verifies that ViciDial leads persist after page refresh and navigation.</p>
+
+    <div>
+        <button onclick="testDatabaseLeads()">Test Database Leads</button>
+        <button onclick="testLocalStorageLeads()">Test localStorage Leads</button>
+        <button onclick="testLoadLeadsFromServer()">Test loadLeadsFromServer()</button>
+        <button onclick="simulatePageRefresh()">Simulate Page Refresh</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testDatabaseLeads() {
+            try {
+                addResult('🔍 Testing database API leads...', 'info');
+                const response = await fetch('/api/leads');
+                const leads = await response.json();
+
+                const vicidialLeads = leads.filter(lead => lead.source === 'ViciDial');
+
+                if (vicidialLeads.length > 0) {
+                    addResult(`✅ Database contains ${vicidialLeads.length} ViciDial leads:`, 'success');
+                    vicidialLeads.forEach(lead => {
+                        addResult(`  • ${lead.id} - ${lead.name} (${lead.contact})`, 'info');
+                    });
+                } else {
+                    addResult('⚠️ No ViciDial leads found in database', 'error');
+                }
+
+                addResult(`Total leads in database: ${leads.length}`, 'info');
+            } catch (error) {
+                addResult(`❌ Error testing database: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLocalStorageLeads() {
+            try {
+                addResult('🔍 Testing localStorage leads...', 'info');
+
+                const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+
+                const vicidialInActive = insuranceLeads.filter(lead => lead.source === 'ViciDial');
+                const vicidialInArchived = archivedLeads.filter(lead => lead.source === 'ViciDial');
+
+                addResult(`Active leads in localStorage: ${insuranceLeads.length}`, 'info');
+                addResult(`Archived leads in localStorage: ${archivedLeads.length}`, 'info');
+
+                if (vicidialInActive.length > 0) {
+                    addResult(`✅ Found ${vicidialInActive.length} ViciDial leads in active storage:`, 'success');
+                    vicidialInActive.forEach(lead => {
+                        addResult(`  • ${lead.id} - ${lead.name}`, 'info');
+                    });
+                } else if (vicidialInArchived.length > 0) {
+                    addResult(`⚠️ Found ${vicidialInArchived.length} ViciDial leads in archived storage (may be accidentally archived):`, 'error');
+                    vicidialInArchived.forEach(lead => {
+                        addResult(`  • ${lead.id} - ${lead.name}`, 'info');
+                    });
+                } else {
+                    addResult('❌ No ViciDial leads found in localStorage', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing localStorage: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLoadLeadsFromServer() {
+            try {
+                addResult('🔍 Testing loadLeadsFromServer() function...', 'info');
+
+                // Check if the function exists
+                if (typeof window.loadLeadsFromServer === 'function') {
+                    addResult('✅ loadLeadsFromServer function found', 'success');
+
+                    // Clear localStorage to test fresh load
+                    const backupActive = localStorage.getItem('insurance_leads');
+                    const backupArchived = localStorage.getItem('archivedLeads');
+
+                    localStorage.removeItem('insurance_leads');
+                    localStorage.removeItem('archivedLeads');
+
+                    addResult('🧹 Cleared localStorage for fresh test', 'info');
+
+                    // Call the function
+                    await window.loadLeadsFromServer();
+
+                    // Check results
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for async operations
+
+                    const newLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                    const vicidialLoaded = newLeads.filter(lead => lead.source === 'ViciDial');
+
+                    if (vicidialLoaded.length > 0) {
+                        addResult(`✅ loadLeadsFromServer() successfully loaded ${vicidialLoaded.length} ViciDial leads`, 'success');
+                    } else {
+                        addResult('❌ loadLeadsFromServer() did not load ViciDial leads', 'error');
+                    }
+
+                    // Restore backup if needed
+                    if (backupActive) localStorage.setItem('insurance_leads', backupActive);
+                    if (backupArchived) localStorage.setItem('archivedLeads', backupArchived);
+
+                } else {
+                    addResult('❌ loadLeadsFromServer function not found in window scope', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing loadLeadsFromServer: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulatePageRefresh() {
+            addResult('🔄 Simulating page refresh behavior...', 'info');
+
+            // Store current state
+            const beforeRefresh = {
+                active: JSON.parse(localStorage.getItem('insurance_leads') || '[]'),
+                archived: JSON.parse(localStorage.getItem('archivedLeads') || '[]')
+            };
+
+            const vicidialBefore = beforeRefresh.active.filter(l => l.source === 'ViciDial').length;
+            addResult(`Before refresh: ${vicidialBefore} ViciDial leads in active storage`, 'info');
+
+            // Simulate the page load process
+            try {
+                // This mimics what happens in app.js on DOMContentLoaded
+                if (typeof window.loadLeadsFromServer === 'function') {
+                    await window.loadLeadsFromServer();
+
+                    const afterRefresh = {
+                        active: JSON.parse(localStorage.getItem('insurance_leads') || '[]'),
+                        archived: JSON.parse(localStorage.getItem('archivedLeads') || '[]')
+                    };
+
+                    const vicidialAfter = afterRefresh.active.filter(l => l.source === 'ViciDial').length;
+                    addResult(`After refresh: ${vicidialAfter} ViciDial leads in active storage`, 'info');
+
+                    if (vicidialAfter >= vicidialBefore) {
+                        addResult('✅ ViciDial leads preserved after simulated refresh!', 'success');
+                    } else {
+                        addResult(`❌ ViciDial leads lost after refresh (${vicidialBefore} → ${vicidialAfter})`, 'error');
+                    }
+                } else {
+                    addResult('❌ Cannot simulate - loadLeadsFromServer function not available', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error during simulation: ${error.message}`, 'error');
+            }
+        }
+
+        // Load the main app.js to get access to functions
+        const script = document.createElement('script');
+        script.src = '/js/app.js';
+        script.onload = () => {
+            addResult('✅ Main app.js loaded - ready for testing', 'success');
+        };
+        script.onerror = () => {
+            addResult('❌ Failed to load app.js', 'error');
+        };
+        document.head.appendChild(script);
+
+        // Initial status
+        addResult('🚀 ViciDial Lead Persistence Test initialized', 'info');
+        addResult('Click buttons above to run tests', 'info');
+    </script>
+</body>
+</html>

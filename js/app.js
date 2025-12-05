@@ -51,6 +51,18 @@ async function loadLeadsFromServer() {
                 archivedIds.has(String(lead.id))
             );
 
+            // Special handling for ViciDial leads - ensure they're never accidentally filtered
+            const vicidialLeads = mergedLeads.filter(lead =>
+                lead.source === 'ViciDial' &&
+                !lead.archived &&
+                !permanentArchive.includes(String(lead.id)) &&
+                !archivedIds.has(String(lead.id))
+            );
+
+            if (vicidialLeads.length > 0) {
+                console.log(`⚠️ PRESERVING ${vicidialLeads.length} ViciDial leads:`, vicidialLeads.map(l => `${l.id} - ${l.name}`));
+            }
+
             // Update localStorage - COMPLETE SEPARATION
             localStorage.setItem('insurance_leads', JSON.stringify(activeLeadsOnly)); // ONLY ACTIVE
 
@@ -78,11 +90,15 @@ async function loadLeadsFromServer() {
                 });
             }
 
-            console.log('Server leads synchronized successfully with preserved archive status');
+            console.log(`✅ Server leads synchronized: ${activeLeadsOnly.length} active, ${archivedLeadsOnly.length} archived`);
 
-            // DISABLED automatic refresh - causes race condition with cleaned data
-            // If we're on the leads page, user can manually refresh if needed
-            console.log('Page load refresh disabled to prevent data contamination');
+            // Refresh leads display if we're on the leads page
+            if (window.location.pathname === '/' || window.location.hash === '#leads') {
+                console.log('🔄 Refreshing leads display after server sync');
+                if (typeof displayLeads === 'function') {
+                    displayLeads();
+                }
+            }
         }
     } catch (error) {
         console.error('Failed to load leads from server:', error);
@@ -329,9 +345,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const existingLeads = localStorage.getItem('insurance_leads');
     const existingArchived = localStorage.getItem('archivedLeads');
 
-    // DISABLED AUTO-LOADING FROM SERVER - Causes race conditions and mock data contamination
-    // Manual sync only via button clicks to prevent interference with cleaned local data
-    console.log('Auto-loading from server disabled - use manual sync button if needed');
+    // Load from server to ensure ViciDial and other server-added leads are visible
+    // This ensures newly added ViciDial leads appear immediately after being synced
+    loadLeadsFromServer().then(() => {
+        console.log('✅ Initial server sync completed - ViciDial leads preserved');
+    });
 
     // Run cleanup less frequently to avoid interference
     setInterval(() => {
