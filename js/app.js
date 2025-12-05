@@ -26,10 +26,19 @@ async function loadLeadsFromServer() {
 
             // Update server leads with archived status from local storage
             const mergedLeads = serverLeads.map(serverLead => {
-                // Check if this lead was previously archived
-                if (archivedIds.has(String(serverLead.id))) {
-                    serverLead.archived = true;
-                    console.log(`Preserving archived status for lead ${serverLead.id} - ${serverLead.name}`);
+                // SPECIAL PROTECTION: Never archive ViciDial leads unless explicitly archived by user
+                if (serverLead.source === 'ViciDial') {
+                    // Only mark as archived if explicitly set in database, not from localStorage
+                    if (serverLead.archived !== true && serverLead.archived !== 1) {
+                        serverLead.archived = false;
+                        console.log(`🛡️ PROTECTING ViciDial lead from archival: ${serverLead.id} - ${serverLead.name}`);
+                    }
+                } else {
+                    // For non-ViciDial leads, check if this lead was previously archived
+                    if (archivedIds.has(String(serverLead.id))) {
+                        serverLead.archived = true;
+                        console.log(`Preserving archived status for lead ${serverLead.id} - ${serverLead.name}`);
+                    }
                 }
                 return serverLead;
             });

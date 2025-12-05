@@ -329,6 +329,7 @@ class VanguardViciDialSync:
                 "cargo": policy_info['cargo']
             },
             "source": "ViciDial",
+            "archived": False,  # CRITICAL: Explicitly set ViciDial leads as NOT archived
             "leadScore": 85,
             "lastContactDate": datetime.now().strftime("%-m/%-d/%Y"),
             "followUpDate": "",
