@@ -2866,8 +2866,26 @@ protectedFunctions.sendEmail = async function(leadId) {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to send email');
+            let errorMessage = 'Failed to send email';
+
+            if (response.status === 413) {
+                errorMessage = 'Email too large - attachments may exceed size limit (100MB max)';
+            } else {
+                try {
+                    const error = await response.json();
+                    errorMessage = error.error || errorMessage;
+                } catch (jsonError) {
+                    // Response is not JSON (likely HTML error page)
+                    const errorText = await response.text();
+                    if (errorText.includes('Request Entity Too Large')) {
+                        errorMessage = 'Email too large - attachments may exceed size limit (100MB max)';
+                    } else {
+                        errorMessage = `Server error (${response.status}): ${response.statusText}`;
+                    }
+                }
+            }
+
+            throw new Error(errorMessage);
         }
 
         const result = await response.json();
@@ -3301,10 +3319,12 @@ window.showApplicationSubmissions = function(leadId) {
 window.viewQuoteApplication = function(appId) {
     console.log('📄 Viewing quote application:', appId);
 
-    // Clean up any existing modals before creating new ones
-    const existingModals = document.querySelectorAll('[id*="quote"], [id*="application"], .modal-overlay');
+    // Clean up any existing modals before creating new ones - but NOT application submissions containers
+    const existingModals = document.querySelectorAll('#quote-application-modal, [id*="quote-modal"], [id*="application-modal"], .modal-overlay');
     existingModals.forEach(modal => {
-        if (modal.id !== 'quote-application-modal' || modal.style.display === 'none') {
+        // Don't remove Application Submissions containers or cards
+        if (!modal.id.includes('application-submissions-container') &&
+            (modal.id !== 'quote-application-modal' || modal.style.display === 'none')) {
             modal.remove();
             console.log('🧹 Cleaned up existing modal:', modal.id || modal.className);
         }
@@ -3351,10 +3371,12 @@ window.viewQuoteApplication = function(appId) {
 window.downloadQuoteApplication = function(appId) {
     console.log('📥 Downloading quote application:', appId);
 
-    // Clean up any existing modals before creating new ones
-    const existingModals = document.querySelectorAll('[id*="quote"], [id*="application"], .modal-overlay');
+    // Clean up any existing modals before creating new ones - but NOT application submissions containers
+    const existingModals = document.querySelectorAll('#quote-application-modal, [id*="quote-modal"], [id*="application-modal"], .modal-overlay');
     existingModals.forEach(modal => {
-        if (modal.id !== 'quote-application-modal' || modal.style.display === 'none') {
+        // Don't remove Application Submissions containers or cards
+        if (!modal.id.includes('application-submissions-container') &&
+            (modal.id !== 'quote-application-modal' || modal.style.display === 'none')) {
             modal.remove();
             console.log('🧹 Cleaned up existing modal:', modal.id || modal.className);
         }
@@ -3853,7 +3875,10 @@ window.saveQuoteApplication = function(leadId) {
         status: 'draft'
     };
 
-    // Save to server
+    // Save to server with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
     fetch('/api/quote-applications', {
         method: 'POST',
         headers: {
@@ -3862,9 +3887,13 @@ window.saveQuoteApplication = function(leadId) {
         body: JSON.stringify({
             leadId: leadId,
             applicationData: applicationData
-        })
+        }),
+        signal: controller.signal
     })
-    .then(response => response.json())
+    .then(response => {
+        clearTimeout(timeoutId); // Clear timeout on successful response
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             console.log('✅ Quote application saved to server:', data.applicationId);
@@ -3878,8 +3907,16 @@ window.saveQuoteApplication = function(leadId) {
         }
     })
     .catch(error => {
+        clearTimeout(timeoutId); // Clear timeout on error
         console.error('❌ Save error:', error);
-        alert('Error saving quote application. Please try again.');
+
+        // Handle timeout specifically
+        if (error.name === 'AbortError') {
+            console.error('❌ Request timed out after 15 seconds');
+            alert('Save request timed out. Please check your connection and try again.');
+        } else {
+            alert('Error saving quote application. Please try again.');
+        }
     });
 
     // Return early - async operation will handle modal closing

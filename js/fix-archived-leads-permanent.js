@@ -26,7 +26,10 @@
         localStorage.setItem('archived_lead_ids', JSON.stringify(filtered));
     }
 
-    // Override archiveLead function to track archived IDs
+    // DISABLED: Override archiveLead function to track archived IDs
+    // This was causing issues with user confirmation dialogs being bypassed
+    // The archived-leads-functionality.js file handles archiving properly with confirmation
+    /*
     const originalArchiveLead = window.archiveLead;
     window.archiveLead = function(leadId) {
         console.log('Archiving lead permanently:', leadId);
@@ -74,6 +77,7 @@
             return originalArchiveLead.call(this, leadId);
         }
     };
+    */
 
     // Filter function to exclude archived leads
     function filterOutArchivedLeads(leads) {

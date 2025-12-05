@@ -341,9 +341,164 @@ function getTopStage(stageGroups) {
 function archiveLead(leadId) {
     console.log('📦 Archiving lead:', leadId);
 
-    if (!confirm('Are you sure you want to archive this lead? It will be moved to the Archived Leads tab.')) {
+    // Prevent multiple simultaneous archive attempts
+    if (window.archivingInProgress) {
+        console.log('⚠️ Archive already in progress, ignoring duplicate request');
         return;
     }
+
+    // Show custom overlay confirmation popup
+    showArchiveConfirmation(leadId);
+}
+
+// Show custom archive confirmation overlay
+function showArchiveConfirmation(leadId) {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'archiveConfirmationOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        backdrop-filter: blur(2px);
+    `;
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 0;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        transform: scale(0.9);
+        animation: modalSlideIn 0.2s ease-out forwards;
+    `;
+
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    modal.innerHTML = `
+        <div style="padding: 24px 24px 0 24px; text-align: center;">
+            <div style="
+                width: 48px;
+                height: 48px;
+                background: linear-gradient(135deg, #f59e0b, #d97706);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 16px auto;
+            ">
+                <i class="fas fa-archive" style="color: white; font-size: 20px;"></i>
+            </div>
+            <h3 style="margin: 0 0 8px 0; color: #374151; font-size: 18px; font-weight: 600;">
+                Archive Lead
+            </h3>
+            <p style="margin: 0 0 24px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                Are you sure you want to archive this lead?<br>
+                It will be moved to the Archived Leads tab.
+            </p>
+        </div>
+        <div style="padding: 16px 24px 24px 24px; display: flex; gap: 12px;">
+            <button id="cancelArchive" style="
+                flex: 1;
+                padding: 10px 16px;
+                border: 1px solid #d1d5db;
+                background: white;
+                color: #374151;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">
+                Cancel
+            </button>
+            <button id="confirmArchive" style="
+                flex: 1;
+                padding: 10px 16px;
+                border: none;
+                background: linear-gradient(135deg, #f59e0b, #d97706);
+                color: white;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+            " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                Archive Lead
+            </button>
+        </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Handle button clicks
+    document.getElementById('cancelArchive').onclick = () => {
+        console.log('❌ User cancelled archiving operation');
+        closeArchiveConfirmation();
+    };
+
+    document.getElementById('confirmArchive').onclick = () => {
+        console.log('✅ User confirmed archiving, proceeding with operation');
+        closeArchiveConfirmation();
+        proceedWithArchive(leadId);
+    };
+
+    // Close on overlay click (outside modal)
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            console.log('❌ User cancelled archiving by clicking outside');
+            closeArchiveConfirmation();
+        }
+    };
+
+    // Close on Escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            console.log('❌ User cancelled archiving with Escape key');
+            closeArchiveConfirmation();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+}
+
+// Close archive confirmation overlay
+function closeArchiveConfirmation() {
+    const overlay = document.getElementById('archiveConfirmationOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+// Proceed with archiving after confirmation
+function proceedWithArchive(leadId) {
+    // Set flag to prevent duplicate requests
+    window.archivingInProgress = true;
 
     // Get current user for tracking
     const archivedBy = (() => {
@@ -384,18 +539,21 @@ function archiveLead(leadId) {
                 }
             }
 
-            // Show success message
-            if (window.showNotification) {
-                window.showNotification('Lead archived successfully', 'success');
-            }
+            // No success notification - removed per user request
         } else {
             console.error('❌ Archive failed:', data.error);
             alert('Failed to archive lead: ' + data.error);
         }
+
+        // Clear the flag to allow future archive operations
+        window.archivingInProgress = false;
     })
     .catch(error => {
         console.error('❌ Archive error:', error);
         alert('Error archiving lead. Please try again.');
+
+        // Clear the flag to allow future archive operations
+        window.archivingInProgress = false;
     });
 }
 

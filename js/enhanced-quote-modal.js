@@ -336,6 +336,7 @@ window.closeQuoteApplicationModal = function() {
     }
 
     // Clear editing state
+    const currentLeadId = window.editingApplicationData?.leadId || window.currentLeadId;
     window.editingApplicationId = null;
     window.editingApplicationData = null;
     console.log('🧹 Closed modal and cleared editing state');
@@ -344,6 +345,14 @@ window.closeQuoteApplicationModal = function() {
     const leadProfileModal = document.getElementById('lead-profile-modal');
     if (leadProfileModal) {
         leadProfileModal.style.display = 'block';
+    }
+
+    // Refresh Application Submissions to restore any hidden cards
+    if (currentLeadId && window.showApplicationSubmissions) {
+        console.log('🔄 Refreshing Application Submissions after modal close for lead:', currentLeadId);
+        setTimeout(() => {
+            window.showApplicationSubmissions(currentLeadId);
+        }, 100);
     }
 };
 

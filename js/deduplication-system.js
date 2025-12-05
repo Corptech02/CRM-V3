@@ -176,7 +176,10 @@
         }, 500);
     };
     
-    // Override archiveLead to ensure proper cleanup
+    // DISABLED: Override archiveLead to ensure proper cleanup
+    // This was causing issues by removing leads even when user clicked Cancel
+    // The archived-leads-functionality.js file handles archiving properly with confirmation
+    /*
     const originalArchiveLead = window.archiveLead;
     window.archiveLead = function(leadId) {
         console.log('Enhanced archiveLead - ensuring proper deduplication');
@@ -217,6 +220,7 @@
             // Don't reload the full view here as it's already handled
         }, 300);
     };
+    */
     
     // Auto-deduplicate on page load
     document.addEventListener('DOMContentLoaded', function() {
