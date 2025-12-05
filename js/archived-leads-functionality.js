@@ -48,7 +48,7 @@ function generateArchivedLeadRows(archivedLeads) {
         return `
             <tr style="opacity: 0.8;">
                 <td>
-                    <input type="checkbox" class="archived-lead-checkbox" value="${lead.id}">
+                    <input type="checkbox" class="archived-lead-checkbox" value="${lead.archiveId || lead.id}" onchange="updateBulkDeleteArchivedButton()">
                 </td>
                 <td>
                     <div class="lead-info">
@@ -776,6 +776,202 @@ function toggleAllArchived(checkbox) {
     checkboxes.forEach(cb => {
         cb.checked = checkbox.checked;
     });
+
+    // Update bulk delete button after toggling
+    updateBulkDeleteArchivedButton();
+}
+
+// Update bulk delete overlay for archived leads
+function updateBulkDeleteArchivedButton() {
+    const selectedCheckboxes = document.querySelectorAll('.archived-lead-checkbox:checked');
+    let deleteOverlay = document.getElementById('bulkDeleteArchivedOverlay');
+
+    if (selectedCheckboxes.length > 0) {
+        // Create overlay if it doesn't exist
+        if (!deleteOverlay) {
+            deleteOverlay = document.createElement('div');
+            deleteOverlay.id = 'bulkDeleteArchivedOverlay';
+            deleteOverlay.innerHTML = `
+                <div class="delete-icon-container" onclick="bulkDeleteArchivedLeads()">
+                    <i class="fas fa-trash"></i>
+                    <span class="delete-count">${selectedCheckboxes.length}</span>
+                </div>
+            `;
+            deleteOverlay.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 30px;
+                z-index: 10000;
+                cursor: pointer;
+                animation: slideInRight 0.3s ease-out;
+            `;
+
+            // Add styles if not already present
+            if (!document.getElementById('bulkDeleteArchivedStyles')) {
+                const style = document.createElement('style');
+                style.id = 'bulkDeleteArchivedStyles';
+                style.textContent = `
+                    @keyframes slideInRight {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes pulse-glow {
+                        0%, 100% {
+                            box-shadow: 0 0 20px rgba(220, 38, 38, 0.8),
+                                       0 0 40px rgba(220, 38, 38, 0.6),
+                                       0 0 60px rgba(220, 38, 38, 0.4);
+                        }
+                        50% {
+                            box-shadow: 0 0 30px rgba(220, 38, 38, 0.9),
+                                       0 0 50px rgba(220, 38, 38, 0.6),
+                                       0 0 70px rgba(220, 38, 38, 0.4);
+                        }
+                    }
+                    #bulkDeleteArchivedOverlay .delete-icon-container {
+                        position: relative;
+                        width: 70px;
+                        height: 70px;
+                        background: linear-gradient(135deg, #dc2626, #b91c1c);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: 28px;
+                        animation: pulse-glow 2s ease-in-out infinite;
+                        transition: transform 0.2s ease;
+                    }
+                    #bulkDeleteArchivedOverlay .delete-icon-container:hover {
+                        transform: scale(1.1);
+                        animation: pulse-glow 1s ease-in-out infinite;
+                    }
+                    #bulkDeleteArchivedOverlay .delete-count {
+                        position: absolute;
+                        top: -5px;
+                        right: -5px;
+                        background: #fbbf24;
+                        color: #000;
+                        border-radius: 50%;
+                        width: 28px;
+                        height: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 14px;
+                        font-weight: bold;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            document.body.appendChild(deleteOverlay);
+        } else {
+            // Update count
+            const countElement = deleteOverlay.querySelector('.delete-count');
+            if (countElement) {
+                countElement.textContent = selectedCheckboxes.length;
+            }
+        }
+    } else {
+        // Remove overlay if no items selected
+        if (deleteOverlay) {
+            deleteOverlay.style.animation = 'slideInRight 0.3s ease-out reverse';
+            setTimeout(() => {
+                if (deleteOverlay && deleteOverlay.parentNode) {
+                    deleteOverlay.remove();
+                }
+            }, 300);
+        }
+    }
+}
+
+// Bulk delete selected archived leads
+async function bulkDeleteArchivedLeads() {
+    const selectedCheckboxes = document.querySelectorAll('.archived-lead-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        console.warn('No archived leads selected for deletion');
+        return;
+    }
+
+    const count = selectedCheckboxes.length;
+    const message = count === 1
+        ? 'Are you sure you want to permanently delete this archived lead?'
+        : `Are you sure you want to permanently delete ${count} archived leads? This cannot be undone.`;
+
+    if (!confirm(message)) {
+        return;
+    }
+
+    console.log(`🗑️ Bulk deleting ${count} archived leads...`);
+
+    // Get the archive IDs from the checkboxes
+    const archiveIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+    console.log('Archive IDs to delete:', archiveIds);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // Delete each archived lead
+    for (const archiveId of archiveIds) {
+        try {
+            const response = await fetch(`/api/archived-leads/${archiveId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                console.log(`✅ Deleted archived lead: ${archiveId}`);
+
+                // Remove the row immediately from UI
+                const checkbox = document.querySelector(`.archived-lead-checkbox[value="${archiveId}"]`);
+                if (checkbox) {
+                    const row = checkbox.closest('tr');
+                    if (row) {
+                        row.style.transition = 'opacity 0.3s, transform 0.3s';
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(-20px)';
+                        setTimeout(() => row.remove(), 300);
+                    }
+                }
+
+                successCount++;
+            } else {
+                console.error(`❌ Failed to delete archived lead ${archiveId}: ${response.status}`);
+                failCount++;
+            }
+        } catch (error) {
+            console.error(`❌ Error deleting archived lead ${archiveId}:`, error);
+            failCount++;
+        }
+    }
+
+    // Show results
+    if (successCount > 0) {
+        console.log(`✅ Successfully deleted ${successCount} archived lead(s)`);
+
+        // Remove the overlay immediately
+        const deleteOverlay = document.getElementById('bulkDeleteArchivedOverlay');
+        if (deleteOverlay) {
+            deleteOverlay.remove();
+        }
+
+        // Clear all checkboxes
+        document.querySelectorAll('.archived-lead-checkbox:checked').forEach(cb => {
+            cb.checked = false;
+        });
+
+        // Show notification
+        const message = failCount > 0
+            ? `Deleted ${successCount} lead(s). ${failCount} failed.`
+            : `Successfully deleted ${successCount} archived lead(s)`;
+
+        console.log(`📊 Bulk delete complete: ${successCount} success, ${failCount} failed`);
+    } else {
+        console.error(`❌ Failed to delete any archived leads`);
+    }
 }
 
 // Make functions globally available
@@ -791,5 +987,7 @@ window.permanentlyDeleteLead = permanentlyDeleteLead;
 window.exportArchivedLeads = exportArchivedLeads;
 window.exportAllArchivedLeads = exportAllArchivedLeads;
 window.toggleAllArchived = toggleAllArchived;
+window.updateBulkDeleteArchivedButton = updateBulkDeleteArchivedButton;
+window.bulkDeleteArchivedLeads = bulkDeleteArchivedLeads;
 
 console.log('✅ Archived leads functionality initialized');
