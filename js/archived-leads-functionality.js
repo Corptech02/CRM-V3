@@ -375,6 +375,15 @@ function archiveLead(leadId) {
                 }
             }
 
+            // If archived leads tab is currently active, refresh it to show the new archived lead
+            const archivedTab = document.getElementById('archived-leads-tab');
+            if (archivedTab && archivedTab.style.display !== 'none') {
+                console.log('🔄 Refreshing archived leads view to show newly archived lead');
+                if (typeof loadArchivedLeads === 'function') {
+                    loadArchivedLeads();
+                }
+            }
+
             // Show success message
             if (window.showNotification) {
                 window.showNotification('Lead archived successfully', 'success');
