@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Color Test</title>
+    <link rel="stylesheet" href="css/styles.css?v=34">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; }
+        .stage-badge { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Direct Stage Color Test</h1>
+
+    <div class="test-section">
+        <h2>Testing CSS Classes Directly:</h2>
+        <span class="stage-badge stage-new">New</span>
+        <span class="stage-badge stage-contacted">Contacted</span>
+        <span class="stage-badge stage-quoted">Quoted</span>
+        <span class="stage-badge stage-interested">Interested</span>
+        <span class="stage-badge stage-qualified">Qualified</span>
+        <span class="stage-badge stage-converted">Converted</span>
+        <span class="stage-badge stage-closed">Closed</span>
+    </div>
+
+    <script>
+        console.log('Testing stage colors...');
+
+        // Check if CSS classes are being applied
+        document.querySelectorAll('.stage-badge').forEach((badge, index) => {
+            const computedStyle = window.getComputedStyle(badge);
+            console.log(`Badge ${index + 1} (${badge.textContent}):`, {
+                className: badge.className,
+                background: computedStyle.background,
+                backgroundColor: computedStyle.backgroundColor,
+                color: computedStyle.color
+            });
+        });
+    </script>
+</body>
+</html>
