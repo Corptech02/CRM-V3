@@ -142,13 +142,13 @@ function loadArchivedLeads() {
         });
 }
 
-// Get current month in YYYY-MM format (always 2025)
+// Get current month in YYYY-MM format (using current year)
 function getCurrentMonth() {
     const now = new Date();
-    return `2025-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// Set up monthly tabs for all 12 months of 2025
+// Set up monthly tabs for all 12 months of current year
 function setupMonthlyTabs(archivedLeads) {
     const monthlyTabsContainer = document.getElementById('monthlyArchiveTabs');
     if (!monthlyTabsContainer) return;
@@ -165,9 +165,9 @@ function setupMonthlyTabs(archivedLeads) {
         monthGroups[monthKey].push(lead);
     });
 
-    // Create all 12 months for 2025 (regardless of whether they have leads)
+    // Create all 12 months for current year (regardless of whether they have leads)
     const currentDate = new Date();
-    const currentYear = 2025; // Always use 2025
+    const currentYear = currentDate.getFullYear(); // Use current year instead of hardcoded 2025
     const currentMonth = currentDate.getMonth() + 1; // Current month (1-12)
     const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
@@ -198,7 +198,7 @@ function setupMonthlyTabs(archivedLeads) {
                     data-month="${monthData.monthKey}"
                     style="padding: 10px 16px; border: none; border-radius: 6px 6px 0 0; cursor: pointer; font-weight: 500; font-size: 13px; transition: all 0.2s; white-space: nowrap; ${monthData.isActive ? 'background: #3b82f6; color: white;' : 'background: #f3f4f6; color: #6b7280;'}">
                 <i class="fas fa-calendar-alt" style="margin-right: 5px;"></i>
-                ${monthData.monthName} 2025
+                ${monthData.monthName}
                 <span style="background: ${monthData.isActive ? 'rgba(255,255,255,0.2)' : '#e5e7eb'}; color: ${monthData.isActive ? 'white' : '#374151'}; padding: 2px 6px; border-radius: 10px; margin-left: 6px; font-size: 11px;">${monthData.count}</span>
             </button>
         `;
