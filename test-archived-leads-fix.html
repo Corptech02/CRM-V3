@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archived Leads Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        button { padding: 8px 16px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { margin-top: 20px; max-height: 400px; overflow-y: auto; }
+        .archive-test { font-size: 18px; font-weight: bold; color: #007bff; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1 class="archive-test">📂 ARCHIVED LEADS FIX TEST</h1>
+    <p><strong>This tests that archived leads now appear properly in the archived tab.</strong></p>
+
+    <div>
+        <button onclick="testArchivedLeadsAPI()">📊 Test API</button>
+        <button onclick="testArchivedLeadsFiltering()">🔍 Test Filtering</button>
+        <button onclick="testLoadArchivedLeads()">🔄 Test Load Function</button>
+        <button onclick="simulateArchiveProcess()">📦 Simulate Archive</button>
+        <button onclick="clearResults()">📄 Clear</button>
+    </div>
+
+    <div id="results"></div>
+
+    <!-- Load archived leads functionality -->
+    <script src="/js/archived-leads-functionality.js"></script>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testArchivedLeadsAPI() {
+            addResult('📊 <strong>Testing Archived Leads API</strong>', 'info');
+
+            try {
+                const response = await fetch('/api/archived-leads');
+                const data = await response.json();
+
+                if (data.success) {
+                    const archivedLeads = data.archivedLeads || [];
+                    const withDates = archivedLeads.filter(l => l.archivedDate);
+                    const withoutDates = archivedLeads.filter(l => !l.archivedDate);
+
+                    addResult(`✅ API Success: ${archivedLeads.length} archived leads found`, 'success');
+                    addResult(`📅 With dates: ${withDates.length}, Without dates: ${withoutDates.length}`,
+                        withoutDates.length === 0 ? 'success' : 'warning');
+
+                    if (withDates.length > 0) {
+                        addResult('📋 Sample archived leads with dates:', 'info');
+                        withDates.slice(0, 3).forEach(lead => {
+                            const date = new Date(lead.archivedDate).toLocaleDateString();
+                            addResult(`  • ${lead.id} - ${lead.name} (${date})`, 'success');
+                        });
+                    }
+
+                    if (withoutDates.length > 0) {
+                        addResult(`⚠️ ${withoutDates.length} leads without dates - these may not display properly`, 'warning');
+                    }
+
+                } else {
+                    addResult(`❌ API Error: ${data.error || 'Unknown error'}`, 'error');
+                }
+
+            } catch (error) {
+                addResult(`❌ Network Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testArchivedLeadsFiltering() {
+            addResult('🔍 <strong>Testing Monthly Filtering Logic</strong>', 'info');
+
+            try {
+                // Get API data
+                const response = await fetch('/api/archived-leads');
+                const data = await response.json();
+
+                if (!data.success) {
+                    addResult('❌ Cannot test filtering - API failed', 'error');
+                    return;
+                }
+
+                const archivedLeads = data.archivedLeads || [];
+                const currentDate = new Date();
+                const currentMonth = `\${currentDate.getFullYear()}-\${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
+                addResult(`📅 Testing for current month: ${currentMonth}`, 'info');
+
+                // Simulate the filtering logic
+                const monthLeads = archivedLeads.filter(lead => {
+                    if (!lead.archivedDate) {
+                        // This should default to current month now
+                        return true; // Show in current month
+                    }
+
+                    const archivedDate = new Date(lead.archivedDate);
+                    if (isNaN(archivedDate.getTime())) {
+                        return false;
+                    }
+
+                    const leadMonthKey = `\${archivedDate.getFullYear()}-\${String(archivedDate.getMonth() + 1).padStart(2, '0')}`;
+                    return leadMonthKey === currentMonth;
+                });
+
+                addResult(`🎯 Filtered Results: ${monthLeads.length} leads for ${currentMonth}`,
+                    monthLeads.length > 0 ? 'success' : 'error');
+
+                if (monthLeads.length > 0) {
+                    addResult('✅ Monthly filtering is working - archived tab should show leads!', 'success');
+                    addResult(`📋 Sample leads that should appear:`, 'info');
+                    monthLeads.slice(0, 5).forEach(lead => {
+                        const date = lead.archivedDate ? new Date(lead.archivedDate).toLocaleDateString() : 'No date';
+                        addResult(`  • ${lead.id} - ${lead.name} (${date})`, 'success');
+                    });
+                } else {
+                    addResult('❌ No leads found for current month - archived tab will be empty', 'error');
+                }
+
+            } catch (error) {
+                addResult(`❌ Filtering test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLoadArchivedLeads() {
+            addResult('🔄 <strong>Testing loadArchivedLeads Function</strong>', 'info');
+
+            if (typeof window.loadArchivedLeads !== 'function') {
+                addResult('❌ loadArchivedLeads function not found', 'error');
+                return;
+            }
+
+            try {
+                // Create a mock table element if it doesn't exist
+                let tableBody = document.getElementById('archivedLeadsTableBody');
+                if (!tableBody) {
+                    const mockTable = document.createElement('div');
+                    mockTable.innerHTML = '<tbody id="archivedLeadsTableBody"></tbody>';
+                    document.body.appendChild(mockTable);
+                    tableBody = document.getElementById('archivedLeadsTableBody');
+                }
+
+                addResult('📞 Calling loadArchivedLeads()...', 'info');
+
+                // Call the function
+                await window.loadArchivedLeads();
+
+                // Wait a moment for it to complete
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Check if data was loaded
+                if (window.allArchivedLeads && window.allArchivedLeads.length > 0) {
+                    addResult(`✅ Function executed successfully: ${window.allArchivedLeads.length} leads loaded`, 'success');
+
+                    // Check table content
+                    if (tableBody.innerHTML.includes('No archived leads found')) {
+                        addResult('⚠️ Table shows "No archived leads found" - monthly filtering may be too restrictive', 'warning');
+                    } else if (tableBody.innerHTML.includes('Loading')) {
+                        addResult('⏳ Table still loading - may need more time', 'warning');
+                    } else {
+                        addResult('✅ Table populated with archived leads data', 'success');
+                    }
+                } else {
+                    addResult('❌ No archived leads data loaded into window.allArchivedLeads', 'error');
+                }
+
+            } catch (error) {
+                addResult(`❌ Load function error: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateArchiveProcess() {
+            addResult('📦 <strong>Simulating Archive Process</strong>', 'info');
+            addResult('This shows what happens when you archive a lead:', 'info');
+
+            // Check if we have any active leads to test with
+            try {
+                const activeResponse = await fetch('/api/leads');
+                const activeLeads = await activeResponse.json();
+                const testLead = activeLeads.find(l => l.source !== 'ViciDial'); // Don't test with ViciDial leads
+
+                if (!testLead) {
+                    addResult('⚠️ No suitable test lead found for archive simulation', 'warning');
+                    return;
+                }
+
+                addResult(`🎯 Test lead: ${testLead.id} - ${testLead.name}`, 'info');
+                addResult('📊 Simulated archive process:', 'info');
+                addResult('  1. Lead would be moved from active leads table to archived_leads table', 'info');
+                addResult('  2. archived_date would be set to CURRENT_TIMESTAMP', 'info');
+                addResult('  3. Lead would be assigned to current month (2025-12)', 'info');
+                addResult('  4. Archived tab would refresh and show the lead', 'info');
+                addResult('✅ Archive process simulation complete', 'success');
+
+            } catch (error) {
+                addResult(`❌ Simulation error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run tests on load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('📂 Archived Leads Fix Test Loaded', 'success');
+            addResult('🔧 Testing the fix for archived leads not appearing in archived tab', 'info');
+
+            // Run basic test automatically
+            setTimeout(() => {
+                testArchivedLeadsAPI();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

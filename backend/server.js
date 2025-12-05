@@ -544,7 +544,7 @@ app.post('/api/archive-lead/:id', (req, res) => {
         const archiveId = `archived_${leadId}_${Date.now()}`;
 
         // Insert into archived_leads table
-        db.run(`INSERT INTO archived_leads (id, original_lead_id, data, archived_by) VALUES (?, ?, ?, ?)`,
+        db.run(`INSERT INTO archived_leads (id, original_lead_id, data, archived_by, archived_date) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
             [archiveId, leadId, row.data, archivedBy],
             function(err) {
                 if (err) {

@@ -240,7 +240,20 @@ function loadArchivedLeadsByMonth(monthKey) {
 
     // Filter leads by month
     const monthLeads = window.allArchivedLeads.filter(lead => {
+        // Handle leads without archivedDate (assign to current month)
+        if (!lead.archivedDate) {
+            console.warn(`Lead ${lead.id} has no archivedDate, assigning to current month`);
+            const currentDate = new Date();
+            const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+            return currentMonthKey === monthKey;
+        }
+
         const archivedDate = new Date(lead.archivedDate);
+        if (isNaN(archivedDate.getTime())) {
+            console.warn(`Lead ${lead.id} has invalid archivedDate: ${lead.archivedDate}`);
+            return false;
+        }
+
         const leadMonthKey = `${archivedDate.getFullYear()}-${String(archivedDate.getMonth() + 1).padStart(2, '0')}`;
         return leadMonthKey === monthKey;
     });
