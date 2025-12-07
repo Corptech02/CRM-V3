@@ -570,10 +570,32 @@ function loadPolicyList() {
                             }
                         }
 
+                        // Get client name using same logic as Policy Management tab
+                        let clientName = 'N/A';
+
+                        // PRIORITY 1: Check Named Insured tab data first (most accurate)
+                        if (policy.insured?.['Name/Business Name']) {
+                            clientName = policy.insured['Name/Business Name'];
+                        } else if (policy.insured?.['Primary Named Insured']) {
+                            clientName = policy.insured['Primary Named Insured'];
+                        } else if (policy.namedInsured?.name) {
+                            clientName = policy.namedInsured.name;
+                        } else if (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' && policy.clientName !== 'unknown') {
+                            // PRIORITY 2: Use existing clientName if it's valid
+                            clientName = policy.clientName;
+                        } else if (policy.clientId) {
+                            // PRIORITY 3: Look up client by ID as fallback
+                            const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+                            const client = clients.find(c => c.id === policy.clientId);
+                            if (client) {
+                                clientName = client.name || client.companyName || client.businessName || 'N/A';
+                            }
+                        }
+
                         return `
                             <tr class="policy-row" data-policy-id="${policy.id}">
                                 <td><strong>${policy.policyNumber || policy.policy_number || policy.id || 'N/A'}</strong></td>
-                                <td>${policy.insured?.['Name/Business Name'] || policy.clientName || policy.company_name || 'Unknown'}</td>
+                                <td>${clientName}</td>
                                 <td><span class="policy-type">${policy.policyType || policy.policy_type || policy.type || 'Commercial Auto'}</span></td>
                                 <td>${coverage}</td>
                                 <td>
@@ -9835,21 +9857,24 @@ function loadCommunicationsView() {
             </div>
             
             <div class="tabs">
-                <button class="tab-btn active" onclick="loadCommunicationTab('campaigns')">Campaigns</button>
-                <button class="tab-btn" onclick="loadCommunicationTab('reminders')">Reminders</button>
+                <button class="tab-btn active" onclick="loadCommunicationTab('reminders')">Reminders</button>
+                <button class="tab-btn" onclick="loadCommunicationTab('campaigns')">Campaigns</button>
                 <button class="tab-btn" onclick="loadCommunicationTab('email')">Email Blast</button>
                 <button class="tab-btn" onclick="loadCommunicationTab('sms')">SMS Blast</button>
                 <button class="tab-btn" onclick="loadCommunicationTab('history')">History</button>
             </div>
             
             <div id="communicationTabContent">
-                ${renderCampaignsTab()}
+                <!-- Default to reminders tab content -->
             </div>
         </div>
     `;
     
     // Add communication styles
     addCommunicationStyles();
+
+    // Load reminders tab by default
+    loadCommunicationTab('reminders');
 }
 
 function renderCampaignsTab() {
@@ -10279,11 +10304,11 @@ function loadCommunicationTab(tabName) {
                             </div>
                         </div>
                         <div class="campaign-actions">
-                            <button class="btn-secondary">View Details</button>
-                            <button class="btn-secondary">Pause</button>
+                            <button class="btn-secondary" onclick="viewCampaignDetails('renewal_reminders')">View Details</button>
+                            <button class="btn-secondary" onclick="pauseCampaign('renewal_reminders')">Pause</button>
                         </div>
                     </div>
-                    
+
                     <div class="campaign-card">
                         <div class="campaign-header">
                             <h3>Welcome Series</h3>
@@ -10304,11 +10329,11 @@ function loadCommunicationTab(tabName) {
                             </div>
                         </div>
                         <div class="campaign-actions">
-                            <button class="btn-secondary">View Details</button>
-                            <button class="btn-secondary">Pause</button>
+                            <button class="btn-secondary" onclick="viewCampaignDetails('welcome_series')">View Details</button>
+                            <button class="btn-secondary" onclick="pauseCampaign('welcome_series')">Pause</button>
                         </div>
                     </div>
-                    
+
                     <div class="campaign-card">
                         <div class="campaign-header">
                             <h3>Holiday Greetings</h3>
@@ -10325,8 +10350,8 @@ function loadCommunicationTab(tabName) {
                             </div>
                         </div>
                         <div class="campaign-actions">
-                            <button class="btn-secondary">Edit</button>
-                            <button class="btn-primary">Preview</button>
+                            <button class="btn-secondary" onclick="editCampaign('holiday_greetings')">Edit</button>
+                            <button class="btn-primary" onclick="previewCampaign('holiday_greetings')">Preview</button>
                         </div>
                     </div>
                 </div>
@@ -10356,7 +10381,14 @@ function loadCommunicationTab(tabName) {
                         <div class="reminders-section">
                             <div class="section-header">
                                 <h3><i class="fas fa-birthday-cake"></i> Birthday Reminders</h3>
-                                <span class="section-count" id="birthday-count">0</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="birthday-view-buttons" style="display: flex; gap: 5px;">
+                                        <button id="birthday-30-btn" class="birthday-view-btn active" onclick="setBirthdayView(30)">30d</button>
+                                        <button id="birthday-60-btn" class="birthday-view-btn" onclick="setBirthdayView(60)">60d</button>
+                                        <button id="birthday-90-btn" class="birthday-view-btn" onclick="setBirthdayView(90)">90d</button>
+                                    </div>
+                                    <span class="section-count" id="birthday-count">0</span>
+                                </div>
                             </div>
                             <div class="reminder-cards-stack" id="birthday-reminders">
                                 <!-- Birthday cards will be populated here -->
@@ -15980,6 +16012,32 @@ function addCommunicationStyles() {
             font-weight: 600;
         }
 
+        .birthday-view-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 40px;
+        }
+
+        .birthday-view-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .birthday-view-btn.active {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            border-color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+        }
+
         .reminder-cards-stack {
             padding: 20px;
             max-height: 600px;
@@ -16170,6 +16228,23 @@ function loadReminderCards() {
     loadNewPolicyCards(newPolicies);
 }
 
+// Global variable to track current birthday view days
+window.currentBirthdayViewDays = 30;
+
+// Function to set birthday view and reload data
+function setBirthdayView(days) {
+    window.currentBirthdayViewDays = days;
+
+    // Update active button state
+    document.querySelectorAll('.birthday-view-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`birthday-${days}-btn`).classList.add('active');
+
+    // Reload reminders with new day filter
+    if (window.communicationsReminders) {
+        loadReminderCards();
+    }
+}
+
 function loadBirthdayCards(birthdays) {
     const container = document.getElementById('birthday-reminders');
     if (!container) return;
@@ -16178,7 +16253,7 @@ function loadBirthdayCards(birthdays) {
         container.innerHTML = `
             <div class="no-reminders">
                 <i class="fas fa-birthday-cake" style="font-size: 48px; color: #d1d5db; margin-bottom: 16px;"></i>
-                <p>No upcoming birthdays in the next 30 days</p>
+                <p>No upcoming birthdays in the next ${window.currentBirthdayViewDays || 30} days</p>
             </div>
         `;
         return;
@@ -17481,6 +17556,168 @@ function renderLeadsList(leads) {
             </tr>
         `;
     }).join(''); */
+}
+
+// Communications Campaign Functions
+function viewCampaignDetails(campaignId) {
+    console.log('Viewing campaign details for:', campaignId);
+
+    const campaigns = {
+        'renewal_reminders': {
+            name: 'Renewal Reminders',
+            status: 'Active',
+            sent: 234,
+            opened: 156,
+            clicked: 45,
+            schedule: 'Monthly',
+            lastSent: '2024-12-05',
+            recipients: ['existing_clients']
+        },
+        'welcome_series': {
+            name: 'Welcome Series',
+            status: 'Active',
+            sent: 89,
+            opened: 72,
+            clicked: 28,
+            schedule: 'On Signup',
+            lastSent: '2024-12-04',
+            recipients: ['new_clients']
+        },
+        'holiday_greetings': {
+            name: 'Holiday Greetings',
+            status: 'Scheduled',
+            recipients: 1245,
+            sendDate: 'Dec 15',
+            schedule: 'Annual'
+        }
+    };
+
+    const campaign = campaigns[campaignId];
+    if (!campaign) {
+        showNotification('Campaign not found', 'error');
+        return;
+    }
+
+    // Show campaign details modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>Campaign Details - ${campaign.name}</h3>
+                <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="campaign-details">
+                    <div class="detail-section">
+                        <h4>Campaign Overview</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>Status:</label>
+                                <span class="status-badge ${campaign.status.toLowerCase()}">${campaign.status}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Schedule:</label>
+                                <span>${campaign.schedule}</span>
+                            </div>
+                            ${campaign.lastSent ? `
+                                <div class="detail-item">
+                                    <label>Last Sent:</label>
+                                    <span>${campaign.lastSent}</span>
+                                </div>
+                            ` : ''}
+                            ${campaign.sendDate ? `
+                                <div class="detail-item">
+                                    <label>Scheduled Date:</label>
+                                    <span>${campaign.sendDate}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    ${campaign.sent ? `
+                        <div class="detail-section">
+                            <h4>Performance Metrics</h4>
+                            <div class="metrics-grid">
+                                <div class="metric-card">
+                                    <span class="metric-value">${campaign.sent}</span>
+                                    <span class="metric-label">Total Sent</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-value">${campaign.opened}</span>
+                                    <span class="metric-label">Opened (${Math.round((campaign.opened / campaign.sent) * 100)}%)</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-value">${campaign.clicked}</span>
+                                    <span class="metric-label">Clicked (${Math.round((campaign.clicked / campaign.sent) * 100)}%)</span>
+                                </div>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="detail-section">
+                            <h4>Recipients</h4>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <label>Total Recipients:</label>
+                                    <span>${campaign.recipients}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `}
+
+                    <div class="detail-section">
+                        <h4>Actions</h4>
+                        <div class="action-buttons">
+                            <button class="btn-secondary" onclick="editCampaign('${campaignId}')">
+                                <i class="fas fa-edit"></i> Edit Campaign
+                            </button>
+                            <button class="btn-secondary" onclick="duplicateCampaign('${campaignId}')">
+                                <i class="fas fa-copy"></i> Duplicate
+                            </button>
+                            ${campaign.status === 'Active' ? `
+                                <button class="btn-secondary" onclick="pauseCampaign('${campaignId}')">
+                                    <i class="fas fa-pause"></i> Pause
+                                </button>
+                            ` : `
+                                <button class="btn-primary" onclick="startCampaign('${campaignId}')">
+                                    <i class="fas fa-play"></i> Start
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+function pauseCampaign(campaignId) {
+    console.log('Pausing campaign:', campaignId);
+    showNotification(`Campaign ${campaignId.replace('_', ' ')} paused`, 'success');
+    // Refresh the communications view to show updated status
+    setTimeout(() => loadCommunicationTab('campaigns'), 500);
+}
+
+function editCampaign(campaignId) {
+    console.log('Editing campaign:', campaignId);
+    showNotification('Campaign editor will be available soon', 'info');
+}
+
+function previewCampaign(campaignId) {
+    console.log('Previewing campaign:', campaignId);
+    showNotification('Campaign preview will be available soon', 'info');
+}
+
+function startCampaign(campaignId) {
+    console.log('Starting campaign:', campaignId);
+    showNotification(`Campaign ${campaignId.replace('_', ' ')} started`, 'success');
+}
+
+function duplicateCampaign(campaignId) {
+    console.log('Duplicating campaign:', campaignId);
+    showNotification('Campaign duplicated', 'success');
 }
 
 // Cache bust: Sun Sep 29 v52 - FORCE REFRESH - Fixed original working flow

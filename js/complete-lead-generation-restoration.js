@@ -658,7 +658,12 @@ async function generateLeadsNow() {
     const endDate = new Date();
     endDate.setDate(today.getDate() + expiry);
 
-    console.log(`Fetching carriers expiring between ${startDate.toISOString().split('T')[0]} and ${endDate.toISOString().split('T')[0]}`);
+    console.log(`🔍 LEAD GENERATION DEBUG:`);
+    console.log(`  State: ${state}`);
+    console.log(`  Expiry Days: ${expiry}`);
+    console.log(`  Skip Days: ${skipDays}`);
+    console.log(`  Date Range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+    console.log(`  Expected: ${skipDays > 0 ? 'FEWER leads due to skip days' : 'Normal lead count'}`);
 
     try {
         const response = await fetch('/api/carriers/expiring', {

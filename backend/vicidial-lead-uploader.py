@@ -120,6 +120,72 @@ def add_lead_to_vicidial(list_id, lead_data):
     except Exception as e:
         return {'success': False, 'error': f'Request failed: {str(e)}'}
 
+def create_vicidial_list(list_id, list_name=None):
+    """Create a ViciDial list if it doesn't exist"""
+
+    if not list_name:
+        list_name = f"Vanguard List {list_id}"
+
+    api_url = f"https://{VICIDIAL_HOST}/vicidial/non_agent_api.php"
+
+    print(f"Attempting to create ViciDial list {list_id}: {list_name}")
+
+    # Method 1: Try direct list creation
+    api_params_1 = {
+        "source": VICIDIAL_SOURCE,
+        "user": VICIDIAL_USER,
+        "pass": VICIDIAL_PASS,
+        "function": "add_list",
+        "list_id": list_id,
+        "list_name": list_name,
+        "campaign_id": "VANGUARD",
+        "active": "Y"
+    }
+
+    try:
+        response = requests.post(api_url, data=api_params_1, timeout=30, verify=False)
+        if response.status_code == 200:
+            response_text = response.text.strip()
+            print(f"Method 1 response: {response_text}")
+            if "SUCCESS" in response_text or "GOOD" in response_text:
+                return {'success': True, 'message': f'List {list_id} created successfully'}
+    except Exception as e:
+        print(f"Method 1 failed: {e}")
+
+    # Method 2: Try adding a dummy lead to force list creation
+    print(f"Method 1 failed, trying to create list {list_id} by adding dummy lead...")
+
+    dummy_params = {
+        "source": VICIDIAL_SOURCE,
+        "user": VICIDIAL_USER,
+        "pass": VICIDIAL_PASS,
+        "function": "add_lead",
+        "list_id": list_id,
+        "phone_number": "0000000001",  # Dummy phone
+        "phone_code": "1",
+        "status": "NEW",
+        "duplicate_check": "DUPUPDATE",
+        "title": list_name,
+        "first_name": "LIST",
+        "last_name": "CREATOR",
+        "comments": f"Dummy lead to create list {list_id} - can be deleted"
+    }
+
+    try:
+        response = requests.post(api_url, data=dummy_params, timeout=30, verify=False)
+        if response.status_code == 200:
+            response_text = response.text.strip()
+            print(f"Method 2 response: {response_text}")
+            if "SUCCESS" in response_text or "GOOD" in response_text:
+                print(f"✅ List {list_id} created via dummy lead method")
+                return {'success': True, 'message': f'List {list_id} created with dummy lead'}
+            else:
+                print(f"Method 2 also failed: {response_text}")
+                return {'success': False, 'error': f'Could not create list {list_id}: {response_text}'}
+    except Exception as e:
+        print(f"Method 2 failed: {e}")
+        return {'success': False, 'error': f'All list creation methods failed: {str(e)}'}
+
 def upload_leads_batch(list_id, leads):
     """Upload multiple leads to ViciDial"""
 
@@ -129,6 +195,15 @@ def upload_leads_batch(list_id, leads):
         'errors': 0,
         'error_details': []
     }
+
+    # First, ensure the list exists
+    print(f"Ensuring ViciDial list {list_id} exists...")
+    list_result = create_vicidial_list(list_id)
+    if not list_result['success']:
+        print(f"Warning: Could not create/verify list {list_id}: {list_result['error']}")
+        print("Proceeding with upload anyway...")
+    else:
+        print(f"✅ List {list_id} is ready")
 
     print(f"Starting upload of {len(leads)} leads to ViciDial list {list_id}")
 

@@ -120,7 +120,7 @@ return;
                 row.className = `policy-row ${statusClass}`;
                 row.innerHTML = `
                     <td style="font-weight: 600;">${policy.policyNumber || policy.policy_number || policy.id || 'N/A'}</td>
-                    <td>${policy.insured?.['Name/Business Name'] || policy.clientName || policy.company_name || policy.client || 'Unknown'}</td>
+                    <td>${policy.insured?.['Name/Business Name'] || policy.clientName || policy.company_name || policy.client || 'N/A'}</td>
                     <td>${policy.policyType || policy.policy_type || policy.type || 'Commercial Auto'}</td>
                     <td>${coverage}</td>
                     <td>

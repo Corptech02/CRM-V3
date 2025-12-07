@@ -810,38 +810,144 @@ app.get('/api/vicidial/data', async (req, res) => {
 // Get Vicidial lists for upload selection
 app.get('/api/vicidial/lists', async (req, res) => {
     try {
-        console.log('🔍 Getting Vicidial lists for upload selection...');
+        console.log('🔍 Getting Vicidial lists directly from ViciDial API...');
 
-        // Make internal request to existing /api/vicidial/data endpoint
-        const axios = require('axios');
-        const response = await axios.get('http://localhost:3001/api/vicidial/data?countsOnly=true');
+        const { spawn } = require('child_process');
+        const fs = require('fs');
+        const path = require('path');
 
-        if (response.data && response.data.allListsSummary) {
-            const allListsSummary = response.data.allListsSummary;
+        // Create Python script to fetch ViciDial lists
+        const pythonScript = `
+import requests
+import urllib3
+import json
+import sys
 
-            // Transform to the format expected by vicidial-uploader
-            const lists = allListsSummary.map(list => ({
-                list_id: list.listId,
-                list_name: list.listName,
-                leads: list.saleCount,
-                active: list.active ? 'Y' : 'N'
-            }));
+# Disable SSL warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-            console.log(`📋 Returning ${lists.length} Vicidial lists for upload`);
+# ViciDial Configuration
+VICIDIAL_HOST = "204.13.233.29"
+VICIDIAL_USER = "6666"
+VICIDIAL_PASS = "corp06"
+VICIDIAL_SOURCE = "vanguard_crm"
 
-            res.json({
-                success: true,
-                lists: lists
-            });
+def get_vicidial_lists():
+    """Get all ViciDial lists"""
+    api_url = f"https://{VICIDIAL_HOST}/vicidial/non_agent_api.php"
 
-        } else {
-            console.log('No lists found in Vicidial data response');
+    # Get list of all lists
+    lists_params = {
+        "source": VICIDIAL_SOURCE,
+        "user": VICIDIAL_USER,
+        "pass": VICIDIAL_PASS,
+        "function": "list_custom_fields"
+    }
+
+    all_lists = []
+
+    # Check specific lists that we know exist
+    known_lists = ["998", "999", "1000", "1001", "1005", "1006"]
+
+    for list_id in known_lists:
+        try:
+            params = {
+                "source": VICIDIAL_SOURCE,
+                "user": VICIDIAL_USER,
+                "pass": VICIDIAL_PASS,
+                "function": "list_info",
+                "list_id": list_id
+            }
+
+            response = requests.post(api_url, data=params, timeout=15, verify=False)
+
+            if response.status_code == 200:
+                data = response.text.strip()
+                if data and "|" in data:
+                    parts = data.split("|")
+                    if len(parts) >= 4:
+                        list_info = {
+                            "list_id": parts[0],
+                            "list_name": parts[1] if len(parts[1]) > 0 else f"List {parts[0]}",
+                            "leads": int(parts[7]) if len(parts) > 7 and parts[7].isdigit() else 0,
+                            "active": parts[3] if len(parts) > 3 else "Y"
+                        }
+                        all_lists.append(list_info)
+
+        except Exception as e:
+            # Skip failed lists
+            pass
+
+    return all_lists
+
+if __name__ == "__main__":
+    lists = get_vicidial_lists()
+    print(json.dumps(lists))
+`;
+
+        // Write Python script to temp file
+        const tempScript = `/tmp/get_vicidial_lists_${Date.now()}.py`;
+        fs.writeFileSync(tempScript, pythonScript);
+
+        // Execute Python script
+        const python = spawn('python3', [tempScript]);
+
+        let output = '';
+        let error = '';
+
+        python.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+
+        python.stderr.on('data', (data) => {
+            error += data.toString();
+        });
+
+        python.on('close', (code) => {
+            // Clean up temp file
+            try {
+                fs.unlinkSync(tempScript);
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+
+            if (code === 0) {
+                try {
+                    const lists = JSON.parse(output.trim());
+                    console.log(`📋 Retrieved ${lists.length} ViciDial lists directly from API`);
+
+                    res.json({
+                        success: true,
+                        lists: lists
+                    });
+                } catch (parseError) {
+                    console.error('Error parsing ViciDial lists response:', parseError);
+                    console.log('Raw output:', output);
+                    res.json({
+                        success: false,
+                        error: 'Failed to parse ViciDial response',
+                        lists: []
+                    });
+                }
+            } else {
+                console.error('Python script failed:', error);
+                res.json({
+                    success: false,
+                    error: `Failed to fetch ViciDial lists: ${error}`,
+                    lists: []
+                });
+            }
+        });
+
+        // Set timeout for the Python script
+        setTimeout(() => {
+            python.kill();
             res.json({
                 success: false,
-                error: 'No lists available',
+                error: 'Timeout fetching ViciDial lists',
                 lists: []
             });
-        }
+        }, 30000);
 
     } catch (error) {
         console.error('Error getting Vicidial lists:', error);

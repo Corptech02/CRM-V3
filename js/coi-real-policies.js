@@ -136,14 +136,31 @@ window.loadRealPolicyList = function() {
                         // Get policy type
                         const policyType = policy.policyType || policy.type || 'Commercial Auto';
 
-                        // Get client name - check multiple possible field locations
-                        let clientName = policy.clientName ||
-                                        policy.name ||
-                                        policy.insured?.['Name/Business Name'] ||
-                                        policy.insured?.['Primary Named Insured'] ||
-                                        policy.insured?.name ||
-                                        policy.insuredName ||
-                                        'Unknown';
+                        // Get client name using same comprehensive logic as Policy Management tab
+                        let clientName = 'N/A';
+
+                        // PRIORITY 1: Check Named Insured tab data first (most accurate)
+                        if (policy.insured?.['Name/Business Name']) {
+                            clientName = policy.insured['Name/Business Name'];
+                        } else if (policy.insured?.['Primary Named Insured']) {
+                            clientName = policy.insured['Primary Named Insured'];
+                        } else if (policy.namedInsured?.name) {
+                            clientName = policy.namedInsured.name;
+                        } else if (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' && policy.clientName !== 'unknown') {
+                            // PRIORITY 2: Use existing clientName if it's valid
+                            clientName = policy.clientName;
+                        } else if (policy.clientId) {
+                            // PRIORITY 3: Look up client by ID as fallback
+                            const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+                            const client = clients.find(c => c.id === policy.clientId);
+                            if (client) {
+                                clientName = client.name || client.companyName || client.businessName || 'N/A';
+                            }
+                        } else if (policy.name) {
+                            clientName = policy.name;
+                        } else if (policy.insuredName) {
+                            clientName = policy.insuredName;
+                        }
 
                         return `
                             <tr class="policy-row" data-policy-id="${policy.policyNumber || policy.id}">
@@ -216,14 +233,30 @@ window.viewPolicyProfileCOI = function(policyId) {
         window.originalPolicyListHTML = policyViewer.innerHTML;
     }
 
-    // Get insured name
-    const insuredName = policy.clientName ||
-                       policy.name ||
-                       policy.insured?.['Name/Business Name'] ||
-                       policy.insured?.['Primary Named Insured'] ||
-                       policy.insured?.name ||
-                       policy.insuredName ||
-                       'Primary Insured';
+    // Get insured name using same comprehensive logic
+    let insuredName = 'Primary Insured';
+
+    // PRIORITY 1: Check Named Insured tab data first (most accurate)
+    if (policy.insured?.['Name/Business Name']) {
+        insuredName = policy.insured['Name/Business Name'];
+    } else if (policy.insured?.['Primary Named Insured']) {
+        insuredName = policy.insured['Primary Named Insured'];
+    } else if (policy.namedInsured?.name) {
+        insuredName = policy.namedInsured.name;
+    } else if (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' && policy.clientName !== 'unknown') {
+        insuredName = policy.clientName;
+    } else if (policy.clientId) {
+        // Look up client by ID as fallback
+        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        const client = clients.find(c => c.id === policy.clientId);
+        if (client) {
+            insuredName = client.name || client.companyName || client.businessName || 'Primary Insured';
+        }
+    } else if (policy.name) {
+        insuredName = policy.name;
+    } else if (policy.insuredName) {
+        insuredName = policy.insuredName;
+    }
 
     // Debug: Log policy data and function availability
     console.log('🔍 Policy data for profile:', policy);

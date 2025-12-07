@@ -30,10 +30,17 @@ class CommunicationsReminders {
         policies.forEach(policy => {
             const createdDate = new Date(policy.createdAt || policy.date);
             if (createdDate >= sevenDaysAgo && createdDate <= new Date()) {
+                // Use same client name hierarchy as other components (Named Insured first, then fallbacks)
+                const clientName = policy.insured?.['Name/Business Name'] ||
+                                  policy.insured?.['Primary Named Insured'] ||
+                                  policy.namedInsured?.name ||
+                                  (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' ? policy.clientName : null) ||
+                                  'Unknown Client';
+
                 reminders.push({
                     id: `policy_${policy.id}`,
                     type: 'new_policy',
-                    clientName: policy.clientName || 'Unknown Client',
+                    clientName: clientName,
                     policyType: policy.type || 'Insurance',
                     premium: policy.premium || 0,
                     date: createdDate,
@@ -43,9 +50,10 @@ class CommunicationsReminders {
             }
         });
 
-        // Get upcoming birthdays (within next 30 days)
+        // Get upcoming birthdays (within configurable days)
         const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-        const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+        const viewDays = window.currentBirthdayViewDays || 30;
+        const viewDaysFromNow = new Date(today.getTime() + (viewDays * 24 * 60 * 60 * 1000));
 
         clients.forEach(client => {
             if (client.dateOfBirth) {
@@ -58,7 +66,7 @@ class CommunicationsReminders {
                     upcomingBirthday = nextYearBirthday;
                 }
 
-                if (upcomingBirthday >= today && upcomingBirthday <= thirtyDaysFromNow) {
+                if (upcomingBirthday >= today && upcomingBirthday <= viewDaysFromNow) {
                     const daysUntil = Math.ceil((upcomingBirthday - today) / (1000 * 60 * 60 * 24));
                     reminders.push({
                         id: `birthday_${client.id}_${upcomingBirthday.getFullYear()}`,
@@ -71,6 +79,69 @@ class CommunicationsReminders {
                         age: upcomingBirthday.getFullYear() - birthDate.getFullYear(),
                         giftSent: this.giftsSent[`birthday_${client.id}_${upcomingBirthday.getFullYear()}`] || false
                     });
+                }
+            }
+        });
+
+        // Also get birthdays from insurance policies' named insured data
+        const insurancePolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+        insurancePolicies.forEach(policy => {
+            // Check if policy has Date of Birth/Inception in insured data
+            if (policy.insured && policy.insured['Date of Birth/Inception']) {
+                const dateOfBirth = policy.insured['Date of Birth/Inception'];
+                if (dateOfBirth && dateOfBirth.trim() !== '') {
+                    try {
+                        const birthDate = new Date(dateOfBirth);
+                        // Ensure it's a valid date
+                        if (!isNaN(birthDate.getTime()) && birthDate.getFullYear() > 1900 && birthDate.getFullYear() < today.getFullYear()) {
+                            const thisYearBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+                            const nextYearBirthday = new Date(today.getFullYear() + 1, birthDate.getMonth(), birthDate.getDate());
+
+                            let upcomingBirthday = thisYearBirthday;
+                            if (thisYearBirthday < today) {
+                                upcomingBirthday = nextYearBirthday;
+                            }
+
+                            if (upcomingBirthday >= today && upcomingBirthday <= viewDaysFromNow) {
+                                const daysUntil = Math.ceil((upcomingBirthday - today) / (1000 * 60 * 60 * 24));
+
+                                // Get client name from policy - use same hierarchy as other components
+                                const clientName = policy.insured?.['Name/Business Name'] ||
+                                                  policy.insured?.['Primary Named Insured'] ||
+                                                  policy.namedInsured?.name ||
+                                                  (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' ? policy.clientName : null) ||
+                                                  'Unknown Client';
+
+                                // Create unique ID to avoid duplicates
+                                const policyBirthdayId = `birthday_policy_${policy.id || policy.policyNumber}_${upcomingBirthday.getFullYear()}`;
+
+                                // Check if we already have this birthday from clients array to avoid duplicates
+                                const existingBirthday = reminders.find(r =>
+                                    r.type === 'birthday' &&
+                                    r.clientName === clientName &&
+                                    r.date.getTime() === upcomingBirthday.getTime()
+                                );
+
+                                if (!existingBirthday) {
+                                    reminders.push({
+                                        id: policyBirthdayId,
+                                        type: 'birthday',
+                                        clientName: clientName,
+                                        email: policy.contact?.['Email Address'] || policy.email || '',
+                                        phone: policy.contact?.['Phone Number'] || policy.phone || '',
+                                        date: upcomingBirthday,
+                                        daysUntil: daysUntil,
+                                        age: upcomingBirthday.getFullYear() - birthDate.getFullYear(),
+                                        giftSent: this.giftsSent[policyBirthdayId] || false,
+                                        source: 'policy' // Mark as coming from policy data
+                                    });
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Invalid date format in policy:', dateOfBirth, error);
+                    }
                 }
             }
         });

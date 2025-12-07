@@ -193,7 +193,7 @@ const vicidialUploader = {
 
                     const API_URL = window.location.origin;
                     // Use the new direct upload endpoint that accepts leads data
-                    const batchResponse = await fetch(`${API_URL}/api/vicidial/upload-leads-data`, {
+                    const batchResponse = await fetch(`${API_URL}/api/vicidial/overwrite`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -245,7 +245,7 @@ const vicidialUploader = {
 
             const API_URL = window.location.origin;
             // Use the new direct upload endpoint that accepts leads data
-            const response = await fetch(`${API_URL}/api/vicidial/upload-leads-data`, {
+            const response = await fetch(`${API_URL}/api/vicidial/overwrite`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

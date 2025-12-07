@@ -73,7 +73,12 @@ def generate_day_list(start_date, days, skip_days=0):
     actual_start = start_date + timedelta(days=skip_days)
     day_list = []
 
-    for i in range(days):
+    # FIXED: Reduce the range by skip_days to maintain the same end date
+    actual_days = max(1, days - skip_days)  # Ensure at least 1 day
+
+    print(f"SKIP DAYS FIX: Original days={days}, skip_days={skip_days}, actual_days={actual_days}")
+
+    for i in range(actual_days):
         current_day = actual_start + timedelta(days=i)
         day_list.append(f"{current_day.month:02d}-{current_day.day:02d}")
 
