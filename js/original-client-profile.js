@@ -100,15 +100,16 @@ window.viewClientOriginal = function(id) {
                     <div style="display: grid; gap: 24px;">
                         <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
                             <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Full Name</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937; font-weight: 500;">${client.name || 'N/A'}</p>
+                            <p style="margin: 0; font-size: 16px; color: #1f2937; font-weight: 500;">${client.fullName || client.contactName || 'N/A'}</p>
                         </div>
 
-                        ${client.company ? `
-                        <div>
-                            <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase;">Company</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937;">${client.company}</p>
+                        <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
+                            <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Business Name</label>
+                            <p style="margin: 0; font-size: 16px; color: #1f2937; font-weight: 500;">
+                                ${client.company || client.businessName || client.name || 'N/A'}
+                            </p>
                         </div>
-                        ` : ''}
+
 
                         <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
                             <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Phone</label>
@@ -253,61 +254,255 @@ window.viewClientOriginal = function(id) {
                 </div>
             </div>
 
-            <!-- Bottom Activity Section -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 24px; margin-top: 4px;">
-                <!-- Recent Activity - Bottom Left -->
-                <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
-                    <div style="display: flex; align-items: center; margin-bottom: 24px;">
-                        <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; margin-right: 12px;">
-                            <i class="fas fa-history" style="font-size: 20px;"></i>
-                        </div>
-                        <div>
-                            <h3 style="margin: 0; color: #1f2937; font-size: 20px; font-weight: 600;">Recent Activity</h3>
-                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Latest Updates</p>
-                        </div>
-                    </div>
-                    <div style="display: grid; gap: 16px;">
-                        <div style="padding-left: 20px; border-left: 2px solid #e5e7eb;">
-                            <p style="margin: 0; font-weight: 500; color: #1f2937;">Policy Added</p>
-                            <p style="margin: 4px 0; font-size: 14px; color: #6b7280;">New policy created</p>
-                            <p style="margin: 4px 0; font-size: 12px; color: #9ca3af;">2 days ago</p>
-                        </div>
-                        <div style="padding-left: 20px; border-left: 2px solid #e5e7eb;">
-                            <p style="margin: 0; font-weight: 500; color: #1f2937;">Client Updated</p>
-                            <p style="margin: 4px 0; font-size: 14px; color: #6b7280;">Contact information updated</p>
-                            <p style="margin: 4px 0; font-size: 12px; color: #9ca3af;">1 week ago</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Documents - Bottom Right -->
-                <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
-                    <div style="display: flex; align-items: center; margin-bottom: 24px;">
-                        <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; margin-right: 12px;">
-                            <i class="fas fa-folder" style="font-size: 20px;"></i>
-                        </div>
-                        <div>
-                            <h3 style="margin: 0; color: #1f2937; font-size: 20px; font-weight: 600;">Documents</h3>
-                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Policy Files</p>
-                        </div>
-                    </div>
-                    <div style="display: grid; gap: 12px;">
-                        <div style="display: flex; align-items: center; padding: 12px; background: #f9fafb; border-radius: 6px;">
-                            <i class="fas fa-file-pdf" style="color: #dc2626; margin-right: 12px; font-size: 20px;"></i>
-                            <div style="flex: 1;">
-                                <p style="margin: 0; font-weight: 500; color: #1f2937; font-size: 14px;">Policy Documents</p>
-                                <p style="margin: 2px 0 0 0; font-size: 12px; color: #6b7280;">Last updated 1 month ago</p>
+            <!-- Documents Section -->
+            <div style="padding: 24px; margin-top: 4px;">
+                <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; width: 100%;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; margin-right: 12px;">
+                                <i class="fas fa-folder" style="font-size: 20px;"></i>
                             </div>
-                            <button style="padding: 6px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                <i class="fas fa-download"></i>
-                            </button>
+                            <div>
+                                <h3 style="margin: 0; color: #1f2937; font-size: 20px; font-weight: 600;">Documents</h3>
+                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Client Files</p>
+                            </div>
                         </div>
+                        <button onclick="window.uploadClientDocument('${id}')" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                    </div>
+                    <div id="client-documents-list" style="display: grid; gap: 12px;">
+                        ${window.renderClientDocuments(id)}
                     </div>
                 </div>
             </div>
         </div>
     `;
 };
+
+// Document Management Functions
+window.renderClientDocuments = function(clientId) {
+    // This will be populated by loadClientDocuments function
+    const loadingHtml = `
+        <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+            <p style="margin: 0; font-size: 16px;">Loading documents...</p>
+        </div>
+    `;
+
+    // Load documents from server asynchronously
+    loadClientDocuments(clientId);
+
+    return loadingHtml;
+};
+
+// Load client documents from server
+async function loadClientDocuments(clientId) {
+    try {
+        console.log('📁 Loading documents for client:', clientId);
+        const url = `/api/documents?clientId=${clientId}`;
+        console.log('📁 Fetching from URL:', url);
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('📁 Raw API response:', data);
+        const clientDocs = data.documents || [];
+
+        console.log(`📁 Loaded ${clientDocs.length} documents from server`);
+
+        // Update the documents display
+        const documentsList = document.getElementById('client-documents-list');
+        if (documentsList) {
+            if (clientDocs.length === 0) {
+                documentsList.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                        <i class="fas fa-folder-open" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                        <p style="margin: 0; font-size: 16px;">No documents uploaded yet</p>
+                        <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Upload to add files</p>
+                    </div>
+                `;
+            } else {
+                documentsList.innerHTML = clientDocs.map(doc => {
+                    const fileIcon = getFileIcon(doc.type);
+                    const fileSize = formatFileSize(doc.size);
+                    const uploadDate = new Date(doc.uploadDate).toLocaleDateString();
+
+                    return `
+                        <div style="display: flex; align-items: center; padding: 12px; background: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb;">
+                            <i class="${fileIcon.icon}" style="color: ${fileIcon.color}; margin-right: 12px; font-size: 20px;"></i>
+                            <div style="flex: 1;">
+                                <p style="margin: 0; font-weight: 500; color: #1f2937; font-size: 14px;">${doc.name}</p>
+                                <p style="margin: 2px 0 0 0; font-size: 12px; color: #6b7280;">${fileSize} • Uploaded ${uploadDate} • by ${doc.uploadedBy}</p>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.downloadClientDocument('${clientId}', '${doc.id}')" style="padding: 6px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" title="Download">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button onclick="window.deleteClientDocument('${clientId}', '${doc.id}')" style="padding: 6px 10px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    } catch (error) {
+        console.error('📁 Error loading documents:', error);
+        const documentsList = document.getElementById('client-documents-list');
+        if (documentsList) {
+            documentsList.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px; opacity: 0.7;"></i>
+                    <p style="margin: 0; font-size: 16px;">Error loading documents</p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Please refresh the page and try again</p>
+                </div>
+            `;
+        }
+    }
+}
+
+window.uploadClientDocument = function(clientId) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xls,.xlsx';
+
+    input.onchange = async function(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+
+        console.log(`📤 Uploading ${files.length} files for client ${clientId}...`);
+        showNotification('Uploading documents...', 'info');
+
+        try {
+            const uploadPromises = files.map(file => uploadFileToServer(file, clientId));
+            await Promise.all(uploadPromises);
+
+            showNotification(`${files.length} document(s) uploaded successfully`, 'success');
+
+            // Refresh documents display
+            loadClientDocuments(clientId);
+
+        } catch (error) {
+            console.error('📤 Upload error:', error);
+            showNotification('Error uploading documents', 'error');
+        }
+    };
+
+    input.click();
+};
+
+// Upload single file to server
+async function uploadFileToServer(file, clientId) {
+    console.log('📤 Uploading file:', file.name, 'for client:', clientId);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('clientId', clientId);
+    formData.append('uploadedBy', sessionStorage.getItem('vanguard_user') || 'User');
+
+    const response = await fetch('/api/documents', {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('📤 Upload error response:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('📤 Upload success response:', result);
+    return result;
+}
+
+window.downloadClientDocument = function(clientId, docId) {
+    console.log(`📥 CLIENT DOCUMENT DOWNLOAD CALLED - Client: ${clientId}, Doc: ${docId}`);
+
+    // Prevent any potential conflicts by explicitly calling this function
+    try {
+        console.log(`📥 Creating download link for document ${docId}...`);
+
+        // Create download link to server endpoint
+        const link = document.createElement('a');
+        const downloadUrl = `/api/download-document?docId=${docId}`;
+        console.log(`📥 Download URL: ${downloadUrl}`);
+
+        link.href = downloadUrl;
+        link.target = '_blank'; // Open in new tab for better UX
+        link.click();
+
+        console.log(`📥 Download link clicked successfully`);
+        showNotification('Download started', 'info');
+    } catch (error) {
+        console.error('📥 Download error:', error);
+        showNotification('Download failed', 'error');
+    }
+};
+
+window.deleteClientDocument = async function(clientId, docId) {
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        console.log(`🗑️ Deleting document ${docId}...`);
+
+        const response = await fetch(`/api/documents/${docId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        showNotification('Document deleted successfully', 'success');
+
+        // Refresh documents display
+        loadClientDocuments(clientId);
+
+    } catch (error) {
+        console.error('🗑️ Delete error:', error);
+        showNotification('Error deleting document', 'error');
+    }
+};
+
+function getFileIcon(fileType) {
+    const type = (fileType || '').toLowerCase();
+
+    if (type.includes('pdf')) {
+        return { icon: 'fas fa-file-pdf', color: '#dc2626' };
+    } else if (type.includes('word') || type.includes('doc')) {
+        return { icon: 'fas fa-file-word', color: '#2563eb' };
+    } else if (type.includes('excel') || type.includes('sheet')) {
+        return { icon: 'fas fa-file-excel', color: '#059669' };
+    } else if (type.includes('image') || type.includes('jpg') || type.includes('jpeg') || type.includes('png')) {
+        return { icon: 'fas fa-file-image', color: '#7c3aed' };
+    } else if (type.includes('text')) {
+        return { icon: 'fas fa-file-alt', color: '#6b7280' };
+    } else {
+        return { icon: 'fas fa-file', color: '#6b7280' };
+    }
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
 // Override the current viewClient function with the original simple design
 window.viewClient = window.viewClientOriginal;

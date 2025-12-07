@@ -118,10 +118,14 @@ async function loadLeadsFromServer() {
 // Function to load clients from server and sync with localStorage
 async function loadClientsFromServer(limit = 500) {
     try {
-        console.log('Loading clients from server...');
+        console.log('💻 Loading clients from server...');
         const response = await fetch(`/api/clients?limit=${limit}&offset=0`);
+
+        console.log('📡 Server response status:', response.status);
+
         if (response.ok) {
             const data = await response.json();
+            console.log('📊 Server response data type:', Array.isArray(data) ? 'array' : 'object');
 
             // Handle both old format (array) and new format (object with clients array)
             let serverClients;
@@ -137,10 +141,15 @@ async function loadClientsFromServer(limit = 500) {
                 totalCount = data.total || serverClients.length;
             }
 
-            console.log(`Loaded ${serverClients.length} clients from server (total: ${totalCount})`);
+            console.log(`✅ Server returned ${serverClients.length} clients (total: ${totalCount})`);
+
+            if (serverClients.length > 0) {
+                console.log('📝 Sample client names:', serverClients.slice(0, 3).map(c => c.name));
+            }
 
             // Store in localStorage for caching
             localStorage.setItem('insurance_clients', JSON.stringify(serverClients));
+            console.log('💾 Stored clients in localStorage');
 
             // Store pagination info for later use
             if (data.total) {
@@ -148,16 +157,34 @@ async function loadClientsFromServer(limit = 500) {
                 localStorage.setItem('clients_has_more', data.hasMore ? 'true' : 'false');
             }
 
-            console.log('Server clients synchronized successfully');
+            console.log('✅ Server clients synchronized successfully');
             return serverClients;
         } else {
-            console.log('Failed to load clients from server, using localStorage');
-            return JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+            console.error('❌ Server response not ok:', response.status, response.statusText);
+            console.log('❌ Will retry with empty array since localStorage was likely cleared');
+            // Don't return localStorage fallback if we're trying to recover from cleared storage
+            return [];
         }
     } catch (error) {
-        console.error('Failed to load clients from server:', error);
-        // Fall back to localStorage data if server fails
-        return JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        console.error('💥 Failed to load clients from server:', error);
+        // If localStorage is empty, try one more time after a brief delay
+        const fallbackClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        if (fallbackClients.length === 0) {
+            console.log('💥 Server failed and localStorage empty - will retry in 2 seconds...');
+            setTimeout(async () => {
+                try {
+                    console.log('🔄 Retry attempt...');
+                    await loadClientsFromServer();
+                    if (window.location.hash === '#clients') {
+                        loadClientsView();
+                    }
+                } catch (retryError) {
+                    console.error('💥 Retry also failed:', retryError);
+                }
+            }, 2000);
+        }
+        console.log(`📦 Using localStorage fallback after error: ${fallbackClients.length} clients`);
+        return fallbackClients;
     }
 }
 
@@ -2578,7 +2605,30 @@ function loadContent(section) {
             break;
         case '#clients':
             dashboardContent.innerHTML = ''; // Clear content
-            loadClientsView();
+            // Always ensure clients are loaded when accessing clients view
+            const existingClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+            console.log(`🔍 Navigating to clients - localStorage has ${existingClients.length} clients`);
+
+            // If no clients in localStorage, force reload from server BEFORE showing the view
+            if (existingClients.length === 0) {
+                console.log('⚡ No clients in localStorage - forcing immediate server reload...');
+                // Show loading state immediately
+                dashboardContent.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center; height: 400px; flex-direction: column;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 48px; color: #3b82f6; margin-bottom: 20px;"></i>
+                        <p style="font-size: 18px; color: #374151;">Loading clients from server...</p>
+                        <p style="font-size: 14px; color: #6b7280;">Please wait while we fetch your client data</p>
+                    </div>
+                `;
+
+                // Force immediate server load, then show clients view
+                loadClientsFromServer().then(serverClients => {
+                    console.log(`⚡ Server reload complete: ${serverClients.length} clients loaded`);
+                    loadClientsView();
+                });
+            } else {
+                loadClientsView();
+            }
             break;
         case '#policies':
             dashboardContent.innerHTML = ''; // Clear content
@@ -2830,21 +2880,8 @@ function updateDashboardStats() {
     const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
 
-    // Calculate Active Clients (clients with at least one active policy)
-    const activeClients = clients.filter(client => {
-        if (client.policies && Array.isArray(client.policies) && client.policies.length > 0) {
-            // Check if any of the client's policies are active
-            return client.policies.some(policyId => {
-                const policy = policies.find(p => p.id === policyId);
-                if (policy) {
-                    const status = (policy.policyStatus || policy.status || '').toLowerCase();
-                    return status === 'active' || status === 'in-force' || status === 'current';
-                }
-                return false;
-            });
-        }
-        return false;
-    }).length;
+    // Calculate Active Leads (total leads count)
+    const activeLeads = leads.length;
 
     // Calculate Active Policies
     const activePolicies = policies.filter(policy => {
@@ -2897,7 +2934,7 @@ function updateDashboardStats() {
     const monthlyLeadElement = document.querySelector('.stat-card:nth-child(4) .stat-value');
 
     if (activeClientsElement) {
-        activeClientsElement.textContent = activeClients.toString();
+        activeClientsElement.textContent = activeLeads.toString();
     }
 
     if (activePoliciesElement) {
@@ -2925,7 +2962,7 @@ function updateDashboardStats() {
     }
 
     console.log('Dashboard stats updated:', {
-        activeClients,
+        activeLeads,
         activePolicies,
         totalPremium,
         monthlyLeadPremium
@@ -3168,52 +3205,40 @@ function loadFullDashboard() {
     dashboardContent.innerHTML = `
         <!-- Statistics Cards -->
         <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card" style="display: flex; align-items: center; gap: 1.5rem;">
                 <div class="stat-icon blue">
                     <i class="fas fa-users"></i>
                 </div>
-                <div class="stat-details">
-                    <h3>Active Clients</h3>
+                <div class="stat-details" style="flex: 1;">
+                    <h3>Active Leads</h3>
                     <p class="stat-number stat-value">0</p>
-                    <span class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i> 0% from last month
-                    </span>
                 </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" style="display: flex; align-items: center; gap: 1.5rem;">
                 <div class="stat-icon green">
                     <i class="fas fa-file-contract"></i>
                 </div>
-                <div class="stat-details">
+                <div class="stat-details" style="flex: 1;">
                     <h3>Active Policies</h3>
                     <p class="stat-number stat-value">0</p>
-                    <span class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i> 0% from last month
-                    </span>
                 </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" style="display: flex; align-items: center; gap: 1.5rem;">
                 <div class="stat-icon purple">
                     <i class="fas fa-dollar-sign"></i>
                 </div>
-                <div class="stat-details">
+                <div class="stat-details" style="flex: 1;">
                     <h3>All Time Premium</h3>
                     <p class="stat-number stat-value">$0</p>
-                    <span class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i> 0% from last month
-                    </span>
                 </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" style="display: flex; align-items: center; gap: 1.5rem;">
                 <div class="stat-icon orange">
                     <i class="fas fa-dollar-sign"></i>
                 </div>
-                <div class="stat-details">
+                <div class="stat-details" style="flex: 1;">
                     <h3>Monthly Lead Premium</h3>
                     <p class="stat-number stat-value">$0</p>
-                    <span class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i> 0% from last month
-                    </span>
                 </div>
             </div>
         </div>
@@ -3538,9 +3563,15 @@ let currentAssignView = 'normal'; // Track assignment mode (normal or assign)
 // Get current user from session data
 function getCurrentUser() {
     const sessionData = sessionStorage.getItem('vanguard_user');
+    console.log('🔍 GET USER DEBUG:', {
+        sessionData,
+        hasSessionData: !!sessionData
+    });
+
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
+            console.log('🔍 Parsed user:', user);
             return user.username || 'User';
         } catch (error) {
             console.error('Error parsing session data:', error);
@@ -3552,7 +3583,14 @@ function getCurrentUser() {
 // Check if current user is admin
 function isCurrentUserAdmin() {
     const currentUser = getCurrentUser();
-    return ['grant', 'maureen'].includes(currentUser.toLowerCase());
+    const isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+    console.log('🔍 ADMIN CHECK:', {
+        currentUser,
+        currentUserLower: currentUser.toLowerCase(),
+        isAdmin,
+        adminList: ['grant', 'maureen']
+    });
+    return isAdmin;
 }
 
 // Make functions globally accessible
@@ -3611,17 +3649,36 @@ window.switchTodoView = function switchTodoView(view) {
 }
 
 window.loadTodos = function loadTodos() {
+    console.log('🔍 loadTodos() called');
     const todoList = document.getElementById('todoList');
     const assignBtn = document.getElementById('assignTodoBtn');
 
-    if (!todoList) return;
+    console.log('🔍 DOM elements found:', {
+        todoList: !!todoList,
+        assignBtn: !!assignBtn
+    });
+
+    if (!todoList) {
+        console.log('🔍 todoList not found, exiting loadTodos');
+        return;
+    }
 
     // Show/hide assign button based on admin status
     const isAdmin = isCurrentUserAdmin();
     const currentUser = getCurrentUser();
 
+    console.log('🔍 ADMIN DEBUG - loadTodos:', {
+        currentUser,
+        isAdmin,
+        assignBtnExists: !!assignBtn,
+        sessionData: sessionStorage.getItem('vanguard_user')
+    });
+
     if (assignBtn) {
         assignBtn.style.display = isAdmin ? 'inline-block' : 'none';
+        console.log('🔍 Assign button display set to:', isAdmin ? 'inline-block' : 'none');
+    } else {
+        console.log('🔍 Assign button element not found!');
     }
 
 
@@ -6916,6 +6973,24 @@ function generateClientRows(page = 1) {
     let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
     console.log(`✅ Loaded ${clients.length} clients from localStorage`);
 
+    // If no clients in localStorage, this is likely because localStorage was cleared
+    if (clients.length === 0) {
+        console.log('⚠️ No clients in localStorage - this may be normal if localStorage was cleared');
+        console.log('⚠️ This suggests localStorage was cleared but server reload may not have completed');
+        console.log('⚠️ The system should automatically reload from server when the Clients tab is accessed');
+
+        // Return a loading state instead of "no clients found" if localStorage is truly empty
+        return `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 16px;"></i>
+                    <p style="font-size: 16px; margin: 0;">Loading clients from server...</p>
+                    <p style="font-size: 14px; margin-top: 8px;">Please wait while we fetch your client data</p>
+                </td>
+            </tr>
+        `;
+    }
+
     // Get current user and check if they are admin
     const sessionData = sessionStorage.getItem('vanguard_user');
     let currentUser = null;
@@ -7146,12 +7221,28 @@ async function loadClientsView() {
     `;
 
     // Load clients from server first, then populate table
-    await loadClientsFromServer();
+    const serverClients = await loadClientsFromServer();
+    console.log(`✅ Server returned ${serverClients.length} clients`);
 
     // Populate the table with actual client data
     const tbody = document.getElementById('clientsTableBody');
     if (tbody) {
-        tbody.innerHTML = generateClientRows(currentClientPage);
+        // Check if we actually have clients after server load
+        const finalClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        if (finalClients.length === 0) {
+            console.log('⚠️ Still no clients after server load - showing empty state');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-users" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                        <p style="font-size: 16px; margin: 0;">No clients found</p>
+                        <p style="font-size: 14px; margin-top: 8px;">Convert leads or add new clients to get started</p>
+                    </td>
+                </tr>
+            `;
+        } else {
+            tbody.innerHTML = generateClientRows(currentClientPage);
+        }
     }
 
     // Update count and pagination
@@ -7159,7 +7250,27 @@ async function loadClientsView() {
 
     // Update the footer info with actual counts
     updateClientsFooterInfo();
-    
+
+    // Add a safety check - if still no clients after everything, try once more
+    setTimeout(async () => {
+        const finalCheck = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        if (finalCheck.length === 0) {
+            console.log('🔄 Safety check: Still no clients found, attempting one more server load...');
+            const retryClients = await loadClientsFromServer();
+            if (retryClients.length > 0) {
+                console.log(`✅ Retry successful: Found ${retryClients.length} clients`);
+                const tbody = document.getElementById('clientsTableBody');
+                if (tbody) {
+                    tbody.innerHTML = generateClientRows(currentClientPage);
+                }
+                updateClientsPagination();
+                updateClientsFooterInfo();
+            } else {
+                console.log('⚠️ Retry also returned no clients - may be a server issue');
+            }
+        }
+    }, 1000);
+
     // Scan for clickable phone numbers and emails with aggressive retry
     const scanContent = () => {
         if (window.scanForClickableContent) {
@@ -10177,7 +10288,7 @@ function renderCampaignsTab() {
                             </div>
                         </div>
                         <div class="campaign-actions">
-                            <button class="btn-small" onclick="viewCampaignDetails(${campaign.id})">
+                            <button class="btn-small" onclick="viewCampaignDetails(${campaign.id}, event)">
                                 <i class="fas fa-eye"></i> Details
                             </button>
                             ${campaign.status === 'active' ? 
@@ -10544,7 +10655,7 @@ function loadCommunicationTab(tabName) {
                             </div>
                         </div>
                         <div class="campaign-actions">
-                            <button class="btn-secondary" onclick="viewCampaignDetails('renewal_reminders')">View Details</button>
+                            <button class="btn-secondary" onclick="viewCampaignDetails('renewal_reminders', event)">View Details</button>
                             <button class="btn-secondary" onclick="pauseCampaign('renewal_reminders')">Pause</button>
                         </div>
                     </div>
@@ -10569,7 +10680,7 @@ function loadCommunicationTab(tabName) {
                             </div>
                         </div>
                         <div class="campaign-actions">
-                            <button class="btn-secondary" onclick="viewCampaignDetails('welcome_series')">View Details</button>
+                            <button class="btn-secondary" onclick="viewCampaignDetails('welcome_series', event)">View Details</button>
                             <button class="btn-secondary" onclick="pauseCampaign('welcome_series')">Pause</button>
                         </div>
                     </div>
@@ -13105,11 +13216,15 @@ function generateViewTabContent(tabId, policy) {
         case 'documents':
             return `
                 <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
-                    <h3 style="margin-top: 0; margin-bottom: 30px; color: #111827; font-size: 22px; font-weight: 600;">Policy Documents</h3>
-                    <p style="color: #6b7280; font-size: 16px; margin-bottom: 25px;">No documents uploaded for this policy</p>
-                    <button class="btn-secondary" style="margin-top: 20px; padding: 12px 24px; font-size: 14px; border-radius: 8px;">
-                        <i class="fas fa-upload"></i> Upload Document
-                    </button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                        <h3 style="margin: 0; color: #111827; font-size: 22px; font-weight: 600;">Policy Documents</h3>
+                        <button onclick="window.uploadPolicyDocument('${policy.id}')" class="btn-secondary" style="padding: 10px 20px; font-size: 14px; border-radius: 8px; background: #10b981; border-color: #10b981; color: white;">
+                            <i class="fas fa-upload"></i> Upload Document
+                        </button>
+                    </div>
+                    <div id="policy-documents-list">
+                        ${window.renderPolicyDocuments(policy.id)}
+                    </div>
                 </div>
             `;
             
@@ -16636,7 +16751,7 @@ function sendBirthdayMessage(clientName, email, phone) {
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.innerHTML = `
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 800px; width: 90%;">
             <div class="modal-header">
                 <h3><i class="fas fa-birthday-cake"></i> Send Birthday Message to ${clientName}</h3>
                 <button class="close-modal" onclick="this.closest('.modal').remove()">&times;</button>
@@ -16715,7 +16830,7 @@ function switchBirthdayTab(button, tabType) {
     document.getElementById(`birthday-${tabType}-tab`).style.display = 'block';
 }
 
-function sendBirthdayMessageNow(clientName) {
+async function sendBirthdayMessageNow(clientName) {
     const activeTab = document.querySelector('.birthday-tab[style="display: block;"], .birthday-tab.active:not([style*="none"])');
     const isEmail = activeTab.id === 'birthday-email-tab';
 
@@ -16729,8 +16844,54 @@ function sendBirthdayMessageNow(clientName) {
             return;
         }
 
-        // Simulate sending email
-        alert(`Birthday email sent to ${clientName} at ${to}!`);
+        // Show loading state
+        const sendButton = document.querySelector('.btn-primary');
+        const originalText = sendButton.innerHTML;
+        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        sendButton.disabled = true;
+
+        try {
+            // Prepare form data using the same system as documentation emails
+            const formData = new FormData();
+            formData.append('from', 'contact@vigagency.com');
+            formData.append('to', to);
+            formData.append('subject', subject);
+            formData.append('message', message);
+            formData.append('type', 'birthday_message');
+            formData.append('clientName', clientName);
+
+            console.log('🎂 Sending birthday email via API...', { to, subject, clientName });
+
+            // Send via the same API endpoint used for documentation emails
+            const response = await fetch('/api/coi/send-request', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert(`🎂 Birthday email sent successfully to ${clientName} at ${to}!`);
+                console.log('✅ Birthday email sent successfully:', result);
+            } else {
+                throw new Error(result.error || 'Failed to send email');
+            }
+
+            document.querySelector('.modal').remove();
+
+        } catch (error) {
+            console.error('❌ Error sending birthday email:', error);
+            alert(`Failed to send birthday email: ${error.message}`);
+
+            // Restore send button
+            sendButton.innerHTML = originalText;
+            sendButton.disabled = false;
+        }
+
     } else {
         const to = document.getElementById('birthdaySmsTo').value;
         const message = document.getElementById('birthdaySmsMessage').value;
@@ -16740,15 +16901,237 @@ function sendBirthdayMessageNow(clientName) {
             return;
         }
 
-        // Simulate sending SMS
-        alert(`Birthday SMS sent to ${clientName} at ${to}!`);
+        // For now, simulate SMS sending (can be integrated with real SMS API later)
+        alert(`🎂 Birthday SMS sent to ${clientName} at ${to}!`);
+        document.querySelector('.modal').remove();
     }
-
-    document.querySelector('.modal').remove();
 }
 
 function sendWelcomeMessage(clientName) {
-    alert(`Welcome message functionality for ${clientName} - Coming soon!`);
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px; width: 90%;">
+            <div class="modal-header">
+                <h3><i class="fas fa-envelope"></i> Send Welcome Message to ${clientName}</h3>
+                <button class="close-modal" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tabs" style="margin-bottom: 20px;">
+                    <button class="tab-btn active" onclick="switchWelcomeTab(this, 'email')">Email</button>
+                    <button class="tab-btn" onclick="switchWelcomeTab(this, 'sms')">SMS</button>
+                </div>
+
+                <div id="welcome-email-tab" class="welcome-tab active">
+                    <div class="form-group">
+                        <label>To:</label>
+                        <input type="email" value="" class="form-control" id="welcomeEmailTo" placeholder="client@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Subject:</label>
+                        <input type="text" value="Welcome to Vanguard Insurance Group LLC, ${clientName}!" class="form-control" id="welcomeEmailSubject">
+                    </div>
+                    <div class="form-group">
+                        <label>Message:</label>
+                        <textarea class="form-control" rows="8" id="welcomeEmailMessage">Dear ${clientName},
+
+Welcome to the Vanguard Insurance Group LLC family! 🎉
+
+We're thrilled to have you as our newest client and want to personally thank you for choosing us for your commercial insurance needs.
+
+Our team is committed to providing you with exceptional service and coverage. You can expect:
+• Dedicated support from our experienced team
+• 24/7 claims assistance
+• Regular policy reviews to ensure optimal coverage
+• Exclusive client perks and benefits
+
+As a token of our appreciation, we have a special welcome gift prepared for you. We'll be in touch soon to arrange delivery!
+
+If you have any questions or need assistance, please don't hesitate to reach out at 330-460-6887 or contact@vigagency.com. We're here to help.
+
+Welcome aboard!
+
+Best regards,
+The Vanguard Insurance Team</textarea>
+                    </div>
+                </div>
+
+                <div id="welcome-sms-tab" class="welcome-tab" style="display: none;">
+                    <div class="form-group">
+                        <label>To:</label>
+                        <input type="tel" value="" class="form-control" id="welcomeSmsTo" placeholder="(555) 123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label>Message:</label>
+                        <textarea class="form-control" rows="4" maxlength="160" id="welcomeSmsMessage">Welcome to our insurance family, ${clientName}! 🎉 Thanks for choosing us. A special gift is on the way! - Your Insurance Team</textarea>
+                        <small class="char-count">0 / 160 characters</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                <button class="btn-primary" onclick="sendWelcomeMessageNow('${clientName}')">
+                    <i class="fas fa-paper-plane"></i> Send Welcome Message
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+
+    // Add character counter for SMS
+    const smsTextarea = modal.querySelector('#welcomeSmsMessage');
+    const charCount = modal.querySelector('.char-count');
+    smsTextarea.addEventListener('input', function() {
+        charCount.textContent = `${this.value.length} / 160 characters`;
+    });
+    // Initial count
+    charCount.textContent = `${smsTextarea.value.length} / 160 characters`;
+}
+
+function switchWelcomeTab(button, tabType) {
+    // Update buttons
+    button.parentNode.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+
+    // Update tabs
+    document.querySelectorAll('.welcome-tab').forEach(tab => tab.style.display = 'none');
+    document.getElementById(`welcome-${tabType}-tab`).style.display = 'block';
+}
+
+async function sendWelcomeMessageNow(clientName) {
+    const activeTab = document.querySelector('.welcome-tab[style="display: block;"], .welcome-tab.active:not([style*="none"])');
+    const isEmail = activeTab.id === 'welcome-email-tab';
+
+    if (isEmail) {
+        const to = document.getElementById('welcomeEmailTo').value;
+        const subject = document.getElementById('welcomeEmailSubject').value;
+        const message = document.getElementById('welcomeEmailMessage').value;
+
+        if (!to || !subject || !message) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        // Show loading state
+        const sendButton = document.querySelector('.btn-primary');
+        const originalText = sendButton.innerHTML;
+        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        sendButton.disabled = true;
+
+        try {
+            // Create HTML email with professional signature
+            const htmlMessage = `
+            <div style="font-family: Arial, Helvetica, sans-serif; color: #333; line-height: 1.6;">
+                ${message.replace(/\n/g, '<br>')}
+            </div>
+
+            <div style="margin: 30px 0;"></div>
+
+            <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; font-family: Arial, Helvetica, sans-serif; color:#0B1D3A; width:100%;">
+                <tbody valign="middle">
+                    <tr valign="inherit">
+                        <td style="padding:12px 0 10px 0;" valign="inherit">
+                            <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; width: 100%;">
+                                <tbody valign="middle">
+                                    <tr valign="inherit">
+                                        <td style="vertical-align:top;" valign="top">
+                                            <div style="font-size:18px;line-height:22px;font-weight:bold;color:#1F4F8D;">Vanguard Insurance Group LLC</div>
+                                            <div style="font-size:12px;line-height:16px;color:#4B5563;padding-top:2px;">Commercial Insurance Services</div>
+                                        </td>
+                                    </tr>
+                                    <tr valign="inherit">
+                                        <td style="padding-top:10px;" valign="inherit"><span style="font-size:14px;line-height:20px;">&nbsp; <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwQjFEM0EiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMiAxNi45MnYzYTIgMiAwIDAgMS0yLjE4IDJBMTkuODYgMTkuODYgMCAwIDEgMTEuMTkgMTguODVBMTkuNSAxOS41IDAgMCAxIDUuMTkgMTIuODkgMTkuODYgMTkuODYgMCAwIDEgMi4wOCA0LjE4QTIgMiAwIDAgMSA0LjA2IDJoM2EyIDIgMCAwIDEgMiAxLjcyYy4xMi45LjMxIDEuNzcuNTcgMi42MWEyIDIgMCAwIDEtLjQ1IDIuMTFMOCA5LjkxYTE2IDE2IDAgMCAwIDYgNmwxLjQ2LTEuMDlhMiAyIDAgMCAxIDIuMTEtLjQ1Yy44NC4yNiAxLjcxLjQ1IDIuNjEuNTdhMiAyIDAgMCAxIDEuODIgMS45MnoiLz48L3N2Zz4=" width="16" height="16" style="vertical-align: middle; margin-right: 6px;"> <a href="tel:+13304606887" style="color:#0B1D3A;text-decoration:none;">330-460-6887</a> &bull; <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwQjFEM0EiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik00IDRoMTZhMiAyIDAgMCAxIDIgMnYxMmEyIDIgMCAwIDEtMiAySDRhMiAyIDAgMCAxLTItMlY2YTIgMiAwIDAgMSAyLTJ6Ii8+PHBvbHlsaW5lIHBvaW50cz0iMjIsNiAxMiwxMyAyLDYiLz48L3N2Zz4=" width="16" height="16" style="vertical-align: middle; margin-right: 6px;"> <a href="mailto:contact@vigagency.com" style="color:#0B1D3A;text-decoration:none;">contact@vigagency.com</a> &bull; <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwQjFEM0EiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PGxpbmUgeDE9IjIiIHkxPSIxMiIgeDI9IjIyIiB5Mj0iMTIiLz48cGF0aCBkPSJNMTIgMmMzIDMuNSAzIDE0IDAgMjBNMTIgMmMtMyAzLjUtMyAxNCAwIDIwIi8+PC9zdmc+" width="16" height="16" style="vertical-align: middle; margin-right: 6px;"> <a href="https://vigagency.com" target="_blank" style="color:#0B1D3A;text-decoration:none;">vigagency.com</a>&nbsp;</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr valign="inherit">
+                        <td style="height:2px;background:#1F4F8D;font-size:0;line-height:0;" height="2" valign="inherit">&nbsp;</td>
+                    </tr>
+                    <tr valign="inherit">
+                        <td style="padding-top:4px;" valign="inherit">
+                            <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background: rgb(235, 235, 236); border-right: 1px solid rgb(235, 235, 236); border-bottom: 1px solid rgb(235, 235, 236); border-left: 1px solid rgb(235, 235, 236); width: 100%;">
+                                <tbody valign="middle">
+                                    <tr valign="inherit">
+                                        <td style="padding:12px 12px;" valign="inherit">
+                                            <table cellpadding="0" cellspacing="0" width="100%">
+                                                <tbody valign="middle">
+                                                    <tr valign="inherit">
+                                                        <td style="padding:0; vertical-align:middle;" valign="middle"><img src="https://permanent-assets-download.flockmail.com/signature/8306917/2025-10-29_e41d4e2a4c914f21beca_55689" style="width: 249px; display: inline-block; vertical-align: bottom; margin-right: 5px; margin-left: 5px;"></td>
+                                                        <td align="right" style="vertical-align:middle;" valign="middle"><a href="https://vigagency.com" target="_blank" style="background:#1F4F8D;color:#ffffff;text-decoration:none;font-size:13px;line-height:18px;border-radius:999px;padding:10px 16px;display:inline-block;">&nbsp;Visit vigagency.com&nbsp;</a></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr valign="inherit">
+                        <td style="font-size:10px;line-height:14px;color:#6B7280;padding-top:8px;" valign="inherit">Coverage cannot be bound or altered via email unless confirmed in writing by an authorized representative. &copy; Vanguard Insurance Group LLC.</td>
+                    </tr>
+                </tbody>
+            </table>
+            `;
+
+            // Prepare form data using the same system as documentation emails
+            const formData = new FormData();
+            formData.append('from', 'contact@vigagency.com');
+            formData.append('to', to);
+            formData.append('subject', subject);
+            formData.append('message', htmlMessage);
+            formData.append('type', 'welcome_message');
+            formData.append('clientName', clientName);
+
+            console.log('🎉 Sending welcome email via API...', { to, subject, clientName });
+
+            // Send via the same API endpoint used for documentation emails
+            const response = await fetch('/api/coi/send-request', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert(`✅ Welcome email sent successfully to ${clientName} at ${to}!`);
+                console.log('✅ Welcome email sent successfully:', result);
+            } else {
+                throw new Error(result.error || 'Failed to send email');
+            }
+
+            document.querySelector('.modal').remove();
+
+        } catch (error) {
+            console.error('❌ Error sending welcome email:', error);
+            alert(`Failed to send welcome email: ${error.message}`);
+
+            // Restore send button
+            sendButton.innerHTML = originalText;
+            sendButton.disabled = false;
+        }
+
+    } else {
+        const to = document.getElementById('welcomeSmsTo').value;
+        const message = document.getElementById('welcomeSmsMessage').value;
+
+        if (!to || !message) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        // For now, simulate SMS sending (can be integrated with real SMS API later)
+        alert(`📱 Welcome SMS sent to ${clientName} at ${to}!`);
+        document.querySelector('.modal').remove();
+    }
 }
 
 // Lead Import and Blast Functions
@@ -17799,7 +18182,13 @@ function renderLeadsList(leads) {
 }
 
 // Communications Campaign Functions
-function viewCampaignDetails(campaignId) {
+function viewCampaignDetails(campaignId, event) {
+    // Prevent event propagation to avoid immediate closing
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
     console.log('Viewing campaign details for:', campaignId);
 
     const campaigns = {
@@ -17841,6 +18230,7 @@ function viewCampaignDetails(campaignId) {
     // Show campaign details modal
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.setAttribute('data-modal-type', 'campaign-details'); // Mark as campaign modal
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
@@ -17930,7 +18320,43 @@ function viewCampaignDetails(campaignId) {
         </div>
     `;
 
+    // Add comprehensive event handling to prevent unwanted closing
+    const modalContent = modal.querySelector('.modal-content');
+
+    // Prevent all click events from bubbling up from modal content
+    modalContent.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+    });
+
+    // Prevent closing on any click except direct clicks on the modal overlay itself
+    modal.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        // Only close if clicking directly on the modal background (not on any child elements)
+        if (e.target === modal) {
+            console.log('Closing campaign modal via overlay click');
+            modal.remove();
+        }
+    });
+
+    // Prevent any other click handlers from interfering
+    modal.addEventListener('mousedown', function(e) {
+        e.stopPropagation();
+    });
+
+    modal.addEventListener('mouseup', function(e) {
+        e.stopPropagation();
+    });
+
     document.body.appendChild(modal);
+
+    // Ensure modal is visible and stays open
+    modal.style.display = 'flex';
+    modal.style.zIndex = '9999'; // High z-index to ensure it's on top
+
+    console.log('Campaign modal created and should stay open');
 }
 
 function pauseCampaign(campaignId) {
@@ -17959,6 +18385,227 @@ function duplicateCampaign(campaignId) {
     console.log('Duplicating campaign:', campaignId);
     showNotification('Campaign duplicated', 'success');
 }
+
+// Policy Document Management Functions
+window.renderPolicyDocuments = function(policyId) {
+    // Load documents from server asynchronously
+    loadPolicyDocuments(policyId);
+
+    return `
+        <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+            <p style="margin: 0; font-size: 16px;">Loading documents...</p>
+        </div>
+    `;
+};
+
+// Load policy documents from server
+async function loadPolicyDocuments(policyId) {
+    try {
+        console.log('📁 Loading documents for policy:', policyId);
+        const response = await fetch(`/api/documents?policyId=${policyId}`);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const policyDocs = data.documents || [];
+
+        console.log(`📁 Loaded ${policyDocs.length} documents from server`);
+
+        // Update the documents display
+        const documentsList = document.getElementById('policy-documents-list');
+        if (documentsList) {
+            if (policyDocs.length === 0) {
+                documentsList.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                        <i class="fas fa-folder-open" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                        <p style="margin: 0; font-size: 16px;">No documents uploaded yet</p>
+                        <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Upload to add files</p>
+                    </div>
+                `;
+            } else {
+                documentsList.innerHTML = policyDocs.map(doc => {
+                    const fileIcon = getPolicyFileIcon(doc.type);
+                    const fileSize = formatPolicyFileSize(doc.size);
+                    const uploadDate = new Date(doc.uploadDate).toLocaleDateString();
+
+                    return `
+                        <div style="display: flex; align-items: center; padding: 16px; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                            <i class="${fileIcon.icon}" style="color: ${fileIcon.color}; margin-right: 16px; font-size: 24px;"></i>
+                            <div style="flex: 1;">
+                                <p style="margin: 0; font-weight: 600; color: #1f2937; font-size: 16px;">${doc.name}</p>
+                                <p style="margin: 4px 0 0 0; font-size: 14px; color: #6b7280;">${fileSize} • Uploaded ${uploadDate} • by ${doc.uploadedBy}</p>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button onclick="window.downloadPolicyDocument('${policyId}', '${doc.id}')" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px;" title="Download">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                <button onclick="window.deletePolicyDocument('${policyId}', '${doc.id}')" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px;" title="Delete">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    } catch (error) {
+        console.error('📁 Error loading policy documents:', error);
+        const documentsList = document.getElementById('policy-documents-list');
+        if (documentsList) {
+            documentsList.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px; opacity: 0.7;"></i>
+                    <p style="margin: 0; font-size: 16px;">Error loading documents</p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Please refresh and try again</p>
+                </div>
+            `;
+        }
+    }
+}
+
+window.uploadPolicyDocument = function(policyId) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xls,.xlsx';
+
+    input.onchange = async function(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+
+        console.log(`📤 Uploading ${files.length} files for policy ${policyId}...`);
+        showNotification('Uploading documents...', 'info');
+
+        try {
+            const uploadPromises = files.map(file => uploadPolicyFileToServer(file, policyId));
+            await Promise.all(uploadPromises);
+
+            showNotification(`${files.length} document(s) uploaded successfully`, 'success');
+
+            // Refresh documents display
+            loadPolicyDocuments(policyId);
+
+        } catch (error) {
+            console.error('📤 Policy upload error:', error);
+            showNotification('Error uploading documents', 'error');
+        }
+    };
+
+    input.click();
+};
+
+// Upload single policy file to server
+async function uploadPolicyFileToServer(file, policyId) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('policyId', policyId);
+    formData.append('uploadedBy', sessionStorage.getItem('vanguard_user') || 'User');
+
+    const response = await fetch('/api/documents', {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+window.downloadPolicyDocument = function(policyId, docId) {
+    console.log(`📥 Downloading policy document ${docId}...`);
+
+    // Create download link to server endpoint
+    const link = document.createElement('a');
+    link.href = `/api/download-document?docId=${docId}`;
+    link.target = '_blank'; // Open in new tab for better UX
+    link.click();
+
+    showNotification('Download started', 'info');
+};
+
+window.deletePolicyDocument = async function(policyId, docId) {
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        console.log(`🗑️ Deleting policy document ${docId}...`);
+
+        const response = await fetch(`/api/documents/${docId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        showNotification('Document deleted successfully', 'success');
+
+        // Refresh documents display
+        loadPolicyDocuments(policyId);
+
+    } catch (error) {
+        console.error('🗑️ Policy delete error:', error);
+        showNotification('Error deleting document', 'error');
+    }
+};
+
+function getPolicyFileIcon(fileType) {
+    const type = (fileType || '').toLowerCase();
+
+    if (type.includes('pdf')) {
+        return { icon: 'fas fa-file-pdf', color: '#dc2626' };
+    } else if (type.includes('word') || type.includes('doc')) {
+        return { icon: 'fas fa-file-word', color: '#2563eb' };
+    } else if (type.includes('excel') || type.includes('sheet')) {
+        return { icon: 'fas fa-file-excel', color: '#059669' };
+    } else if (type.includes('image') || type.includes('jpg') || type.includes('jpeg') || type.includes('png')) {
+        return { icon: 'fas fa-file-image', color: '#7c3aed' };
+    } else if (type.includes('text')) {
+        return { icon: 'fas fa-file-alt', color: '#6b7280' };
+    } else {
+        return { icon: 'fas fa-file', color: '#6b7280' };
+    }
+}
+
+function formatPolicyFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Add global detection for localStorage clearing
+function detectStorageCleared() {
+    const expectedKeys = ['insurance_clients', 'insurance_policies', 'insurance_leads'];
+    const missingKeys = expectedKeys.filter(key => !localStorage.getItem(key));
+
+    if (missingKeys.length === expectedKeys.length) {
+        console.log('🔄 Detected localStorage was cleared externally - reloading data from server...');
+
+        // If we're on the clients page, trigger a reload
+        if (window.location.hash === '#clients') {
+            loadClientsView();
+        }
+
+        // Mark that we've detected the clear to avoid infinite loops
+        localStorage.setItem('storage_cleared_detected', Date.now().toString());
+    }
+}
+
+// Check for storage clearing every 3 seconds
+setInterval(detectStorageCleared, 3000);
 
 // Cache bust: Sun Sep 29 v52 - FORCE REFRESH - Fixed original working flow
 

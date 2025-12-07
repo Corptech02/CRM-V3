@@ -266,6 +266,16 @@ document.addEventListener('click', function(e) {
     const element = target.closest('button, a');
 
     if (element) {
+        // Skip tab navigation and menu items
+        if (element.closest('.nav-menu, .sidebar-menu, .tab-btn, .modal-tabs') ||
+            element.classList.contains('tab-btn') ||
+            element.classList.contains('nav-link') ||
+            element.hasAttribute('data-tab') ||
+            element.onclick && element.onclick.toString().includes('Tab')) {
+            console.log('✅ Allowing navigation/tab click');
+            return; // Let navigation handle its own clicks
+        }
+
         // Skip quote application PDF buttons
         if (element.hasAttribute('data-quote-app-pdf')) {
             console.log('✅ Allowing quote application PDF download');
@@ -276,6 +286,14 @@ document.addEventListener('click', function(e) {
         if (element.hasAttribute('data-lead-split-csv')) {
             console.log('✅ Allowing lead split CSV export');
             return; // Let the lead split handle its own export
+        }
+
+        // Skip client/policy document downloads
+        if (element.onclick &&
+            (element.onclick.toString().includes('downloadClientDocument') ||
+             element.onclick.toString().includes('downloadPolicyDocument'))) {
+            console.log('✅ Allowing client/policy document download');
+            return; // Let the document system handle its own download
         }
 
         // Check for download buttons

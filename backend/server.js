@@ -3,6 +3,8 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,6 +43,51 @@ app.get('/', (req, res) => {
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+
+// Multer configuration for file uploads
+const uploadDir = '/var/www/vanguard/uploads/documents/';
+
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const documentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        // Generate unique filename
+        const docId = 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const ext = path.extname(file.originalname);
+        cb(null, docId + ext);
+    }
+});
+
+const uploadDocumentFiles = multer({
+    storage: documentStorage,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+    fileFilter: (req, file, cb) => {
+        // Allowed file types
+        const allowedTypes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'text/plain',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('File type not allowed'), false);
+        }
+    }
+});
 
 // Database setup
 const db = new sqlite3.Database('/var/www/vanguard/vanguard.db', (err) => {
@@ -156,6 +203,26 @@ function initializeDatabase() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (lead_id) REFERENCES leads(id)
     )`);
+
+    // Documents table
+    db.run(`CREATE TABLE IF NOT EXISTS documents (
+        id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        policy_id TEXT,
+        filename TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        file_type TEXT NOT NULL,
+        uploaded_by TEXT,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Create indexes for better query performance
+    db.run(`CREATE INDEX IF NOT EXISTS idx_documents_client_id ON documents(client_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_documents_policy_id ON documents(policy_id)`);
 
     console.log('Database tables initialized');
 }
@@ -1600,8 +1667,6 @@ app.use('/api/coi', coiPdfRoutes);
 // COI Request Email endpoint will be defined after multer configuration
 
 // Quote submission endpoints
-const multer = require('multer');
-const fs = require('fs');
 
 // Configure multer for documentation email attachments (memory storage)
 const uploadDocuments = multer({
@@ -3442,6 +3507,216 @@ app.delete('/api/quote-applications/:id', (req, res) => {
         res.json({
             success: true,
             message: 'Quote application deleted successfully'
+        });
+    });
+});
+
+// Document Management API Endpoints
+
+// Upload document
+app.post('/api/documents', uploadDocumentFiles.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            error: 'No file uploaded'
+        });
+    }
+
+    const { clientId, policyId, uploadedBy } = req.body;
+
+    if (!clientId) {
+        // Clean up uploaded file if clientId is missing
+        fs.unlink(req.file.path, () => {});
+        return res.status(400).json({
+            success: false,
+            error: 'Missing clientId parameter'
+        });
+    }
+
+    // Generate document ID
+    const docId = 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+    const documentData = {
+        id: docId,
+        client_id: clientId,
+        policy_id: policyId || null,
+        filename: req.file.filename,
+        original_name: req.file.originalname,
+        file_path: req.file.path,
+        file_size: req.file.size,
+        file_type: req.file.mimetype,
+        uploaded_by: uploadedBy || 'Unknown'
+    };
+
+    // Save metadata to database
+    db.run(
+        `INSERT INTO documents (id, client_id, policy_id, filename, original_name, file_path, file_size, file_type, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            documentData.id,
+            documentData.client_id,
+            documentData.policy_id,
+            documentData.filename,
+            documentData.original_name,
+            documentData.file_path,
+            documentData.file_size,
+            documentData.file_type,
+            documentData.uploaded_by
+        ],
+        function(err) {
+            if (err) {
+                // Clean up uploaded file if database insert fails
+                fs.unlink(req.file.path, () => {});
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            res.json({
+                success: true,
+                document: {
+                    id: documentData.id,
+                    name: documentData.original_name,
+                    type: documentData.file_type,
+                    size: documentData.file_size,
+                    uploadDate: new Date().toISOString(),
+                    uploadedBy: documentData.uploaded_by
+                }
+            });
+        }
+    );
+});
+
+// Get documents for client or policy
+app.get('/api/documents', (req, res) => {
+    const { clientId, policyId } = req.query;
+
+    if (!clientId && !policyId) {
+        return res.status(400).json({
+            success: false,
+            error: 'Missing clientId or policyId parameter'
+        });
+    }
+
+    let query, params;
+
+    if (clientId) {
+        query = `SELECT id, original_name as name, file_type as type, file_size as size,
+                        upload_date as uploadDate, uploaded_by as uploadedBy
+                 FROM documents WHERE client_id = ? ORDER BY upload_date DESC`;
+        params = [clientId];
+    } else {
+        query = `SELECT id, original_name as name, file_type as type, file_size as size,
+                        upload_date as uploadDate, uploaded_by as uploadedBy
+                 FROM documents WHERE policy_id = ? ORDER BY upload_date DESC`;
+        params = [policyId];
+    }
+
+    db.all(query, params, (err, rows) => {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        res.json({
+            success: true,
+            documents: rows
+        });
+    });
+});
+
+// Download document
+app.get('/api/download-document', (req, res) => {
+    const { docId } = req.query;
+
+    if (!docId) {
+        return res.status(400).json({
+            success: false,
+            error: 'Missing docId parameter'
+        });
+    }
+
+    // Get document info from database
+    db.get(
+        'SELECT filename, original_name, file_path, file_type FROM documents WHERE id = ?',
+        [docId],
+        (err, doc) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!doc) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Document not found'
+                });
+            }
+
+            if (!fs.existsSync(doc.file_path)) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'File not found on server'
+                });
+            }
+
+            // Set headers for file download
+            res.setHeader('Content-Type', doc.file_type);
+            res.setHeader('Content-Disposition', `attachment; filename="${doc.original_name}"`);
+
+            // Stream the file
+            const fileStream = fs.createReadStream(doc.file_path);
+            fileStream.pipe(res);
+        }
+    );
+});
+
+// Delete document
+app.delete('/api/documents/:docId', (req, res) => {
+    const docId = req.params.docId;
+
+    // Get document info first
+    db.get('SELECT file_path FROM documents WHERE id = ?', [docId], (err, doc) => {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        if (!doc) {
+            return res.status(404).json({
+                success: false,
+                error: 'Document not found'
+            });
+        }
+
+        // Delete from database first
+        db.run('DELETE FROM documents WHERE id = ?', [docId], function(err) {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            // Delete physical file
+            fs.unlink(doc.file_path, (err) => {
+                if (err) {
+                    console.warn('Failed to delete physical file:', err);
+                    // Don't fail the request if file deletion fails
+                }
+            });
+
+            res.json({
+                success: true,
+                message: 'Document deleted successfully'
+            });
         });
     });
 });
