@@ -7304,6 +7304,9 @@ function loadRenewalsView() {
                         <button class="view-btn ${currentRenewalView === 'month' ? 'active' : ''}" onclick="switchRenewalView('month')">
                             <i class="fas fa-calendar-day"></i> Month View
                         </button>
+                        <button class="view-btn ${currentRenewalView === '3month' ? 'active' : ''}" onclick="switchRenewalView('3month')">
+                            <i class="fas fa-calendar-week"></i> 3-Month View
+                        </button>
                         <button class="view-btn ${currentRenewalView === 'year' ? 'active' : ''}" onclick="switchRenewalView('year')">
                             <i class="fas fa-calendar"></i> Year View
                         </button>
@@ -7339,7 +7342,9 @@ function loadRenewalsView() {
             
             <div class="renewal-content">
                 <div id="renewalListContainer" class="renewal-list-container">
-                    ${currentRenewalView === 'month' ? renderMonthView(renewalPolicies) : renderYearView(renewalPolicies)}
+                    ${currentRenewalView === 'month' ? renderMonthView(renewalPolicies) :
+                      currentRenewalView === '3month' ? renderThreeMonthView(renewalPolicies) :
+                      renderYearView(renewalPolicies)}
                 </div>
                 
                 <div id="renewalProfile" class="renewal-profile" style="display: none;">
@@ -7369,7 +7374,16 @@ function getRealRenewalPolicies(policies, clients) {
         
         // Get client info
         const client = clientsArray.find(c => c.id === policy.clientId) || {};
-        const clientName = client.name || policy.clientName || 'Unknown Client';
+
+        // Use same client name hierarchy as other components (Named Insured first, then fallbacks)
+        const clientName = policy.insured?.['Name/Business Name'] ||
+                          policy.insured?.['Primary Named Insured'] ||
+                          policy.namedInsured?.name ||
+                          (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' ? policy.clientName : null) ||
+                          client.name ||
+                          client.companyName ||
+                          client.businessName ||
+                          'Unknown Client';
         
         // Get premium value
         let premiumValue = 0;
@@ -7510,6 +7524,50 @@ function renderMonthView(policies) {
             <h3>Renewals Due Within 30 Days</h3>
             <div class="renewal-list">
                 ${monthPolicies.map(policy => `
+                    <div class="renewal-card ${policy.status || ''} ${selectedRenewalPolicyId === policy.id ? 'selected' : ''}"
+                         onclick="showRenewalProfile('${policy.id}')"
+                         id="renewal-card-${policy.id}">
+                        <div class="renewal-header">
+                            <div class="renewal-info">
+                                <h4>${policy.client || 'Unknown Client'}</h4>
+                                <p>${policy.type || 'Commercial Auto'} - ${policy.carrier || 'Unknown Carrier'}</p>
+                                <p class="policy-number">Policy #${policy.policyNumber || 'N/A'}</p>
+                            </div>
+                            <div class="renewal-date">
+                                <span class="date-label">Expires</span>
+                                <span class="date-value">${formatDate(policy.expirationDate)}</span>
+                                <span class="days-remaining">${getDaysRemaining(policy.expirationDate)}</span>
+                            </div>
+                        </div>
+                        <div class="renewal-footer">
+                            <span class="premium">$${(policy.premium || 0).toLocaleString()}/yr</span>
+                            <span class="status-badge ${policy.status || ''}">${(policy.status || 'pending').replace('-', ' ')}</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderThreeMonthView(policies) {
+    const today = new Date();
+    // Show policies expiring within 90 days (3 months)
+    const threeMonthPolicies = policies.filter(p => {
+        const expDate = new Date(p.expirationDate);
+        if (isNaN(expDate.getTime())) return false;
+
+        const daysUntilExpiry = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+
+        // Show policies expiring in next 90 days (include today, exclude overdue)
+        return daysUntilExpiry >= 0 && daysUntilExpiry <= 90;
+    });
+
+    return `
+        <div class="three-month-view">
+            <h3>Renewals Due Within 3 Months</h3>
+            <div class="renewal-list">
+                ${threeMonthPolicies.map(policy => `
                     <div class="renewal-card ${policy.status || ''} ${selectedRenewalPolicyId === policy.id ? 'selected' : ''}"
                          onclick="showRenewalProfile('${policy.id}')"
                          id="renewal-card-${policy.id}">
