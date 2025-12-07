@@ -580,25 +580,18 @@ const apiService = {
             });
 
             if (!response.ok) {
+                // Don't treat 404 as an error, just return null to trigger fallback
+                if (response.status === 404) {
+                    return null;
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
             return data;
         } catch (error) {
-            console.error('Error fetching dashboard stats:', error);
-            // Fallback to calculating from localStorage
-            const leads = JSON.parse(localStorage.getItem('leads') || '[]');
-            const clients = JSON.parse(localStorage.getItem('clients') || '[]');
-            const policies = JSON.parse(localStorage.getItem('policies') || '[]');
-
-            return {
-                total_leads: leads.length,
-                total_clients: clients.length,
-                total_policies: policies.length,
-                total_premium: policies.reduce((sum, policy) => sum + (parseFloat(policy.premium) || 0), 0),
-                monthly_lead_premium: leads.reduce((sum, lead) => sum + (parseFloat(lead.premium) || 0), 0)
-            };
+            // Suppress API errors and return null to trigger localStorage fallback
+            return null;
         }
     },
 

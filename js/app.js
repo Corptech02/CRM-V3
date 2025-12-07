@@ -2344,25 +2344,35 @@ window.addEventListener('hashchange', function() {
     }
 
     loadContent(hash);
-    updateActiveMenuItem(hash);
+
+    // Small delay to ensure menu highlighting happens after content loading
+    setTimeout(() => {
+        updateActiveMenuItem(hash);
+    }, 10);
 });
 
 // Update active menu item
 function updateActiveMenuItem(hash) {
-    console.log('Updating active menu item for:', hash);
-    
+    // Normalize hash (handle empty or missing hash)
+    const normalizedHash = hash || '#dashboard';
+
     // Remove active class from all menu items
     document.querySelectorAll('.sidebar li').forEach(li => {
         li.classList.remove('active');
     });
-    
+
     // Add active class to current menu item
-    const activeLink = document.querySelector(`.sidebar a[href="${hash}"]`);
+    const activeLink = document.querySelector(`.sidebar a[href="${normalizedHash}"]`);
     if (activeLink) {
         activeLink.parentElement.classList.add('active');
-        console.log('Set active:', hash);
     } else {
-        console.log('Could not find menu item for:', hash);
+        // Fallback: try to find dashboard if hash not found
+        if (normalizedHash !== '#dashboard') {
+            const dashboardLink = document.querySelector(`.sidebar a[href="#dashboard"]`);
+            if (dashboardLink) {
+                dashboardLink.parentElement.classList.add('active');
+            }
+        }
     }
 }
 
@@ -2412,19 +2422,19 @@ function showRatingEngine() {
 
 function showRenewalsList() {
     // Simulate navigation to renewals page
-    highlightMenuItem('renewals');
+    updateActiveMenuItem('#renewals');
     loadRenewalsData();
 }
 
 function showClaims() {
     // Simulate navigation to claims page
-    highlightMenuItem('claims');
+    updateActiveMenuItem('#claims');
     loadClaimsData();
 }
 
 function showReports() {
     // Simulate navigation to reports page
-    highlightMenuItem('reports');
+    updateActiveMenuItem('#reports');
     generateReports();
 }
 
@@ -3096,16 +3106,7 @@ function showNotification(message, type = 'info') {
 }
 
 // Helper Functions
-function highlightMenuItem(item) {
-    document.querySelectorAll('.sidebar li').forEach(li => {
-        li.classList.remove('active');
-    });
-    
-    const menuItem = document.querySelector(`.sidebar a[href="#${item}"]`);
-    if (menuItem) {
-        menuItem.parentElement.classList.add('active');
-    }
-}
+// Note: highlightMenuItem() removed - use updateActiveMenuItem() instead
 
 function updateClientCount() {
     const clientCount = document.querySelector('.sidebar a[href="#clients"] .count');
@@ -3149,7 +3150,20 @@ function loadFullDashboard() {
         console.log('No dashboard content found');
         return;
     }
-    
+
+    // Check if dashboard is already built to avoid unnecessary rebuilds
+    const existingStatsGrid = dashboardContent.querySelector('.stats-grid');
+    if (existingStatsGrid) {
+        console.log('Dashboard already exists, updating data only...');
+        // Just update stats and todos without rebuilding
+        updateDashboardStats();
+        setTimeout(() => {
+            loadTodos();
+            loadReminderStats();
+        }, 100);
+        return;
+    }
+
     // Rebuild the entire dashboard structure
     dashboardContent.innerHTML = `
         <!-- Statistics Cards -->
@@ -3204,58 +3218,81 @@ function loadFullDashboard() {
             </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="quick-actions">
-            <h2>Quick Actions</h2>
-            <div class="actions-grid">
-                <button class="action-btn" onclick="showNewQuote()">
-                    <i class="fas fa-plus-circle"></i>
-                    <span>New Quote</span>
-                </button>
-                <button class="action-btn" onclick="showNewClient()">
-                    <i class="fas fa-user-plus"></i>
-                    <span>Add Client</span>
-                </button>
-                <button class="action-btn" onclick="showRatingEngine()">
-                    <i class="fas fa-calculator"></i>
-                    <span>Compare Rates</span>
-                </button>
-                <button class="action-btn" onclick="showRenewalsList()">
-                    <i class="fas fa-sync"></i>
-                    <span>Renewals</span>
-                </button>
-                <button class="action-btn" onclick="showClaims()">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>Claims</span>
-                </button>
-                <button class="action-btn" onclick="showReports()">
-                    <i class="fas fa-chart-pie"></i>
-                    <span>Reports</span>
-                </button>
-            </div>
-        </div>
 
         <!-- Main Sections -->
-        <div class="dashboard-sections">
-            <!-- Recent Activities -->
-            <div class="section-card">
-                <div class="section-header">
-                    <h2>Recent Activities</h2>
-                    <a href="#" class="view-all">View All</a>
+        <div class="dashboard-sections" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- To-Do List -->
+            <div class="section-card todo-container">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>To-Do</h2>
+                    <div style="display: flex; gap: 5px;" id="todoViewButtons">
+                        <button id="personalTodoBtn" class="btn-sm active" onclick="switchTodoView('personal')" style="
+                            padding: 5px 10px;
+                            font-size: 0.8rem;
+                            background: #3b82f6;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                        ">Personal</button>
+                        <button id="agencyTodoBtn" class="btn-sm" onclick="switchTodoView('agency')" style="
+                            padding: 5px 10px;
+                            font-size: 0.8rem;
+                            background: #e5e7eb;
+                            color: #6b7280;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                        ">Agency</button>
+                        <button id="assignTodoBtn" class="btn-sm" onclick="switchTodoView('assign')" style="
+                            padding: 5px 10px;
+                            font-size: 0.8rem;
+                            background: #e5e7eb;
+                            color: #6b7280;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            display: none;
+                        ">Assign</button>
+                    </div>
                 </div>
-                <div class="activities-list">
-                    <!-- Activities will be added here when actions are performed -->
+                <div style="padding: 20px;">
+                    <div style="margin-bottom: 15px;" id="todoInputContainer">
+                        <input type="text" id="todoInput" placeholder="Add a new task..."
+                            style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 14px; margin-bottom: 10px;"
+                            onkeypress="if(event.key === 'Enter') addTodo()">
+                        <div id="assignDropdownContainer" style="display: none;">
+                            <select id="assignToSelect" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 14px; margin-bottom: 10px;">
+                                <option value="">Assign to...</option>
+                                <option value="Hunter">Hunter</option>
+                                <option value="Carson">Carson</option>
+                            </select>
+                            <button onclick="addTodo()" style="
+                                width: 100%;
+                                padding: 10px;
+                                background: #3b82f6;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                font-size: 14px;
+                                cursor: pointer;
+                                font-weight: 500;
+                            ">Assign Task</button>
+                        </div>
+                    </div>
+                    <div id="todoList" style="max-height: 320px; overflow-y: auto;">
+                        <!-- To-do items will be loaded here -->
+                    </div>
                 </div>
             </div>
 
-            <!-- Upcoming Renewals -->
+            <!-- Reminders & Renewals -->
             <div class="section-card">
                 <div class="section-header">
-                    <h2>Upcoming Renewals</h2>
-                    <a href="#" class="view-all">View All</a>
+                    <h2>Reminders & Renewals</h2>
                 </div>
-                <div class="renewals-list" id="renewals-list-container">
-                    <!-- Renewals will be dynamically populated here -->
+                <div class="reminder-stats" id="reminder-stats-container" style="padding: 20px;">
+                    <!-- Reminder statistics will be dynamically populated here -->
                 </div>
             </div>
         </div>
@@ -3272,7 +3309,7 @@ function loadFullDashboard() {
     }
     
     if (window.dashboardRenewals) {
-        window.dashboardRenewals.updateRenewalsList();
+        window.dashboardRenewals.updateRenewalsDisplay();
     }
     
     // Now call loadDashboardView to add the To-Do box after a short delay to ensure DOM is ready
@@ -3294,154 +3331,306 @@ function loadDashboardView() {
         updateDashboardStats();
     }, 100);
 
-    // Check if To-Do box already exists by looking for the specific To-Do container
-    const existingTodoContainer = document.querySelector('.todo-container');
-    if (!existingTodoContainer) {
-        console.log('Adding To-Do box...');
-        // Find the dashboard-sections div that contains Recent Activities and Upcoming Renewals
-        const dashboardSections = dashboardContent.querySelector('.dashboard-sections');
-        
-        if (dashboardSections) {
-            console.log('Found dashboard-sections, modifying layout...');
-            // Change the dashboard-sections to a 3-column grid layout
-            dashboardSections.style.display = 'grid';
-            dashboardSections.style.gridTemplateColumns = '1fr 1fr 1fr';
-            dashboardSections.style.gap = '20px';
-            
-            // Find and scale the existing section cards
-            const sectionCards = dashboardSections.querySelectorAll('.section-card');
-            sectionCards.forEach(card => {
-                card.style.width = '100%';
-                card.style.marginBottom = '0';
-            });
-            
-            // Create the To-Do box HTML
-            const todoBoxHTML = `
-                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2>To-Do List</h2>
-                    <div style="display: flex; gap: 5px;">
-                        <button id="personalTodoBtn" class="btn-sm active" onclick="switchTodoView('personal')" style="
-                            padding: 5px 10px;
-                            font-size: 0.8rem;
-                            background: #3b82f6;
-                            color: white;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                        ">Personal</button>
-                        <button id="agencyTodoBtn" class="btn-sm" onclick="switchTodoView('agency')" style="
-                            padding: 5px 10px;
-                            font-size: 0.8rem;
-                            background: #e5e7eb;
-                            color: #6b7280;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                        ">Agency</button>
-                    </div>
-                </div>
-                <div style="padding: 20px;">
-                    <div style="margin-bottom: 15px;">
-                        <input type="text" id="todoInput" placeholder="Add a new task..." 
-                            style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 14px;"
-                            onkeypress="if(event.key === 'Enter') addTodo()">
-                    </div>
-                    <div id="todoList" style="max-height: 320px; overflow-y: auto;">
-                        <!-- To-do items will be loaded here -->
-                    </div>
-                </div>
-            `;
-            
-            // Create the To-Do box as the third column
-            const todoBox = document.createElement('div');
-            todoBox.className = 'section-card todo-container';
-            todoBox.innerHTML = todoBoxHTML;
-            
-            // Append the To-Do box as the third column
-            dashboardSections.appendChild(todoBox);
-            console.log('To-Do box added successfully!');
-
-            // Notification removed - no overlay needed
-        } else {
-            console.log('ERROR: Could not find .dashboard-sections element! Dashboard structure may be different.');
-            // Try alternative approach - add it directly after the stats grid
-            const statsGrid = dashboardContent.querySelector('.stats-grid');
-            if (statsGrid) {
-                const todoSection = document.createElement('div');
-                todoSection.className = 'dashboard-sections';
-                todoSection.style.display = 'grid';
-                todoSection.style.gridTemplateColumns = '1fr 1fr 1fr';
-                todoSection.style.gap = '20px';
-                todoSection.style.marginTop = '2rem';
-                
-                // Move existing dashboard-sections content if it exists elsewhere
-                const existingSections = dashboardContent.querySelectorAll('.section-card');
-                existingSections.forEach(card => {
-                    todoSection.appendChild(card);
-                });
-                
-                // Create and add the To-Do box
-                const todoBox = document.createElement('div');
-                todoBox.className = 'section-card todo-container';
-                todoBox.innerHTML = todoBoxHTML;
-                todoSection.appendChild(todoBox);
-                
-                // Insert after stats grid
-                statsGrid.insertAdjacentElement('afterend', todoSection);
-                console.log('To-Do box added using alternative method!');
-                // Notification removed - no overlay needed
-            }
-        }
-    } else {
-        console.log('To-Do list already exists');
-    }
-    
-    // Reinitialize charts and todos after content load
+    // Reinitialize todos and reminder stats after content load
     setTimeout(() => {
         if (typeof Chart !== 'undefined') {
             initializeCharts();
         }
         loadTodos(); // Load todos on dashboard initialization
+        loadReminderStats(); // Load reminder statistics
     }, 100);
+}
+
+// Load Reminder Statistics
+function loadReminderStats(retryCount = 0) {
+    const reminderStatsContainer = document.getElementById('reminder-stats-container');
+    if (!reminderStatsContainer) {
+        if (retryCount < 3) {
+            console.log(`Reminder stats container not found, retrying... (attempt ${retryCount + 1})`);
+            setTimeout(() => {
+                loadReminderStats(retryCount + 1);
+            }, 100);
+        } else {
+            console.error('Reminder stats container not found after 3 attempts');
+        }
+        return;
+    }
+
+    console.log('Loading reminder statistics...');
+
+    // Get data from localStorage
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    // Calculate stats
+    const today = new Date();
+
+    // 60-day upcoming renewals
+    const sixtyDaysFromNow = new Date(today.getTime() + (60 * 24 * 60 * 60 * 1000));
+    const upcomingRenewals60d = policies.filter(policy => {
+        if (policy.expirationDate) {
+            const expiryDate = new Date(policy.expirationDate);
+            return expiryDate >= today && expiryDate <= sixtyDaysFromNow;
+        }
+        return false;
+    }).length;
+
+    // New clients with unsent gifts (clients added in last 30 days without birthday gift)
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const newClientsUnsent = clients.filter(client => {
+        const createdDate = client.created || client.dateAdded;
+        if (createdDate) {
+            const created = new Date(createdDate);
+            return created >= thirtyDaysAgo && !client.giftSent;
+        }
+        return false;
+    }).length;
+
+    // 30-day upcoming birthdays
+    const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+    let upcomingBirthdays30d = 0;
+
+    // Count birthdays from clients
+    clients.forEach(client => {
+        if (client.dateOfBirth) {
+            const birthDate = new Date(client.dateOfBirth);
+            const thisYearBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+            const nextYearBirthday = new Date(today.getFullYear() + 1, birthDate.getMonth(), birthDate.getDate());
+
+            const upcomingBirthday = thisYearBirthday >= today ? thisYearBirthday : nextYearBirthday;
+            if (upcomingBirthday >= today && upcomingBirthday <= thirtyDaysFromNow) {
+                upcomingBirthdays30d++;
+            }
+        }
+    });
+
+    // Count birthdays from policy insured data
+    policies.forEach(policy => {
+        if (policy.insured?.['Date of Birth/Inception']) {
+            try {
+                const birthDate = new Date(policy.insured['Date of Birth/Inception']);
+                if (!isNaN(birthDate.getTime()) && birthDate.getFullYear() > 1900 && birthDate.getFullYear() < today.getFullYear()) {
+                    const thisYearBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+                    const nextYearBirthday = new Date(today.getFullYear() + 1, birthDate.getMonth(), birthDate.getDate());
+
+                    const upcomingBirthday = thisYearBirthday >= today ? thisYearBirthday : nextYearBirthday;
+                    if (upcomingBirthday >= today && upcomingBirthday <= thirtyDaysFromNow) {
+                        upcomingBirthdays30d++;
+                    }
+                }
+            } catch (error) {
+                // Invalid date format, skip
+            }
+        }
+    });
+
+    // Policies needing updates (expired or expiring within 7 days)
+    const sevenDaysFromNow = new Date(today.getTime() + (7 * 24 * 60 * 60 * 1000));
+    const policiesNeedingUpdate = policies.filter(policy => {
+        if (policy.expirationDate) {
+            const expiryDate = new Date(policy.expirationDate);
+            return expiryDate <= sevenDaysFromNow;
+        }
+        return false;
+    }).length;
+
+    // New COI Emails (from local storage if available)
+    const newCoiEmails = JSON.parse(localStorage.getItem('new_coi_emails') || '[]').length;
+
+    // Generate the stats HTML with clickable titles
+    reminderStatsContainer.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; cursor: pointer; transition: transform 0.2s;"
+                 onclick="navigateToTab('#renewals')"
+                 onmouseover="this.style.transform='translateY(-2px)'"
+                 onmouseout="this.style.transform='translateY(0)'">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <p style="margin: 0; font-size: 0.8rem; color: #6b7280; font-weight: 500;">60d Renewals</p>
+                        <p style="margin: 5px 0 0 0; font-size: 1.4rem; font-weight: 700; color: #1f2937;">${upcomingRenewals60d}</p>
+                    </div>
+                    <i class="fas fa-calendar-alt" style="font-size: 1.2rem; color: #3b82f6;"></i>
+                </div>
+            </div>
+
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; cursor: pointer; transition: transform 0.2s;"
+                 onclick="navigateToTab('#communications')"
+                 onmouseover="this.style.transform='translateY(-2px)'"
+                 onmouseout="this.style.transform='translateY(0)'">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <p style="margin: 0; font-size: 0.8rem; color: #92400e; font-weight: 500;">New Clients Gifts</p>
+                        <p style="margin: 5px 0 0 0; font-size: 1.4rem; font-weight: 700; color: #92400e;">${newClientsUnsent}</p>
+                    </div>
+                    <i class="fas fa-gift" style="font-size: 1.2rem; color: #f59e0b;"></i>
+                </div>
+            </div>
+
+            <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; cursor: pointer; transition: transform 0.2s;"
+                 onclick="navigateToTab('#communications')"
+                 onmouseover="this.style.transform='translateY(-2px)'"
+                 onmouseout="this.style.transform='translateY(0)'">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <p style="margin: 0; font-size: 0.8rem; color: #047857; font-weight: 500;">30d Birthdays</p>
+                        <p style="margin: 5px 0 0 0; font-size: 1.4rem; font-weight: 700; color: #047857;">${upcomingBirthdays30d}</p>
+                    </div>
+                    <i class="fas fa-birthday-cake" style="font-size: 1.2rem; color: #10b981;"></i>
+                </div>
+            </div>
+
+            <div style="background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; cursor: pointer; transition: transform 0.2s;"
+                 onclick="navigateToTab('#policies')"
+                 onmouseover="this.style.transform='translateY(-2px)'"
+                 onmouseout="this.style.transform='translateY(0)'">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <p style="margin: 0; font-size: 0.8rem; color: #dc2626; font-weight: 500;">Policies to Update</p>
+                        <p style="margin: 5px 0 0 0; font-size: 1.4rem; font-weight: 700; color: #dc2626;">${policiesNeedingUpdate}</p>
+                    </div>
+                    <i class="fas fa-exclamation-triangle" style="font-size: 1.2rem; color: #ef4444;"></i>
+                </div>
+            </div>
+
+            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #06b6d4; grid-column: 1 / -1; cursor: pointer; transition: transform 0.2s;"
+                 onclick="navigateToTab('#coi')"
+                 onmouseover="this.style.transform='translateY(-2px)'"
+                 onmouseout="this.style.transform='translateY(0)'">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <p style="margin: 0; font-size: 0.8rem; color: #0c4a6e; font-weight: 500;">New COI Emails</p>
+                        <p style="margin: 5px 0 0 0; font-size: 1.4rem; font-weight: 700; color: #0c4a6e;">${newCoiEmails}</p>
+                    </div>
+                    <i class="fas fa-envelope" style="font-size: 1.2rem; color: #06b6d4;"></i>
+                </div>
+            </div>
+        </div>
+    `;
+
+    console.log('Reminder statistics loaded:', {
+        upcomingRenewals60d,
+        newClientsUnsent,
+        upcomingBirthdays30d,
+        policiesNeedingUpdate,
+        newCoiEmails
+    });
+}
+
+// Navigation function for reminder stats
+function navigateToTab(hash) {
+    console.log('Navigating to tab:', hash);
+
+    // Update the URL hash
+    window.location.hash = hash;
+
+    // Update the active menu item
+    updateActiveMenuItem(hash);
+
+    // Load the appropriate content
+    loadContent(hash);
 }
 
 // To-Do List Management Functions
 let currentTodoView = 'personal'; // Track current view
-const currentUser = 'John Agent'; // In production, this would come from login system
+let currentAssignView = 'normal'; // Track assignment mode (normal or assign)
+
+// Get current user from session data
+function getCurrentUser() {
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            return user.username || 'User';
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+    return 'User';
+}
+
+// Check if current user is admin
+function isCurrentUserAdmin() {
+    const currentUser = getCurrentUser();
+    return ['grant', 'maureen'].includes(currentUser.toLowerCase());
+}
 
 // Make functions globally accessible
 window.switchTodoView = function switchTodoView(view) {
     currentTodoView = view;
-    
+
     // Update button styles
     const personalBtn = document.getElementById('personalTodoBtn');
     const agencyBtn = document.getElementById('agencyTodoBtn');
-    
+    const assignBtn = document.getElementById('assignTodoBtn');
+    const assignDropdown = document.getElementById('assignDropdownContainer');
+    const todoInput = document.getElementById('todoInput');
+
     if (personalBtn && agencyBtn) {
+        // Reset all buttons
+        personalBtn.style.background = '#e5e7eb';
+        personalBtn.style.color = '#6b7280';
+        agencyBtn.style.background = '#e5e7eb';
+        agencyBtn.style.color = '#6b7280';
+        if (assignBtn) {
+            assignBtn.style.background = '#e5e7eb';
+            assignBtn.style.color = '#6b7280';
+        }
+
+        // Set active button
         if (view === 'personal') {
             personalBtn.style.background = '#3b82f6';
             personalBtn.style.color = 'white';
-            agencyBtn.style.background = '#e5e7eb';
-            agencyBtn.style.color = '#6b7280';
-        } else {
+        } else if (view === 'agency') {
             agencyBtn.style.background = '#3b82f6';
             agencyBtn.style.color = 'white';
-            personalBtn.style.background = '#e5e7eb';
-            personalBtn.style.color = '#6b7280';
+        } else if (view === 'assign') {
+            if (assignBtn) {
+                assignBtn.style.background = '#3b82f6';
+                assignBtn.style.color = 'white';
+            }
+        }
+
+        // Show/hide assignment UI
+        if (view === 'assign') {
+            if (assignDropdown) assignDropdown.style.display = 'block';
+            if (todoInput) {
+                todoInput.style.marginBottom = '0';
+                todoInput.placeholder = 'Enter task to assign...';
+            }
+        } else {
+            if (assignDropdown) assignDropdown.style.display = 'none';
+            if (todoInput) {
+                todoInput.style.marginBottom = '10px';
+                todoInput.placeholder = 'Add a new task...';
+            }
         }
     }
-    
+
     loadTodos();
 }
 
 window.loadTodos = function loadTodos() {
     const todoList = document.getElementById('todoList');
+    const assignBtn = document.getElementById('assignTodoBtn');
+
     if (!todoList) return;
-    
+
+    // Show/hide assign button based on admin status
+    const isAdmin = isCurrentUserAdmin();
+    const currentUser = getCurrentUser();
+
+    if (assignBtn) {
+        assignBtn.style.display = isAdmin ? 'inline-block' : 'none';
+    }
+
+
     // Get todos from localStorage
     const personalTodos = JSON.parse(localStorage.getItem('personalTodos') || '[]');
     let agencyTodos = JSON.parse(localStorage.getItem('agencyTodos') || '[]');
-    
+    const hunterTodos = JSON.parse(localStorage.getItem('hunterAssignedTodos') || '[]');
+    const carsonTodos = JSON.parse(localStorage.getItem('carsonAssignedTodos') || '[]');
+
     // Add some default agency todos if none exist (for demo)
     if (agencyTodos.length === 0) {
         agencyTodos = [
@@ -3468,8 +3657,32 @@ window.loadTodos = function loadTodos() {
         ];
         localStorage.setItem('agencyTodos', JSON.stringify(agencyTodos));
     }
-    
-    const todosToShow = currentTodoView === 'personal' ? personalTodos : agencyTodos;
+
+    let todosToShow = [];
+
+    if (currentTodoView === 'personal') {
+        // Show personal todos including assigned ones
+        todosToShow = [...personalTodos];
+
+        // Add assigned todos if current user is Hunter or Carson
+        if (currentUser.toLowerCase() === 'hunter') {
+            todosToShow = [...todosToShow, ...hunterTodos];
+        } else if (currentUser.toLowerCase() === 'carson') {
+            todosToShow = [...todosToShow, ...carsonTodos];
+        }
+    } else if (currentTodoView === 'agency') {
+        todosToShow = agencyTodos;
+    } else if (currentTodoView === 'assign') {
+        // Show assignment interface
+        todoList.innerHTML = `
+            <div style="text-align: center; color: #6b7280; padding: 20px;">
+                <i class="fas fa-user-plus" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                <p>Enter a task above and select who to assign it to.</p>
+                <p style="font-size: 0.9rem; margin-top: 10px;">Tasks will appear on the assigned user's Personal list.</p>
+            </div>
+        `;
+        return;
+    }
     
     if (todosToShow.length === 0) {
         todoList.innerHTML = `
@@ -3495,8 +3708,9 @@ window.loadTodos = function loadTodos() {
                     onchange="toggleTodo(${index})"
                     style="margin-top: 3px; cursor: pointer;">
                 <div style="flex: 1;">
-                    <div style="${todo.completed ? 'text-decoration: line-through; color: #9ca3af;' : ''}">
+                    <div style="${todo.completed ? 'text-decoration: line-through; color: #9ca3af;' : todo.assigned ? 'color: #dc2626;' : ''}">
                         ${todo.text}
+                        ${todo.assigned ? '<span style="color: #dc2626; font-size: 0.8rem; font-weight: 600; margin-left: 8px;">Assigned</span>' : ''}
                     </div>
                     ${currentTodoView === 'agency' ? `
                         <div style="display: flex; justify-content: space-between; margin-top: 5px;">
@@ -3509,7 +3723,7 @@ window.loadTodos = function loadTodos() {
                         </div>
                     ` : ''}
                 </div>
-                ${currentTodoView === 'personal' || todo.author === currentUser ? `
+                ${currentTodoView === 'personal' || todo.author === getCurrentUser() ? `
                     <button onclick="deleteTodo(${index})" style="
                         background: none;
                         border: none;
@@ -3527,16 +3741,41 @@ window.loadTodos = function loadTodos() {
 
 window.addTodo = function addTodo() {
     const input = document.getElementById('todoInput');
+    const assignSelect = document.getElementById('assignToSelect');
+
     if (!input || !input.value.trim()) return;
-    
+
+    const currentUser = getCurrentUser();
+
     const newTodo = {
         text: input.value.trim(),
         completed: false,
         date: new Date().toISOString(),
         author: currentUser
     };
-    
-    if (currentTodoView === 'personal') {
+
+    if (currentTodoView === 'assign') {
+        // Handle assignment mode
+        const assignTo = assignSelect ? assignSelect.value : '';
+        if (!assignTo) {
+            alert('Please select who to assign this task to.');
+            return;
+        }
+
+        // Add assigned flag and assignee info
+        newTodo.assigned = true;
+        newTodo.assignedTo = assignTo;
+        newTodo.assignedBy = currentUser;
+
+        // Store in the assigned user's personal todo list
+        const assignedTodosKey = `${assignTo.toLowerCase()}AssignedTodos`;
+        const assignedTodos = JSON.parse(localStorage.getItem(assignedTodosKey) || '[]');
+        assignedTodos.unshift(newTodo);
+        localStorage.setItem(assignedTodosKey, JSON.stringify(assignedTodos));
+
+        // Reset form
+        if (assignSelect) assignSelect.value = '';
+    } else if (currentTodoView === 'personal') {
         const personalTodos = JSON.parse(localStorage.getItem('personalTodos') || '[]');
         personalTodos.unshift(newTodo); // Add to beginning
         localStorage.setItem('personalTodos', JSON.stringify(personalTodos));
@@ -3545,7 +3784,7 @@ window.addTodo = function addTodo() {
         agencyTodos.unshift(newTodo); // Add to beginning
         localStorage.setItem('agencyTodos', JSON.stringify(agencyTodos));
     }
-    
+
     input.value = '';
     loadTodos();
 }
@@ -3577,7 +3816,7 @@ function deleteTodo(index) {
     } else {
         const agencyTodos = JSON.parse(localStorage.getItem('agencyTodos') || '[]');
         // Only allow deleting own todos in agency view
-        if (agencyTodos[index].author === currentUser) {
+        if (agencyTodos[index].author === getCurrentUser()) {
             agencyTodos.splice(index, 1);
             localStorage.setItem('agencyTodos', JSON.stringify(agencyTodos));
         }
@@ -3686,8 +3925,8 @@ function generateSimpleLeadRows(leads) {
 
         // PRIORITY 3: Legacy authService - only if nothing else worked
         if (!currentUserName && window.authService && window.authService.getCurrentUser) {
-            const currentUser = window.authService.getCurrentUser();
-            currentUserName = currentUser?.username || currentUser?.full_name || '';
+            const authUser = window.authService.getCurrentUser();
+            currentUserName = authUser?.username || authUser?.full_name || '';
             console.log('⚡ DULLING: Using authService user:', currentUserName);
         }
 
@@ -4125,20 +4364,21 @@ async function loadLeadsView() {
         // Filter out archived leads - they should not appear in the active leads view
         leads = leads.filter(lead => !lead.archived);
 
+        // Get current logged-in user
+        let currentUser = '';
+        const userData = sessionStorage.getItem('vanguard_user');
+        if (userData) {
+            try {
+                const user = JSON.parse(userData);
+                // Capitalize username to match assignedTo format (grant -> Grant)
+                currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+            }
+        }
+
         // Sort leads with logged-in user's leads at the top, then by assignedTo, with closed leads at the bottom
         leads.sort((a, b) => {
-            // Get current logged-in user
-            let currentUser = '';
-            const userData = sessionStorage.getItem('vanguard_user');
-            if (userData) {
-                try {
-                    const user = JSON.parse(userData);
-                    // Capitalize username to match assignedTo format (grant -> Grant)
-                    currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
-                } catch (e) {
-                    console.error('Error parsing user data:', e);
-                }
-            }
 
             // First, check if either lead is closed - closed leads go to the bottom
             const aIsClosed = a.stage === 'closed' || a.stage === 'Closed';
