@@ -144,9 +144,10 @@ function generateClientRowsWithPremium() {
         // Ensure client has an ID - generate one if missing
         if (!client.id) {
             // Generate a unique ID based on name and timestamp
-            const nameId = (client.name || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const clientName = client.name || client.companyName || client.businessName || `client_${Date.now()}`;
+            const nameId = clientName.toLowerCase().replace(/[^a-z0-9]/g, '_');
             client.id = `client_${nameId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            console.log(`📝 Generated ID for client ${client.name}: ${client.id}`);
+            console.log(`📝 Generated ID for client ${clientName}: ${client.id}`);
 
             // Update localStorage to persist the ID
             const allClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');

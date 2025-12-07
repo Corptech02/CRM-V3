@@ -194,6 +194,17 @@ window.viewClientOriginal = function(id) {
                                         <p style="margin: 6px 0 0 0; color: #1f2937; font-size: 18px; font-weight: 600;">
                                             ${policy.policyType || policy.type || 'Unknown Type'}
                                         </p>
+                                        ${(() => {
+                                            // Get business name from Named Insured tab first, then fallback to clientName
+                                            const businessName = policy.insured?.['Name/Business Name'] ||
+                                                                policy.insured?.['Primary Named Insured'] ||
+                                                                policy.namedInsured?.name ||
+                                                                policy.clientName;
+                                            return businessName ? `
+                                        <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px; font-weight: 500;">
+                                            ${businessName}
+                                        </p>` : '';
+                                        })()}
                                     </div>
                                     <span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
                                         ${policy.policyStatus || policy.status || 'Active'}

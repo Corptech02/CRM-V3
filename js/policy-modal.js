@@ -1150,18 +1150,25 @@ async function savePolicy() {
             console.log('DEBUG: Reconstructed policyData:', policyData);
         }
 
-        // IMPORTANT: Ensure client association is preserved
-        if (!policyData.clientId && (window.currentClientId || window.currentViewingClientId)) {
-            policyData.clientId = window.currentClientId || window.currentViewingClientId;
-            console.log('Adding missing clientId:', policyData.clientId);
-        }
-        if (!policyData.clientName && policyData.clientId) {
+        // IMPORTANT: Get client name from Named Insured tab FIRST, then fallback to client profile
+        const namedInsuredName = document.getElementById('insured-name')?.value?.trim();
+        if (namedInsuredName) {
+            policyData.clientName = namedInsuredName;
+            console.log('Using Named Insured name as client name:', policyData.clientName);
+        } else if (!policyData.clientName && policyData.clientId) {
+            // Fallback to client profile name only if Named Insured is empty
             const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
             const client = clients.find(c => c.id === policyData.clientId);
             if (client) {
                 policyData.clientName = client.name || client.companyName || client.businessName || 'N/A';
-                console.log('Adding missing clientName:', policyData.clientName);
+                console.log('Using client profile name as fallback:', policyData.clientName);
             }
+        }
+
+        // Ensure client association is preserved
+        if (!policyData.clientId && (window.currentClientId || window.currentViewingClientId)) {
+            policyData.clientId = window.currentClientId || window.currentViewingClientId;
+            console.log('Adding missing clientId:', policyData.clientId);
         }
 
         // Add/update core fields
@@ -1181,17 +1188,24 @@ async function savePolicy() {
             policyData.clientId = window.currentClientId || window.currentViewingClientId;
             console.log('Assigning policy to client:', policyData.clientId);
 
-            // Also add client name if we have client info
-            if (window.currentClientInfo) {
-                policyData.clientName = window.currentClientInfo.name || window.currentClientInfo.companyName || window.currentClientInfo.businessName || 'N/A';
-                console.log('Client name from currentClientInfo:', policyData.clientName);
-            } else {
-                // Try to get client name from localStorage
-                const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-                const client = clients.find(c => c.id === policyData.clientId);
-                if (client) {
-                    policyData.clientName = client.name || client.companyName || client.businessName || 'N/A';
-                    console.log('Client name from localStorage:', policyData.clientName);
+            // PRIORITY 1: Use Named Insured name from form if available
+            const namedInsuredNameFromForm = document.getElementById('insured-name')?.value?.trim();
+            if (namedInsuredNameFromForm && !policyData.clientName) {
+                policyData.clientName = namedInsuredNameFromForm;
+                console.log('Client name from Named Insured form field:', policyData.clientName);
+            } else if (!policyData.clientName) {
+                // PRIORITY 2: Fallback to client info if Named Insured is empty
+                if (window.currentClientInfo) {
+                    policyData.clientName = window.currentClientInfo.name || window.currentClientInfo.companyName || window.currentClientInfo.businessName || 'N/A';
+                    console.log('Client name from currentClientInfo:', policyData.clientName);
+                } else {
+                    // PRIORITY 3: Try to get client name from localStorage
+                    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+                    const client = clients.find(c => c.id === policyData.clientId);
+                    if (client) {
+                        policyData.clientName = client.name || client.companyName || client.businessName || 'N/A';
+                        console.log('Client name from localStorage:', policyData.clientName);
+                    }
                 }
             }
         } else {

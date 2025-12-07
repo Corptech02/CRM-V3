@@ -4287,6 +4287,11 @@ async function loadLeadsView() {
                             <option value="health">Health</option>
                         </select>
                     </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #374151;">Skip First N Days</label>
+                        <input type="number" id="filterSkipDays" onchange="applyAdvancedFilters()" placeholder="0" min="0" max="365" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                        <small style="color: #6b7280; font-size: 12px;">Skip leads renewing within this many days from today</small>
+                    </div>
                     <div style="display: flex; align-items: end;">
                         <button onclick="clearAdvancedFilters()" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">
                             <i class="fas fa-times"></i> Clear All
@@ -4602,6 +4607,7 @@ async function loadLeadsView() {
                         ${generateSimpleLeadRows(leads)}
                     </tbody>
                 </table>
+            </div>
             </div>
             </div>
             <!-- End Active Leads Tab -->
@@ -7278,10 +7284,10 @@ let selectedRenewalPolicyId = null;
 function loadRenewalsView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
-    
+
     // Get real policy data from localStorage
     const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
     
     // Process policies for renewals
     const renewalPolicies = getRealRenewalPolicies(allPolicies, clients);
@@ -7351,6 +7357,9 @@ function getRealRenewalPolicies(policies, clients) {
     const renewalPolicies = [];
     const today = new Date();
     const oneYearFromNow = new Date(today.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+    // Ensure clients is an array to prevent .find() errors
+    const clientsArray = Array.isArray(clients) ? clients : [];
     
     policies.forEach(policy => {
         if (!policy.expirationDate && !policy.endDate) return;
@@ -7359,7 +7368,7 @@ function getRealRenewalPolicies(policies, clients) {
         if (isNaN(expirationDate.getTime())) return;
         
         // Get client info
-        const client = clients.find(c => c.id === policy.clientId) || {};
+        const client = clientsArray.find(c => c.id === policy.clientId) || {};
         const clientName = client.name || policy.clientName || 'Unknown Client';
         
         // Get premium value
@@ -11456,15 +11465,27 @@ function generateClientPoliciesList(policies) {
     return policies.map((policy, index) => {
         // Get the policy type label
         const typeLabel = getPolicyTypeLabel(policy.policyType || policy.type || 'unknown');
-        
+
+        // Get the business name from Named Insured tab (highest priority)
+        let businessName = '';
+        if (policy.insured?.['Name/Business Name']) {
+            businessName = policy.insured['Name/Business Name'];
+        } else if (policy.insured?.['Primary Named Insured']) {
+            businessName = policy.insured['Primary Named Insured'];
+        } else if (policy.namedInsured?.name) {
+            businessName = policy.namedInsured.name;
+        } else if (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown') {
+            businessName = policy.clientName;
+        }
+
         // Get the premium value from various possible locations
-        const premiumValue = policy.financial?.['Annual Premium'] || 
-                            policy.financial?.['Premium'] || 
+        const premiumValue = policy.financial?.['Annual Premium'] ||
+                            policy.financial?.['Premium'] ||
                             policy.financial?.['Monthly Premium'] ||
-                            policy.premium || 
+                            policy.premium ||
                             policy.monthlyPremium ||
                             policy.annualPremium || 0;
-        
+
         // Format the premium for display
         let formattedPremium = '0';
         if (premiumValue) {
@@ -11479,11 +11500,11 @@ function generateClientPoliciesList(policies) {
                 }
             }
         }
-        
+
         // Format status
         const status = policy.policyStatus || policy.status || 'Active';
         const statusClass = getStatusClass(status);
-        
+
         return `
             <div class="policy-item">
                 <div class="policy-header">
@@ -11492,6 +11513,7 @@ function generateClientPoliciesList(policies) {
                 </div>
                 <div class="policy-details">
                     <p><strong>${typeLabel}</strong></p>
+                    ${businessName ? `<p style="color: #6b7280; font-size: 13px; margin: 2px 0;">${businessName}</p>` : ''}
                     <p>${policy.carrier || 'N/A'} • $${formattedPremium}/year</p>
                     <p>Expires: ${formatDate(policy.expirationDate) || 'N/A'}</p>
                 </div>
@@ -12594,12 +12616,19 @@ function generateViewTabContent(tabId, policy) {
                             <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">Agent</label>
                             <p style="font-size: 17px; margin: 0; color: #374151;">${policy.agent || 'N/A'}</p>
                         </div>
-                        ${policy.clientName ? `
+                        ${(() => {
+                            // Get business name from Named Insured tab first, then fallback to clientName
+                            const businessName = policy.insured?.['Name/Business Name'] ||
+                                                policy.insured?.['Primary Named Insured'] ||
+                                                policy.namedInsured?.name ||
+                                                policy.clientName;
+                            return businessName ? `
                         <div class="view-item">
-                            <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">Client</label>
-                            <p style="font-size: 17px; margin: 0; color: #374151;">${policy.clientName}</p>
+                            <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">Business Name</label>
+                            <p style="font-size: 17px; margin: 0; color: #374151;">${businessName}</p>
                         </div>
-                        ` : ''}
+                            ` : '';
+                        })()}
                     </div>
                 </div>
             `;
@@ -12976,20 +13005,26 @@ function generatePolicyRows() {
                        `$${premiumValue.toLocaleString()}` :
                        (premiumValue?.toString().startsWith('$') ? premiumValue : `$${premiumValue || '0.00'}`);
 
-        // Get client name - prioritize clientName, then look up by clientId, then fall back to insured name
+        // Get client name - PRIORITY 1: Named Insured from form, PRIORITY 2: clientName, PRIORITY 3: client profile
         let clientName = 'N/A';
-        if (policy.clientName) {
+
+        // PRIORITY 1: Check Named Insured tab data first (most accurate)
+        if (policy.insured?.['Name/Business Name']) {
+            clientName = policy.insured['Name/Business Name'];
+        } else if (policy.insured?.['Primary Named Insured']) {
+            clientName = policy.insured['Primary Named Insured'];
+        } else if (policy.namedInsured?.name) {
+            clientName = policy.namedInsured.name;
+        } else if (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' && policy.clientName !== 'unknown') {
+            // PRIORITY 2: Use existing clientName if it's valid
             clientName = policy.clientName;
         } else if (policy.clientId) {
-            // Look up client by ID
+            // PRIORITY 3: Look up client by ID as fallback
             const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
             const client = clients.find(c => c.id === policy.clientId);
             if (client) {
                 clientName = client.name || client.companyName || client.businessName || 'N/A';
             }
-        } else {
-            // Fall back to insured name if no client link
-            clientName = policy.insured?.['Name/Business Name'] || policy.insured?.['Primary Named Insured'] || 'N/A';
         }
 
         // Use policy.id, or fallback to policyNumber if id is missing
@@ -16874,6 +16909,7 @@ window.applyAdvancedFilters = function() {
     const filterAssigned = document.getElementById('filterAssigned')?.value;
     console.log('🔍 FILTER DEBUG: filterAssigned =', filterAssigned);
     const filterProduct = document.getElementById('filterProduct')?.value;
+    const filterSkipDays = document.getElementById('filterSkipDays')?.value;
 
     let filteredLeads = [...window.allLeads || []];
     let filterCount = 0;
@@ -16935,6 +16971,76 @@ window.applyAdvancedFilters = function() {
         filterCount++;
     }
 
+    // Apply skip days filter
+    if (filterSkipDays && parseInt(filterSkipDays) > 0) {
+        const skipDays = parseInt(filterSkipDays);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Calculate the date to skip until (today + skipDays)
+        const skipUntilDate = new Date(today);
+        skipUntilDate.setDate(skipUntilDate.getDate() + skipDays);
+
+        console.log(`🔍 Skip Days Filter: Skipping leads renewing within ${skipDays} days (until ${skipUntilDate.toDateString()})`);
+
+        const beforeSkipCount = filteredLeads.length;
+
+        filteredLeads = filteredLeads.filter(lead => {
+            // Check various renewal date fields
+            let renewalDateStr = null;
+
+            if (lead.renewalDate && lead.renewalDate !== "N/A") {
+                renewalDateStr = lead.renewalDate;
+            } else if (lead.policyExpirationDate && lead.policyExpirationDate !== "N/A") {
+                renewalDateStr = lead.policyExpirationDate;
+            } else if (lead.expiryDate && lead.expiryDate !== "N/A") {
+                renewalDateStr = lead.expiryDate;
+            } else if (lead.insuranceInfo?.expirationDate) {
+                renewalDateStr = lead.insuranceInfo.expirationDate;
+            }
+
+            // If no valid renewal date found, keep the lead (can't filter what we don't know)
+            if (!renewalDateStr || renewalDateStr === "N/A" || renewalDateStr === "") {
+                console.log(`🔍 Skip Filter: No valid date for lead ${lead.name || lead.id} - keeping in results`);
+                return true;
+            }
+
+            // Parse the date - handle various formats
+            let renewalDate = null;
+
+            // Try to parse MM/DD/YYYY or MM/DDYYYY format
+            if (renewalDateStr.match(/^\d{1,2}\/\d{1,2}\d{4}$/)) {
+                // Handle format like "07/102025" -> "07/10/2025"
+                const parts = renewalDateStr.split('/');
+                if (parts[1].length === 6) {
+                    renewalDateStr = `${parts[0]}/${parts[1].slice(0,2)}/${parts[1].slice(2)}`;
+                }
+            }
+
+            renewalDate = new Date(renewalDateStr);
+
+            // If date parsing failed, keep the lead
+            if (isNaN(renewalDate.getTime())) {
+                console.log(`🔍 Skip Filter: Invalid date format "${renewalDateStr}" for lead ${lead.name || lead.id} - keeping in results`);
+                return true;
+            }
+
+            const isWithinSkipPeriod = renewalDate <= skipUntilDate;
+            console.log(`🔍 Skip Filter: Lead ${lead.name || lead.id} - Renewal: ${renewalDate.toDateString()}, Skip Until: ${skipUntilDate.toDateString()}, Skip: ${isWithinSkipPeriod}`);
+
+            // Skip leads that renew within the specified number of days
+            return !isWithinSkipPeriod;
+        });
+
+        console.log(`🔍 Skip Days Filter Applied: ${beforeSkipCount} → ${filteredLeads.length} leads (filtered out ${beforeSkipCount - filteredLeads.length} leads)`);
+
+        if (beforeSkipCount === filteredLeads.length) {
+            console.log(`⚠️ Skip Days Filter had no effect - check if leads have valid renewal dates`);
+        }
+
+        filterCount++;
+    }
+
     // Update filter count badge
     const filterCountBadge = document.getElementById('filterCount');
     if (filterCountBadge) {
@@ -16949,13 +17055,21 @@ window.applyAdvancedFilters = function() {
     // Store filtered leads globally
     window.filteredLeads = filteredLeads;
 
+    // Update leads count display (if it exists)
+    const leadsCountElement = document.querySelector('.leads-count, #leadsCount');
+    if (leadsCountElement) {
+        leadsCountElement.textContent = `${filteredLeads.length} leads`;
+    }
+
+    console.log(`🔍 FINAL FILTER RESULT: Showing ${filteredLeads.length} leads after all filters applied`);
+
     // Re-render leads table with filtered data
     renderLeadsList(filteredLeads);
 };
 
 window.clearAdvancedFilters = function() {
     // Reset all filter inputs
-    const filterInputs = ['filterStage', 'filterPremium', 'filterRenewal', 'filterAssigned', 'filterProduct'];
+    const filterInputs = ['filterStage', 'filterPremium', 'filterRenewal', 'filterAssigned', 'filterProduct', 'filterSkipDays'];
     filterInputs.forEach(id => {
         const element = document.getElementById(id);
         if (element) element.value = '';
