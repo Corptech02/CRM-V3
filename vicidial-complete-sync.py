@@ -64,8 +64,7 @@ class ViciDialCompleteSync:
         print(f"🔍 Connecting to ViciDial at {VICIDIAL_HOST}...")
 
         # All possible lists to scan
-        all_lists = ['999', '1000', '1001', '1002', '1003', '1004', '1005',
-                     '1213', '1214', '1215']  # Add more if needed
+        all_lists = ['998', '999', '1000', '1001', '1002', '1003', '1004', '1005', '1006']  # Real active lists
 
         all_leads = []
         list_summary = {}
@@ -93,9 +92,19 @@ class ViciDialCompleteSync:
 
             if unique_leads:
                 all_leads.extend(unique_leads)
+                # Map list IDs to their actual ViciDial names
+                list_names = {
+                    '998': 'OH Hunter',
+                    '999': 'TX Hunter',
+                    '1000': 'IN Hunter',
+                    '1001': 'OH Grant',
+                    '1005': 'TX Grant',
+                    '1006': 'IN Grant'
+                }
+
                 list_summary[list_id] = {
                     'listId': list_id,
-                    'listName': f'List {list_id}',
+                    'listName': list_names.get(list_id, f'List {list_id}'),
                     'saleCount': len(unique_leads),
                     'active': is_active
                 }
@@ -105,9 +114,19 @@ class ViciDialCompleteSync:
                 else:
                     print(f"  ✅ Found {len(unique_leads)} SALE leads in List {list_id} {status_icon}")
             else:
+                # Map list IDs to their actual ViciDial names
+                list_names = {
+                    '998': 'OH Hunter',
+                    '999': 'TX Hunter',
+                    '1000': 'IN Hunter',
+                    '1001': 'OH Grant',
+                    '1005': 'TX Grant',
+                    '1006': 'IN Grant'
+                }
+
                 list_summary[list_id] = {
                     'listId': list_id,
-                    'listName': f'List {list_id}',
+                    'listName': list_names.get(list_id, f'List {list_id}'),
                     'saleCount': 0,
                     'active': is_active
                 }
@@ -638,6 +657,7 @@ class ViciDialCompleteSync:
             'yearsInBusiness': extracted_data.get('years_in_business', ''),
             'radiusOfOperation': extracted_data.get('radius_of_operation', ''),
             'commodityHauled': extracted_data.get('commodity_hauled', ''),
+            'address3': lead_details.get('address3', ''),  # Add renewal date field from Vicidial
             'structuredData': extracted_data
         }
 
@@ -743,6 +763,7 @@ Agent: Wonderful! I'm marking this as a sale and will send over the paperwork wi
             'currentPremium': 0,
             'quotedPremium': 0,
             'savings': 0,
+            'address3': lead_details.get('address3', ''),  # Add renewal date field from Vicidial
             'notes': 'No call recording found for transcription'
         }
 

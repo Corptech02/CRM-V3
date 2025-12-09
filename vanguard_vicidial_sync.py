@@ -41,12 +41,73 @@ class VanguardViciDialSync:
         self.session.verify = False
         self.db = sqlite3.connect(DB_PATH)
         self.processed_leads = self.load_processed_leads()
+        # Auto-assignment configuration
+        self.representatives = ["Hunter", "Grant", "Maureen"]
+        self.assignment_index = self.get_current_assignment_index()
 
     def load_processed_leads(self):
         """Load list of already processed lead IDs"""
         cursor = self.db.cursor()
         cursor.execute("SELECT id FROM leads WHERE id LIKE '8%' AND LENGTH(id) = 5")
         return set(row[0] for row in cursor.fetchall())
+
+    def get_current_assignment_index(self):
+        """Get the current round-robin assignment index"""
+        cursor = self.db.cursor()
+        # Create assignment tracking table if it doesn't exist
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vicidial_assignment_tracker (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                current_index INTEGER DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Get current index
+        cursor.execute("SELECT current_index FROM vicidial_assignment_tracker WHERE id = 1")
+        result = cursor.fetchone()
+
+        if result:
+            return result[0]
+        else:
+            # Initialize with 0
+            cursor.execute("INSERT INTO vicidial_assignment_tracker (id, current_index) VALUES (1, 0)")
+            self.db.commit()
+            return 0
+
+    def get_next_representative(self):
+        """Get the next representative in round-robin and update the index"""
+        current_rep = self.representatives[self.assignment_index]
+
+        # Update to next index (with wrap-around)
+        self.assignment_index = (self.assignment_index + 1) % len(self.representatives)
+
+        # Save updated index to database
+        cursor = self.db.cursor()
+        cursor.execute("""
+            UPDATE vicidial_assignment_tracker
+            SET current_index = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+        """, (self.assignment_index,))
+        self.db.commit()
+
+        logger.info(f"Auto-assigned to {current_rep} (next will be {self.representatives[self.assignment_index]})")
+        return current_rep
+
+    def get_assigned_agent_for_list(self, list_id):
+        """Determine assigned agent based on list ID"""
+        # Mapping based on Vicidial list assignment
+        list_agent_mapping = {
+            '998': 'Hunter',    # Hunter's list
+            '999': 'Grant',     # Grant's list
+            '1000': 'Hunter',   # Default Hunter list
+            '1001': 'Grant',    # Grant's secondary list
+            '1002': 'Maureen'   # Maureen's list
+        }
+
+        assigned_agent = list_agent_mapping.get(list_id, 'Hunter')  # Default to Hunter
+        logger.info(f"List {list_id} assigned to agent: {assigned_agent}")
+        return assigned_agent
 
     def get_sale_leads_from_list(self, list_id="1000"):
         """Get SALE leads from ViciDial list using web scraping"""
@@ -74,35 +135,57 @@ class VanguardViciDialSync:
             for row in rows:
                 cells = row.find_all('td')
                 if len(cells) > 10:
+                    # Get the actual lead ID - it's in column 1, not column 0
+                    actual_lead_id = cells[1].text.strip()
                     lead_id = cells[0].text.strip()
-                    if lead_id and lead_id.isdigit():
-                        # Skip if already processed
-                        if lead_id in self.processed_leads:
-                            continue
 
-                        # Extract lead details
-                        phone = cells[2].text.strip() if len(cells) > 2 else ''
-                        first_name = cells[3].text.strip() if len(cells) > 3 else ''
-                        last_name = cells[4].text.strip() if len(cells) > 4 else ''
-                        city = cells[5].text.strip() if len(cells) > 5 else ''
-                        state = cells[6].text.strip() if len(cells) > 6 else 'OH'
-                        vendor_code = cells[10].text.strip() if len(cells) > 10 else ''
+                    # Use the actual lead ID (column 1) if it's numeric and longer
+                    if actual_lead_id and actual_lead_id.isdigit() and len(actual_lead_id) > 3:
+                        lead_id = actual_lead_id
+                    elif not (lead_id and lead_id.isdigit()):
+                        continue
 
-                        lead = {
-                            'lead_id': lead_id,
-                            'phone': phone,
-                            'first_name': first_name,
-                            'last_name': last_name,
-                            'city': city,
-                            'state': state,
-                            'vendor_code': vendor_code,
-                            'list_id': list_id
-                        }
+                    # Skip if already processed
+                    if lead_id in self.processed_leads:
+                        continue
 
-                        # Only add unique leads
-                        if not any(l['lead_id'] == lead_id for l in leads):
-                            leads.append(lead)
-                            logger.info(f"Found new SALE lead: {lead_id} - {first_name} {last_name}")
+                    # Extract lead details - Fixed column mapping based on debug output
+                    # Based on actual parsing results:
+                    # Column 0: Some ID (1)
+                    # Column 1: Lead ID (123477) - THE REAL LEAD ID
+                    # Column 2: Status (SALE)
+                    # Column 3: Unknown field (3591796)
+                    # Column 4: Unknown field (1001)
+                    # Column 5: Unknown field (1001)
+                    # Column 6: Phone number (5168173515)
+                    # Column 7: Company Name (THIRD GEN TRUCKING L Unknown Rep)
+                    # Column 8: City (MONROE)
+                    # Column 10: Date
+
+                    phone = cells[6].text.strip() if len(cells) > 6 else ''  # Column 6 has real phone
+                    first_name = ''  # ViciDial doesn't seem to have separate first/last in this view
+                    last_name = ''
+                    company_name = cells[7].text.strip() if len(cells) > 7 else ''  # Column 7 has company name
+                    city = cells[8].text.strip() if len(cells) > 8 else ''
+                    state = cells[9].text.strip() if len(cells) > 9 else 'OH'
+                    vendor_code = cells[3].text.strip() if len(cells) > 3 else ''  # This might be DOT number
+
+                    lead = {
+                        'lead_id': lead_id,
+                        'phone': phone,
+                        'first_name': first_name,
+                        'last_name': last_name,
+                        'company_name': company_name,
+                        'city': city,
+                        'state': state,
+                        'vendor_code': vendor_code,
+                        'list_id': list_id
+                    }
+
+                    # Only add unique leads
+                    if not any(l['lead_id'] == lead_id for l in leads):
+                        leads.append(lead)
+                        logger.info(f"Found new SALE lead: {lead_id} - Company: {company_name}, Phone: {phone}, Name: {first_name} {last_name}")
 
         return leads
 
@@ -129,18 +212,31 @@ class VanguardViciDialSync:
             if 'comments' in str(textarea.get('name', '')).lower():
                 details['comments'] = textarea.text.strip()
 
-        # Extract any custom fields
+        # Extract any custom fields including address3 (renewal date)
         for input_field in soup.find_all('input'):
             name = input_field.get('name', '')
             value = input_field.get('value', '')
             if name and value:
                 details[name] = value
+                # Specifically capture address3 for renewal date
+                if name.lower() == 'address3':
+                    details['address3'] = value.strip()
+                    logger.info(f"Found renewal date in address3: {value}")
 
         return details
 
-    def format_business_name(self, first_name, last_name, vendor_code):
+    def format_business_name(self, first_name, last_name, vendor_code, company_name=None):
         """Format business name like existing leads"""
-        # Match format: "CHARLES V MUMFORD JR / MUMFORD FARMS"
+        # First priority: Use the actual company name from ViciDial if available
+        if company_name and company_name.strip():
+            # Clean up the company name (remove "Unknown Rep" suffix if present)
+            cleaned_company = company_name.strip()
+            if 'Unknown Rep' in cleaned_company:
+                cleaned_company = cleaned_company.replace('Unknown Rep', '').strip()
+            if cleaned_company:
+                return cleaned_company.upper()
+
+        # Fallback: Use first/last name if available
         if first_name and last_name:
             # Create business name in proper format
             full_name = f"{first_name} {last_name}".upper()
@@ -180,29 +276,45 @@ class VanguardViciDialSync:
 
         # Clean up the raw date string
         raw_date = raw_date.strip()
+        logger.info(f"Processing renewal date: '{raw_date}'")
 
-        # Try various date formats that might be in address3
+        # PRIORITY: Handle the most common Vicidial format first (YYYY-MM-DD)
+        if re.match(r'^\d{4}-\d{1,2}-\d{1,2}$', raw_date):
+            try:
+                year, month, day = raw_date.split('-')
+                formatted = f"{int(month)}/{int(day)}/{year}"
+                logger.info(f"YYYY-MM-DD format detected: '{raw_date}' -> '{formatted}'")
+                return formatted
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse YYYY-MM-DD format: {raw_date}, error: {e}")
+
+        # Try other date formats that might be in address3
         date_patterns = [
-            r'(\d{1,2})/(\d{1,2})/(\d{4})',  # M/D/YYYY or MM/DD/YYYY
-            r'(\d{1,2})-(\d{1,2})-(\d{4})',  # M-D-YYYY or MM-DD-YYYY
-            r'(\d{4})-(\d{1,2})-(\d{1,2})',  # YYYY-MM-DD
-            r'(\d{1,2})/(\d{1,2})/(\d{2})',  # M/D/YY or MM/DD/YY
+            (r'(\d{1,2})/(\d{1,2})/(\d{4})', 'M/D/YYYY'),  # M/D/YYYY or MM/DD/YYYY
+            (r'(\d{1,2})-(\d{1,2})-(\d{4})', 'M-D-YYYY'),  # M-D-YYYY or MM-DD-YYYY
+            (r'(\d{4})/(\d{1,2})/(\d{1,2})', 'YYYY/M/D'),  # YYYY/M/D format
+            (r'(\d{1,2})/(\d{1,2})/(\d{2})', 'M/D/YY'),    # M/D/YY or MM/DD/YY
         ]
 
-        for pattern in date_patterns:
+        for pattern, format_name in date_patterns:
             match = re.search(pattern, raw_date)
             if match:
-                if len(match.group(3)) == 4:  # Full year
-                    if pattern == r'(\d{4})-(\d{1,2})-(\d{1,2})':  # YYYY-MM-DD format
-                        year, month, day = match.groups()
-                        return f"{int(month)}/{int(day)}/{year}"
-                    else:  # M/D/YYYY or M-D-YYYY format
-                        month, day, year = match.groups()
-                        return f"{int(month)}/{int(day)}/{year}"
-                else:  # 2-digit year, assume 20XX
+                if format_name in ['M/D/YYYY', 'M-D-YYYY']:
                     month, day, year = match.groups()
-                    full_year = f"20{year}"
-                    return f"{int(month)}/{int(day)}/{full_year}"
+                    formatted = f"{int(month)}/{int(day)}/{year}"
+                    logger.info(f"{format_name} format detected: '{raw_date}' -> '{formatted}'")
+                    return formatted
+                elif format_name == 'YYYY/M/D':
+                    year, month, day = match.groups()
+                    formatted = f"{int(month)}/{int(day)}/{year}"
+                    logger.info(f"{format_name} format detected: '{raw_date}' -> '{formatted}'")
+                    return formatted
+                elif format_name == 'M/D/YY':
+                    month, day, year = match.groups()
+                    full_year = f"20{year}" if int(year) < 50 else f"19{year}"
+                    formatted = f"{int(month)}/{int(day)}/{full_year}"
+                    logger.info(f"{format_name} format detected: '{raw_date}' -> '{formatted}'")
+                    return formatted
 
         # If no standard date pattern found, look for month names
         month_names = {
@@ -271,12 +383,35 @@ class VanguardViciDialSync:
         business_name = self.format_business_name(
             vicidial_lead.get('first_name', ''),
             vicidial_lead.get('last_name', ''),
-            vicidial_lead.get('vendor_code', '')
+            vicidial_lead.get('vendor_code', ''),
+            vicidial_lead.get('company_name', '')
         )
 
-        # Format contact name
+        # Format contact name - try multiple sources for better contact info
         contact_name = f"{vicidial_lead.get('first_name', '')} {vicidial_lead.get('last_name', '')}".strip()
-        if not contact_name or contact_name == ' ':
+
+        # If we don't have proper first/last name, try other sources
+        company_name = vicidial_lead.get('company_name', '')
+        email = lead_details.get('email', '') if lead_details else ''
+
+        # Try to extract contact from email address (e.g., "john.doe@company.com" -> "John Doe")
+        if (not contact_name or contact_name == ' ' or contact_name in ['1001', '1002', '1000', '1003']) and email and '@' in email:
+            email_prefix = email.split('@')[0].replace('.', ' ').replace('_', ' ').replace('-', ' ')
+            # Convert to proper case (john doe -> John Doe)
+            if email_prefix and not email_prefix.isdigit():
+                contact_name = ' '.join(word.capitalize() for word in email_prefix.split())
+                logger.info(f"Extracted contact from email: '{email}' -> '{contact_name}'")
+
+        # If still no good contact, try to extract from company name
+        if (not contact_name or contact_name == ' ' or contact_name in ['1001', '1002', '1000', '1003']) and company_name:
+            if 'Unknown Rep' in company_name:
+                # For "TANNER TRUCKING INC Unknown Rep", use a generic contact
+                base_company = company_name.replace('Unknown Rep', '').strip()
+                contact_name = "Owner/Manager"  # Generic professional contact
+                logger.info(f"Using generic contact for company: {base_company}")
+            else:
+                contact_name = company_name
+        elif not contact_name or contact_name == ' ':
             contact_name = business_name.split('/')[0].strip()
 
         # Format phone
@@ -293,6 +428,15 @@ class VanguardViciDialSync:
             if raw_renewal:
                 # Try to format the renewal date to match existing format (M/D/YYYY)
                 renewal_date = self.format_renewal_date(raw_renewal)
+                logger.info(f"Formatted renewal date: '{raw_renewal}' -> '{renewal_date}'")
+
+        # Fallback: try to get renewal from vendor_code or other fields
+        if not renewal_date and vicidial_lead.get('vendor_code'):
+            # Sometimes renewal date is in other fields, check lead data
+            logger.info(f"No renewal date in address3, lead data: {vicidial_lead}")
+
+        # Get assigned representative based on list ID (intelligent assignment)
+        assigned_representative = self.get_assigned_agent_for_list(vicidial_lead.get('list_id', '1000'))
 
         # Create lead data matching existing format
         lead_data = {
@@ -304,7 +448,8 @@ class VanguardViciDialSync:
             "product": "Commercial Auto",
             "stage": "new",  # All new imports start as 'new'
             "status": "hot_lead",
-            "assignedTo": "Sales Team",
+            "assignedTo": assigned_representative,
+            "assigned_to": assigned_representative,  # Also save underscore format for frontend compatibility
             "created": datetime.now().strftime("%-m/%-d/%Y"),
             "renewalDate": renewal_date,
             "premium": policy_info['quoted_premium'],
@@ -368,8 +513,8 @@ class VanguardViciDialSync:
 
         total_imported = 0
 
-        # Check multiple lists if needed
-        lists_to_check = ["1000", "1001", "1002"]  # Add more lists as needed
+        # Check multiple lists if needed - each assigned to different agents
+        lists_to_check = ["998", "999", "1000", "1001", "1002"]  # Hunter, Grant, Hunter, Grant, Maureen
 
         for list_id in lists_to_check:
             logger.info(f"Checking list {list_id}...")

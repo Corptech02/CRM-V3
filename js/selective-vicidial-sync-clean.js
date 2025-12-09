@@ -8,6 +8,19 @@ console.log('🔧 FIXED Selective ViciDial Sync system loaded - Individual leads
 // Global variable to track available leads
 let availableVicidialLeads = [];
 
+// Function to determine assignment tag based on list ID and name
+function getAssignmentTag(listId, listName) {
+    const hunterLists = [998, 999, 1000]; // Hunter lists
+    const grantLists = [1001, 1005, 1006]; // Grant lists
+
+    if (hunterLists.includes(listId) || (listName && listName.toLowerCase().includes('hunter'))) {
+        return { tag: 'HUNTER', color: '#3b82f6', bgColor: '#dbeafe' }; // Blue
+    } else if (grantLists.includes(listId) || (listName && listName.toLowerCase().includes('grant'))) {
+        return { tag: 'GRANT', color: '#7c3aed', bgColor: '#ede9fe' }; // Purple
+    }
+    return null;
+}
+
 // Override the sync function with selective sync
 console.log('🔧 Defining window.syncVicidialLeads function...');
 window.syncVicidialLeads = async function() {
@@ -207,6 +220,7 @@ function showLeadSelectionPopup(leads, data) {
         leadsByListId[lead.listId].push({ ...lead, originalIndex: index });
     });
 
+
     // Generate HTML for ALL lists (including empty ones)
     const leadsList = allListsSummary.map(listSummary => {
         const listId = listSummary.listId;
@@ -220,6 +234,24 @@ function showLeadSelectionPopup(leads, data) {
         const shadowColor = isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(234, 88, 12, 0.3)';
         const statusIcon = isActive ? '🟢' : '🔴';
 
+        // Get assignment tag for this list
+        const assignmentTag = getAssignmentTag(listId, listSummary.listName);
+        console.log(`🏷️  List ${listId} (${listSummary.listName}) → Assignment tag:`, assignmentTag);
+        const tagHtml = assignmentTag ? `
+            <span style="
+                background: ${assignmentTag.bgColor};
+                color: ${assignmentTag.color};
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                margin-left: 8px;
+                border: 1px solid ${assignmentTag.color};
+            ">
+                📋 AUTO-ASSIGN: ${assignmentTag.tag}
+            </span>
+        ` : '';
+
         const listHeader = `
             <div style="
                 background: ${headerColor};
@@ -230,8 +262,12 @@ function showLeadSelectionPopup(leads, data) {
                 font-weight: 700;
                 font-size: 16px;
                 box-shadow: 0 2px 8px ${shadowColor};
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
             ">
-                ${statusIcon} ${listSummary.listName} (${listSummary.saleCount} SALE leads)
+                <span>${statusIcon} ${listSummary.listName} (${listSummary.saleCount} SALE leads)</span>
+                ${tagHtml}
             </div>
         `;
 
@@ -521,8 +557,26 @@ async function importSelectedLeads() {
             console.log(`🔄 Attempting sync import ${i + 1}/${API_URLS.length}:`, fullUrl);
 
             try {
+                // Apply automatic assignment based on list ID
+                const leadsWithAutoAssignment = selectedLeads.map(lead => {
+                    console.log(`🔍 Checking assignment for lead ${lead.name || lead.id} from list ${lead.listId} (${lead.listName})`);
+                    const assignmentTag = getAssignmentTag(lead.listId, lead.listName);
+                    if (assignmentTag) {
+                        console.log(`🎯 AUTO-ASSIGNING: Lead "${lead.name || lead.id}" from list ${lead.listId} (${lead.listName}) → ${assignmentTag.tag}`);
+                        return {
+                            ...lead,
+                            assignedTo: assignmentTag.tag,
+                            autoAssigned: true,
+                            assignmentReason: `Auto-assigned from ${lead.listName || `List ${lead.listId}`}`
+                        };
+                    } else {
+                        console.log(`ℹ️  No auto-assignment rule for list ${lead.listId} (${lead.listName})`);
+                    }
+                    return lead;
+                });
+
                 const requestBody = {
-                    selectedLeads: selectedLeads,
+                    selectedLeads: leadsWithAutoAssignment,
                     selective: true
                 };
 
