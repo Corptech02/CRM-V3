@@ -345,17 +345,30 @@ class VanguardViciDialSync:
         return raw_date
 
     def extract_policy_from_comments(self, comments):
-        """Extract insurance policy details from comments/notes"""
+        """Extract insurance policy details and fleet size from comments/notes"""
         policy_info = {
             'current_carrier': '',
             'current_premium': '',
             'quoted_premium': 0,
             'liability': '$1,000,000',
-            'cargo': '$100,000'
+            'cargo': '$100,000',
+            'fleet_size': 0,
+            'calculated_premium': 0
         }
 
         if not comments:
             return policy_info
+
+        # Extract fleet size from pattern: "Insurance Expires: xxxx-xx-xx | Fleet Size: x"
+        fleet_pattern = r'Insurance Expires:.*?\|\s*Fleet Size:\s*(\d+)'
+        fleet_match = re.search(fleet_pattern, comments, re.I)
+        if fleet_match:
+            fleet_size = int(fleet_match.group(1))
+            policy_info['fleet_size'] = fleet_size
+            # Calculate premium at $15,600 per vehicle
+            calculated_premium = fleet_size * 15600
+            policy_info['calculated_premium'] = calculated_premium
+            logger.info(f"Fleet size extracted: {fleet_size} vehicles, calculated premium: ${calculated_premium:,}")
 
         # Extract carrier
         carrier_match = re.search(r'(State Farm|Progressive|Nationwide|Geico|Allstate|Liberty)', comments, re.I)
@@ -452,11 +465,11 @@ class VanguardViciDialSync:
             "assigned_to": assigned_representative,  # Also save underscore format for frontend compatibility
             "created": datetime.now().strftime("%-m/%-d/%Y"),
             "renewalDate": renewal_date,
-            "premium": policy_info['quoted_premium'],
+            "premium": policy_info['calculated_premium'] if policy_info['calculated_premium'] > 0 else policy_info['quoted_premium'],
             "dotNumber": vicidial_lead.get('vendor_code', ''),
             "mcNumber": "",
             "yearsInBusiness": "Unknown",
-            "fleetSize": "Unknown",
+            "fleetSize": str(policy_info['fleet_size']) if policy_info['fleet_size'] > 0 else "Unknown",
             "address": "",
             "city": vicidial_lead.get('city', '').upper(),
             "state": vicidial_lead.get('state', 'OH'),
