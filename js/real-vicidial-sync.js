@@ -58,23 +58,109 @@ window.syncVicidialLeads = async function() {
     let leadsData = [];
     
     try {
-        // Try to connect to the API
-        const response = await fetch('http://localhost:8904/api/sync-vicidial', {
+        // Call the backend API that runs the Python script with premium calculation
+        const response = await fetch('/api/vicidial/sync-with-premium', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             }
         }).catch(err => {
-            console.log('API connection failed, using direct import');
+            console.log('Premium sync API failed:', err);
             return null;
         });
-        
+
         if (response && response.ok) {
             const apiResult = await response.json();
-            console.log('API Response:', apiResult);
-            
-            if (apiResult.new_leads > 0 && apiResult.leads) {
-                leadsData = apiResult.leads;
+            console.log('Premium Sync API Response:', apiResult);
+
+            if (apiResult.success && apiResult.imported > 0) {
+                // If the sync was successful, load the updated leads from the server
+                notification.remove();
+
+                notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #10b981;
+                    color: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    z-index: 100000;
+                    max-width: 400px;
+                `;
+
+                notification.innerHTML = `
+                    <h3 style="margin: 0 0 10px 0;">✅ Imported ${apiResult.imported} Leads with Premiums!</h3>
+                    <p style="margin: 0;">All leads now have premium calculated based on fleet size × $15,600</p>
+                    <p style="margin-top: 10px; font-size: 14px; opacity: 0.9;">
+                        Refreshing lead list now...
+                    </p>
+                `;
+
+                document.body.appendChild(notification);
+
+                // Force refresh the lead list by loading fresh data from database
+                setTimeout(async () => {
+                    console.log('🔄 Refreshing leads from database after premium sync...');
+
+                    // First, load fresh data from the database to localStorage
+                    if (typeof window.loadLeadsFromServer === 'function') {
+                        try {
+                            await window.loadLeadsFromServer();
+                            console.log('✅ Fresh lead data loaded from database');
+                        } catch (error) {
+                            console.error('❌ Failed to load fresh data from database:', error);
+                        }
+                    }
+
+                    // Then refresh the lead view
+                    if (typeof window.loadLeadsView === 'function') {
+                        window.loadLeadsView();
+                        console.log('✅ Lead view refreshed');
+                    }
+
+                    // Also click the nav item to ensure refresh
+                    const leadNavItem = document.querySelector('a[onclick*="loadLeadsView"]') ||
+                                       document.querySelector('.nav-item:has(.fa-users)') ||
+                                       Array.from(document.querySelectorAll('.nav-item')).find(el =>
+                                           el.textContent.includes('Lead Management')
+                                       );
+
+                    if (leadNavItem) {
+                        leadNavItem.click();
+                        console.log('✅ Navigation refreshed');
+                    }
+                }, 1000);
+
+                setTimeout(() => notification.remove(), 5000);
+                return; // Exit early since we successfully synced
+            } else if (apiResult.success && apiResult.imported === 0) {
+                notification.remove();
+
+                notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #f59e0b;
+                    color: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    z-index: 100000;
+                    max-width: 400px;
+                `;
+
+                notification.innerHTML = `
+                    <h3 style="margin: 0 0 10px 0;">ℹ️ All Leads Already Imported</h3>
+                    <p style="margin: 0;">No new leads found in Vicidial. All current leads have calculated premiums.</p>
+                `;
+
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 3000);
+                return; // Exit early
             }
         }
         

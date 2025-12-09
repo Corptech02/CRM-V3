@@ -233,11 +233,18 @@ function formatRenewalDate(rawDate) {
 
     const cleanDate = rawDate.trim();
 
-    // Try various date formats that might be in address3
+    // PRIORITY: Check YYYY-MM-DD format first (most common from Vicidial)
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanDate)) {
+        const [year, month, day] = cleanDate.split('-');
+        const formatted = `${parseInt(month)}/${parseInt(day)}/${year}`;
+        console.log(`🗓️  YYYY-MM-DD detected: "${cleanDate}" -> "${formatted}"`);
+        return formatted;
+    }
+
+    // Try other date formats that might be in address3
     const datePatterns = [
         /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // M/D/YYYY or MM/DD/YYYY
-        /(\d{1,2})-(\d{1,2})-(\d{4})/,   // M-D-YYYY or MM-DD-YYYY
-        /(\d{4})-(\d{1,2})-(\d{1,2})/,   // YYYY-MM-DD
+        /(\d{1,2})-(\d{1,2})-(\d{4})/,   // M-D-YYYY or MM-DD-YYYY (1-22-2025)
         /(\d{1,2})\/(\d{1,2})\/(\d{2})/  // M/D/YY or MM/DD/YY
     ];
 
@@ -245,16 +252,19 @@ function formatRenewalDate(rawDate) {
         const match = cleanDate.match(pattern);
         if (match) {
             if (match[3] && match[3].length === 4) { // Full year
-                if (pattern === /(\d{4})-(\d{1,2})-(\d{1,2})/) { // YYYY-MM-DD format
+                if (pattern.source === '(\\d{4})-(\\d{1,2})-(\\d{1,2})') { // YYYY-MM-DD format
                     const [, year, month, day] = match;
+                    console.log(`🗓️  YYYY-MM-DD detected: "${cleanDate}" -> "${parseInt(month)}/${parseInt(day)}/${year}"`);
                     return `${parseInt(month)}/${parseInt(day)}/${year}`;
                 } else { // M/D/YYYY or M-D-YYYY format
                     const [, month, day, year] = match;
+                    console.log(`🗓️  M/D/YYYY detected: "${cleanDate}" -> "${parseInt(month)}/${parseInt(day)}/${year}"`);
                     return `${parseInt(month)}/${parseInt(day)}/${year}`;
                 }
             } else { // 2-digit year, assume 20XX
                 const [, month, day, year] = match;
                 const fullYear = `20${year}`;
+                console.log(`🗓️  M/D/YY detected: "${cleanDate}" -> "${parseInt(month)}/${parseInt(day)}/${fullYear}"`);
                 return `${parseInt(month)}/${parseInt(day)}/${fullYear}`;
             }
         }
@@ -788,7 +798,7 @@ app.post('/api/bulk-save', (req, res) => {
     }
 });
 
-// ViciDial data endpoint - COMPLETE sync with recordings and transcription
+// ViciDial data endpoint - Fast direct API sync with authentication
 app.get('/api/vicidial/data', async (req, res) => {
     const { spawn } = require('child_process');
     const https = require('https');
@@ -1008,12 +1018,14 @@ if __name__ == "__main__":
 
         // Set timeout for the Python script
         setTimeout(() => {
-            python.kill();
-            res.json({
-                success: false,
-                error: 'Timeout fetching ViciDial lists',
-                lists: []
-            });
+            if (!res.headersSent) {
+                python.kill();
+                res.json({
+                    success: false,
+                    error: 'Timeout fetching ViciDial lists',
+                    lists: []
+                });
+            }
         }, 30000);
 
     } catch (error) {
@@ -1036,6 +1048,77 @@ app.get('/api/vicidial/test', (req, res) => {
         status: 'Connection successful',
         message: 'Vicidial API is available'
     });
+});
+
+// Premium-calculating Vicidial sync endpoint
+app.post('/api/vicidial/sync-with-premium', async (req, res) => {
+    const { spawn } = require('child_process');
+    console.log('💰 Starting Vicidial sync with premium calculation...');
+
+    // Call the Python script that has premium calculation logic
+    const python = spawn('python3', ['/var/www/vanguard/vanguard_vicidial_sync.py']);
+
+    let output = '';
+    let errorOutput = '';
+    let result = null;
+
+    python.stdout.on('data', (data) => {
+        output += data.toString();
+        console.log('Premium Sync:', data.toString().trim());
+    });
+
+    python.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+        console.error('Premium Sync Error:', data.toString());
+    });
+
+    python.on('close', (code) => {
+        if (code !== 0) {
+            console.error('Premium sync failed with code:', code);
+            console.error('Error output:', errorOutput);
+            return res.status(500).json({
+                success: false,
+                error: 'Premium sync failed',
+                message: errorOutput
+            });
+        }
+
+        // Try to parse the JSON result from the Python script
+        try {
+            // The Python script outputs JSON on the last line
+            const lines = output.trim().split('\n');
+            const lastLine = lines[lines.length - 1];
+            result = JSON.parse(lastLine);
+
+            res.json({
+                success: true,
+                imported: result.imported,
+                message: result.message,
+                details: result
+            });
+        } catch (parseError) {
+            console.error('Failed to parse Python output:', parseError);
+            console.log('Raw output:', output);
+            res.json({
+                success: true,
+                imported: 0,
+                message: 'Sync completed but could not parse results',
+                rawOutput: output
+            });
+        }
+    });
+
+    // Set a timeout to prevent hanging
+    setTimeout(() => {
+        python.kill();
+        if (!res.headersSent) {
+            res.status(408).json({
+                success: false,
+                error: 'Sync timeout',
+                message: 'Sync operation timed out after 60 seconds'
+            });
+        }
+    }, 60000);
 });
 
 // Upload leads to Vicidial endpoint
@@ -1072,14 +1155,15 @@ app.post('/api/vicidial/clear-list', async (req, res) => {
     try {
         const list_id = req.query.list_id;
 
-        console.log('🧹 Clearing Vicidial list:', list_id);
+        console.log('🧹 Skipping list clear for speed (append mode):', list_id);
 
-        // For now, return success response
-        // In a real implementation, this would connect to Vicidial and clear the list
+        // Return success immediately to avoid timeouts
+        // This means uploads will append to existing leads rather than replace them
         res.json({
             success: true,
-            message: `List ${list_id} cleared successfully`,
-            list_id: list_id
+            message: `List ${list_id} ready (append mode - existing leads preserved)`,
+            list_id: list_id,
+            mode: 'append'
         });
 
     } catch (error) {
@@ -1184,6 +1268,12 @@ app.post('/api/vicidial/overwrite', async (req, res) => {
                 fs.unlinkSync(tempFile);
             } catch (e) {
                 console.warn('Could not delete temp file:', tempFile);
+            }
+
+            // Check if response has already been sent (due to timeout)
+            if (res.headersSent) {
+                console.log('Response already sent, skipping close callback');
+                return;
             }
 
             if (code === 0) {
@@ -1323,6 +1413,7 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
     // First, process transcriptions using Python service
     let transcriptionResults = {};
 
+    // Try transcription but continue with import if it fails
     try {
         console.log('🐍 Processing transcriptions with Deepgram and OpenAI...');
 
@@ -1396,8 +1487,11 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
         syncStatus.percentage = 40;
         syncStatus.message = `Processed ${Object.keys(transcriptionResults).length} transcriptions`;
         syncStatus.transcriptionsProcessed = Object.keys(transcriptionResults).length > 0;
-    } catch (error) {
-        console.error('Error processing transcriptions:', error);
+    } catch (transcriptionError) {
+        console.error('🐍 Transcription service failed, proceeding with import:', transcriptionError);
+        syncStatus.percentage = 40;
+        syncStatus.message = 'Transcription failed, proceeding with lead import...';
+        syncStatus.transcriptionsProcessed = false;
     }
 
     let imported = 0;
@@ -1428,17 +1522,60 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
             // Format phone number
             const formattedPhone = formatPhoneNumber(lead.phone || '');
 
+            // Extract better contact name from email if available
+            let contactName = lead.contact || '';
+
+            // If contact is just a user ID (like 1001, 1003), extract from email
+            if (!contactName || contactName.match(/^\d{4}$/)) {
+                if (lead.email && lead.email.includes('@')) {
+                    const emailPrefix = lead.email.split('@')[0];
+                    // Convert email prefix to proper contact name
+                    contactName = emailPrefix
+                        .replace(/[._-]/g, ' ')
+                        .split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+                    console.log(`📧 Extracted contact from email: "${lead.email}" -> "${contactName}"`);
+                } else {
+                    // Fallback to company name or generic contact
+                    contactName = 'Owner/Manager';
+                }
+            }
+
+            // Clean up company name (remove "Unknown Rep" suffix)
+            let companyName = lead.name || lead.companyName || 'Unknown Company';
+            if (companyName.includes('Unknown Rep')) {
+                companyName = companyName.replace(/Unknown Rep/g, '').trim();
+                console.log(`🏢 Cleaned company name: "${lead.name}" -> "${companyName}"`);
+            }
+
+            // Determine assigned agent based on listId
+            function getAssignedAgentFromList(listId) {
+                const listAgentMapping = {
+                    '998': 'Hunter',    // OH Hunter
+                    '999': 'Hunter',    // TX Hunter
+                    '1000': 'Hunter',   // IN Hunter
+                    '1001': 'Grant',    // OH Grant
+                    '1005': 'Grant',    // TX Grant
+                    '1006': 'Grant'     // IN Grant
+                };
+                return listAgentMapping[listId] || 'Unassigned';
+            }
+
+            const assignedAgent = getAssignedAgentFromList(lead.listId);
+            console.log(`📋 List ${lead.listId} → Assigned to: ${assignedAgent}`);
+
             // Ensure lead has required fields in proper Vanguard format
             const leadToSave = {
                 id: leadId,
-                name: lead.name || lead.companyName || 'Unknown Company',
-                contact: lead.contact || '',
+                name: companyName,
+                contact: contactName,
                 phone: formattedPhone,
                 email: lead.email || '',
                 product: "Commercial Auto",
                 stage: "new",
                 status: "hot_lead",
-                assignedTo: "Sales Team",
+                assignedTo: assignedAgent, // Use list-based assignment
                 created: new Date().toLocaleDateString("en-US", {
                     month: "numeric",
                     day: "numeric",
@@ -1659,6 +1796,10 @@ app.use('/api/gmail', gmailRoutes);
 // Outlook routes for email
 const outlookRoutes = require('./outlook-routes');
 app.use('/api/outlook', outlookRoutes);
+
+// Titan email routes
+const titanRoutes = require('./titan-email-routes');
+app.use('/api/titan', titanRoutes);
 
 // COI PDF Generator routes
 const coiPdfRoutes = require('./coi-pdf-generator');

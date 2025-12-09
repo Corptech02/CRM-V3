@@ -102,7 +102,8 @@ class VanguardViciDialSync:
             '999': 'Grant',     # Grant's list
             '1000': 'Hunter',   # Default Hunter list
             '1001': 'Grant',    # Grant's secondary list
-            '1002': 'Maureen'   # Maureen's list
+            '1002': 'Maureen',  # Maureen's list
+            '1005': 'Grant'     # Grant's additional list
         }
 
         assigned_agent = list_agent_mapping.get(list_id, 'Hunter')  # Default to Hunter
@@ -139,10 +140,14 @@ class VanguardViciDialSync:
                     actual_lead_id = cells[1].text.strip()
                     lead_id = cells[0].text.strip()
 
-                    # Use the actual lead ID (column 1) if it's numeric and longer
+                    # ALWAYS prefer the actual lead ID (column 1) if it's a pure numeric value
                     if actual_lead_id and actual_lead_id.isdigit() and len(actual_lead_id) > 3:
                         lead_id = actual_lead_id
-                    elif not (lead_id and lead_id.isdigit()):
+                    # Only use column 0 if it's also a pure numeric value (no prefixes)
+                    elif lead_id and lead_id.isdigit() and len(lead_id) > 3:
+                        lead_id = lead_id
+                    else:
+                        # Skip leads with invalid ID formats (like 88126125)
                         continue
 
                     # Skip if already processed
@@ -359,16 +364,30 @@ class VanguardViciDialSync:
         if not comments:
             return policy_info
 
-        # Extract fleet size from pattern: "Insurance Expires: xxxx-xx-xx | Fleet Size: x"
-        fleet_pattern = r'Insurance Expires:.*?\|\s*Fleet Size:\s*(\d+)'
-        fleet_match = re.search(fleet_pattern, comments, re.I)
-        if fleet_match:
-            fleet_size = int(fleet_match.group(1))
-            policy_info['fleet_size'] = fleet_size
-            # Calculate premium at $15,600 per vehicle
-            calculated_premium = fleet_size * 15600
-            policy_info['calculated_premium'] = calculated_premium
-            logger.info(f"Fleet size extracted: {fleet_size} vehicles, calculated premium: ${calculated_premium:,}")
+        # Extract fleet size from multiple possible patterns
+        # Primary pattern: "Insurance Expires: xxxx-xx-xx | Fleet Size: x"
+        fleet_patterns = [
+            r'Insurance Expires:.*?\|\s*Fleet Size:?\s*(\d+)',  # Original pattern
+            r'Fleet Size:?\s*(\d+)',  # Simple "Fleet Size: x" pattern
+            r'Fleet\s*Size\s*:\s*(\d+)',  # "Fleet Size : x" with spaces
+            r'(\d+)\s*vehicles?',  # "9 vehicles" pattern
+            r'fleet\s*of\s*(\d+)',  # "fleet of 9" pattern
+        ]
+
+        fleet_size = 0
+        for pattern in fleet_patterns:
+            fleet_match = re.search(pattern, comments, re.I)
+            if fleet_match:
+                fleet_size = int(fleet_match.group(1))
+                policy_info['fleet_size'] = fleet_size
+                # Calculate premium at $15,600 per vehicle
+                calculated_premium = fleet_size * 15600
+                policy_info['calculated_premium'] = calculated_premium
+                logger.info(f"✓ Fleet size extracted with pattern '{pattern}': {fleet_size} vehicles, calculated premium: ${calculated_premium:,}")
+                break
+
+        if fleet_size == 0:
+            logger.warning(f"⚠️ No fleet size found in comments: '{comments}'")
 
         # Extract carrier
         carrier_match = re.search(r'(State Farm|Progressive|Nationwide|Geico|Allstate|Liberty)', comments, re.I)
@@ -465,7 +484,7 @@ class VanguardViciDialSync:
             "assigned_to": assigned_representative,  # Also save underscore format for frontend compatibility
             "created": datetime.now().strftime("%-m/%-d/%Y"),
             "renewalDate": renewal_date,
-            "premium": policy_info['calculated_premium'] if policy_info['calculated_premium'] > 0 else policy_info['quoted_premium'],
+            "premium": policy_info['calculated_premium'] if policy_info['calculated_premium'] > 0 else (policy_info['quoted_premium'] if policy_info['quoted_premium'] > 0 else 0),
             "dotNumber": vicidial_lead.get('vendor_code', ''),
             "mcNumber": "",
             "yearsInBusiness": "Unknown",
@@ -494,6 +513,14 @@ class VanguardViciDialSync:
             "notes": f"SALE from ViciDial list {vicidial_lead.get('list_id', '1000')}. {comments}",
             "tags": ["ViciDial", "Sale", f"List-{vicidial_lead.get('list_id', '1000')}"]
         }
+
+        # Log premium calculation details for debugging
+        logger.info(f"🔢 Premium calculation for lead {lead_id}:")
+        logger.info(f"   Fleet Size: {policy_info['fleet_size']}")
+        logger.info(f"   Calculated Premium (fleet × $15,600): ${policy_info['calculated_premium']:,}")
+        logger.info(f"   Quoted Premium: ${policy_info['quoted_premium']:,}")
+        logger.info(f"   Final Premium in Lead: ${lead_data['premium']:,}")
+        logger.info(f"   Comments: {comments[:100]}...")
 
         return lead_data
 
@@ -527,7 +554,7 @@ class VanguardViciDialSync:
         total_imported = 0
 
         # Check multiple lists if needed - each assigned to different agents
-        lists_to_check = ["998", "999", "1000", "1001", "1002"]  # Hunter, Grant, Hunter, Grant, Maureen
+        lists_to_check = ["998", "999", "1000", "1001", "1002", "1005"]  # Hunter, Grant, Hunter, Grant, Maureen, Grant
 
         for list_id in lists_to_check:
             logger.info(f"Checking list {list_id}...")
