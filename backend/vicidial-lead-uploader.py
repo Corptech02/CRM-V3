@@ -54,33 +54,31 @@ def add_lead_to_vicidial(list_id, lead_data):
     expiry_date = lead_data.get('insurance_expiry', lead_data.get('renewal_date', ''))
     fleet_size = lead_data.get('fleet_size', '')
 
-    # Build comprehensive comments with all key info and call script
+    # Build compact comments with essential info
     comments_parts = []
     if expiry_date:
-        comments_parts.append(f"Insurance Expires: {expiry_date}")
+        comments_parts.append(f"Exp: {expiry_date}")
     if fleet_size:
-        comments_parts.append(f"Fleet Size: {fleet_size}")
-    if lead_data.get('years_in_business'):
-        comments_parts.append(f"Years in Business: {lead_data.get('years_in_business')}")
-    if lead_data.get('radius_of_operation'):
-        comments_parts.append(f"Radius: {lead_data.get('radius_of_operation')}")
-    if lead_data.get('commodity_hauled'):
-        comments_parts.append(f"Commodity: {lead_data.get('commodity_hauled')}")
+        comments_parts.append(f"Size: {fleet_size}")
 
-    # Create organized call script with your specified format
+    # Create your exact format
     basic_info = ' | '.join(comments_parts)
 
-    # Add compact organized call script without decorative lines
+    # Add your specified compact format
     script_addendum = """
-
-TRUCK: Year:___ Brand:___ Value:___
-TRAILER: Year:___ Brand:___ Value:___
-OWNER: Birth Year:___ CDL Length:___
-DRIVER: Birth Year:___ CDL Length:___
-OPERATION: Radius:___ Years in Business:___
-COVERAGE: Physical:___ Trailer Int:___ Amazon:___
-CURRENT: Carrier:___ Premium:___
-NOTES: ___________________"""
+===QUESTIONS===
+Tr(S) Year:
+Tr(s) Brand:
+Tr(s) Value:
+T(s) Year:
+T(s) Brand:
+T(s) Value:
+Owners Year of birth:
+Owners CDL:
+Driver(s) Year of birth:
+Driver(s) CDL:
+Mile Radius:
+Years Business:"""
 
     # Combine basic info with organized script
     comments = basic_info + script_addendum
