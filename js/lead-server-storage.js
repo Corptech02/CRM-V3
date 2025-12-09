@@ -59,14 +59,15 @@ async function loadLeadsFromServer() {
         const leads = await response.json();
         console.log(`Loaded ${leads.length} leads from server`);
 
-        // Also update localStorage as a cache/backup
+        // Also update localStorage as a cache/backup - using both keys for compatibility
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        localStorage.setItem('leads', JSON.stringify(leads));
 
         return leads;
     } catch (error) {
         console.error('Error loading leads from server:', error);
-        // Fallback to localStorage if server fails
-        return JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        // Fallback to localStorage if server fails - check both keys
+        return JSON.parse(localStorage.getItem('insurance_leads') || localStorage.getItem('leads') || '[]');
     }
 }
 
