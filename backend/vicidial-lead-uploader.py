@@ -66,19 +66,26 @@ def add_lead_to_vicidial(list_id, lead_data):
 
     # Add your specified compact format
     script_addendum = """
-===QUESTIONS===
-Tr(S) Year:
-Tr(s) Brand:
-Tr(s) Value:
-T(s) Year:
-T(s) Brand:
-T(s) Value:
-Owners Year of birth:
-Owners CDL:
-Driver(s) Year of birth:
-Driver(s) CDL:
-Mile Radius:
-Years Business:"""
+----TRUCKS-------
+Amount:
+Year:
+Brand:
+Value:
+----TRAILERS-----
+Amount:
+Year:
+Brand:
+Value:
+----OWNER--------
+Year of birth:
+CDL:
+----DRIVER(S)----
+Amount:
+Year of birth:
+CDL:
+---OPERATION-----
+Mile Radius (80%):
+Additional:"""
 
     # Combine basic info with organized script
     comments = basic_info + script_addendum
