@@ -87,35 +87,39 @@ INFORMATION GATHERING:
 
 PHYSICAL COVERAGE:
 Do they have physical coverage? (In case of an accident or damage to the vehicle, does the insurance pay out for your vehicle)
-□ Yes
-□ No
+Physical Coverage: ____________________
 
 TRAILER INTERCHANGE:
 (Q) Trailer Interchange? (If they have no trailers)
-□ Yes
-□ No
-□ Other: _______________
+Trailer Interchange: ____________________
+Other: ____________________
 
 AMAZON HAULING:
 (Q) Do they haul for amazon? (If they do, then trailer interchange with $50k coverage is required)
-□ Yes
-□ No
-□ Maybe
+Amazon Hauling: ____________________
 
 OPERATION DETAILS:
 (Q) How far do they usually go? (mile radius 80% of the time)
+Radius: ____________________
 (Q) What do they typically haul? (most likely general freight)
+Commodity: ____________________
 
 CDL INFORMATION:
 If they had a box truck, they don't need a CDL, but you can still ask:
 "I know you don't need one but do you have a CDL?"
 (Q) Do they have a CDL? How long have they had it?
+CDL: ____________________
+CDL Years: ____________________
 (Q) Do they have drivers under them? (age, CDL history)
+Other Drivers: ____________________
 
 ADDITIONAL QUESTIONS/INFO:
-_________________________________
-_________________________________
-_________________________________"""
+Current Carrier: ____________________
+Current Premium: ____________________
+Renewal Date: ____________________
+Fleet Details: ____________________
+Notes: ____________________
+Follow Up: ____________________"""
 
     # Combine basic info with call script
     basic_info = ' | '.join(comments_parts)
