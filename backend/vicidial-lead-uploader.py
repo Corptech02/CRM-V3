@@ -67,16 +67,30 @@ def add_lead_to_vicidial(list_id, lead_data):
     if lead_data.get('commodity_hauled'):
         comments_parts.append(f"Commodity: {lead_data.get('commodity_hauled')}")
 
-    # Create compact comments that fit ViciDial limits
+    # Create organized call script with your specified format
     basic_info = ' | '.join(comments_parts)
 
-    # Add essential call script info in compact format
+    # Add organized call script with specific sections
     script_addendum = """
+==================QUESTIONS==================
+Truck(s) Year:
+Truck(s) Brand:
+Truck(s) Value:
+------------------TRAILER(S)-----------------
+Trailer(s) Year:
+Trailer(s) Brand:
+Trailer(s) Value:
+-------------------OWNER---------------------
+Owners Year of birth:
+Owners CDL length:
+------------------DRIVER(S)------------------
+Driver(s) Year of birth:
+Driver(s) CDL Length:
+-----------------OPERATION-------------------
+Mile Radius (80% of time):
+Years in business: """
 
-SCRIPT: 1)Intro-name-VIG Brunswick-better price 2)What paying?Who? 3)Trucks/trailers? 4)Physical coverage? 5)Trailer interchange? 6)Amazon? 7)Radius? 8)CDL? 9)Other drivers?
-NOTES: Carrier:___ Premium:___ Fleet:___ Follow-up:___"""
-
-    # Keep it concise to avoid truncation
+    # Combine basic info with organized script
     comments = basic_info + script_addendum
 
     # Prepare lead data for ViciDial with proper trucking field mapping
