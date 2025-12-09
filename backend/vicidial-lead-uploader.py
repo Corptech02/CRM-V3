@@ -70,25 +70,17 @@ def add_lead_to_vicidial(list_id, lead_data):
     # Create organized call script with your specified format
     basic_info = ' | '.join(comments_parts)
 
-    # Add organized call script with specific sections
+    # Add compact organized call script without decorative lines
     script_addendum = """
-==================QUESTIONS==================
-Truck(s) Year:
-Truck(s) Brand:
-Truck(s) Value:
-------------------TRAILER(S)-----------------
-Trailer(s) Year:
-Trailer(s) Brand:
-Trailer(s) Value:
--------------------OWNER---------------------
-Owners Year of birth:
-Owners CDL length:
-------------------DRIVER(S)------------------
-Driver(s) Year of birth:
-Driver(s) CDL Length:
------------------OPERATION-------------------
-Mile Radius (80% of time):
-Years in business: """
+
+TRUCK: Year:___ Brand:___ Value:___
+TRAILER: Year:___ Brand:___ Value:___
+OWNER: Birth Year:___ CDL Length:___
+DRIVER: Birth Year:___ CDL Length:___
+OPERATION: Radius:___ Years in Business:___
+COVERAGE: Physical:___ Trailer Int:___ Amazon:___
+CURRENT: Carrier:___ Premium:___
+NOTES: ___________________"""
 
     # Combine basic info with organized script
     comments = basic_info + script_addendum
