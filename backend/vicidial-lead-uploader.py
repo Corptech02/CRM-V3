@@ -54,7 +54,7 @@ def add_lead_to_vicidial(list_id, lead_data):
     expiry_date = lead_data.get('insurance_expiry', lead_data.get('renewal_date', ''))
     fleet_size = lead_data.get('fleet_size', '')
 
-    # Build comprehensive comments with all key info
+    # Build comprehensive comments with all key info and call script
     comments_parts = []
     if expiry_date:
         comments_parts.append(f"Insurance Expires: {expiry_date}")
@@ -67,7 +67,63 @@ def add_lead_to_vicidial(list_id, lead_data):
     if lead_data.get('commodity_hauled'):
         comments_parts.append(f"Commodity: {lead_data.get('commodity_hauled')}")
 
-    comments = ' | '.join(comments_parts)[:255]  # Limit to 255 chars
+    # Add detailed call script
+    call_script = """
+
+=== CALL SCRIPT ===
+
+INTRO:
+- Ask how they're doing (use their name if possible)
+- Your name
+- VIG based out of Brunswick
+- We carry basically every market in Ohio
+- We are confident we can get you a better price
+- Move in to asking how much their paying
+
+INFORMATION GATHERING:
+(I) Business name, DOT, number, email
+(Q) What are they paying? With who?
+(Q) How many trucks and trailers do they have? Make model, year, value
+
+PHYSICAL COVERAGE:
+Do they have physical coverage? (In case of an accident or damage to the vehicle, does the insurance pay out for your vehicle)
+□ Yes
+□ No
+
+TRAILER INTERCHANGE:
+(Q) Trailer Interchange? (If they have no trailers)
+□ Yes
+□ No
+□ Other: _______________
+
+AMAZON HAULING:
+(Q) Do they haul for amazon? (If they do, then trailer interchange with $50k coverage is required)
+□ Yes
+□ No
+□ Maybe
+
+OPERATION DETAILS:
+(Q) How far do they usually go? (mile radius 80% of the time)
+(Q) What do they typically haul? (most likely general freight)
+
+CDL INFORMATION:
+If they had a box truck, they don't need a CDL, but you can still ask:
+"I know you don't need one but do you have a CDL?"
+(Q) Do they have a CDL? How long have they had it?
+(Q) Do they have drivers under them? (age, CDL history)
+
+ADDITIONAL QUESTIONS/INFO:
+_________________________________
+_________________________________
+_________________________________"""
+
+    # Combine basic info with call script
+    basic_info = ' | '.join(comments_parts)
+    full_comments = basic_info + call_script
+
+    # ViciDial comments field can hold up to 255 characters in most setups, but some allow more
+    # We'll use the full script since it's valuable information
+    comments = full_comments
 
     # Prepare lead data for ViciDial with proper trucking field mapping
     api_params = {
