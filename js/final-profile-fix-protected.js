@@ -232,6 +232,68 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
+                <!-- Owner Details -->
+                <div class="profile-section" style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3><i class="fas fa-user-circle"></i> Owner Details</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Sex:</label>
+                            <select onchange="updateLeadField('${lead.id}', 'ownerSex', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="">Select Sex</option>
+                                <option value="Male" ${(lead.ownerSex === 'Male') ? 'selected' : ''}>Male</option>
+                                <option value="Female" ${(lead.ownerSex === 'Female') ? 'selected' : ''}>Female</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Race:</label>
+                            <select onchange="updateLeadField('${lead.id}', 'ownerRace', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="">Select Race</option>
+                                <option value="White" ${(lead.ownerRace === 'White') ? 'selected' : ''}>White</option>
+                                <option value="Black" ${(lead.ownerRace === 'Black') ? 'selected' : ''}>Black</option>
+                                <option value="Hispanic" ${(lead.ownerRace === 'Hispanic') ? 'selected' : ''}>Hispanic</option>
+                                <option value="Asian" ${(lead.ownerRace === 'Asian') ? 'selected' : ''}>Asian</option>
+                                <option value="Native American" ${(lead.ownerRace === 'Native American') ? 'selected' : ''}>Native American</option>
+                                <option value="Other" ${(lead.ownerRace === 'Other') ? 'selected' : ''}>Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Preferred Pickup Time:</label>
+                            <select onchange="updateLeadField('${lead.id}', 'preferredPickupTime', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="">Select Time</option>
+                                <option value="Morning" ${(lead.preferredPickupTime === 'Morning') ? 'selected' : ''}>Morning</option>
+                                <option value="Mid-day" ${(lead.preferredPickupTime === 'Mid-day') ? 'selected' : ''}>Mid-day</option>
+                                <option value="Afternoon" ${(lead.preferredPickupTime === 'Afternoon') ? 'selected' : ''}>Afternoon</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Personality:</label>
+                            <select onchange="updateLeadField('${lead.id}', 'ownerPersonality', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="">Select Personality</option>
+                                <option value="Talkative" ${(lead.ownerPersonality === 'Talkative') ? 'selected' : ''}>Talkative</option>
+                                <option value="Quiet" ${(lead.ownerPersonality === 'Quiet') ? 'selected' : ''}>Quiet</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Temper:</label>
+                            <select onchange="updateLeadField('${lead.id}', 'ownerTemper', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="">Select Temper</option>
+                                <option value="Calm" ${(lead.ownerTemper === 'Calm') ? 'selected' : ''}>Calm</option>
+                                <option value="Average" ${(lead.ownerTemper === 'Average') ? 'selected' : ''}>Average</option>
+                                <option value="Cheerful" ${(lead.ownerTemper === 'Cheerful') ? 'selected' : ''}>Cheerful</option>
+                                <option value="Easy to Irritate" ${(lead.ownerTemper === 'Easy to Irritate') ? 'selected' : ''}>Easy to Irritate</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Tone:</label>
+                            <select onchange="updateLeadField('${lead.id}', 'ownerTone', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="">Select Tone</option>
+                                <option value="Formal" ${(lead.ownerTone === 'Formal') ? 'selected' : ''}>Formal</option>
+                                <option value="Friendly" ${(lead.ownerTone === 'Friendly') ? 'selected' : ''}>Friendly</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Notes -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h3><i class="fas fa-sticky-note"></i> Notes</h3>
