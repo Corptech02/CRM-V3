@@ -224,11 +224,18 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             <label style="font-weight: 600; font-size: 12px;">Assigned To:</label>
                             <select id="lead-assignedTo-${lead.id}" onchange="updateLeadAssignedTo('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
                                 <option value="" ${!lead.assignedTo ? 'selected' : ''}>Unassigned</option>
-                                <option value="Grant" ${lead.assignedTo === 'Grant' ? 'selected' : ''}>Grant</option>
                                 <option value="Hunter" ${lead.assignedTo === 'Hunter' ? 'selected' : ''}>Hunter</option>
+                                <option value="Grant" ${lead.assignedTo === 'Grant' ? 'selected' : ''}>Grant</option>
+                                <option value="Maureen" ${lead.assignedTo === 'Maureen' ? 'selected' : ''}>Maureen</option>
                             </select>
                         </div>
                     </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3><i class="fas fa-sticky-note"></i> Notes</h3>
+                    <textarea onchange="updateLeadField('${lead.id}', 'notes', this.value)" style="width: 100%; min-height: 100px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">${lead.notes || ''}</textarea>
                 </div>
 
                 <!-- Company Information -->
@@ -503,11 +510,6 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
-                <!-- Notes -->
-                <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3><i class="fas fa-sticky-note"></i> Notes</h3>
-                    <textarea onchange="updateLeadField('${lead.id}', 'notes', this.value)" style="width: 100%; min-height: 100px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">${lead.notes || ''}</textarea>
-                </div>
             </div>
         </div>
     `;
@@ -521,7 +523,6 @@ protectedFunctions.createEnhancedProfile = function(lead) {
             'Info Requested', 'info_requested',
             'Loss Runs Requested', 'loss_runs_requested',
             'Quote Sent', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware',
-            'App Sent', 'app_sent',
             'Interested', 'interested'
         ];
 
@@ -1691,7 +1692,6 @@ protectedFunctions.updateLeadStage = function(leadId, stage) {
             'Info Requested', 'info_requested',
             'Loss Runs Requested', 'loss_runs_requested',
             'Quote Sent', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware',
-            'App Sent', 'app_sent',
             'Interested', 'interested'
         ];
 
@@ -1739,7 +1739,13 @@ protectedFunctions.updateWinLossStatus = function(leadId, winLoss) {
 };
 
 protectedFunctions.updateLeadAssignedTo = function(leadId, assignedTo) {
+    console.log('🎯 updateLeadAssignedTo called:', leadId, assignedTo);
+
+    // Update both field formats for compatibility
     protectedFunctions.updateLeadField(leadId, 'assignedTo', assignedTo);
+    protectedFunctions.updateLeadField(leadId, 'assigned_to', assignedTo);
+
+    console.log('✅ Both assignedTo formats updated:', assignedTo);
 };
 
 // Vehicle, Trailer, Driver management functions - Use existing card functions
@@ -3055,6 +3061,9 @@ function syncLeadToServer(leadId, leadData) {
 // Make functions globally available for onclick handlers
 window.updateLeadField = protectedFunctions.updateLeadField;
 window.updateLeadStage = protectedFunctions.updateLeadStage;
+window.updateLeadAssignedTo = protectedFunctions.updateLeadAssignedTo;
+window.updateLeadStatus = protectedFunctions.updateLeadStatus;
+window.updateWinLossStatus = protectedFunctions.updateWinLossStatus;
 window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
 window.sendEmail = protectedFunctions.sendEmail;
@@ -3983,17 +3992,32 @@ window.getReachOutStatus = function(lead) {
     const reachOut = lead.reachOut;
 
     // Check if stage requires reach out
+    console.log(`🔍 REACH OUT CHECK: Lead ${lead.id} stage = "${lead.stage}"`);
+
+    // Explicitly exclude App Sent stages (any case variation)
+    const isAppSentStage = (
+        lead.stage === 'app_sent' || lead.stage === 'App Sent' || lead.stage === 'APP_SENT' ||
+        lead.stage === 'app sent' || lead.stage === 'App sent'
+    );
+
+    if (isAppSentStage) {
+        console.log(`🔍 REACH OUT CHECK: ✅ App Sent stage detected - NO REACH OUT REQUIRED`);
+        return ''; // App Sent stages don't need reach out
+    }
+
     const stageRequiresReachOut = (
         lead.stage === 'quoted' || lead.stage === 'info_requested' || lead.stage === 'Info Requested' ||
         lead.stage === 'loss_runs_requested' || lead.stage === 'Loss Runs Requested' ||
-        lead.stage === 'app_sent' || lead.stage === 'App Sent' ||
         lead.stage === 'quote_sent' || lead.stage === 'quote-sent-unaware' || lead.stage === 'quote-sent-aware' ||
         lead.stage === 'interested' || lead.stage === 'Interested'
     );
 
     if (!stageRequiresReachOut) {
+        console.log(`🔍 REACH OUT CHECK: ✅ Stage "${lead.stage}" doesn't require reach out`);
         return ''; // No reach out required for this stage
     }
+
+    console.log(`🔍 REACH OUT CHECK: ❗ Stage "${lead.stage}" REQUIRES reach out`);
 
     // Check if reach out is completed - MUST verify actual completion actions
     const hasActuallyCompleted = (reachOut.callsConnected > 0) || (reachOut.textCount > 0);
