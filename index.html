@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/styles.css?v=34">
     <link rel="stylesheet" href="css/carrier-profile.css?v=2">
     <link rel="stylesheet" href="css/policy-modal.css?v=3">
+    <link rel="stylesheet" href="css/mobile.css?v=5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Dancing+Script:wght@400;600&display=swap" rel="stylesheet">
@@ -472,6 +473,11 @@
                         <span id="userNameDisplay">User</span>
                         <i class="fas fa-chevron-down"></i>
                     </div>
+                    <!-- Mobile Menu Toggle -->
+                    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
                     <div id="userDropdown" style="display: none; position: absolute; top: 60px; right: 20px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); z-index: 1000; min-width: 180px;">
                         <a href="#" onclick="logout(); return false;" style="display: block; padding: 12px 16px; color: #374151; text-decoration: none; hover: background: #f3f4f6; border-radius: 8px;">
                             <i class="fas fa-sign-out-alt" style="margin-right: 8px; color: #6b7280;"></i>
@@ -672,6 +678,110 @@
             </div>
         </nav>
     </header>
+
+    <!-- Mobile Navigation Menu -->
+    <nav class="mobile-nav" id="mobileNav">
+        <ul class="mobile-nav-list">
+            <!-- Main Section -->
+            <li class="mobile-nav-section-header">
+                <span>Main</span>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#dashboard" class="mobile-nav-link" onclick="setActiveTab('dashboard'); closeMobileMenu();">
+                    <i class="fas fa-tachometer-alt"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#leads" class="mobile-nav-link" onclick="setActiveTab('leads'); closeMobileMenu();">
+                    <i class="fas fa-users"></i>
+                    Leads
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#clients" class="mobile-nav-link" onclick="setActiveTab('clients'); closeMobileMenu();">
+                    <i class="fas fa-user-tie"></i>
+                    Clients
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#policies" class="mobile-nav-link" onclick="setActiveTab('policies'); closeMobileMenu();">
+                    <i class="fas fa-file-contract"></i>
+                    Policies
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#renewals" class="mobile-nav-link" onclick="setActiveTab('renewals'); closeMobileMenu();">
+                    <i class="fas fa-redo"></i>
+                    Renewals
+                </a>
+            </li>
+
+            <!-- Tools Section -->
+            <li class="mobile-nav-section-header">
+                <span>Tools</span>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#lead-gen" class="mobile-nav-link" onclick="setActiveTab('lead-gen'); closeMobileMenu();">
+                    <i class="fas fa-bullseye"></i>
+                    Lead Gen
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#coi-management" class="mobile-nav-link" onclick="setActiveTab('coi-management'); closeMobileMenu();">
+                    <i class="fas fa-certificate"></i>
+                    COI Management
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#communications" class="mobile-nav-link" onclick="setActiveTab('communications'); closeMobileMenu();">
+                    <i class="fas fa-comments"></i>
+                    Communications
+                </a>
+            </li>
+
+            <!-- Admin Section -->
+            <li class="mobile-nav-section-header">
+                <span>Admin</span>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#carriers" class="mobile-nav-link" onclick="setActiveTab('carriers'); closeMobileMenu();">
+                    <i class="fas fa-truck"></i>
+                    Carriers
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#producers" class="mobile-nav-link" onclick="setActiveTab('producers'); closeMobileMenu();">
+                    <i class="fas fa-user-friends"></i>
+                    Producers
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#accounting" class="mobile-nav-link" onclick="setActiveTab('accounting'); closeMobileMenu();">
+                    <i class="fas fa-calculator"></i>
+                    Accounting
+                </a>
+            </li>
+            <li class="mobile-nav-item">
+                <a href="#reports" class="mobile-nav-link" onclick="setActiveTab('reports'); closeMobileMenu();">
+                    <i class="fas fa-chart-bar"></i>
+                    Reports
+                </a>
+            </li>
+
+            <!-- Logout -->
+            <li class="mobile-nav-divider"></li>
+            <li class="mobile-nav-item">
+                <a href="#" class="mobile-nav-link" onclick="logout(); closeMobileMenu();">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
 
     <!-- Main Dashboard -->
     <main class="main-content">
@@ -874,41 +984,54 @@
                     <div class="activities-list">
                         <!-- Activities will be populated dynamically by recent-activities.js -->
                     </div>
-                    <script>
-                        // Force clear ALL demo data immediately
-                        document.addEventListener('DOMContentLoaded', function() {
-                            // Clear demo stat values
-                            document.querySelectorAll('.stat-value').forEach(el => {
-                                if (el.textContent.includes('2,547') || el.textContent.includes('3,892') || 
-                                    el.textContent.includes('1.2M') || el.textContent.includes('68%')) {
-                                    el.textContent = '0';
-                                }
-                            });
-                            
-                            // Clear percentage changes
-                            document.querySelectorAll('.stat-change').forEach(el => {
-                                if (el.textContent.includes('12%') || el.textContent.includes('8%') || 
-                                    el.textContent.includes('15%') || el.textContent.includes('3%')) {
-                                    el.innerHTML = '<i class="fas fa-arrow-up"></i> 0% from last month';
-                                }
-                            });
-                            
-                            // Clear renewals table
-                            const renewalsTbody = document.getElementById('renewals-tbody');
-                            if (renewalsTbody && (renewalsTbody.innerHTML.includes('David Wilson') || 
-                                renewalsTbody.innerHTML.includes('Robert Wilson') ||
-                                renewalsTbody.innerHTML.includes('Lisa Anderson'))) {
-                                renewalsTbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">No upcoming renewals in the next 30 days</td></tr>';
-                            }
-                            
-                            // Clear activities if they contain demo data
-                            const activitiesList = document.querySelector('.activities-list');
-                            if (activitiesList && activitiesList.innerHTML.includes('John Smith')) {
-                                activitiesList.innerHTML = '';
-                            }
-                        });
-                    </script>
                 </div>
+
+
+                <section class="bottom-grid">
+                  <!-- LEFT COLUMN: TO-DO LIST -->
+                  <div class="column">
+                    <div class="column-header">To-Do List</div>
+                    <div class="card column-body">
+                      <input
+                        class="task-input"
+                        type="text"
+                        placeholder="Add a new task..."
+                      />
+                      <!-- later you can list tasks here -->
+                    </div>
+                  </div>
+
+                  <!-- RIGHT COLUMN: REMINDERS -->
+                  <div class="column">
+                    <div class="column-header">Reminders</div>
+                    <div class="card column-body">
+                      <div class="reminder-card renewals">
+                        <div class="reminder-title">60d Renewals</div>
+                        <div class="reminder-value">0</div>
+                      </div>
+
+                      <div class="reminder-card gifts">
+                        <div class="reminder-title">New Clients Gifts</div>
+                        <div class="reminder-value">0</div>
+                      </div>
+
+                      <div class="reminder-card birthdays">
+                        <div class="reminder-title">30d Birthdays</div>
+                        <div class="reminder-value">1</div>
+                      </div>
+
+                      <div class="reminder-card policies">
+                        <div class="reminder-title">Policies to Update</div>
+                        <div class="reminder-value">5</div>
+                      </div>
+
+                      <div class="reminder-card coi">
+                        <div class="reminder-title">New COI Emails</div>
+                        <div class="reminder-value">0</div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
 
                 <!-- Upcoming Renewals -->
                 <div class="section-card">
@@ -1243,6 +1366,8 @@
 
     <!-- Protect ViciDial leads stored in database from localStorage clearing -->
     <script src="js/protect-database-leads.js?v=5"></script>
+    <!-- Protect campaign modals from global click handler interference -->
+    <script src="js/protect-campaign-modal.js?v=1"></script>
 
     <script src="js/restore-coi-features.js?v=1"></script>
 
@@ -1446,7 +1571,7 @@
     <script src="js/fix-premium-display.js?v=1733252400_FIX_CLIENT_IDS"></script>
 
     <!-- FINAL PROFILE FIX PROTECTED - MUST BE ABSOLUTELY LAST - Cannot be overridden -->
-    <script src="js/final-profile-fix-protected.js?v=1043"></script>
+    <script src="js/final-profile-fix-protected.js?v=1046"></script>
 
     <!-- PREVENT TAB SWITCHING OVERRIDE - DISABLED because it blocks legitimate lead loading -->
     <!-- <script src="js/prevent-tab-switching-override.js?v=1"></script> -->
@@ -1663,7 +1788,7 @@
     <script src="js/fix-lead-generation-matched-carriers.js?v=9"></script>
 
     <!-- Selective Vicidial Sync - Choose which leads to import - MUST BE ABSOLUTELY LAST -->
-    <script src="js/selective-vicidial-sync-clean.js?v=12"></script>
+    <script src="js/selective-vicidial-sync-clean.js?v=14"></script>
 
     <!-- Force COI to use Outlook instead of Gmail - MUST BE ABSOLUTELY LAST -->
     <!-- DISABLED: Contains mock data - <script src="js/coi-use-outlook.js?v=1"></script> -->
@@ -1774,6 +1899,13 @@
                 </div>
                 <div style="padding: 30px; overflow-y: auto; flex: 1;">
 
+                    <!-- Reach-out & Communication -->
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Reach-out & Communication</h3>
+                        <textarea placeholder="Add notes about calls, emails, follow-ups..."
+                                  style="width: 100%; height: 120px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">\${lead.notes || ''}</textarea>
+                    </div>
+
                     <!-- Company Information -->
                     <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
                         <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Company Information</h3>
@@ -1787,13 +1919,6 @@
                             <div><label style="display: block; font-weight: bold; margin-bottom: 5px;">Email:</label>
                                  <input type="text" value="\${lead.email || ''}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></div>
                         </div>
-                    </div>
-
-                    <!-- Reach-out & Communication -->
-                    <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
-                        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #111827;">Reach-out & Communication</h3>
-                        <textarea placeholder="Add notes about calls, emails, follow-ups..."
-                                  style="width: 100%; height: 120px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">\${lead.notes || ''}</textarea>
                     </div>
 
                     <!-- Loss Runs & Documentation -->
@@ -1922,6 +2047,86 @@
     <script src="js/force-quote-modal-front.js"></script>
     <script src="js/enhanced-quote-form.js"></script>
     <script src="js/enhanced-quote-modal.js?v=6"></script>
+
+    <!-- Mobile Enhancements -->
+    <script src="js/mobile-enhancements.js?v=1"></script>
+
+    <!-- Mobile Navigation JavaScript -->
+    <script>
+        function toggleMobileMenu() {
+            const mobileNav = document.getElementById('mobileNav');
+            const mobileOverlay = document.getElementById('mobileOverlay');
+            const isActive = mobileNav.classList.contains('active');
+
+            if (isActive) {
+                closeMobileMenu();
+            } else {
+                openMobileMenu();
+            }
+        }
+
+        function openMobileMenu() {
+            const mobileNav = document.getElementById('mobileNav');
+            const mobileOverlay = document.getElementById('mobileOverlay');
+
+            mobileNav.classList.add('active');
+            mobileOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function closeMobileMenu() {
+            const mobileNav = document.getElementById('mobileNav');
+            const mobileOverlay = document.getElementById('mobileOverlay');
+
+            mobileNav.classList.remove('active');
+            mobileOverlay.classList.remove('active');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+
+        // Close mobile menu when resizing to desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) {
+                closeMobileMenu();
+            }
+        });
+
+        // Close mobile menu when pressing Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMobileMenu();
+            }
+        });
+
+        // Mobile Renewal Tabs Functionality
+        function initMobileRenewalTabs() {
+            const tabs = document.querySelectorAll('.mobile-renewal-tab');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // Remove active class from all tabs
+                    tabs.forEach(t => t.classList.remove('active'));
+
+                    // Add active class to clicked tab
+                    this.classList.add('active');
+
+                    // Get tab type
+                    const tabType = this.getAttribute('data-tab');
+
+                    // Add visual feedback
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 150);
+
+                    // You can add specific functionality for personal vs agency view here
+                    console.log('Switched renewal view to:', tabType);
+                });
+            });
+        }
+
+        // Initialize mobile renewal tabs when page loads
+        document.addEventListener('DOMContentLoaded', initMobileRenewalTabs);
+    </script>
 
     <!-- REMOVED: Scripts moved earlier to ensure loading -->
 </body>
