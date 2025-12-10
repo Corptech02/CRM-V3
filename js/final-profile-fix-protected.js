@@ -291,6 +291,14 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                                 <option value="Friendly" ${(lead.ownerTone === 'Friendly') ? 'selected' : ''}>Friendly</option>
                             </select>
                         </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Availability:</label>
+                            <select onchange="updateLeadField('${lead.id}', 'ownerAvailability', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="">Select Availability</option>
+                                <option value="Often Free" ${(lead.ownerAvailability === 'Often Free') ? 'selected' : ''}>Often Free</option>
+                                <option value="Often Busy" ${(lead.ownerAvailability === 'Often Busy') ? 'selected' : ''}>Often Busy</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
