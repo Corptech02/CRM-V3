@@ -149,31 +149,10 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <!-- Separator Line -->
                     <div id="reach-out-separator-${lead.id}" style="border-bottom: 2px solid #f59e0b; margin-bottom: 15px; padding-bottom: 10px;"></div>
                     <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- Called Section - Now at top -->
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="email-sent-${lead.id}" ${lead.reachOut.emailCount > 0 ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'email', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
-                                <label for="email-sent-${lead.id}" style="font-weight: 600; cursor: pointer;">Email Sent</label>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span style="font-weight: 600;">Sent:</span>
-                                <span id="email-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.emailCount}</span>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="text-sent-${lead.id}" ${lead.reachOut.textCount > 0 ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'text', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
-                                <label for="text-sent-${lead.id}" style="font-weight: 600; cursor: pointer;">Text Sent</label>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span style="font-weight: 600;">Sent:</span>
-                                <span id="text-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.textCount}</span>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="call-made-${lead.id}" ${lead.reachOut.callAttempts > 0 ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'call', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                                <input type="checkbox" id="call-made-${lead.id}" onchange="updateReachOut('${lead.id}', 'call', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
                                 <label for="call-made-${lead.id}" style="font-weight: 600; cursor: pointer;">Called</label>
                             </div>
                             <div style="display: flex; align-items: center; gap: 20px;">
@@ -185,12 +164,43 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                                     <span style="font-weight: 600;">Connected:</span>
                                     <span id="call-connected-${lead.id}" style="font-weight: bold; font-size: 18px; color: #10b981; min-width: 30px; text-align: center;">${lead.reachOut.callsConnected}</span>
                                 </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-weight: 600;">Voicemail Sent:</span>
+                                    <span id="voicemail-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #f59e0b; min-width: 30px; text-align: center;">${lead.reachOut.voicemailCount}</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 10px; padding-left: 30px;">
-                            <span style="font-weight: 600;">Voicemail Sent:</span>
-                            <span id="voicemail-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #f59e0b; min-width: 30px; text-align: center;">${lead.reachOut.voicemailCount}</span>
+                        <!-- Call Logs and Call Status Buttons -->
+                        <div style="padding-left: 30px; display: flex; gap: 10px;">
+                            <button onclick="showCallLogs('${lead.id}')" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                                <i class="fas fa-phone-alt"></i> Call Logs
+                            </button>
+                            <button onclick="showCallStatus('${lead.id}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                                <i class="fas fa-phone-volume"></i> Call Status
+                            </button>
+                        </div>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="email-sent-${lead.id}" onchange="updateReachOut('${lead.id}', 'email', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                                <label for="email-sent-${lead.id}" style="font-weight: 600; cursor: pointer;">Email Sent</label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-weight: 600;">Sent:</span>
+                                <span id="email-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.emailCount}</span>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="text-sent-${lead.id}" onchange="updateReachOut('${lead.id}', 'text', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                                <label for="text-sent-${lead.id}" style="font-weight: 600; cursor: pointer;">Text Sent</label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-weight: 600;">Sent:</span>
+                                <span id="text-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.textCount}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1325,97 +1335,9 @@ window.handleCallOutcome = function(leadId, answered) {
         }
 
         if (answered) {
-            // Lead answered - increment connected counter AND mark reach-out as COMPLETE
-            leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
-            leads[leadIndex].reachOut.completedAt = new Date().toISOString();
-            leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString(); // BOTH fields for compatibility
-
-            // Update connected display
-            const connectedDisplay = document.getElementById(`call-connected-${leadId}`);
-            if (connectedDisplay) {
-                connectedDisplay.textContent = leads[leadIndex].reachOut.callsConnected;
-            }
-
-            // Close popup and backdrop
-            const popup = document.getElementById('call-outcome-popup');
-            if (popup) {
-                popup.remove();
-            }
-            const backdrop = document.getElementById('popup-backdrop');
-            if (backdrop) {
-                backdrop.remove();
-            }
-
-            // Save to localStorage and server
-            localStorage.setItem('insurance_leads', JSON.stringify(leads));
-
-            // Save the complete lead with reachOut data to server
-            const updateData = {
-                reachOut: leads[leadIndex].reachOut
-            };
-
-            fetch(`/api/leads/${leadId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(updateData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    console.log('✅ Lead completion data saved to server - triggering final refresh');
-
-                    // FINAL refresh after confirmed server save
-                    setTimeout(() => {
-                        loadLeadsFromServerAndRefresh();
-                        console.log('🔄 FINAL refresh after confirmed server save');
-                    }, 300);
-                } else {
-                    console.error('❌ Server completion update failed:', data.error);
-                }
-            })
-            .catch(error => {
-                console.error('❌ Error saving completion data:', error);
-            });
-
-            // Update checkbox to checked
-            const checkbox = document.getElementById(`call-made-${leadId}`);
-            if (checkbox) {
-                checkbox.checked = true;
-            }
-
-            // Mark reach-out as COMPLETE with green styling and timestamp
-            markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt);
-
-            showNotification('Call connected! Reach-out completed.', 'success');
-
-            // Refresh the leads table to remove the red "Reach out" from TO DO column
-            // CRITICAL: Must wait for server save to complete first
-            setTimeout(() => {
-                console.log('🔄 Step 1: Updating localStorage for immediate effect');
-                // Update localStorage immediately for instant local refresh
-                localStorage.setItem('insurance_leads', JSON.stringify(leads));
-
-                // Force table refresh with updated localStorage
-                if (window.displayLeads) {
-                    window.displayLeads();
-                    console.log('✅ Forced displayLeads refresh');
-                }
-                if (window.loadLeadsView) {
-                    window.loadLeadsView();
-                    console.log('✅ Forced loadLeadsView refresh');
-                }
-                refreshLeadsTable();
-                console.log('✅ Forced refreshLeadsTable');
-            }, 100);
-
-            // Secondary refresh after server save completes
-            setTimeout(() => {
-                console.log('🔄 Step 2: Server reload after save completion');
-                loadLeadsFromServerAndRefresh();
-                console.log('🔄 FORCED SERVER RELOAD after completion');
-            }, 2000);
+            // Lead answered - show call duration popup instead of completing immediately
+            showCallDurationPopup(leadId);
+            return; // Exit here - duration popup will handle completion
         } else {
             // Lead didn't pick up - save and show voicemail question
             localStorage.setItem('insurance_leads', JSON.stringify(leads));
@@ -1448,6 +1370,11 @@ window.handleVoicemailOutcome = function(leadId, leftVoicemail) {
     const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
 
     if (leadIndex !== -1) {
+        // Initialize callLogs array if it doesn't exist
+        if (!leads[leadIndex].reachOut.callLogs) {
+            leads[leadIndex].reachOut.callLogs = [];
+        }
+
         if (leftVoicemail) {
             leads[leadIndex].reachOut.voicemailCount = (leads[leadIndex].reachOut.voicemailCount || 0) + 1;
 
@@ -1457,6 +1384,16 @@ window.handleVoicemailOutcome = function(leadId, leftVoicemail) {
                 voicemailDisplay.textContent = leads[leadIndex].reachOut.voicemailCount;
             }
         }
+
+        // Add call log entry for unanswered call
+        const callLog = {
+            timestamp: new Date().toISOString(),
+            connected: false,
+            duration: null,
+            leftVoicemail: leftVoicemail,
+            notes: leftVoicemail ? 'No answer - Left voicemail' : 'No answer - No voicemail left'
+        };
+        leads[leadIndex].reachOut.callLogs.push(callLog);
 
         // Save to localStorage and server
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
@@ -1505,6 +1442,216 @@ function saveReachOutToServer(leadId, reachOutData) {
         console.error('❌ Error updating reach-out data:', error);
     });
 }
+
+// Function to show call duration popup
+function showCallDurationPopup(leadId) {
+    console.log(`📞 Showing call duration popup for lead: ${leadId}`);
+
+    // Remove existing popups
+    const existingPopup = document.getElementById('call-outcome-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+
+    // Create new popup for duration
+    const popup = document.createElement('div');
+    popup.id = 'call-duration-popup';
+    popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        z-index: 1000002;
+        min-width: 400px;
+    `;
+
+    popup.innerHTML = `
+        <div style="text-align: center;">
+            <h3 style="margin-top: 0;">Call Duration</h3>
+            <p style="font-size: 16px; margin: 20px 0;">How long was the call?</p>
+            <div style="margin: 20px 0;">
+                <input type="number" id="duration-minutes" placeholder="0" min="0" max="999"
+                       style="width: 80px; padding: 10px; border: 2px solid #e5e7eb; border-radius: 5px; font-size: 16px; text-align: center;">
+                <span style="font-size: 16px; margin-left: 10px;">minutes</span>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button onclick="handleCallDuration('${leadId}', document.getElementById('duration-minutes').value)" style="
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 10px 30px;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                ">Save</button>
+                <button onclick="cancelCallDuration('${leadId}')" style="
+                    background: #6b7280;
+                    color: white;
+                    border: none;
+                    padding: 10px 30px;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                ">Cancel</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(popup);
+
+    // Focus on input field
+    setTimeout(() => {
+        const input = document.getElementById('duration-minutes');
+        if (input) {
+            input.focus();
+        }
+    }, 100);
+}
+
+// Function to handle call duration submission
+window.handleCallDuration = function(leadId, duration) {
+    console.log(`📞 Handling call duration for lead ${leadId}: ${duration} minutes`);
+
+    const durationNum = parseInt(duration) || 0;
+
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {
+                emailCount: 0,
+                textCount: 0,
+                callAttempts: 0,
+                callsConnected: 0,
+                voicemailCount: 0,
+                callLogs: []
+            };
+        }
+
+        // Initialize callLogs array if it doesn't exist
+        if (!leads[leadIndex].reachOut.callLogs) {
+            leads[leadIndex].reachOut.callLogs = [];
+        }
+
+        // Increment connected counter
+        leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
+
+        // Add call log entry
+        const callLog = {
+            timestamp: new Date().toISOString(),
+            connected: true,
+            duration: durationNum > 0 ? `${durationNum} min` : '< 1 min',
+            leftVoicemail: false,
+            notes: `Call connected - Duration: ${durationNum > 0 ? durationNum + ' minutes' : 'less than 1 minute'}`
+        };
+        leads[leadIndex].reachOut.callLogs.push(callLog);
+
+        // Mark reach-out as COMPLETE
+        leads[leadIndex].reachOut.completedAt = new Date().toISOString();
+        leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
+
+        // Update connected display
+        const connectedDisplay = document.getElementById(`call-connected-${leadId}`);
+        if (connectedDisplay) {
+            connectedDisplay.textContent = leads[leadIndex].reachOut.callsConnected;
+        }
+
+        // Close popup and backdrop
+        const popup = document.getElementById('call-duration-popup');
+        if (popup) {
+            popup.remove();
+        }
+        const backdrop = document.getElementById('popup-backdrop');
+        if (backdrop) {
+            backdrop.remove();
+        }
+
+        // Update checkbox to checked
+        const checkbox = document.getElementById(`call-made-${leadId}`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+
+        // Save to localStorage
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Save to server
+        const updateData = {
+            reachOut: leads[leadIndex].reachOut
+        };
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Call completion data saved to server');
+                setTimeout(() => {
+                    loadLeadsFromServerAndRefresh();
+                    console.log('🔄 Table refreshed after call completion');
+                }, 300);
+            } else {
+                console.error('❌ Server completion update failed:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error saving completion data:', error);
+        });
+
+        // Mark reach-out as COMPLETE with green styling
+        markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt);
+
+        showNotification(`Call connected (${durationNum > 0 ? durationNum + ' min' : '< 1 min'})! Reach-out completed.`, 'success');
+
+        // Refresh the leads table
+        setTimeout(() => {
+            console.log('🔄 Updating localStorage for immediate effect');
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+            if (window.displayLeads) {
+                window.displayLeads();
+            }
+            if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+            refreshLeadsTable();
+            console.log('✅ Table refresh completed');
+        }, 100);
+    }
+};
+
+// Function to cancel call duration input
+window.cancelCallDuration = function(leadId) {
+    console.log('📞 Canceling call duration for lead:', leadId);
+
+    // Close popup and backdrop
+    const popup = document.getElementById('call-duration-popup');
+    if (popup) {
+        popup.remove();
+    }
+    const backdrop = document.getElementById('popup-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+
+    // Uncheck the call checkbox since user canceled
+    const checkbox = document.getElementById(`call-made-${leadId}`);
+    if (checkbox) {
+        checkbox.checked = false;
+    }
+
+    showNotification('Call duration canceled', 'info');
+};
 
 // Function to apply styling to reach-out section based on lead's to-do requirements
 function applyReachOutStyling(leadId, hasReachOutTodo) {
@@ -1687,6 +1834,261 @@ function markReachOutComplete(leadId, completedAt) {
 
     console.log(`✅ Marked reach-out as complete for lead ${leadId} at ${completedAt}`);
 }
+
+// Function to show call logs for a lead
+protectedFunctions.showCallLogs = function(leadId) {
+    console.log(`📞 Showing call logs for lead: ${leadId}`);
+
+    // Get the lead data
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || localStorage.getItem('leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        alert('Lead not found!');
+        return;
+    }
+
+    // Create modal for call logs
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000003;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    `;
+
+    // Get call logs from reachOut data
+    const callLogs = lead.reachOut?.callLogs || [];
+    const callAttempts = lead.reachOut?.callAttempts || 0;
+    const callsConnected = lead.reachOut?.callsConnected || 0;
+    const voicemailCount = lead.reachOut?.voicemailCount || 0;
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-phone-alt"></i> Call Logs - ${lead.name || 'Unknown'}</h2>
+            <button onclick="this.closest('.call-logs-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${callAttempts}</div>
+                <div style="font-size: 14px; color: #6b7280;">Total Attempts</div>
+            </div>
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #10b981;">${callsConnected}</div>
+                <div style="font-size: 14px; color: #6b7280;">Connected</div>
+            </div>
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${voicemailCount}</div>
+                <div style="font-size: 14px; color: #6b7280;">Voicemails</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h3 style="color: #1f2937; margin-bottom: 10px;">Recent Call History</h3>
+            <div style="max-height: 300px; overflow-y: auto;">
+                ${callLogs.length > 0 ?
+                    callLogs.slice().reverse().map(log => `
+                        <div style="background: #f9fafb; padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid ${log.connected ? '#10b981' : '#ef4444'};">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong style="color: ${log.connected ? '#10b981' : '#ef4444'};">
+                                        ${log.connected ? '✓ Connected' : '✗ No Answer'}
+                                    </strong>
+                                    ${log.duration ? ` - ${log.duration}` : ''}
+                                    ${log.leftVoicemail ? ' (Voicemail left)' : ''}
+                                </div>
+                                <div style="color: #6b7280; font-size: 12px;">
+                                    ${new Date(log.timestamp || Date.now()).toLocaleDateString()}
+                                    ${new Date(log.timestamp || Date.now()).toLocaleTimeString()}
+                                </div>
+                            </div>
+                            ${log.notes ? `<div style="margin-top: 5px; color: #4b5563; font-size: 14px;">${log.notes}</div>` : ''}
+                        </div>
+                    `).join('')
+                : '<div style="text-align: center; color: #6b7280; padding: 40px;">No call history available</div>'}
+            </div>
+        </div>
+
+        <div style="text-align: right; border-top: 2px solid #e5e7eb; padding-top: 15px;">
+            <button onclick="this.closest('.call-logs-modal').remove()" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                Close
+            </button>
+        </div>
+    `;
+
+    modal.className = 'call-logs-modal';
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
+
+// Function to show call status modal
+protectedFunctions.showCallStatus = function(leadId) {
+    console.log(`📞 Showing call status for lead: ${leadId}`);
+
+    // Get the lead data
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || localStorage.getItem('leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        alert('Lead not found!');
+        return;
+    }
+
+    // Create modal for call status
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000003;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    `;
+
+    // Get call status data from reachOut
+    const callAttempts = lead.reachOut?.callAttempts || 0;
+    const callsConnected = lead.reachOut?.callsConnected || 0;
+    const voicemailCount = lead.reachOut?.voicemailCount || 0;
+    const emailCount = lead.reachOut?.emailCount || 0;
+    const textCount = lead.reachOut?.textCount || 0;
+    const isCompleted = lead.reachOut?.completedAt || lead.reachOut?.reachOutCompletedAt;
+
+    // Calculate call success rate
+    const successRate = callAttempts > 0 ? ((callsConnected / callAttempts) * 100).toFixed(1) : 0;
+
+    // Determine overall status
+    let overallStatus = 'Pending';
+    let statusColor = '#f59e0b';
+    let statusIcon = 'fas fa-clock';
+
+    if (isCompleted) {
+        overallStatus = 'Completed';
+        statusColor = '#10b981';
+        statusIcon = 'fas fa-check-circle';
+    } else if (callAttempts > 0 || emailCount > 0 || textCount > 0) {
+        overallStatus = 'In Progress';
+        statusColor = '#3b82f6';
+        statusIcon = 'fas fa-phone';
+    }
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-phone-volume"></i> Call Status - ${lead.name || 'Unknown'}</h2>
+            <button onclick="this.closest('.call-status-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+        </div>
+
+        <!-- Overall Status -->
+        <div style="text-align: center; margin-bottom: 25px;">
+            <div style="display: inline-flex; align-items: center; background: ${statusColor}; color: white; padding: 12px 20px; border-radius: 25px; font-weight: bold; font-size: 16px;">
+                <i class="${statusIcon}" style="margin-right: 8px;"></i>
+                ${overallStatus}
+            </div>
+            ${isCompleted ? `<div style="font-size: 12px; color: #6b7280; margin-top: 8px;">Completed: ${new Date(isCompleted).toLocaleDateString()} at ${new Date(isCompleted).toLocaleTimeString()}</div>` : ''}
+        </div>
+
+        <!-- Call Metrics -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-bottom: 25px;">
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${callAttempts}</div>
+                <div style="font-size: 12px; color: #6b7280;">Call Attempts</div>
+            </div>
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #10b981;">${callsConnected}</div>
+                <div style="font-size: 12px; color: #6b7280;">Connected</div>
+            </div>
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${voicemailCount}</div>
+                <div style="font-size: 12px; color: #6b7280;">Voicemails</div>
+            </div>
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: ${successRate >= 50 ? '#10b981' : successRate > 0 ? '#f59e0b' : '#6b7280'};">${successRate}%</div>
+                <div style="font-size: 12px; color: #6b7280;">Success Rate</div>
+            </div>
+        </div>
+
+        <!-- Communication Summary -->
+        <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <h4 style="margin: 0 0 10px 0; color: #1f2937;">Communication Summary</h4>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
+                <div>
+                    <div style="font-size: 18px; font-weight: bold; color: #0066cc;">${emailCount}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Emails Sent</div>
+                </div>
+                <div>
+                    <div style="font-size: 18px; font-weight: bold; color: #0066cc;">${textCount}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Texts Sent</div>
+                </div>
+                <div>
+                    <div style="font-size: 18px; font-weight: bold; color: #0066cc;">${callAttempts + emailCount + textCount}</div>
+                    <div style="font-size: 12px; color: #6b7280;">Total Outreach</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button onclick="showCallLogs('${leadId}'); this.closest('.call-status-modal').remove();" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                <i class="fas fa-history"></i> View Call Logs
+            </button>
+            <button onclick="this.closest('.call-status-modal').remove()" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                Close
+            </button>
+        </div>
+    `;
+
+    modal.className = 'call-status-modal';
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
 
 // Update stage function
 protectedFunctions.updateLeadStage = function(leadId, stage) {
