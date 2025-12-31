@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Profile Enhancements</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-button { padding: 10px 20px; margin: 10px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Vanguard Profile Enhancements Test</h1>
+
+    <p>This page tests the new Current Insurance Company field and Audio Player functionality.</p>
+
+    <button class="test-button" onclick="testProfile()">Test Enhanced Profile</button>
+    <button class="test-button" onclick="clearTestData()">Clear Test Data</button>
+
+    <div id="results"></div>
+
+    <!-- Load necessary scripts -->
+    <script src="js/final-profile-fix-protected.js"></script>
+
+    <script>
+        // Mock notification function
+        window.showNotification = function(message, type) {
+            console.log(`${type.toUpperCase()}: ${message}`);
+            const results = document.getElementById('results');
+            results.innerHTML += `<div style="margin: 10px 0; padding: 10px; background: ${type === 'success' ? '#d1fae5' : '#fee2e2'}; border-radius: 4px;">${message}</div>`;
+        };
+
+        // Mock updateLeadStage function
+        window.updateLeadStage = function(leadId, stage) {
+            console.log('Stage updated:', leadId, stage);
+            showNotification(`Stage updated to: ${stage}`, 'success');
+        };
+
+        function testProfile() {
+            // Set up session storage for authentication
+            sessionStorage.setItem('vanguard_user', JSON.stringify({ name: 'Test User' }));
+
+            // Create test lead data with the new fields
+            const testLead = {
+                id: 'test-123',
+                name: 'THIRD GEN TRUCKING L',
+                contact: 'Thirdgentrucking1',
+                phone: '(516) 817-3515',
+                email: 'THIRDGENTRUCKING1@GMAIL.COM',
+                dotNumber: '3591796',
+                mcNumber: '1234567',
+                yearsInBusiness: 'Unknown',
+                renewalDate: '1/26/2025',
+                currentInsuranceCompany: '', // New field we added
+                transcriptText: 'Test call transcript content here...',
+                stage: 'New',
+                audioUrl: '', // For audio player
+                audioFileName: '', // For audio player
+                vehicles: [],
+                trailers: [],
+                drivers: [],
+                reachOut: {
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    emailCount: 0,
+                    textCount: 0,
+                    voicemailCount: 0
+                },
+                applications: [],
+                quotes: []
+            };
+
+            // Save test data to localStorage
+            const leads = [testLead];
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+            // Test the enhanced profile function
+            if (typeof protectedFunctions !== 'undefined' && protectedFunctions.createEnhancedProfile) {
+                protectedFunctions.createEnhancedProfile(testLead);
+                showNotification('Enhanced profile opened! Check for Current Insurance Company field and Audio Player.', 'success');
+            } else {
+                showNotification('Error: Enhanced profile function not found!', 'error');
+            }
+        }
+
+        function clearTestData() {
+            localStorage.removeItem('insurance_leads');
+            sessionStorage.removeItem('vanguard_user');
+
+            // Close any open modals
+            const modal = document.getElementById('lead-profile-container');
+            if (modal) modal.remove();
+
+            // Clear results
+            document.getElementById('results').innerHTML = '';
+
+            showNotification('Test data cleared', 'success');
+        }
+
+        // Test that our functions are loaded
+        window.addEventListener('load', function() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Function Check:</h3>';
+
+            if (typeof window.loadAudioFile === 'function') {
+                results.innerHTML += '<div style="color: green;">✓ loadAudioFile function loaded</div>';
+            } else {
+                results.innerHTML += '<div style="color: red;">✗ loadAudioFile function NOT loaded</div>';
+            }
+
+            if (typeof window.removeAudioFile === 'function') {
+                results.innerHTML += '<div style="color: green;">✓ removeAudioFile function loaded</div>';
+            } else {
+                results.innerHTML += '<div style="color: red;">✗ removeAudioFile function NOT loaded</div>';
+            }
+
+            if (typeof protectedFunctions !== 'undefined' && protectedFunctions.createEnhancedProfile) {
+                results.innerHTML += '<div style="color: green;">✓ Enhanced profile function loaded</div>';
+            } else {
+                results.innerHTML += '<div style="color: red;">✗ Enhanced profile function NOT loaded</div>';
+            }
+        });
+    </script>
+</body>
+</html>

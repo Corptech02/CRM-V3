@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CRM Data Bridge</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .loading { background: #e3f2fd; color: #1565c0; }
+    </style>
+</head>
+<body>
+    <h2>🔗 CRM Data Bridge</h2>
+    <div id="status" class="status loading">Loading CRM data...</div>
+    <div id="details"></div>
+
+    <script>
+        console.log('🚀 CRM Bridge initialized');
+
+        async function fetchAndBridge() {
+            const statusEl = document.getElementById('status');
+            const detailsEl = document.getElementById('details');
+
+            try {
+                statusEl.textContent = '🔗 Connecting to CRM system...';
+                statusEl.className = 'status loading';
+
+                // Fetch from local vanguard backend
+                const response = await fetch('/api/vigagency/crm/leads');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                statusEl.textContent = `✅ Success! Loaded ${data.leads?.length || 0} CRM leads`;
+                statusEl.className = 'status success';
+
+                detailsEl.innerHTML = `
+                    <p><strong>Source:</strong> ${data.source}</p>
+                    <p><strong>Total Leads:</strong> ${data.total}</p>
+                    <p><strong>Fetched:</strong> ${data.fetchedAt}</p>
+                `;
+
+                // Send data to parent window
+                if (window.parent !== window) {
+                    console.log('📤 Sending CRM data to parent window');
+                    window.parent.postMessage({
+                        type: 'CRM_DATA',
+                        success: true,
+                        data: data
+                    }, 'https://vigagency.com');
+                }
+
+            } catch (error) {
+                console.error('❌ CRM Bridge Error:', error);
+
+                statusEl.textContent = `❌ Failed: ${error.message}`;
+                statusEl.className = 'status error';
+
+                detailsEl.innerHTML = `<p><strong>Error Details:</strong> ${error.message}</p>`;
+
+                // Send error to parent window
+                if (window.parent !== window) {
+                    console.log('📤 Sending error to parent window');
+                    window.parent.postMessage({
+                        type: 'CRM_ERROR',
+                        success: false,
+                        error: error.message
+                    }, 'https://vigagency.com');
+                }
+            }
+        }
+
+        // Auto-run when loaded
+        window.addEventListener('load', () => {
+            console.log('🎯 CRM Bridge loaded, fetching data...');
+            fetchAndBridge();
+        });
+    </script>
+</body>
+</html>
