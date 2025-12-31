@@ -12,7 +12,9 @@
     <link rel="stylesheet" href="css/styles.css?v=34">
     <link rel="stylesheet" href="css/carrier-profile.css?v=2">
     <link rel="stylesheet" href="css/policy-modal.css?v=3">
+    <link rel="stylesheet" href="css/coi-upload-styles.css?v=1">
     <link rel="stylesheet" href="css/mobile.css?v=5">
+    <link rel="stylesheet" href="css/fix-sidebar-text.css?v=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Dancing+Script:wght@400;600&display=swap" rel="stylesheet">
@@ -23,6 +25,7 @@
     <!-- SIP calling library for VoIP functionality -->
     <script src="js/jssip.min.js"></script>
     <script src="js/performance-critical-fix.js?v=1"></script>
+    <script src="js/fix-localStorage-quota.js?v=1"></script>
     <script src="js/disable-heavy-scripts.js?v=1"></script>
     <script>
         // Check authentication first
@@ -37,6 +40,9 @@
     </script>
     <!-- COI Email Timeout Fix -->
     <script src="js/fix-coi-email-timeout.js?v=999"></script>
+
+    <!-- COI Policy Lookup Fix -->
+    <script src="js/fix-coi-policy-lookup.js?v=1"></script>
 
     <!-- Call Status Fix -->
     <script src="js/call-status-fix.js?v=1"></script>
@@ -1384,8 +1390,12 @@
     <script src="js/ai-functions-fallback.js"></script>
     <script src="debug-agent-save.js"></script>
     <script src="js/policy-modal.js?v=30"></script>
+    <script src="js/policy-quickfill.js?v=1"></script>
     <script src="js/fix-policy-server-save.js?v=1"></script>
     <script src="js/policy-to-client-auto-sync.js?v=1"></script>
+    <script src="js/admin-coi-upload-enhancement.js?v=1"></script>
+    <script src="js/debug-policy-modal.js?v=1"></script>
+    <script src="js/universal-coi-upload.js?v=1"></script>
     <script src="js/fix-policy-types.js"></script>
     <!-- Removed carrier-profile-fixed.js to avoid conflicts -->
     <script src="js/database-connector.js?v=22"></script>
@@ -1427,7 +1437,7 @@
     <script src="js/ai-lead-caller.js"></script>
     <script src="js/create-sample-ai-campaign.js"></script>
     <script src="js/sms-persistence-test.js"></script>
-    <script src="js/quote-application.js"></script>
+    <script src="js/quote-application.js?v=1"></script>
     <script src="js/quote-application-server.js"></script>
     <script src="js/test-quote-modal.js"></script>
     <script src="js/quote-applications-view.js"></script>
@@ -1571,7 +1581,7 @@
     <script src="js/fix-premium-display.js?v=1733252400_FIX_CLIENT_IDS"></script>
 
     <!-- FINAL PROFILE FIX PROTECTED - MUST BE ABSOLUTELY LAST - Cannot be overridden -->
-    <script src="js/final-profile-fix-protected.js?v=1046"></script>
+    <script src="js/final-profile-fix-protected.js?v=1058_REMOVE_BUTTONS"></script>
 
     <!-- PREVENT TAB SWITCHING OVERRIDE - DISABLED because it blocks legitimate lead loading -->
     <!-- <script src="js/prevent-tab-switching-override.js?v=1"></script> -->
@@ -1593,6 +1603,8 @@
     <script src="js/coi-real-policies.js?v=13"></script>
     <!-- COI Policy Sync - Keep policies in sync -->
     <script src="js/coi-policy-sync.js?v=1"></script>
+    <!-- COI Panel Toggle - Minimize/Maximize functionality -->
+    <script src="js/coi-panel-toggle.js?v=3"></script>
 
     <!-- Prevent duplicate policy loads - MUST LOAD AFTER COI SCRIPTS -->
     <script src="js/preserve-coi-policy-list.js"></script>
@@ -1788,7 +1800,7 @@
     <script src="js/fix-lead-generation-matched-carriers.js?v=9"></script>
 
     <!-- Selective Vicidial Sync - Choose which leads to import - MUST BE ABSOLUTELY LAST -->
-    <script src="js/selective-vicidial-sync-clean.js?v=14"></script>
+    <script src="js/selective-vicidial-sync-clean.js?v=19"></script>
 
     <!-- Force COI to use Outlook instead of Gmail - MUST BE ABSOLUTELY LAST -->
     <!-- DISABLED: Contains mock data - <script src="js/coi-use-outlook.js?v=1"></script> -->
@@ -2046,7 +2058,7 @@
     <script src="js/force-freeze-timestamps.js"></script>
     <script src="js/force-quote-modal-front.js"></script>
     <script src="js/enhanced-quote-form.js"></script>
-    <script src="js/enhanced-quote-modal.js?v=6"></script>
+    <script src="js/enhanced-quote-modal.js?v=11"></script>
 
     <!-- Mobile Enhancements -->
     <script src="js/mobile-enhancements.js?v=1"></script>
