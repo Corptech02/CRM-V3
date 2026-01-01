@@ -863,6 +863,46 @@ async def create_policy(policy: PolicyCreate):
 
         return {"message": "Policy created", "policy_number": policy.policy_number}
 
+@app.delete("/api/policies/{policy_id}")
+async def delete_policy(policy_id: str):
+    """Delete a policy"""
+    try:
+        # First check if policy exists in the main vanguard.db
+        vanguard_db_path = os.path.join(os.path.dirname(__file__), "vanguard.db")
+
+        with get_db(vanguard_db_path) as conn:
+            cursor = conn.cursor()
+
+            # Check if policy exists
+            cursor.execute("SELECT policy_number FROM policies WHERE policy_number = ?", (policy_id,))
+            policy = cursor.fetchone()
+
+            if not policy:
+                # Also check by id field if policy_number didn't match
+                cursor.execute("SELECT policy_number FROM policies WHERE id = ?", (policy_id,))
+                policy = cursor.fetchone()
+
+                if not policy:
+                    raise HTTPException(status_code=404, detail="Policy not found")
+
+            # Delete the policy
+            cursor.execute("DELETE FROM policies WHERE policy_number = ? OR id = ?", (policy_id, policy_id))
+            deleted_count = cursor.rowcount
+
+            if deleted_count == 0:
+                raise HTTPException(status_code=404, detail="Policy not found")
+
+            conn.commit()
+
+            print(f"✅ Policy {policy_id} deleted successfully from database")
+            return {"success": True, "message": f"Policy {policy_id} deleted successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error deleting policy {policy_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting policy: {str(e)}")
+
 # ==================== USER MANAGEMENT ====================
 
 @app.post("/api/users/register")

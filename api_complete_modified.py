@@ -782,6 +782,57 @@ async def create_policy(policy: PolicyCreate):
 
         return {"message": "Policy created", "policy_number": policy.policy_number}
 
+@app.delete("/api/policies/{policy_id}")
+async def delete_policy(policy_id: str):
+    """Delete a policy"""
+    try:
+        # Use the main vanguard.db with JSON-based policy storage
+        vanguard_db_path = os.path.join(os.path.dirname(__file__), "vanguard.db")
+
+        with get_db(vanguard_db_path) as conn:
+            cursor = conn.cursor()
+
+            # Check if policy exists by id or by parsing JSON data for policy_number
+            cursor.execute("SELECT id, data FROM policies WHERE id = ?", (policy_id,))
+            policy = cursor.fetchone()
+
+            if not policy:
+                # Check if policy_id matches a policy_number in the JSON data
+                cursor.execute("SELECT id, data FROM policies")
+                all_policies = cursor.fetchall()
+
+                policy = None
+                for row in all_policies:
+                    try:
+                        policy_data = json.loads(row["data"])
+                        if policy_data.get("policy_number") == policy_id or policy_data.get("id") == policy_id:
+                            policy = row
+                            policy_id = row["id"]  # Use the database ID for deletion
+                            break
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+
+                if not policy:
+                    raise HTTPException(status_code=404, detail="Policy not found")
+
+            # Delete the policy
+            cursor.execute("DELETE FROM policies WHERE id = ?", (policy_id,))
+            deleted_count = cursor.rowcount
+
+            if deleted_count == 0:
+                raise HTTPException(status_code=404, detail="Policy not found")
+
+            conn.commit()
+
+            print(f"✅ Policy {policy_id} deleted successfully from database")
+            return {"success": True, "message": f"Policy {policy_id} deleted successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error deleting policy {policy_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting policy: {str(e)}")
+
 # ==================== USER MANAGEMENT ====================
 
 @app.post("/api/users/register")
