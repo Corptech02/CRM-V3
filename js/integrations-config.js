@@ -658,15 +658,20 @@ function updateVoIPFields() {
 function saveOpenAIConfig() {
     const apiKey = document.getElementById('openai-key').value;
     const model = document.getElementById('openai-model').value;
-    
+
     if (!apiKey) {
         showStatus('openai-status', 'Please enter an API key', 'error');
         return;
     }
-    
+
     localStorage.setItem('integration_openai_key', apiKey);
     localStorage.setItem('integration_openai_model', model);
-    
+
+    // Sync API keys to environment for server-side scripts
+    if (typeof window.syncAPIKeys === 'function') {
+        window.syncAPIKeys();
+    }
+
     showStatus('openai-status', 'OpenAI configuration saved successfully!', 'success');
 }
 
