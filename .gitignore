@@ -55,3 +55,8 @@ uploads/
 # Logs with potential API keys
 logs/
 *.log
+
+# Database files with potential sensitive data
+*.db
+*.db-wal
+*.db-shm
