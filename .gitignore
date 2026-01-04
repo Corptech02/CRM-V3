@@ -51,3 +51,7 @@ token.json
 # Upload directories
 uploads/
 *.zip
+
+# Logs with potential API keys
+logs/
+*.log
