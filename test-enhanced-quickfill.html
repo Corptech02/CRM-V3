@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced QuickFill Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .test-data {
+            background: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #10b981;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            margin: 15px 0;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .results {
+            background: #e6fffa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .success { color: #059669; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .info { color: #3b82f6; }
+        .improvement { background: #fef3c7; border: 2px solid #f59e0b; padding: 10px; border-radius: 8px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🚀 Enhanced QuickFill Test</h1>
+        <p>Testing the improved parsing logic for General Aggregate, Vehicle Deductibles, and Cargo Deductible extraction.</p>
+
+        <div class="improvement">
+            <h4>🔧 New Improvements:</h4>
+            <ul>
+                <li>✅ General Aggregate auto-populates to $2M when liability is $1M</li>
+                <li>✅ Enhanced cargo deductible parsing: "$100k/$2500 deductible" format</li>
+                <li>✅ Vehicle deductible extraction from "Vehicle Coverages" section</li>
+                <li>✅ Smart defaults for missing commercial auto coverages</li>
+            </ul>
+        </div>
+
+        <div class="test-data">Policy Details
+Motor Truck Cargo (MTC)
+$100k/$2500 deductible
+
+Combined Single Limit Liability (CSL)
+$1,000,000
+
+Vehicle Coverages
+
+1
+2022
+DODGE RAM
+3500
+15774
+$2,500
+Not Included
+$2,500
+Not Included
+Not Included
+
+2
+2024
+Utility
+Gooseneck Trailer
+49190
+$2,500
+Not Included
+$2,500
+Not Included
+Not Included</div>
+
+        <button class="test-button" onclick="testEnhancedParsing()">🧪 Test Enhanced Parsing</button>
+        <div id="test-results" class="results" style="display: none;"></div>
+    </div>
+
+    <script src="js/policy-quickfill.js"></script>
+    <script>
+        function testEnhancedParsing() {
+            const testData = document.querySelector('.test-data').textContent;
+            const results = document.getElementById('test-results');
+            results.style.display = 'block';
+
+            try {
+                // Use the enhanced parsing function
+                const parsed = parsePolicyData(testData);
+
+                let html = '<h4>📊 Enhanced Parsing Results:</h4>';
+
+                // Test cargo deductible parsing
+                if (parsed.coverages.cargoDeductible) {
+                    html += `<div class="success">✅ Cargo Deductible: $${parsed.coverages.cargoDeductible} (from "$100k/$2500 deductible")</div>`;
+                } else {
+                    html += `<div class="error">❌ Cargo Deductible not found</div>`;
+                }
+
+                // Test vehicle deductibles
+                if (parsed.coverages.compDeductible && parsed.coverages.collDeductible) {
+                    html += `<div class="success">✅ Vehicle Deductibles - Comp: $${parsed.coverages.compDeductible}, Collision: $${parsed.coverages.collDeductible}</div>`;
+                } else {
+                    html += `<div class="error">❌ Vehicle Deductibles not found</div>`;
+                }
+
+                // Test General Aggregate auto-population
+                if (parsed.coverages.generalAggregate) {
+                    html += `<div class="success">✅ General Aggregate: ${parsed.coverages.generalAggregate} (auto-set based on $1M liability)</div>`;
+                } else {
+                    html += `<div class="error">❌ General Aggregate not auto-populated</div>`;
+                }
+
+                // Show all coverages found
+                html += `<div class="info"><strong>All Coverages Found:</strong><br>`;
+                for (const [key, value] of Object.entries(parsed.coverages)) {
+                    if (value) {
+                        html += `${key}: ${value}<br>`;
+                    }
+                }
+                html += `</div>`;
+
+                results.innerHTML = html;
+
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Test error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

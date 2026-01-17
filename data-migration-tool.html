@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP to HTTPS Data Migration Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2563eb;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        button.danger {
+            background: #dc2626;
+        }
+        button.danger:hover {
+            background: #b91c1c;
+        }
+        button.success {
+            background: #059669;
+        }
+        button.success:hover {
+            background: #047857;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .stats {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+        .warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            color: #92400e;
+        }
+        .success-msg {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            color: #047857;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Data Migration Tool</h1>
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This tool helps migrate your clients and policies data from HTTP to HTTPS version of your CRM.
+            Use this if your data disappeared after switching to HTTPS.
+        </div>
+
+        <!-- Step 1: Export from HTTP -->
+        <div class="section">
+            <h2>📤 Step 1: Export Data from HTTP Version</h2>
+            <p>If you're on the HTTP version (http://your-domain) and can see your data, click this button to export it:</p>
+            <button onclick="exportData()">Export All Data</button>
+            <button onclick="clearExportArea()">Clear</button>
+
+            <div class="stats" id="exportStats">
+                Ready to export...
+            </div>
+
+            <textarea id="exportData" placeholder="Exported data will appear here. Copy this text to import into HTTPS version."></textarea>
+        </div>
+
+        <!-- Step 2: Import to HTTPS -->
+        <div class="section">
+            <h2>📥 Step 2: Import Data to HTTPS Version</h2>
+            <p>If you're on the HTTPS version (https://your-domain), paste the exported data here and import:</p>
+            <textarea id="importData" placeholder="Paste the exported data here..."></textarea>
+
+            <div style="margin-top: 15px;">
+                <button class="success" onclick="importData()">Import Data</button>
+                <button onclick="previewImport()">Preview Import</button>
+                <button class="danger" onclick="clearImportArea()">Clear</button>
+            </div>
+
+            <div class="stats" id="importStats">
+                Ready to import...
+            </div>
+
+            <div id="importResult"></div>
+        </div>
+
+        <!-- Step 3: Backup Options -->
+        <div class="section">
+            <h2>💾 Step 3: Backup & Sync to Database</h2>
+            <p>After importing, sync your data to the backend database for permanent storage:</p>
+            <button onclick="syncToDatabase()">Sync to Database</button>
+            <button onclick="downloadBackup()">Download Backup File</button>
+
+            <div class="stats" id="syncStats">
+                Ready to sync...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function exportData() {
+            try {
+                // Get all relevant data from localStorage
+                const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+                const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+                const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+                const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+                const settings = JSON.parse(localStorage.getItem('vanguard_settings') || '{}');
+
+                const exportObj = {
+                    timestamp: new Date().toISOString(),
+                    version: '1.0',
+                    data: {
+                        clients,
+                        policies,
+                        insuranceLeads,
+                        regularLeads,
+                        archivedLeads,
+                        settings
+                    }
+                };
+
+                const exportJson = JSON.stringify(exportObj, null, 2);
+                document.getElementById('exportData').value = exportJson;
+
+                // Update stats
+                const stats = document.getElementById('exportStats');
+                stats.innerHTML = `
+                    <strong>✅ Export Complete:</strong><br>
+                    📊 Clients: ${clients.length}<br>
+                    📋 Policies: ${policies.length}<br>
+                    🎯 Insurance Leads: ${insuranceLeads.length}<br>
+                    📝 Regular Leads: ${regularLeads.length}<br>
+                    📂 Archived Leads: ${archivedLeads.length}<br>
+                    ⚙️ Settings: ${Object.keys(settings).length} items
+                `;
+
+                console.log('✅ Data exported successfully');
+            } catch (error) {
+                alert('Error exporting data: ' + error.message);
+                console.error('Export error:', error);
+            }
+        }
+
+        function clearExportArea() {
+            document.getElementById('exportData').value = '';
+            document.getElementById('exportStats').innerHTML = 'Ready to export...';
+        }
+
+        function previewImport() {
+            try {
+                const importText = document.getElementById('importData').value.trim();
+                if (!importText) {
+                    alert('Please paste exported data first');
+                    return;
+                }
+
+                const importObj = JSON.parse(importText);
+                const data = importObj.data;
+
+                const stats = document.getElementById('importStats');
+                stats.innerHTML = `
+                    <strong>👁️ Import Preview:</strong><br>
+                    📊 Clients: ${data.clients?.length || 0}<br>
+                    📋 Policies: ${data.policies?.length || 0}<br>
+                    🎯 Insurance Leads: ${data.insuranceLeads?.length || 0}<br>
+                    📝 Regular Leads: ${data.regularLeads?.length || 0}<br>
+                    📂 Archived Leads: ${data.archivedLeads?.length || 0}<br>
+                    ⚙️ Settings: ${Object.keys(data.settings || {}).length} items<br>
+                    📅 Exported: ${new Date(importObj.timestamp).toLocaleString()}
+                `;
+            } catch (error) {
+                alert('Error parsing import data: ' + error.message);
+                console.error('Preview error:', error);
+            }
+        }
+
+        function importData() {
+            try {
+                const importText = document.getElementById('importData').value.trim();
+                if (!importText) {
+                    alert('Please paste exported data first');
+                    return;
+                }
+
+                const importObj = JSON.parse(importText);
+                const data = importObj.data;
+
+                // Confirm before overwriting
+                const confirmMsg = `This will overwrite your current data:\n\n` +
+                    `Current localStorage will be replaced with:\n` +
+                    `• ${data.clients?.length || 0} clients\n` +
+                    `• ${data.policies?.length || 0} policies\n` +
+                    `• ${data.insuranceLeads?.length || 0} insurance leads\n` +
+                    `• ${data.regularLeads?.length || 0} regular leads\n` +
+                    `• ${data.archivedLeads?.length || 0} archived leads\n\n` +
+                    `Continue?`;
+
+                if (!confirm(confirmMsg)) {
+                    return;
+                }
+
+                // Import data to localStorage
+                localStorage.setItem('clients', JSON.stringify(data.clients || []));
+                localStorage.setItem('policies', JSON.stringify(data.policies || []));
+                localStorage.setItem('insurance_leads', JSON.stringify(data.insuranceLeads || []));
+                localStorage.setItem('leads', JSON.stringify(data.regularLeads || []));
+                localStorage.setItem('archivedLeads', JSON.stringify(data.archivedLeads || []));
+                localStorage.setItem('vanguard_settings', JSON.stringify(data.settings || {}));
+
+                // Update stats
+                const stats = document.getElementById('importStats');
+                stats.innerHTML = `
+                    <strong>✅ Import Complete:</strong><br>
+                    📊 Clients: ${data.clients?.length || 0} imported<br>
+                    📋 Policies: ${data.policies?.length || 0} imported<br>
+                    🎯 Insurance Leads: ${data.insuranceLeads?.length || 0} imported<br>
+                    📝 Regular Leads: ${data.regularLeads?.length || 0} imported<br>
+                    📂 Archived Leads: ${data.archivedLeads?.length || 0} imported<br>
+                    ⚙️ Settings: ${Object.keys(data.settings || {}).length} items imported
+                `;
+
+                // Show success message
+                const resultDiv = document.getElementById('importResult');
+                resultDiv.innerHTML = `
+                    <div class="success-msg">
+                        <strong>🎉 Import Successful!</strong><br>
+                        Your data has been restored. Please refresh your CRM page to see the imported data.
+                        <br><br>
+                        <button onclick="window.location.reload()">Refresh Page</button>
+                    </div>
+                `;
+
+                console.log('✅ Data imported successfully');
+            } catch (error) {
+                alert('Error importing data: ' + error.message);
+                console.error('Import error:', error);
+            }
+        }
+
+        function clearImportArea() {
+            document.getElementById('importData').value = '';
+            document.getElementById('importStats').innerHTML = 'Ready to import...';
+            document.getElementById('importResult').innerHTML = '';
+        }
+
+        function syncToDatabase() {
+            const stats = document.getElementById('syncStats');
+            stats.innerHTML = '🔄 Syncing to database...';
+
+            // Get data from localStorage
+            const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+            const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+
+            if (clients.length === 0 && policies.length === 0) {
+                stats.innerHTML = '⚠️ No data to sync. Import data first.';
+                return;
+            }
+
+            // Send to backend bulk save endpoint
+            fetch('/api/bulk-save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    clients: clients,
+                    policies: policies,
+                    leads: [] // Don't sync leads to avoid duplicates
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    stats.innerHTML = `✅ Sync Complete: ${data.saved} items saved to database`;
+                } else {
+                    stats.innerHTML = `❌ Sync Failed: ${data.error}`;
+                }
+            })
+            .catch(error => {
+                stats.innerHTML = `❌ Sync Error: ${error.message}`;
+                console.error('Sync error:', error);
+            });
+        }
+
+        function downloadBackup() {
+            try {
+                const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+                const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+                const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
+                const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+                const settings = JSON.parse(localStorage.getItem('vanguard_settings') || '{}');
+
+                const backupObj = {
+                    timestamp: new Date().toISOString(),
+                    version: '1.0',
+                    data: {
+                        clients,
+                        policies,
+                        insuranceLeads,
+                        regularLeads,
+                        archivedLeads,
+                        settings
+                    }
+                };
+
+                const dataStr = JSON.stringify(backupObj, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(dataBlob);
+                link.download = `vanguard-backup-${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+
+                const stats = document.getElementById('syncStats');
+                stats.innerHTML = '💾 Backup file downloaded successfully';
+            } catch (error) {
+                alert('Error creating backup: ' + error.message);
+                console.error('Backup error:', error);
+            }
+        }
+
+        // Auto-detect current protocol and show appropriate message
+        window.onload = function() {
+            const protocol = window.location.protocol;
+            const warning = document.querySelector('.warning');
+
+            if (protocol === 'http:') {
+                warning.innerHTML = `
+                    <strong>📍 You're on HTTP</strong><br>
+                    If you can see your data here, use Step 1 to export it. Then open the HTTPS version and use Step 2 to import.
+                `;
+                warning.style.backgroundColor = '#dbeafe';
+                warning.style.borderColor = '#3b82f6';
+                warning.style.color = '#1e40af';
+            } else {
+                warning.innerHTML = `
+                    <strong>🔒 You're on HTTPS</strong><br>
+                    If your data disappeared, paste the exported data from HTTP version into Step 2 to import it.
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

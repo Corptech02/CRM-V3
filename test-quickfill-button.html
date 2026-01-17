@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QuickFill Button</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px;
+        }
+        .mock-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 0;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 800px;
+            max-height: 600px;
+            z-index: 1000;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8f9fa;
+            border-radius: 12px 12px 0 0;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #6b7280;
+        }
+        .mock-body {
+            padding: 20px;
+            text-align: center;
+            color: #6b7280;
+        }
+        .results {
+            background: #e6fffa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .success { color: #059669; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test QuickFill Button</h1>
+        <p>This page tests if the QuickFill button gets added to policy modal headers.</p>
+
+        <button class="test-button" onclick="showMockModal()">Show Mock Policy Modal</button>
+        <button class="test-button" onclick="testQuickFillInit()">Test QuickFill Init</button>
+
+        <div id="results" class="results" style="display: none;"></div>
+    </div>
+
+    <!-- Mock Policy Modal -->
+    <div class="modal-overlay" id="mockOverlay" onclick="closeMockModal()"></div>
+    <div class="mock-modal" id="policyModal">
+        <div class="modal-header">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                <span class="policy-type-badge">Commercial Auto</span>
+                <h2 style="margin: 0;">Policy Details - TEST123</h2>
+            </div>
+            <button class="close-btn" onclick="closeMockModal()">&times;</button>
+        </div>
+        <div class="mock-body">
+            <p>Mock policy modal for testing QuickFill button integration</p>
+            <p><strong>Expected:</strong> QuickFill button should appear in the header after initialization</p>
+        </div>
+    </div>
+
+    <script src="js/policy-quickfill.js"></script>
+    <script>
+        function showMockModal() {
+            document.getElementById('mockOverlay').style.display = 'block';
+            document.getElementById('policyModal').style.display = 'block';
+
+            // Trigger QuickFill initialization
+            setTimeout(() => {
+                if (window.initQuickFill) {
+                    window.initQuickFill();
+                    checkForQuickFillButton();
+                }
+            }, 200);
+        }
+
+        function closeMockModal() {
+            document.getElementById('mockOverlay').style.display = 'none';
+            document.getElementById('policyModal').style.display = 'none';
+        }
+
+        function testQuickFillInit() {
+            const results = document.getElementById('results');
+            results.style.display = 'block';
+
+            let html = '<h4>🔍 QuickFill Initialization Test:</h4>';
+
+            // Check if function is available
+            if (typeof window.initQuickFill === 'function') {
+                html += '<div class="success">✅ initQuickFill function is available</div>';
+
+                // Show the modal first
+                showMockModal();
+
+                setTimeout(() => {
+                    checkForQuickFillButton();
+                }, 500);
+            } else {
+                html += '<div class="error">❌ initQuickFill function not found</div>';
+            }
+
+            results.innerHTML = html;
+        }
+
+        function checkForQuickFillButton() {
+            const results = document.getElementById('results');
+            const modal = document.querySelector('#policyModal');
+            const quickFillBtn = modal ? modal.querySelector('.quickfill-btn') : null;
+
+            let html = results.innerHTML + '<br>';
+
+            if (quickFillBtn) {
+                html += '<div class="success">✅ QuickFill button found in modal header!</div>';
+                html += `<div class="success">Button text: "${quickFillBtn.textContent}"</div>`;
+            } else {
+                html += '<div class="error">❌ QuickFill button NOT found in modal header</div>';
+
+                // Debug info
+                const modalHeader = modal ? modal.querySelector('.modal-header') : null;
+                const modalTitle = modalHeader ? modalHeader.querySelector('h2') : null;
+
+                html += `<div>Modal found: ${!!modal}</div>`;
+                html += `<div>Modal header found: ${!!modalHeader}</div>`;
+                html += `<div>Modal title found: ${!!modalTitle}</div>`;
+                html += `<div>Modal title text: "${modalTitle ? modalTitle.textContent : 'N/A'}"</div>`;
+            }
+
+            results.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

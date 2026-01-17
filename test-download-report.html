@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Download Report</title>
+</head>
+<body>
+    <h1>Test Agent Report Download</h1>
+    <button onclick="downloadAgentReport('Grant')">Download Grant's Report</button>
+    <button onclick="downloadAgentReport('Hunter')">Download Hunter's Report</button>
+    <button onclick="downloadAgentReport('Carson')">Download Carson's Report</button>
+
+    <script>
+        // Copy the functions from app.js for testing
+        function downloadAgentReport(agentName) {
+            try {
+                console.log('Downloading report for:', agentName);
+
+                // Try multiple localStorage keys and also fetch from server if needed
+                let leads = JSON.parse(localStorage.getItem('insurance_leads') || localStorage.getItem('leads') || '[]');
+
+                console.log('Found leads in localStorage:', leads.length);
+
+                // If no leads in localStorage, try to fetch from server
+                if (leads.length === 0) {
+                    console.log('No leads in localStorage, fetching from server...');
+                    fetchLeadsForReport(agentName);
+                    return;
+                }
+
+                const agentLeads = leads.filter(lead => lead.assignedTo === agentName);
+                console.log('Agent leads found:', agentLeads.length);
+
+                // If still no leads for this agent, create an empty report
+                if (agentLeads.length === 0) {
+                    console.log('No leads found for agent:', agentName);
+                    generateEmptyReport(agentName);
+                    return;
+                }
+
+                // For testing, just generate empty report
+                generateEmptyReport(agentName);
+
+            } catch (error) {
+                console.error('Error generating report:', error);
+                alert('Error generating report. Please check the console for details.');
+            }
+        }
+
+        async function fetchLeadsForReport(agentName) {
+            try {
+                const apiUrl = window.location.protocol === 'https:'
+                    ? `https://${window.location.hostname}/api`
+                    : `http://${window.location.hostname}:3001/api`;
+
+                console.log('Fetching leads from:', apiUrl + '/leads');
+                const response = await fetch(apiUrl + '/leads');
+
+                if (!response.ok) {
+                    throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+                }
+
+                const serverLeads = await response.json();
+                console.log(`Fetched ${serverLeads.length} leads from server`);
+
+                localStorage.setItem('insurance_leads', JSON.stringify(serverLeads));
+                downloadAgentReport(agentName);
+
+            } catch (error) {
+                console.error('Failed to fetch leads from server:', error);
+                alert('Unable to fetch lead data for the report. Please check your connection and try again.');
+            }
+        }
+
+        function generateEmptyReport(agentName) {
+            console.log('Generating test report for:', agentName);
+
+            const csvContent = `Agent Performance Report - ${agentName}
+Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
+
+SUMMARY STATISTICS
+Total Leads,0
+High Value Leads,0
+High Value Percentage,0%
+Low Value Leads,0
+Low Value Percentage,0%
+Total Premium,$0
+
+PERFORMANCE METRICS
+Contact Rate,0%
+Conversion Rate,0%
+Total Calls Made,0
+Average Call Time,0 minutes
+Leads Pushed to Brokers,0
+Broker Push Rate,0%
+
+NEGATIVE INDICATORS
+Time on Non-Green Leads,0 minutes
+Low Value Lead Rate,0%
+
+DETAILED LEAD DATA
+Lead ID,Lead Name,Status,Premium,Fleet Size,Lead Value,Phone,State,DOT Number,Insurance Company
+Test report generated successfully`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${agentName}_Performance_Report_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            console.log('Test report downloaded successfully');
+        }
+    </script>
+</body>
+</html>

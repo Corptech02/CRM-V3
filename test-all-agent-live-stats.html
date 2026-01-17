@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Live Stats for All Agents</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .agent-test { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .stats { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Live Stats Test for All Agents</h1>
+
+    <div class="agent-test">
+        <h2>Grant</h2>
+        <button onclick="testAgent('Grant')">Load Grant's Live Stats</button>
+        <div id="grant-stats" class="stats"></div>
+    </div>
+
+    <div class="agent-test">
+        <h2>Hunter</h2>
+        <button onclick="testAgent('Hunter')">Load Hunter's Live Stats</button>
+        <div id="hunter-stats" class="stats"></div>
+    </div>
+
+    <div class="agent-test">
+        <h2>Carson</h2>
+        <button onclick="testAgent('Carson')">Load Carson's Live Stats</button>
+        <div id="carson-stats" class="stats"></div>
+    </div>
+
+    <script>
+        async function testAgent(agentName) {
+            const statsDiv = document.getElementById(agentName.toLowerCase() + '-stats');
+            statsDiv.innerHTML = 'Loading...';
+
+            try {
+                const response = await fetch(`/api/live-agent-stats/${agentName}`);
+                const result = await response.json();
+
+                if (result.stats) {
+                    statsDiv.innerHTML = `
+                        <h3>${agentName}'s Live Stats:</h3>
+                        <p><strong>Total Leads:</strong> ${result.stats.totalLeads}</p>
+                        <p><strong>Total Calls:</strong> ${result.stats.totalCalls}</p>
+                        <p><strong>Connected Calls:</strong> ${result.stats.connectedCalls}</p>
+                        <p><strong>Call Duration:</strong> ${result.stats.totalCallDuration} minutes</p>
+                        <p><strong>High Value Leads:</strong> ${result.stats.highValueLeads}</p>
+                        <p><strong>Low Value Leads:</strong> ${result.stats.lowValueLeads}</p>
+                        <p><strong>Contact Rate:</strong> ${result.stats.contactRate}%</p>
+                        <p><strong>Leads to Brokers:</strong> ${result.stats.leadsToBrokers}</p>
+                        <p><strong>Last Updated:</strong> ${result.stats.lastUpdated}</p>
+                    `;
+                } else {
+                    statsDiv.innerHTML = `<p style="color: red;">No live stats found for ${agentName}</p>`;
+                }
+            } catch (error) {
+                statsDiv.innerHTML = `<p style="color: red;">Error loading stats: ${error.message}</p>`;
+            }
+        }
+
+        // Auto-load all agents on page load
+        window.addEventListener('load', () => {
+            testAgent('Grant');
+            testAgent('Hunter');
+            testAgent('Carson');
+        });
+    </script>
+</body>
+</html>

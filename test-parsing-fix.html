@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Parsing Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .test-data {
+            background: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #10b981;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            margin: 15px 0;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .results {
+            background: #e6fffa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .success { color: #059669; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔧 Test Parsing Fix</h1>
+        <p>Testing the fix for address vs vehicle parsing issue.</p>
+
+        <div class="test-data">Policy Details
+Business Name
+LOPEZ TRUCKING COMPANY LLC
+
+Email
+MCLOPEZ2006@GMAIL.COM
+
+Phone
+(567) 303-5530
+
+Mailing Address
+1158 TOWNSHIP ROAD 126
+NOVA
+OH 44859
+
+Vehicles
+
+1
+1998
+PETERBILT
+379
+45052
+
+2
+2025
+Unidentified
+Trailer For 45052
+
+Policy Coverages - For the Insured and Others
+Combined Single Limit Liability (CSL)
+$1,000,000
+
+Motor Truck Cargo (MTC)
+$100k/$2500 deductible</div>
+
+        <button class="test-button" onclick="testParsingFix()">🧪 Test Parsing Fix</button>
+        <div id="test-results" class="results" style="display: none;"></div>
+    </div>
+
+    <script src="js/policy-quickfill.js"></script>
+    <script>
+        function testParsingFix() {
+            const testData = document.querySelector('.test-data').textContent;
+            const results = document.getElementById('test-results');
+            results.style.display = 'block';
+
+            try {
+                // Use the fixed parsing function
+                const parsed = parsePolicyData(testData);
+
+                let html = '<h4>🔧 Fixed Parsing Results:</h4>';
+
+                // Test contact information parsing
+                if (parsed.address && parsed.address.includes('1158 TOWNSHIP ROAD 126')) {
+                    html += `<div class="success">✅ Address correctly parsed: ${parsed.address}</div>`;
+                } else if (parsed.address) {
+                    html += `<div class="error">⚠️ Address parsed but incomplete: ${parsed.address}</div>`;
+                } else {
+                    html += `<div class="error">❌ Address not found</div>`;
+                }
+
+                if (parsed.city === 'NOVA') {
+                    html += `<div class="success">✅ City correctly parsed: ${parsed.city}</div>`;
+                } else {
+                    html += `<div class="error">❌ City parsing issue: ${parsed.city}</div>`;
+                }
+
+                if (parsed.state === 'OH') {
+                    html += `<div class="success">✅ State correctly parsed: ${parsed.state}</div>`;
+                } else {
+                    html += `<div class="error">❌ State parsing issue: ${parsed.state}</div>`;
+                }
+
+                if (parsed.zip === '44859') {
+                    html += `<div class="success">✅ ZIP correctly parsed: ${parsed.zip}</div>`;
+                } else {
+                    html += `<div class="error">❌ ZIP parsing issue: ${parsed.zip}</div>`;
+                }
+
+                // Test vehicle parsing (should NOT include the address as a vehicle)
+                const vehicleCount = parsed.vehicles ? parsed.vehicles.length : 0;
+                html += `<div class="info">🚗 Vehicles found: ${vehicleCount}</div>`;
+
+                let addressAsVehicleFound = false;
+                if (parsed.vehicles) {
+                    parsed.vehicles.forEach((vehicle, index) => {
+                        if (vehicle.year === '1158' || vehicle.make === 'TOWNSHIP') {
+                            addressAsVehicleFound = true;
+                        }
+                        html += `<div class="info">Vehicle ${index + 1}: ${vehicle.year} ${vehicle.make} ${vehicle.model}</div>`;
+                    });
+                }
+
+                if (addressAsVehicleFound) {
+                    html += `<div class="error">❌ Address was incorrectly parsed as a vehicle!</div>`;
+                } else {
+                    html += `<div class="success">✅ Address was NOT incorrectly parsed as a vehicle</div>`;
+                }
+
+                // Show all parsed data
+                html += `<div class="info"><strong>Full Parsed Data:</strong><pre>${JSON.stringify(parsed, null, 2)}</pre></div>`;
+
+                results.innerHTML = html;
+
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Test error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

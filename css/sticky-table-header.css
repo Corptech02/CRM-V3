@@ -1,0 +1,171 @@
+/* Sticky Table Header - Freezes leads table header below main content header */
+
+/* Main content header - establish position context */
+.leads-view .content-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 15px;
+    margin-bottom: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Table container - REMOVED - using natural page scroll instead */
+/*
+.leads-view .table-container {
+    position: relative;
+    overflow-x: auto;
+    max-height: calc(100vh - 220px);
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+*/
+
+/* Make table header sticky */
+.leads-view #leadsTable thead {
+    position: sticky;
+    top: var(--sticky-header-top, 0);
+    z-index: 50;
+    background: white;
+    transition: box-shadow 0.2s ease;
+}
+
+/* Enhanced shadow when header is stuck */
+.leads-view #leadsTable thead.is-sticky {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Ensure header cells have proper background and styling */
+.leads-view #leadsTable thead th {
+    background: white !important;
+    border-bottom: 2px solid #e5e7eb !important;
+    padding: 15px 12px !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+    white-space: nowrap;
+    position: relative;
+}
+
+/* Enhance header row visibility */
+.leads-view #leadsTable thead tr {
+    background: white !important;
+    border-bottom: 2px solid #d1d5db;
+}
+
+/* Fix for sortable headers */
+.leads-view #leadsTable thead th.sortable {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.leads-view #leadsTable thead th.sortable:hover {
+    background: #f9fafb !important;
+}
+
+/* Ensure sort arrows stay visible on sticky header */
+.leads-view #leadsTable thead th .sort-arrow {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+}
+
+/* Table body styling to work with sticky header */
+.leads-view #leadsTable tbody tr {
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* Fix checkbox alignment in sticky header */
+.leads-view #leadsTable thead th:first-child {
+    text-align: center;
+    padding: 15px 8px !important;
+}
+
+.leads-view #leadsTable thead th:first-child input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+/* Prevent table content from jumping during scroll */
+.leads-view #leadsTable {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    table-layout: fixed;
+}
+
+/* Enhanced visibility for active tab content */
+.leads-view #active-leads-tab {
+    background: white;
+    border-radius: 0 8px 8px 8px;
+    padding: 0;
+    margin: 0;
+}
+
+/* Fix for advanced filters panel to work with sticky header */
+.leads-view #advancedFiltersPanel {
+    margin: 15px 0 10px 0 !important;
+    background: #f9fafb !important;
+}
+
+/* Smooth scrolling for the table container - DISABLED */
+/*
+.leads-view .table-container {
+    scroll-behavior: smooth;
+}
+*/
+
+/* Mobile responsiveness for sticky header */
+@media (max-width: 768px) {
+    .leads-view .content-header {
+        position: static;
+        box-shadow: none;
+    }
+
+    /* .leads-view .table-container - DISABLED
+    .leads-view .table-container {
+        max-height: calc(100vh - 180px);
+    }
+    */
+
+    .leads-view #leadsTable thead {
+        position: static;
+    }
+}
+
+/* Fix z-index layering issues */
+.leads-view .header-actions {
+    position: relative;
+    z-index: 10;
+}
+
+.leads-view .lead-tabs {
+    position: relative;
+    z-index: 10;
+}
+
+/* Ensure table stays properly contained */
+.leads-view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.leads-view #active-leads-tab {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* .leads-view .table-container - DISABLED
+.leads-view .table-container {
+    flex: 1;
+    overflow: auto;
+}
+*/

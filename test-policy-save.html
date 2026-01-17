@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Policy Save</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .results {
+            background: #e6fffa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .success { color: #059669; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .info { color: #3b82f6; }
+        .policy-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Policy Save Test</h1>
+        <p>Testing the enhanced policy save functionality with vehicle and driver data collection.</p>
+
+        <form id="test-policy-form" class="policy-form">
+            <!-- Overview Fields -->
+            <div class="form-group">
+                <label for="overview-policy-number">Policy Number:</label>
+                <input type="text" id="overview-policy-number" value="TEST-POL-123">
+            </div>
+            <div class="form-group">
+                <label for="overview-carrier">Carrier:</label>
+                <select id="overview-carrier">
+                    <option value="GEICO">GEICO</option>
+                    <option value="Progressive">Progressive</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="overview-policy-type">Policy Type:</label>
+                <select id="overview-policy-type">
+                    <option value="Commercial Auto">Commercial Auto</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="overview-premium">Premium:</label>
+                <input type="text" id="overview-premium" value="16937">
+            </div>
+            <div class="form-group">
+                <label for="overview-effective-date">Effective Date:</label>
+                <input type="date" id="overview-effective-date" value="2025-01-07">
+            </div>
+            <div class="form-group">
+                <label for="overview-expiration-date">Expiration Date:</label>
+                <input type="date" id="overview-expiration-date" value="2026-01-07">
+            </div>
+        </form>
+
+        <!-- Vehicle Section -->
+        <h3>Test Vehicle Data</h3>
+        <div id="vehicle-1" class="vehicle-container">
+            <div class="form-group">
+                <label>Vehicle Year:</label>
+                <input type="text" id="vehicle-1-year" value="2022">
+            </div>
+            <div class="form-group">
+                <label>Vehicle Make:</label>
+                <input type="text" id="vehicle-1-make" value="DODGE">
+            </div>
+            <div class="form-group">
+                <label>Vehicle Model:</label>
+                <input type="text" id="vehicle-1-model" value="RAM 3500">
+            </div>
+            <div class="form-group">
+                <label>VIN:</label>
+                <input type="text" id="vehicle-1-vin" value="15774">
+            </div>
+        </div>
+
+        <div id="vehicle-2" class="vehicle-container">
+            <div class="form-group">
+                <label>Vehicle Year:</label>
+                <input type="text" id="vehicle-2-year" value="2024">
+            </div>
+            <div class="form-group">
+                <label>Vehicle Make:</label>
+                <input type="text" id="vehicle-2-make" value="Utility">
+            </div>
+            <div class="form-group">
+                <label>Vehicle Model:</label>
+                <input type="text" id="vehicle-2-model" value="Gooseneck Trailer">
+            </div>
+            <div class="form-group">
+                <label>VIN:</label>
+                <input type="text" id="vehicle-2-vin" value="49190">
+            </div>
+        </div>
+
+        <!-- Driver Section -->
+        <h3>Test Driver Data</h3>
+        <div id="driver-1" class="driver-container">
+            <div class="form-group">
+                <label>Driver Name:</label>
+                <input type="text" id="driver-1-name" value="STANLEY CYRIL ONONOGBO">
+            </div>
+            <div class="form-group">
+                <label>Age:</label>
+                <input type="text" id="driver-1-age" value="52">
+            </div>
+            <div class="form-group">
+                <label>License Number:</label>
+                <input type="text" id="driver-1-license" value="OH123456">
+            </div>
+        </div>
+
+        <!-- Coverage Section -->
+        <h3>Test Coverage Data</h3>
+        <div class="form-group">
+            <label>Liability Coverage:</label>
+            <input type="text" id="coverage-liability" value="$1,000,000">
+        </div>
+        <div class="form-group">
+            <label>General Aggregate:</label>
+            <input type="text" id="coverage-generalAggregate" value="$2,000,000">
+        </div>
+        <div class="form-group">
+            <label>Cargo Deductible:</label>
+            <input type="text" id="coverage-cargoDeductible" value="2500">
+        </div>
+
+        <button type="button" class="test-button" onclick="testPolicySave()">🧪 Test Policy Save</button>
+        <div id="test-results" class="results" style="display: none;"></div>
+    </div>
+
+    <script src="js/fix-policy-server-save.js"></script>
+    <script>
+        async function testPolicySave() {
+            const results = document.getElementById('test-results');
+            results.style.display = 'block';
+            results.innerHTML = '<div class="info">Testing policy save...</div>';
+
+            try {
+                console.log('Starting policy save test...');
+
+                // Call the enhanced savePolicy function without passing data
+                // to test the data collection from form
+                const result = await window.savePolicy();
+
+                console.log('Policy save result:', result);
+
+                results.innerHTML = `
+                    <div class="success">✅ Policy save successful!</div>
+                    <div class="info">Policy ID: ${result.id || 'Not provided'}</div>
+                    <div class="info">Server Response: ${JSON.stringify(result, null, 2)}</div>
+                `;
+
+            } catch (error) {
+                console.error('Policy save test failed:', error);
+                results.innerHTML = `
+                    <div class="error">❌ Policy save failed: ${error.message}</div>
+                    <div class="info">Check console for details</div>
+                `;
+            }
+        }
+
+        // Test data collection without saving
+        function testDataCollection() {
+            console.log('Testing data collection...');
+
+            // Mock the data collection logic from the save function
+            const policyData = {
+                policyNumber: document.getElementById('overview-policy-number')?.value,
+                carrier: document.getElementById('overview-carrier')?.value,
+                policyType: document.getElementById('overview-policy-type')?.value,
+                premium: document.getElementById('overview-premium')?.value,
+                effectiveDate: document.getElementById('overview-effective-date')?.value,
+                expirationDate: document.getElementById('overview-expiration-date')?.value
+            };
+
+            // Collect vehicles
+            policyData.vehicles = [];
+            const vehicleContainers = document.querySelectorAll('[id^="vehicle-"], .vehicle-container');
+            vehicleContainers.forEach((container, index) => {
+                const vehicle = {};
+                const inputs = container.querySelectorAll('input, select, textarea');
+
+                inputs.forEach(input => {
+                    if (input.value) {
+                        const id = input.id || '';
+                        let fieldName = 'unknown';
+                        if (id.includes('year')) fieldName = 'year';
+                        else if (id.includes('make')) fieldName = 'make';
+                        else if (id.includes('model')) fieldName = 'model';
+                        else if (id.includes('vin')) fieldName = 'vin';
+
+                        vehicle[fieldName] = input.value;
+                    }
+                });
+
+                if (Object.keys(vehicle).length > 0) {
+                    vehicle.vehicleNumber = index + 1;
+                    policyData.vehicles.push(vehicle);
+                }
+            });
+
+            // Collect drivers
+            policyData.drivers = [];
+            const driverContainers = document.querySelectorAll('[id^="driver-"], .driver-container');
+            driverContainers.forEach((container, index) => {
+                const driver = {};
+                const inputs = container.querySelectorAll('input, select, textarea');
+
+                inputs.forEach(input => {
+                    if (input.value) {
+                        const id = input.id || '';
+                        let fieldName = 'unknown';
+                        if (id.includes('name')) fieldName = 'name';
+                        else if (id.includes('age')) fieldName = 'age';
+                        else if (id.includes('license')) fieldName = 'licenseNumber';
+
+                        driver[fieldName] = input.value;
+                    }
+                });
+
+                if (Object.keys(driver).length > 0) {
+                    driver.driverNumber = index + 1;
+                    policyData.drivers.push(driver);
+                }
+            });
+
+            console.log('Collected policy data:', policyData);
+            console.log('Vehicles:', policyData.vehicles);
+            console.log('Drivers:', policyData.drivers);
+
+            return policyData;
+        }
+
+        // Auto-test data collection on page load
+        setTimeout(() => {
+            console.log('Auto-testing data collection...');
+            testDataCollection();
+        }, 1000);
+    </script>
+</body>
+</html>

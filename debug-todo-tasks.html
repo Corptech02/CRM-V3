@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug To Do Tasks Count</title>
+</head>
+<body>
+    <h1>Debug To Do Tasks Count</h1>
+    <p>Open browser console (F12) to see debug output</p>
+
+    <div>
+        <h2>Instructions:</h2>
+        <ol>
+            <li>Make sure you're logged into Vanguard CRM in another tab</li>
+            <li>Navigate to the leads page to ensure data is loaded</li>
+            <li>Come back to this page and click the button below</li>
+            <li>Check the browser console for debug output</li>
+        </ol>
+    </div>
+
+    <button onclick="runDebug()">Run To Do Tasks Debug</button>
+
+    <div id="results" style="margin-top: 20px; padding: 10px; background: #f0f0f0;">
+        Click the button to see results here...
+    </div>
+
+    <script src="debug-todo-count.js"></script>
+    <script>
+        function runDebug() {
+            const resultsDiv = document.getElementById('results');
+            try {
+                // Clear previous console output
+                console.clear();
+                console.log('🔍 Starting To Do Tasks Debug...');
+
+                // Run the debug script content inline since it was loaded
+                eval(document.querySelector('script[src="debug-todo-count.js"]').innerHTML ||
+                     'console.log("Debug script not found - running inline..."); ' +
+                     // We'll put the debug logic inline as backup
+                     `
+                     const userData = sessionStorage.getItem('vanguard_user');
+                     let currentUser = '';
+                     if (userData) {
+                         const user = JSON.parse(userData);
+                         currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+                     }
+                     console.log('Current user:', currentUser);
+
+                     const leads = JSON.parse(localStorage.getItem('leads') || '[]');
+                     console.log('Total leads:', leads.length, leads);
+
+                     resultsDiv.innerHTML = \`
+                         <strong>Debug Results:</strong><br>
+                         Current User: \${currentUser}<br>
+                         Total Leads: \${leads.length}<br>
+                         Check console for detailed output...
+                     \`;
+                     `);
+
+            } catch (error) {
+                console.error('Debug error:', error);
+                resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}<br>Check console for more details.`;
+            }
+        }
+
+        // Auto-run debug when page loads
+        window.addEventListener('load', function() {
+            setTimeout(runDebug, 1000);
+        });
+    </script>
+</body>
+</html>

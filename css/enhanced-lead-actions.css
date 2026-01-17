@@ -1,0 +1,330 @@
+/* Enhanced Lead Management Action Buttons Fix */
+/* Fixes display issues with 4 action buttons per lead row */
+
+/* Ensure action column has enough width for 4 buttons */
+.leads-view .data-table th:last-child,
+.leads-view .data-table td:last-child {
+    min-width: 180px !important;
+    width: 180px !important;
+    max-width: 180px !important;
+}
+
+/* Standardize action button container */
+.leads-view .action-buttons,
+#leadsTableBody .action-buttons {
+    display: flex !important;
+    gap: 0.25rem !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    overflow: visible !important;
+}
+
+/* Consistent button sizing for lead table */
+.leads-view .btn-icon,
+#leadsTableBody .btn-icon {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1px solid #e5e7eb !important;
+    background: var(--white) !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 0.75rem !important;
+    transition: all 0.2s !important;
+    flex-shrink: 0 !important;
+}
+
+/* Button hover states */
+.leads-view .btn-icon:hover,
+#leadsTableBody .btn-icon:hover {
+    background: #f3f4f6 !important;
+    border-color: #d1d5db !important;
+    transform: scale(1.05);
+}
+
+/* Specific button color styling */
+.leads-view .btn-icon[title="View Lead"] i,
+#leadsTableBody .btn-icon[title="View Lead"] i {
+    color: #3b82f6 !important;
+}
+
+.leads-view .btn-icon[title="Convert to Client"] i,
+#leadsTableBody .btn-icon[title="Convert to Client"] i {
+    color: #10b981 !important;
+}
+
+.leads-view .btn-icon[title="Archive Lead"] i,
+#leadsTableBody .btn-icon[title="Archive Lead"] i {
+    color: #f59e0b !important;
+}
+
+.leads-view .btn-icon[title="Delete Permanently"] i,
+#leadsTableBody .btn-icon[title="Delete Permanently"] i {
+    color: #ef4444 !important;
+}
+
+/* Ensure table doesn't overflow */
+.leads-view .data-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+
+/* Prevent row height issues */
+.leads-view tbody tr,
+#leadsTableBody tr {
+    min-height: 48px !important;
+    height: auto !important;
+}
+
+/* Ensure action cell doesn't get compressed */
+.leads-view tbody td:last-child,
+#leadsTableBody td:last-child {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    vertical-align: middle !important;
+    padding: 0.5rem !important;
+}
+
+/* Fix any background color issues */
+.leads-view tbody tr,
+#leadsTableBody tr {
+    background: var(--white) !important;
+}
+
+.leads-view tbody tr:hover,
+#leadsTableBody tr:hover {
+    background: #f9fafb !important;
+}
+
+/* Remove any conflicting table layout rules - DISABLED for natural page scroll */
+/*
+.leads-view .data-table-container {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+}
+*/
+
+/* Prevent table structure corruption after lead deletion */
+.leads-view .data-table tbody tr {
+    opacity: 1 !important;
+    background: var(--white) !important;
+    transition: opacity 0.2s ease !important;
+}
+
+/* RESTORE proper header colors - don't override default grey headers */
+.leads-view .data-table thead {
+    background: #f9fafb !important; /* Restore grey header background */
+}
+
+.leads-view .data-table th {
+    background: #f9fafb !important; /* Restore grey header background */
+    color: #374151 !important; /* Restore proper text color */
+}
+
+/* Ensure all table cells are properly sized */
+.leads-view .data-table tbody td {
+    box-sizing: border-box !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    background: inherit !important;
+    opacity: 1 !important;
+}
+
+/* Force table to recalculate layout after changes */
+.leads-view .data-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
+/* Prevent orphaned cells or layout issues */
+.leads-view .data-table tbody tr:empty {
+    display: none !important;
+}
+
+/* Ensure proper cell count - prevent grayed out areas */
+.leads-view .data-table tbody tr td:empty {
+    min-height: 1px !important;
+    background: var(--white) !important;
+}
+
+/* Animation for row removal to prevent visual glitches */
+.leads-view .data-table tbody tr.removing {
+    opacity: 0 !important;
+    transform: translateX(-100%) !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Force proper table rendering after DOM changes */
+.leads-view .data-table tbody {
+    position: relative !important;
+}
+
+.leads-view .data-table tbody::after {
+    content: "";
+    display: table-row !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* CRITICAL FIX: Prevent blank space on right side after mass deletion */
+.leads-view .data-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* .leads-view .data-table-container - DISABLED for natural page scroll
+.leads-view .data-table-container {
+    width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+*/
+
+/* Ensure no extra spacing after row removal */
+.leads-view .data-table tbody tr {
+    width: 100% !important;
+    display: table-row !important;
+    box-sizing: border-box !important;
+}
+
+.leads-view .data-table tbody td {
+    position: relative !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+}
+
+/* Force proper column distribution */
+.leads-view .data-table th:nth-child(1),
+.leads-view .data-table td:nth-child(1) { width: 40px !important; } /* Checkbox */
+
+.leads-view .data-table th:nth-child(2),
+.leads-view .data-table td:nth-child(2) { width: 15% !important; } /* Name */
+
+.leads-view .data-table th:nth-child(3),
+.leads-view .data-table td:nth-child(3) { width: 8% !important; } /* Contact */
+
+.leads-view .data-table th:nth-child(4),
+.leads-view .data-table td:nth-child(4) { width: 12% !important; } /* Product */
+
+.leads-view .data-table th:nth-child(5),
+.leads-view .data-table td:nth-child(5) { width: 10% !important; } /* Premium */
+
+.leads-view .data-table th:nth-child(6),
+.leads-view .data-table td:nth-child(6) { width: 10% !important; } /* Stage */
+
+.leads-view .data-table th:nth-child(7),
+.leads-view .data-table td:nth-child(7) { width: 15% !important; } /* To Do */
+
+.leads-view .data-table th:nth-child(8),
+.leads-view .data-table td:nth-child(8) { width: 8% !important; } /* Renewal */
+
+.leads-view .data-table th:nth-child(9),
+.leads-view .data-table td:nth-child(9) { width: 10% !important; } /* Assigned */
+
+.leads-view .data-table th:nth-child(10),
+.leads-view .data-table td:nth-child(10) { width: 8% !important; } /* Created */
+
+.leads-view .data-table th:nth-child(11),
+.leads-view .data-table td:nth-child(11) { width: 180px !important; } /* Actions */
+
+/* CRITICAL FIX: Prevent gray areas after lead deletion */
+.leads-view .data-table tbody tr::after {
+    content: "";
+    display: table-cell !important;
+    width: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+/* Ensure no phantom cells or layout artifacts */
+.leads-view .data-table tbody td:last-child {
+    border-right: none !important;
+}
+
+/* Force proper table cell count and prevent layout corruption */
+.leads-view .data-table tbody tr {
+    display: table-row !important;
+    width: 100% !important;
+}
+
+.leads-view .data-table tbody tr td {
+    display: table-cell !important;
+    box-sizing: border-box !important;
+    background: var(--white) !important;
+}
+
+/* Prevent any extra space or phantom elements */
+.leads-view .data-table tbody tr:after,
+.leads-view .data-table tbody tr:before {
+    display: none !important;
+}
+
+/* Fix for table regeneration issues */
+.leads-view .data-table tbody {
+    background: transparent !important;
+}
+
+/* Ensure consistent row structure */
+.leads-view .data-table tbody tr:nth-child(odd) {
+    background: var(--white) !important;
+}
+
+.leads-view .data-table tbody tr:nth-child(even) {
+    background: var(--white) !important;
+}
+
+/* FINAL FIX: Force immediate table repaint after any DOM change */
+.leads-view .data-table tbody tr {
+    will-change: auto !important;
+    transform: translateZ(0) !important; /* Force GPU acceleration */
+}
+
+/* Ensure no residual styling from deleted elements */
+.leads-view .data-table * {
+    background-attachment: scroll !important;
+    background-repeat: no-repeat !important;
+}
+
+/* Critical fix for table container width after deletions - DISABLED for natural page scroll */
+/*
+.leads-view .data-table-container,
+.leads-view .data-table-container * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+*/
+
+/* Force table to completely recalculate layout */
+.leads-view .data-table:after {
+    content: "";
+    display: block;
+    clear: both;
+    height: 0;
+    width: 100%;
+}
+
+/* My Leads Toggle in Header Styling */
+.leads-view .data-table th:nth-child(2) {
+    position: relative !important;
+    overflow: visible !important;
+}
+
+
+/* Ensure header text doesn't wrap with toggle */
+.leads-view .data-table th:nth-child(2) {
+    white-space: nowrap !important;
+    min-width: 200px !important;
+}

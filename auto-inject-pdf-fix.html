@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auto PDF Fix Injector</title>
+</head>
+<body>
+<script>
+// Auto-inject PDF fix when page loads
+(function() {
+    'use strict';
+
+    console.log('🚀 Auto-injecting PDF COI fix...');
+
+    // Function to inject the PDF fix
+    function injectPDFFix() {
+        // Load jsPDF library
+        if (!window.jspdf && !window.jsPDF) {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            document.head.appendChild(script);
+            script.onload = () => console.log('✅ jsPDF loaded for PDF conversion');
+        }
+
+        // Override COI generation function for PDF
+        setTimeout(() => {
+            if (window.createSimpleCOIWithTextOverlay) {
+                const originalFunc = window.createSimpleCOIWithTextOverlay;
+
+                window.createSimpleCOIWithTextOverlay = async function(coiDocument, holderType, policy) {
+                    console.log('📄 FIXED: Creating PDF COI instead of PNG...');
+
+                    return new Promise(async (resolve) => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+
+                        const img = new Image();
+                        img.onload = async function() {
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+
+                            // Draw original image
+                            ctx.drawImage(img, 0, 0);
+
+                            // Add text overlays (same as original logic)
+                            ctx.fillStyle = '#000000';
+                            ctx.font = '14px Arial, sans-serif';
+                            ctx.textAlign = 'left';
+
+                            const startX = 50;
+                            const startY = 900;
+
+                            if (holderType === 'business') {
+                                const clientName = policy.insured_name || policy.client_name || 'Unknown Client';
+                                ctx.fillText(clientName, startX, startY);
+                                console.log('📝 Overlaid business certificate holder:', clientName);
+                            } else {
+                                const holderName = document.getElementById('holderName')?.value?.trim() || 'Third Party Holder';
+                                ctx.fillText(holderName, startX, startY);
+                                console.log('📝 Overlaid third-party certificate holder:', holderName);
+                            }
+
+                            // Add current date
+                            const currentDate = new Date().toLocaleDateString('en-US');
+                            const dateX = Math.min(canvas.width - 150, 695);
+                            const dateY = 57.5;
+                            ctx.fillText(currentDate, dateX, dateY);
+                            console.log('📅 Overlaid current date:', currentDate);
+
+                            // PDF CONVERSION INSTEAD OF PNG
+                            try {
+                                // Wait for jsPDF to be ready
+                                let attempts = 0;
+                                while (!window.jspdf && !window.jsPDF && attempts < 50) {
+                                    await new Promise(r => setTimeout(r, 100));
+                                    attempts++;
+                                }
+
+                                const jsPDF = window.jspdf?.jsPDF || window.jsPDF;
+                                if (jsPDF) {
+                                    const pdf = new jsPDF({
+                                        orientation: 'portrait',
+                                        unit: 'mm',
+                                        format: 'a4'
+                                    });
+
+                                    const imgData = canvas.toDataURL('image/png');
+                                    pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+
+                                    const pdfBlob = pdf.output('blob');
+                                    console.log('✅ FIXED: Created PDF COI, size:', pdfBlob.size, 'bytes');
+                                    resolve(pdfBlob);
+                                } else {
+                                    console.log('⚠️ jsPDF not available, falling back to PNG');
+                                    canvas.toBlob(resolve, 'image/png', 0.95);
+                                }
+                            } catch (error) {
+                                console.error('❌ PDF conversion error:', error);
+                                console.log('🔄 Falling back to original PNG generation');
+                                canvas.toBlob(resolve, 'image/png', 0.95);
+                            }
+                        };
+                        img.src = coiDocument.dataUrl;
+                    });
+                };
+
+                console.log('✅ PDF COI generation fix applied successfully!');
+
+                // Show success notification
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #4CAF50;
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    z-index: 10000;
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                `;
+                notification.innerHTML = '📄 PDF COI Fix Applied!<br><small>COI emails will now be sent as PDF</small>';
+                document.body.appendChild(notification);
+
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 5000);
+
+            } else {
+                console.log('🔄 COI function not found yet, retrying...');
+                setTimeout(injectPDFFix, 1000);
+            }
+        }, 500);
+    }
+
+    // Run when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', injectPDFFix);
+    } else {
+        injectPDFFix();
+    }
+
+    // Also try multiple times to ensure it loads
+    setTimeout(injectPDFFix, 1000);
+    setTimeout(injectPDFFix, 3000);
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Standalone Report Generation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <h1>Test Standalone Report Generation</h1>
+    <button onclick="testStandaloneReport()">Test Standalone Report</button>
+
+    <script>
+        // Test function to verify standalone report generation
+        async function testStandaloneReport() {
+            console.log('Testing standalone report generation...');
+
+            // Mock statistics for testing
+            const testStats = {
+                totalLeads: 29,
+                highValueLeads: 12,
+                lowValueLeads: 17,
+                totalPremium: 245000,
+                contactRate: 93.1,
+                conversionRate: 34.5,
+                totalCalls: 87,
+                avgCallTime: 4.2,
+                leadsPushedToBrokers: 8,
+                highValuePercentage: 41.4,
+                lowValuePercentage: 58.6,
+                brokerPushPercentage: 27.6,
+                nonGreenLeadTime: 23.5
+            };
+
+            // Copy the generateStandaloneReportPDF function here for testing
+            try {
+                console.log('📊 Generating standalone report dashboard for: Test Agent');
+
+                // Create a temporary container for the report dashboard
+                const reportContainer = document.createElement('div');
+                reportContainer.id = 'standalone-report-container';
+                reportContainer.style.cssText = `
+                    position: fixed;
+                    top: -10000px;
+                    left: 0;
+                    width: 1200px;
+                    min-height: 800px;
+                    background: white;
+                    padding: 40px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    z-index: 999999;
+                `;
+
+                // Generate the report HTML content with proper 3-column grid layout
+                reportContainer.innerHTML = `
+                    <div style="margin-bottom: 30px; text-align: center;">
+                        <h1 style="font-size: 28px; margin: 0 0 10px 0; color: #1f2937;">Test Agent Performance Report</h1>
+                        <p style="font-size: 16px; color: #6b7280; margin: 0;">Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
+                        <!-- Summary Statistics -->
+                        <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <div style="font-size: 36px; font-weight: bold; color: #059669; margin-bottom: 8px;">${testStats.totalLeads}</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Total Leads</div>
+                        </div>
+
+                        <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <div style="font-size: 36px; font-weight: bold; color: #059669; margin-bottom: 8px;">${testStats.contactRate}%</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Contact Rate</div>
+                        </div>
+
+                        <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <div style="font-size: 36px; font-weight: bold; color: #059669; margin-bottom: 8px;">${testStats.conversionRate}%</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Conversion Rate</div>
+                        </div>
+
+                        <!-- High Value Metrics -->
+                        <div style="text-align: center; padding: 24px; background: #ecfdf5; border-radius: 12px; border: 1px solid #d1fae5;">
+                            <div style="font-size: 36px; font-weight: bold; color: #065f46; margin-bottom: 8px;">${testStats.highValueLeads}</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">High Value Leads</div>
+                            <div style="font-size: 12px; color: #059669; margin-top: 4px;">(${testStats.highValuePercentage}%)</div>
+                        </div>
+
+                        <div style="text-align: center; padding: 24px; background: #fef3f2; border-radius: 12px; border: 1px solid #fecaca;">
+                            <div style="font-size: 36px; font-weight: bold; color: #dc2626; margin-bottom: 8px;">${testStats.lowValueLeads}</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Low Value Leads</div>
+                            <div style="font-size: 12px; color: #dc2626; margin-top: 4px;">(${testStats.lowValuePercentage}%)</div>
+                        </div>
+
+                        <div style="text-align: center; padding: 24px; background: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                            <div style="font-size: 36px; font-weight: bold; color: #0369a1; margin-bottom: 8px;">$${testStats.totalPremium.toLocaleString()}</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Total Premium</div>
+                        </div>
+
+                        <!-- Call Metrics -->
+                        <div style="text-align: center; padding: 24px; background: #faf5ff; border-radius: 12px; border: 1px solid #e9d5ff;">
+                            <div style="font-size: 36px; font-weight: bold; color: #7c3aed; margin-bottom: 8px;">${testStats.totalCalls}</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Total Calls Made</div>
+                        </div>
+
+                        <div style="text-align: center; padding: 24px; background: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
+                            <div style="font-size: 36px; font-weight: bold; color: #d97706; margin-bottom: 8px;">${testStats.avgCallTime}</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Avg Call Time (min)</div>
+                        </div>
+
+                        <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <div style="font-size: 36px; font-weight: bold; color: #374151; margin-bottom: 8px;">${testStats.leadsPushedToBrokers}</div>
+                            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Leads to Brokers</div>
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">(${testStats.brokerPushPercentage}%)</div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Indicators -->
+                    <div style="margin-top: 30px;">
+                        <h2 style="font-size: 20px; margin-bottom: 16px; color: #1f2937;">Performance Indicators</h2>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                            <div style="padding: 16px; background: #fef2f2; border-radius: 8px; border-left: 4px solid #dc2626;">
+                                <div style="font-size: 16px; font-weight: 600; color: #dc2626;">Non-Green Lead Time</div>
+                                <div style="font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 4px;">${testStats.nonGreenLeadTime} minutes</div>
+                            </div>
+                            <div style="padding: 16px; background: ${testStats.lowValuePercentage > 50 ? '#fef2f2' : '#f0f9ff'}; border-radius: 8px; border-left: 4px solid ${testStats.lowValuePercentage > 50 ? '#dc2626' : '#0369a1'};">
+                                <div style="font-size: 16px; font-weight: 600; color: ${testStats.lowValuePercentage > 50 ? '#dc2626' : '#0369a1'};">Low Value Lead Rate</div>
+                                <div style="font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 4px;">${testStats.lowValuePercentage}%</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Add to document body
+                document.body.appendChild(reportContainer);
+
+                // Wait for content to render
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                console.log('✅ Report container created and added to DOM');
+                console.log('Container dimensions:', reportContainer.offsetWidth, 'x', reportContainer.offsetHeight);
+
+                // Capture the report as PDF using html2canvas
+                if (window.html2canvas) {
+                    console.log('📸 Starting html2canvas capture...');
+                    const canvas = await html2canvas(reportContainer, {
+                        backgroundColor: '#ffffff',
+                        scale: 1.5,
+                        width: 1200,
+                        height: 800,
+                        useCORS: true,
+                        logging: true
+                    });
+
+                    console.log('✅ Canvas captured:', canvas.width, 'x', canvas.height);
+
+                    // Create PDF in landscape orientation
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF({
+                        orientation: 'landscape',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+
+                    // Convert canvas to image data
+                    const imgData = canvas.toDataURL('image/png');
+                    console.log('✅ Image data created, length:', imgData.length);
+
+                    // Calculate dimensions to fit the image on the page
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    const canvasAspect = canvas.height / canvas.width;
+
+                    let imgWidth = pdfWidth - 20; // 10mm margin on each side
+                    let imgHeight = imgWidth * canvasAspect;
+
+                    // If height is too large, scale down to fit
+                    if (imgHeight > pdfHeight - 20) {
+                        imgHeight = pdfHeight - 20;
+                        imgWidth = imgHeight / canvasAspect;
+                    }
+
+                    // Center the image
+                    const x = (pdfWidth - imgWidth) / 2;
+                    const y = (pdfHeight - imgHeight) / 2;
+
+                    console.log(`📄 PDF layout: ${imgWidth}x${imgHeight} at (${x}, ${y})`);
+
+                    // Add the image to PDF
+                    pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+
+                    // Save the PDF
+                    pdf.save(`Test_Agent_Performance_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+                    console.log('📄 Test standalone report PDF downloaded successfully');
+
+                } else {
+                    console.error('html2canvas not available for PDF generation');
+                    alert('PDF generation requires html2canvas library. Please refresh the page and try again.');
+                }
+
+                // Clean up - remove temporary container
+                document.body.removeChild(reportContainer);
+                console.log('🧹 Cleanup completed');
+
+            } catch (error) {
+                console.error('Error generating standalone report:', error);
+                alert('Error generating report. Please try again.');
+
+                // Clean up on error
+                const tempContainer = document.getElementById('standalone-report-container');
+                if (tempContainer) {
+                    document.body.removeChild(tempContainer);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

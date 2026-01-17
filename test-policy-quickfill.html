@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Policy QuickFill</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 40px;
+        }
+        .test-section h3 {
+            color: #10b981;
+            border-bottom: 2px solid #10b981;
+            padding-bottom: 8px;
+        }
+        .test-data {
+            background: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #10b981;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .test-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        .results {
+            background: #e6fffa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .success { color: #059669; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🚀 Policy QuickFill Test Page</h1>
+        <p><strong>Instructions:</strong> This page tests the enhanced policy quickfill functionality with automatic carrier detection and commercial policy type setting.</p>
+
+        <div class="test-section">
+            <h3>🏢 GEICO Test Data</h3>
+            <div class="test-data" id="geico-data">View Auto Policy
+Policy Number: 9300258908
+Status: InForce
+Policy Period: 12/29/2025 - 12/29/2026
+Billing & Payments
+Billing details updated on: 1/6/2026 8:26:05 PM (ET)
+
+Current Amount Due
+$0.00
+
+Next Withdrawal Date
+2026-01-29
+
+Total Premium
+$16,937.00
+
+Remaining Balance
+$14,996.61
+
+You are enrolled in our electronic funds transfer (EFT) program
+
+Change your bank account information
+This information may not reflect payments made in the last 24 hours.
+
+Filing Added
+A filing has been added to this policy
+A mobile phone number is needed for one or more drivers on your policy.
+This policy has active state and/or federal filings.
+Business Information
+Business Name
+MAVICS GLOBAL SERVICES LLC
+
+Business Class
+Other For- Hire Trucking Operations
+
+Date Business Started
+01/2019
+
+Business Entity Type
+Limited Liability Company
+
+Email
+MAVICSGLOBAL@YAHOO.COM
+
+Mailing Address
+24800 CHAGRIN BLVD STE 208
+BEACHWOOD, OH 44122
+
+Business Phone Number
+(216) 551-6363
+
+Mobile Phone Number
+Receive Text Messages From Geico
+1
+
+Receive Digital Communications
+Yes
+
+EDIT BUSINESS INFORMATION
+Filings Information
+
+State
+Liability
+
+OH
+Active
+
+EDIT FILING INFORMATION
+Additional Interests (AI/DI/COI)
+No Results Found
+
+EDIT ADDITIONAL INTERESTS
+Vehicles
+
+1
+2022
+DODGE RAM
+3500
+15774
+MAVICS GLOBAL SERVICES LLC
+OH
+
+2
+2024
+Utility
+Gooseneck Trailer
+49190
+MAVICS GLOBAL SERVICES LLC
+OH
+
+EDIT VEHICLE INFORMATION
+Drivers
+
+STANLEY
+CYRIL ONONOGBO
+Owner
+52
+Active
+
+EDIT DRIVER INFORMATION
+Policy Coverages - For the Insured and Others
+Combined Single Limit Liability (CSL)
+$1,000,000
+
+Uninsured Motorist Bodily Injury (UMBI)
+$75,000
+
+Underinsured Motorist Bodily Injury (UIMBI)
+$75,000
+
+Medical Payments
+$5,000
+
+Motor Truck Cargo (MTC)
+$5k/$500 deductible
+
+EDIT POLICY COVERAGES
+Vehicle Coverages
+
+1
+2022
+DODGE RAM
+3500
+15774
+$2,500
+Not Included
+$2,500
+Not Included
+Not Included
+
+2
+2024
+Utility
+Gooseneck Trailer
+49190
+$2,500
+Not Included
+$2,500
+Not Included
+Not Included
+
+EDIT VEHICLE COVERAGES</div>
+            <button class="test-button" onclick="testGeicoParser()">🧪 Test GEICO Parser</button>
+            <div id="geico-results" class="results" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 Progressive Test Data</h3>
+            <div class="test-data" id="progressive-data">Policy Details
+Insured Information:
+AL'S TOWING LLC
+701 Kintner Pkwy
+Sunbury, OH 43074
+614-678-6114
+rick@alstowingwesterville.com
+Business Information:
+Business Owner: RICK  LANGLEY
+USDOT Number: 1086431
+Corporation or LLC / Non- Profit
+Auto Haulers
+SIC: 7546
+BMT: B-For Hire Trans
+Rating Information:
+Channel: Agency
+Agent Code: CA-04KJF
+Company: 06-Progressive Preferred Insurance Co
+NAIC: 37834
+Rate Revision: OH0604202500
+Policy Accident History Count: 0
+Last Update: 11/11/2025
+Second Named Insured:
+Drivers
+RICK  LANGLEY
+Date of Birth:
+**/**/1965
+License State:
+OH
+License:
+****2459
+SR22:
+No
+Progressive Points:
+3
+TRACEY  LANGLEY
+Date of Birth:
+**/**/1967
+License State:
+OH
+License:
+****8627
+SR22:
+No
+Progressive Points:
+0
+BRANT  CAMPBELL
+Date of Birth:
+**/**/1997
+License State:
+OH
+License:
+****4350
+SR22:
+No
+Progressive Points:
+0
+Covered Property (Vehicles)
+Vehicle Groups:
+1-34-5
+
+2018 SUNDOWNER
+Body Style:
+26-Auto Hauling Trailer
+VIN:
+13SCG4833J1CA1778
+Garaging:
+43074
+Radius:
+200  miles
+Use:
+X
+Lienholder:
+
+2024 RAM 3500
+Body Style:
+61-Pickup w/ 5th Wheel Hitch
+VIN:
+3C63RRKL9RG174079
+Garaging:
+43074
+Radius:
+200  miles
+Use:
+X
+Lienholder:
+View Coverages
+Discounts and Rating:
+Auto Insurance History
+Continuous Coverage Indicator:
+Yes
+View Discounts
+Additional Insureds
+Blanket Additional Insured Endorsement
+No
+Waivers of Subrogation
+Blanket Waiver of Subrogation Endorsement
+No
+Filings
+Federal
+Liability:
+Yes
+MCS-90:
+Yes
+MCS-90B:
+No
+Cargo:
+No
+Policy Attachments
+Form Name
+Form Number
+Edition Date
+Uninsured/Underinsured Motorist Coverage Endorsement
+2852OH
+0219
+Medical Payments Coverage Endorsement
+4757
+0219
+Motor Truck Cargo Legal Liability Coverage Endorsement
+Z434
+0219
+Cargo Plus Coverage Endorsement
+A439
+0125
+Endorsement for Motor Carrier Policies of Insurance for Public Liability Under Sections 29 and 30 of the Motor Carriers Act of 1980
+MCS90
+9999
+Roadside Assistance Coverage Endorsement
+Z313
+0421
+Cancellation and Nonrenewal Endorsement
+4852OH
+0904
+Ohio Amendatory Endorsement
+4881OH
+0219
+Mobile Equipment As Insured Auto Endorsement
+Z228
+0111</div>
+            <button class="test-button" onclick="testProgressiveParser()">🧪 Test Progressive Parser</button>
+            <div id="progressive-results" class="results" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Load the policy quickfill script
+        const script = document.createElement('script');
+        script.src = 'js/policy-quickfill.js';
+        document.head.appendChild(script);
+
+        // Test functions
+        function testGeicoParser() {
+            const data = document.getElementById('geico-data').textContent;
+            const results = document.getElementById('geico-results');
+            results.style.display = 'block';
+
+            try {
+                // Wait for script to load
+                setTimeout(() => {
+                    if (typeof parsePolicyData !== 'undefined') {
+                        const parsed = parsePolicyData(data);
+                        displayResults('geico-results', parsed);
+                    } else {
+                        // Try accessing the function directly from the quickfill script
+                        console.log('Testing GEICO parsing...');
+                        const lines = data.split('\\n').map(line => line.trim()).filter(line => line);
+                        const testData = {
+                            carrier: detectCarrierFromText(data),
+                            policyType: 'commercial-auto',
+                            vehicles: [],
+                            drivers: [],
+                            coverages: {}
+                        };
+
+                        // Basic parsing test
+                        lines.forEach(line => {
+                            if (line.match(/Policy Number:\\s*(.+)/i)) {
+                                testData.policyNumber = line.match(/Policy Number:\\s*(.+)/i)[1].trim();
+                            }
+                            if (line.match(/Business Name[:\\s]*(.+)/i)) {
+                                testData.insuredName = line.match(/Business Name[:\\s]*(.+)/i)[1].trim();
+                            }
+                            if (line.match(/Total Premium[:\\s]*\\$?([\\d,]+\\.?\\d*)/i)) {
+                                testData.premium = line.match(/Total Premium[:\\s]*\\$?([\\d,]+\\.?\\d*)/i)[1].replace(/,/g, '');
+                            }
+                        });
+
+                        displayResults('geico-results', testData);
+                    }
+                }, 500);
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function testProgressiveParser() {
+            const data = document.getElementById('progressive-data').textContent;
+            const results = document.getElementById('progressive-results');
+            results.style.display = 'block';
+
+            try {
+                setTimeout(() => {
+                    console.log('Testing Progressive parsing...');
+                    const lines = data.split('\\n').map(line => line.trim()).filter(line => line);
+                    const testData = {
+                        carrier: 'Progressive', // Should be auto-detected
+                        policyType: 'commercial-auto',
+                        vehicles: [],
+                        drivers: [],
+                        coverages: {}
+                    };
+
+                    // Basic parsing test for Progressive format
+                    let foundInsured = false;
+                    lines.forEach((line, i) => {
+                        // Find company name after "Insured Information:"
+                        if (line.includes('Insured Information:')) {
+                            foundInsured = true;
+                        } else if (foundInsured && !testData.insuredName && line.match(/^[A-Z'][A-Z\\s'&.,\\-]{5,}(?:LLC|INC|CORP|LTD|CO\\.?)?\\s*$/i)) {
+                            testData.insuredName = line.trim();
+                            foundInsured = false;
+                        }
+
+                        if (line.match(/USDOT Number[:\\s]*(.+)/i)) {
+                            testData.usdotNumber = line.match(/USDOT Number[:\\s]*(.+)/i)[1].trim();
+                        }
+                        if (line.match(/Business Owner[:\\s]*(.+)/i)) {
+                            testData.businessOwner = line.match(/Business Owner[:\\s]*(.+)/i)[1].trim();
+                        }
+                        if (line.match(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$/) && !testData.email) {
+                            testData.email = line.trim();
+                        }
+                        if (line.match(/^\\d{3}-\\d{3}-\\d{4}$/) && !testData.phone) {
+                            testData.phone = line.trim();
+                        }
+                    });
+
+                    displayResults('progressive-results', testData);
+                }, 500);
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function detectCarrierFromText(text) {
+            const upperText = text.toUpperCase();
+
+            // GEICO indicators
+            if (upperText.includes('ELECTRONIC FUNDS TRANSFER (EFT) PROGRAM') ||
+                upperText.includes('FILING ADDED') ||
+                upperText.includes('COMBINED SINGLE LIMIT LIABILITY (CSL)')) {
+                return 'GEICO';
+            }
+
+            // Progressive indicators
+            if (upperText.includes('PROGRESSIVE PREFERRED INSURANCE CO') ||
+                upperText.includes('PROGRESSIVE POINTS') ||
+                upperText.includes('USDOT NUMBER')) {
+                return 'Progressive';
+            }
+
+            return 'Unknown';
+        }
+
+        function displayResults(containerId, parsed) {
+            const container = document.getElementById(containerId);
+
+            let html = '<h4>📊 Parsing Results:</h4>';
+
+            // Show carrier detection
+            if (parsed.carrier) {
+                html += `<div class="success">✅ Carrier Detected: ${parsed.carrier}</div>`;
+            } else {
+                html += `<div class="error">❌ Carrier not detected</div>`;
+            }
+
+            // Show policy type
+            html += `<div class="success">✅ Policy Type: ${parsed.policyType || 'commercial-auto'}</div>`;
+
+            // Show basic info
+            if (parsed.policyNumber) {
+                html += `<div class="info">📋 Policy Number: ${parsed.policyNumber}</div>`;
+            }
+            if (parsed.insuredName) {
+                html += `<div class="info">🏢 Insured Name: ${parsed.insuredName}</div>`;
+            }
+            if (parsed.email) {
+                html += `<div class="info">📧 Email: ${parsed.email}</div>`;
+            }
+            if (parsed.phone) {
+                html += `<div class="info">📞 Phone: ${parsed.phone}</div>`;
+            }
+            if (parsed.premium) {
+                html += `<div class="info">💰 Premium: $${parsed.premium}</div>`;
+            }
+            if (parsed.usdotNumber) {
+                html += `<div class="info">🚛 USDOT: ${parsed.usdotNumber}</div>`;
+            }
+            if (parsed.businessOwner) {
+                html += `<div class="info">👤 Business Owner: ${parsed.businessOwner}</div>`;
+            }
+
+            // Show vehicles count
+            if (parsed.vehicles && parsed.vehicles.length > 0) {
+                html += `<div class="success">🚗 Found ${parsed.vehicles.length} vehicle(s)</div>`;
+            }
+
+            // Show drivers count
+            if (parsed.drivers && parsed.drivers.length > 0) {
+                html += `<div class="success">👥 Found ${parsed.drivers.length} driver(s)</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

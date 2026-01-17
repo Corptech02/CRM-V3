@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Screenshot Functionality</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+    <div id="test-content" style="padding: 20px; background: #f0f0f0; border: 2px solid #333; width: 400px;">
+        <h2>Test Screenshot Content</h2>
+        <p>This is a test of the screenshot functionality.</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0;">
+            <div style="text-align: center; padding: 20px; background: #fff; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #059669;">29</div>
+                <div style="font-size: 14px;">Total Leads</div>
+            </div>
+            <div style="text-align: center; padding: 20px; background: #fff; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #059669;">93.1%</div>
+                <div style="font-size: 14px;">Contact Rate</div>
+            </div>
+        </div>
+    </div>
+
+    <button onclick="testScreenshot()" style="margin: 20px; padding: 10px 20px; background: #059669; color: white; border: none; border-radius: 5px; cursor: pointer;">
+        Test Screenshot
+    </button>
+
+    <script>
+        async function testScreenshot() {
+            console.log('Testing screenshot...');
+            console.log('html2canvas available:', typeof html2canvas);
+
+            const element = document.getElementById('test-content');
+
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 1.5,
+                    logging: true
+                });
+
+                console.log('Canvas created:', canvas.width, 'x', canvas.height);
+
+                canvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'test-screenshot.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    console.log('Test screenshot downloaded!');
+                }, 'image/png');
+
+            } catch (error) {
+                console.error('Screenshot failed:', error);
+            }
+        }
+    </script>
+</body>
+</html>

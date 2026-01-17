@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QuickFill Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .test-data {
+            background: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #10b981;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            margin: 15px 0;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        .results {
+            background: #e6fffa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .success { color: #059669; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .info { color: #3b82f6; }
+        .console-output {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔧 Test QuickFill Fix</h1>
+        <p>Testing the fix for the vehicle parsing issue where addresses were incorrectly parsed as vehicles.</p>
+
+        <div class="test-data">Policy Details
+Business Name
+LOPEZ TRUCKING COMPANY LLC
+
+Email
+MCLOPEZ2006@GMAIL.COM
+
+Phone
+(567) 303-5530
+
+Mailing Address
+1158 TOWNSHIP ROAD 126
+NOVA
+OH 44859
+
+Vehicles
+
+1
+1998
+PETERBILT
+379
+45052
+
+2
+2025
+Unidentified
+Trailer For 45052
+
+Policy Coverages - For the Insured and Others
+Combined Single Limit Liability (CSL)
+$1,000,000
+
+Motor Truck Cargo (MTC)
+$100k/$2500 deductible</div>
+
+        <button class="test-button" onclick="startConsoleCapture()">📝 Start Console Capture</button>
+        <button class="test-button" onclick="testDirectParsing()">🧪 Test Direct Parsing</button>
+        <button class="test-button" onclick="clearResults()">🗑️ Clear Results</button>
+
+        <div id="test-results" class="results" style="display: none;">
+            <h4>Console Output:</h4>
+            <div id="console-output" class="console-output"></div>
+        </div>
+    </div>
+
+    <script src="js/policy-quickfill.js"></script>
+    <script>
+        let originalConsoleLog = console.log;
+        let capturedLogs = [];
+        let isCapturing = false;
+
+        function startConsoleCapture() {
+            isCapturing = true;
+            capturedLogs = [];
+
+            console.log = function(...args) {
+                if (isCapturing) {
+                    capturedLogs.push(args.join(' '));
+                }
+                originalConsoleLog.apply(console, args);
+            };
+
+            document.getElementById('test-results').style.display = 'block';
+            updateConsoleOutput();
+
+            setTimeout(() => {
+                testDirectParsing();
+            }, 100);
+        }
+
+        function testDirectParsing() {
+            const testData = document.querySelector('.test-data').textContent;
+
+            try {
+                console.log('🔍 Starting parsing test...');
+                console.log('📋 Input data length:', testData.length);
+
+                // Test the parsing function directly
+                if (typeof parsePolicyData === 'function') {
+                    console.log('✅ parsePolicyData function found');
+
+                    const parsed = parsePolicyData(testData);
+
+                    console.log('🎯 Parsing completed, checking results...');
+
+                    // Check address parsing
+                    console.log('📧 Address:', parsed.address || 'NOT FOUND');
+                    console.log('🏙️ City:', parsed.city || 'NOT FOUND');
+                    console.log('🗺️ State:', parsed.state || 'NOT FOUND');
+                    console.log('📮 ZIP:', parsed.zip || 'NOT FOUND');
+
+                    // Check vehicles
+                    console.log('🚗 Vehicle count:', parsed.vehicles ? parsed.vehicles.length : 0);
+                    if (parsed.vehicles) {
+                        parsed.vehicles.forEach((vehicle, index) => {
+                            console.log(`🚗 Vehicle ${index + 1}: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
+
+                            // Check if address was parsed as vehicle
+                            if (vehicle.year === '1158' || vehicle.make === 'TOWNSHIP') {
+                                console.log('❌ ERROR: Address parsed as vehicle!');
+                            }
+                        });
+                    }
+
+                    // Final assessment
+                    const addressAsVehicle = parsed.vehicles && parsed.vehicles.some(v =>
+                        v.year === '1158' || v.make === 'TOWNSHIP'
+                    );
+
+                    if (addressAsVehicle) {
+                        console.log('❌ TEST FAILED: Address was incorrectly parsed as vehicle');
+                    } else {
+                        console.log('✅ TEST PASSED: Address was not parsed as vehicle');
+                    }
+
+                    const addressParsed = parsed.address && parsed.address.includes('1158');
+                    if (addressParsed) {
+                        console.log('✅ TEST PASSED: Address was correctly parsed to contact info');
+                    } else {
+                        console.log('❌ TEST FAILED: Address not found in contact info');
+                    }
+
+                } else {
+                    console.log('❌ parsePolicyData function not found');
+                }
+
+            } catch (error) {
+                console.log('❌ Parsing error:', error.message);
+            }
+
+            setTimeout(() => {
+                updateConsoleOutput();
+                isCapturing = false;
+            }, 1000);
+        }
+
+        function updateConsoleOutput() {
+            const output = document.getElementById('console-output');
+            output.textContent = capturedLogs.join('\n');
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearResults() {
+            capturedLogs = [];
+            document.getElementById('console-output').textContent = '';
+            document.getElementById('test-results').style.display = 'none';
+        }
+
+        // Auto-start test
+        setTimeout(() => {
+            startConsoleCapture();
+        }, 1000);
+    </script>
+</body>
+</html>

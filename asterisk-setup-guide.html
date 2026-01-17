@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vanguard CRM - Asterisk Setup Guide</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .step {
+            background: #f0f8ff;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #2563eb;
+        }
+        .success {
+            background: #f0fdf4;
+            border-left-color: #16a34a;
+        }
+        .warning {
+            background: #fffbeb;
+            border-left-color: #d97706;
+        }
+        .config-box {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover { background: #1d4ed8; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .test-success { background: #dcfce7; color: #166534; }
+        .test-error { background: #fef2f2; color: #dc2626; }
+    </style>
+</head>
+<body>
+    <h1>🎯 Vanguard CRM - Asterisk Phone System Setup Guide</h1>
+
+    <div class="success step">
+        <h3>✅ Asterisk Installation Complete!</h3>
+        <p>Your Asterisk PBX server is now running and configured for CRM-Zoiper integration.</p>
+    </div>
+
+    <div class="step">
+        <h2>📱 Step 1: Configure Zoiper</h2>
+        <p>Download and install Zoiper from <a href="https://www.zoiper.com/en/voip-softphone/download/current">zoiper.com</a></p>
+
+        <h4>Zoiper Configuration Settings:</h4>
+        <div class="config-box">
+Account Name: Vanguard CRM
+Username: zoiper-vanguard
+Password: ZoiperVanguard2025!
+Domain/Realm: 162.220.14.239
+Proxy Host: 162.220.14.239:5060
+Transport: UDP
+        </div>
+    </div>
+
+    <div class="step">
+        <h2>🌐 Step 2: Website Softphone</h2>
+        <p>Your website already has SaraPhone WebRTC softphone integrated. It will automatically connect to Asterisk.</p>
+
+        <h4>Website SIP Configuration:</h4>
+        <div class="config-box">
+WebSocket Server: ws://162.220.14.239:8088/ws
+Username: vanguard-web
+Password: VanguardWeb2025!
+Extension: 1000
+        </div>
+    </div>
+
+    <div class="step">
+        <h2>📞 Step 3: How to Make Calls</h2>
+        <div class="config-box">
+Website to Zoiper: Dial 2000
+Zoiper to Website: Dial 1000
+Join Conference: Dial 1001
+Create 3-Way Conference: Dial 3000
+Echo Test: Dial 9999
+Connection Test: Dial 8888
+        </div>
+    </div>
+
+    <div class="step">
+        <h2>🎪 Step 4: Conference Calling</h2>
+        <ol>
+            <li><strong>Simple Conference:</strong> Both parties dial 1001 to join the same conference room</li>
+            <li><strong>3-Way Conference:</strong> One party dials 3000 to create an admin conference, then invites others</li>
+            <li><strong>Conference Controls:</strong>
+                <ul>
+                    <li>*1 = Mute all participants</li>
+                    <li>*2 = Unmute all participants</li>
+                    <li>*3 = Lock conference</li>
+                    <li>*4 = Unlock conference</li>
+                    <li>*0 = Emergency exit</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <div class="step">
+        <h2>🧪 Step 5: Test Your Setup</h2>
+        <button onclick="testAsteriskConnection()">Test Asterisk Connection</button>
+        <button onclick="showConfiguration()">Show Configuration</button>
+        <button onclick="testWebSocketConnection()">Test WebSocket</button>
+
+        <div id="test-results"></div>
+    </div>
+
+    <div class="warning step">
+        <h3>⚠️ Troubleshooting</h3>
+        <ul>
+            <li><strong>Can't connect from website:</strong> Check that WebSocket port 8089 is open</li>
+            <li><strong>Can't connect from Zoiper:</strong> Check that SIP port 5060 is open</li>
+            <li><strong>No audio in conference:</strong> Check firewall allows RTP ports 10000-20000</li>
+            <li><strong>WebSocket SSL issues:</strong> Make sure your SSL certificate covers wss:// connections</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h2>🔧 Advanced Configuration</h2>
+        <p>Configuration files location:</p>
+        <div class="config-box">
+Asterisk Config: /etc/asterisk/
+SIP Accounts: /etc/asterisk/pjsip.conf
+Dialplan: /etc/asterisk/extensions.conf
+Conference: /etc/asterisk/confbridge.conf
+
+Backup files created:
+- pjsip.conf.backup
+- extensions.conf.backup
+- confbridge.conf.backup
+        </div>
+    </div>
+
+    <script src="asterisk-sip-config.js"></script>
+    <script>
+        function testAsteriskConnection() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<div class="test-result">Testing connection...</div>';
+
+            if (window.VanguardAsteriskConfig) {
+                window.VanguardAsteriskConfig.testConnection().then(success => {
+                    if (success) {
+                        resultsDiv.innerHTML = '<div class="test-result test-success">✅ Asterisk connection successful!</div>';
+                    } else {
+                        resultsDiv.innerHTML = '<div class="test-result test-error">❌ Connection failed. Check Asterisk status.</div>';
+                    }
+                });
+            } else {
+                resultsDiv.innerHTML = '<div class="test-result test-error">❌ Configuration not loaded</div>';
+            }
+        }
+
+        function showConfiguration() {
+            const resultsDiv = document.getElementById('test-results');
+            if (window.VanguardAsteriskConfig) {
+                const config = window.VanguardAsteriskConfig;
+                resultsDiv.innerHTML = `
+                    <div class="test-result test-success">
+                        <h4>🔧 Current Configuration:</h4>
+                        <pre>${JSON.stringify(config, null, 2)}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        function testWebSocketConnection() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<div class="test-result">Testing WebSocket connection...</div>';
+
+            try {
+                const ws = new WebSocket('ws://162.220.14.239:8088/ws');
+
+                ws.onopen = () => {
+                    resultsDiv.innerHTML = '<div class="test-result test-success">✅ WebSocket connection successful!</div>';
+                    ws.close();
+                };
+
+                ws.onerror = () => {
+                    resultsDiv.innerHTML = '<div class="test-result test-error">❌ WebSocket connection failed. Check Asterisk WebSocket configuration.</div>';
+                };
+
+                ws.onclose = () => {
+                    console.log('WebSocket connection closed');
+                };
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="test-result test-error">❌ WebSocket test failed: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-show configuration on load
+        setTimeout(() => {
+            if (window.VanguardAsteriskConfig) {
+                console.log('🎉 Asterisk setup guide loaded successfully!');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

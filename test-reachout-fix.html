@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test ReachOut Data Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .button { background: #3b82f6; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .result { background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .success { background: #ecfdf5; border-left: 4px solid #10b981; }
+        .error { background: #fef2f2; border-left: 4px solid #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>🔧 ReachOut Data Fix Test</h1>
+
+    <div>
+        <button class="button" onclick="setTestData()">Set Test Data (KLASSIC=1, CENTEX=2)</button>
+        <button class="button" onclick="checkData()">Check Current Data</button>
+        <button class="button" onclick="fixReferences()">Fix ReachOut References</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        function logResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            console.log(message);
+        }
+
+        function setTestData() {
+            logResult('🧪 Setting test reach-out data...');
+
+            try {
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                let klassicFound = false, centexFound = false;
+
+                leads.forEach(lead => {
+                    if (lead.name && lead.name.includes('KLASSIC')) {
+                        if (!lead.reachOut) lead.reachOut = {};
+                        lead.reachOut.callAttempts = 3;
+                        lead.reachOut.callsConnected = 1;
+                        lead.reachOut.emailCount = 2;
+                        lead.reachOut.textCount = 1;
+                        klassicFound = true;
+                        logResult(`✅ Set KLASSIC stats: calls=3, connected=1, emails=2, texts=1`, 'success');
+                    } else if (lead.name && lead.name.includes('CENTEX')) {
+                        if (!lead.reachOut) lead.reachOut = {};
+                        lead.reachOut.callAttempts = 5;
+                        lead.reachOut.callsConnected = 2;
+                        lead.reachOut.emailCount = 1;
+                        lead.reachOut.textCount = 3;
+                        centexFound = true;
+                        logResult(`✅ Set CENTEX stats: calls=5, connected=2, emails=1, texts=3`, 'success');
+                    }
+                });
+
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+                if (!klassicFound) logResult('⚠️ KLASSIC lead not found', 'error');
+                if (!centexFound) logResult('⚠️ CENTEX lead not found', 'error');
+
+                logResult('✅ Test data saved to localStorage', 'success');
+
+            } catch (error) {
+                logResult(`❌ Error setting test data: ${error.message}`, 'error');
+            }
+        }
+
+        function checkData() {
+            logResult('🔍 Checking current reach-out data...');
+
+            try {
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+                leads.forEach(lead => {
+                    if ((lead.name && lead.name.includes('KLASSIC')) || (lead.name && lead.name.includes('CENTEX'))) {
+                        const reachOut = lead.reachOut || {};
+                        logResult(`📊 ${lead.name}: calls=${reachOut.callAttempts || 0}, connected=${reachOut.callsConnected || 0}, emails=${reachOut.emailCount || 0}, texts=${reachOut.textCount || 0}`, 'info');
+                    }
+                });
+
+            } catch (error) {
+                logResult(`❌ Error checking data: ${error.message}`, 'error');
+            }
+        }
+
+        function fixReferences() {
+            logResult('🔧 Running fixAllLeadReachOutReferences...');
+
+            try {
+                if (window.protectedFunctions && typeof window.protectedFunctions.fixAllLeadReachOutReferences === 'function') {
+                    const result = window.protectedFunctions.fixAllLeadReachOutReferences();
+                    if (result) {
+                        logResult('✅ ReachOut references fixed successfully', 'success');
+                    } else {
+                        logResult('❌ Failed to fix references', 'error');
+                    }
+                } else {
+                    logResult('❌ fixAllLeadReachOutReferences function not available', 'error');
+                }
+            } catch (error) {
+                logResult(`❌ Error fixing references: ${error.message}`, 'error');
+            }
+        }
+
+        // Check if we're in the main app
+        if (window.location.href.includes('index.html') || window.location.href.endsWith('/')) {
+            logResult('✅ Test loaded - use buttons above to test reachOut data persistence', 'info');
+        } else {
+            logResult('⚠️ This test should be run from the main CRM page', 'error');
+        }
+    </script>
+</body>
+</html>
