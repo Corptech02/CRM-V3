@@ -21,18 +21,20 @@
         let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
         const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
 
+        let lead = null;
         if (leadIndex === -1) {
-            console.error('Lead not found with ID:', leadId);
-            showNotification('Lead not found', 'error');
-            return;
+            console.warn('Lead not found in localStorage, forcing server deletion:', leadId);
+            // Lead might be stale in display but deleted from storage, force server deletion
+            lead = { id: leadId, name: 'Unknown' }; // Create minimal lead object for deletion
+        } else {
+            // Get lead before removing it
+            lead = leads[leadIndex];
+            leads.splice(leadIndex, 1);
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            console.log('✅ Lead removed from localStorage:', leadId);
         }
 
-        const lead = leads[leadIndex];
         console.log('Lead to permanently delete:', lead);
-
-        // Remove from localStorage
-        leads.splice(leadIndex, 1);
-        localStorage.setItem('insurance_leads', JSON.stringify(leads));
 
         // Add to deleted lead IDs to prevent re-addition
         const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
@@ -62,8 +64,12 @@
             showNotification('Error deleting from server - lead removed locally', 'warning');
         });
 
-        // Update UI - full refresh to avoid table corruption
+        // Force clear cache and update UI - full refresh to avoid table corruption
         setTimeout(() => {
+            localStorage.removeItem('insurance_leads');
+            localStorage.removeItem('insurance_clients');
+            console.log('🧹 Cleared localStorage cache after individual deletion');
+
             if (typeof loadLeadsView === 'function') {
                 loadLeadsView();
                 console.log('✅ Full leads view refreshed after deletion');
@@ -90,69 +96,76 @@
 
         console.log(`🗑️ Mass deleting ${selectedLeadIds.length} leads:`, selectedLeadIds);
 
-        let deletionCount = 0;
+        // IMMEDIATE LOCAL DELETION - Don't wait for server
+        let successfulLocalDeletes = 0;
         const totalToDelete = selectedLeadIds.length;
 
-        selectedLeadIds.forEach(leadId => {
-            // Remove from localStorage
-            let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-            const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+        // First, delete all leads from localStorage immediately
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
 
+        selectedLeadIds.forEach(leadId => {
+            const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
             if (leadIndex !== -1) {
-                const lead = leads[leadIndex];
+                console.log(`🗑️ Removing lead ${leadId} from localStorage`);
                 leads.splice(leadIndex, 1);
-                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                successfulLocalDeletes++;
 
                 // Add to deleted lead IDs
-                const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
                 if (!deletedLeadIds.includes(String(leadId))) {
                     deletedLeadIds.push(String(leadId));
-                    localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeadIds));
                 }
-
-                // Delete from server
-                fetch(`/api/leads/${leadId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => {
-                    deletionCount++;
-                    if (response.ok) {
-                        console.log('✅ Lead permanently deleted from server:', leadId);
-                    } else {
-                        console.warn('⚠️ Server deletion failed for lead:', leadId);
-                    }
-
-                    // Check if all deletions are complete
-                    if (deletionCount === totalToDelete) {
-                        showNotification(`${totalToDelete} leads permanently deleted`, 'success');
-                        // Full refresh to avoid table corruption
-                        setTimeout(() => {
-                            if (typeof loadLeadsView === 'function') {
-                                loadLeadsView();
-                                console.log('✅ Full leads view refreshed after mass deletion');
-                            }
-                        }, 100);
-                    }
-                })
-                .catch(error => {
-                    deletionCount++;
-                    console.error('❌ Error deleting lead from server:', leadId, error);
-
-                    if (deletionCount === totalToDelete) {
-                        showNotification(`${totalToDelete} leads deleted locally (some server errors)`, 'warning');
-                        // Full refresh to avoid table corruption
-                        setTimeout(() => {
-                            if (typeof loadLeadsView === 'function') {
-                                loadLeadsView();
-                                console.log('✅ Full leads view refreshed after mass deletion (with errors)');
-                            }
-                        }, 100);
-                    }
-                });
+            } else {
+                console.warn(`⚠️ Lead ${leadId} not found in localStorage`);
             }
+        });
+
+        // Save updated localStorage immediately
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeadIds));
+
+        console.log(`✅ Locally deleted ${successfulLocalDeletes}/${totalToDelete} leads`);
+
+        // Show immediate success notification
+        showNotification(`${successfulLocalDeletes} leads deleted locally`, 'success');
+
+        // Refresh the view immediately
+        setTimeout(() => {
+            if (typeof loadLeadsView === 'function') {
+                loadLeadsView();
+                console.log('✅ Leads view refreshed after mass deletion');
+            }
+        }, 100);
+
+        // Background server deletion (don't wait for it)
+        let serverDeletionCount = 0;
+        selectedLeadIds.forEach(leadId => {
+            // Add timeout to prevent hanging
+            const timeoutId = setTimeout(() => {
+                console.warn(`⏰ Server deletion timeout for lead ${leadId}`);
+                serverDeletionCount++;
+            }, 5000); // 5 second timeout
+
+            fetch(`/api/leads/${leadId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                serverDeletionCount++;
+                if (response.ok) {
+                    console.log('✅ Lead permanently deleted from server:', leadId);
+                } else {
+                    console.warn('⚠️ Server deletion failed for lead:', leadId, response.status);
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                serverDeletionCount++;
+                console.error('❌ Error deleting lead from server:', leadId, error.message);
+            });
         });
     };
 

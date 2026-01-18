@@ -604,17 +604,26 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
-                ${lead.recordingPath && lead.hasRecording ? `
-                    <!-- Audio Recording Player -->
-                    <div class="profile-section" style="background: #fff; border: 2px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                        <h3><i class="fas fa-play-circle"></i> Call Recording</h3>
+                <!-- Call Recording Section -->
+                <div class="profile-section" style="background: #fff; border: 2px solid ${lead.recordingPath && lead.hasRecording ? '#10b981' : '#f3f4f6'}; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3><i class="fas fa-${lead.recordingPath && lead.hasRecording ? 'play-circle' : 'microphone-alt'}"></i> Call Recording</h3>
+                        ${!(lead.recordingPath && lead.hasRecording) ? `
+                            <button onclick="openCallRecordingUpload('${lead.id}')" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                <i class="fas fa-upload"></i> Upload Recording
+                            </button>
+                        ` : ''}
+                    </div>
+                    ${lead.recordingPath && lead.hasRecording ? `
                         <audio controls style="width: 100%; height: 40px;" preload="none">
                             <source src="${lead.recordingPath}" type="audio/mpeg">
                             <source src="${lead.recordingPath}" type="audio/wav">
                             Your browser does not support the audio element.
                         </audio>
-                    </div>
-                ` : ''}
+                    ` : `
+                        <p style="color: #9ca3af; text-align: center; padding: 20px;">No call recording available yet</p>
+                    `}
+                </div>
 
                 <!-- Call Transcript -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
@@ -1183,16 +1192,132 @@ protectedFunctions.removeLossRuns = function(leadId, fileId) {
     });
 };
 
+// Call recording upload function
+protectedFunctions.openCallRecordingUpload = function(leadId) {
+    console.log('🎵 Opening call recording upload for lead:', leadId);
+
+    // Create file input
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.mp3,.wav,.m4a,.aac,.ogg';
+    fileInput.multiple = false; // Single recording file
+
+    fileInput.onchange = function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            protectedFunctions.uploadCallRecording(leadId, file);
+        }
+    };
+
+    // Trigger file selection
+    fileInput.click();
+};
+
+// Upload call recording to server
+protectedFunctions.uploadCallRecording = function(leadId, file) {
+    console.log('🎵 Uploading call recording for lead:', leadId, 'File:', file.name);
+
+    const formData = new FormData();
+    formData.append('leadId', leadId);
+    formData.append('recording', file);
+
+    // Show upload progress
+    const notification = document.createElement('div');
+    notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #3b82f6; color: white; padding: 15px; border-radius: 8px; z-index: 10000; font-weight: bold;';
+    notification.innerHTML = '🎵 Uploading call recording...';
+    document.body.appendChild(notification);
+
+    fetch('/api/call-recording-upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Call recording uploaded successfully');
+            notification.innerHTML = '✅ Recording uploaded successfully!';
+            notification.style.background = '#10b981';
+
+            // Update lead data with recording info
+            protectedFunctions.updateLeadRecording(leadId, data.recordingPath);
+
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 3000);
+
+            // Refresh the lead profile to show the recording
+            setTimeout(() => {
+                if (window.showLeadProfile) {
+                    window.showLeadProfile(leadId);
+                }
+            }, 1000);
+        } else {
+            console.error('❌ Upload failed:', data.error);
+            notification.innerHTML = '❌ Upload failed: ' + data.error;
+            notification.style.background = '#dc3545';
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 5000);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Upload error:', error);
+        notification.innerHTML = '❌ Upload error: ' + error.message;
+        notification.style.background = '#dc3545';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 5000);
+    });
+};
+
+// Update lead with recording information
+protectedFunctions.updateLeadRecording = function(leadId, recordingPath) {
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(lead => lead.id === leadId);
+
+    if (leadIndex !== -1) {
+        leads[leadIndex].recordingPath = recordingPath;
+        leads[leadIndex].hasRecording = true;
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log('✅ Lead updated with recording path:', recordingPath);
+    }
+};
+
 // Reach-out update function
 protectedFunctions.updateReachOut = function(leadId, type, checked) {
     console.log(`🐛 DEBUG updateReachOut called: leadId=${leadId}, type=${type}, checked=${checked}`);
 
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    // Enhanced debugging for lead lookup
+    console.log(`🔍 DEBUG: Looking for lead ID "${leadId}" (type: ${typeof leadId})`);
+    console.log(`🔍 DEBUG: Total leads in storage: ${leads.length}`);
+
+    // Try multiple lookup methods
+    let leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
 
     if (leadIndex === -1) {
-        console.log('🐛 DEBUG updateReachOut - lead not found');
+        // Try looking up by number/integer
+        leadIndex = leads.findIndex(l => l.id == leadId);
+        console.log(`🔍 DEBUG: Loose comparison result: index=${leadIndex}`);
+    }
+
+    if (leadIndex === -1) {
+        // Try parsing leadId as number
+        const numLeadId = parseInt(leadId);
+        if (!isNaN(numLeadId)) {
+            leadIndex = leads.findIndex(l => l.id === numLeadId);
+            console.log(`🔍 DEBUG: Number lookup result: index=${leadIndex}`);
+        }
+    }
+
+    if (leadIndex === -1) {
+        console.log(`🐛 DEBUG updateReachOut - lead not found after all lookup methods`);
+        console.log(`🔍 DEBUG: Available lead IDs:`, leads.slice(0, 5).map(l => `"${l.id}" (${typeof l.id})`));
         return;
+    } else {
+        console.log(`✅ DEBUG: Found lead at index ${leadIndex} with ID ${leads[leadIndex].id}`);
     }
 
     if (!leads[leadIndex].reachOut) {
@@ -2878,14 +3003,29 @@ function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
 }
 
 // Override viewLead to use enhanced profile
-protectedFunctions.viewLead = function(leadId) {
+protectedFunctions.viewLead = async function(leadId) {
     console.log('🔥 viewLead override called for:', leadId);
 
-    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
     console.log(`🔍 SEARCHING: Looking for lead ID ${leadId} in ${leads.length} total leads`);
-    console.log(`🔍 AVAILABLE LEAD IDS:`, leads.map(l => l.id).join(', '));
 
-    const lead = leads.find(l => String(l.id) === String(leadId));
+    let lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.log('⚡ Lead not found in localStorage, refreshing from server...');
+
+        try {
+            // Refresh leads from server if lead not found locally
+            await loadLeadsFromServerAndRefresh();
+
+            // Try again after refresh
+            leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            console.log(`🔍 RETRY SEARCH: Looking for lead ID ${leadId} in ${leads.length} total leads after server refresh`);
+            lead = leads.find(l => String(l.id) === String(leadId));
+        } catch (error) {
+            console.error('❌ Error refreshing leads from server:', error);
+        }
+    }
 
     if (lead) {
         console.log(`✅ FOUND LEAD: ID=${lead.id}, Name=${lead.name}`);
@@ -4290,9 +4430,10 @@ window.updateWinLossStatus = protectedFunctions.updateWinLossStatus;
 window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
 window.sendEmail = protectedFunctions.sendEmail;
+window.openCallRecordingUpload = protectedFunctions.openCallRecordingUpload;
 
 // Handle Contact Attempted completion
-window.handleContactAttemptedCompletion = function(leadId) {
+window.handleContactAttemptedCompletion = async function(leadId) {
     console.log('🎯 Auto-completing Contact Attempted reach-out for lead:', leadId);
 
     try {
@@ -4303,6 +4444,24 @@ window.handleContactAttemptedCompletion = function(leadId) {
         // Find the lead
         let lead = insurance_leads.find(l => String(l.id) === String(leadId)) ||
                   regular_leads.find(l => String(l.id) === String(leadId));
+
+        if (!lead) {
+            console.log('⚡ Lead not found locally, refreshing from server...');
+            try {
+                // Refresh leads from server if lead not found locally
+                if (typeof loadLeadsFromServerAndRefresh === 'function') {
+                    await loadLeadsFromServerAndRefresh();
+                }
+
+                // Try again after refresh
+                insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+                lead = insurance_leads.find(l => String(l.id) === String(leadId)) ||
+                      regular_leads.find(l => String(l.id) === String(leadId));
+            } catch (error) {
+                console.error('❌ Error refreshing leads from server:', error);
+            }
+        }
 
         if (!lead) {
             console.error('Lead not found for ID:', leadId);

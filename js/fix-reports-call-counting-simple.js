@@ -37,202 +37,117 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function fixCallCountsInModal(modalElement) {
     try {
-        console.log('🔧 fixCallCountsInModal called on element:', modalElement.className, modalElement.tagName);
+        console.log('🚫 DISABLED: fixCallCountsInModal - Total Calls and Duration now work directly like Total Leads');
+        console.log('✅ NO FIXING NEEDED: Modal gets correct values from TRUE counter system');
 
-        // Extract agent name from modal title
+        // Extract agent name just for logging
         const titleElement = modalElement.querySelector('h2');
-        console.log('🔍 Title element found:', titleElement?.textContent);
-        if (!titleElement) {
-            console.log('❌ No h2 title element found');
-            return;
-        }
-
-        const titleText = titleElement.textContent;
-        const agentNameMatch = titleText.match(/(\w+)\s+Performance Profile/);
-        console.log('🔍 Agent name match:', agentNameMatch);
-        if (!agentNameMatch) {
-            console.log('❌ No agent name found in title:', titleText);
-            return;
-        }
-
-        const agentName = agentNameMatch[1];
-        console.log(`🔧 Fixing call counts for agent: ${agentName}`);
-
-        // Calculate correct call counts
-        const allLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-        const agentLeads = allLeads.filter(lead => {
-            const assignedTo = lead.assignedTo || lead.agent || '';
-            return assignedTo.toLowerCase() === agentName.toLowerCase();
-        });
-
-        let totalConnectedCalls = 0;
-        let totalCallAttempts = 0;
-
-        agentLeads.forEach(lead => {
-            if (lead.reachOut) {
-                const connected = lead.reachOut.callsConnected || 0;
-                const attempts = lead.reachOut.callAttempts || 0;
-                totalConnectedCalls += connected;
-                totalCallAttempts += attempts;
-
-                if (connected > 0) {
-                    console.log(`📞 ${lead.name}: ${connected} connected calls`);
-                }
+        if (titleElement) {
+            const agentNameMatch = titleElement.textContent.match(/(\w+)\s+Performance Profile/);
+            if (agentNameMatch) {
+                const agentName = agentNameMatch[1];
+                console.log(`✅ DIRECT DISPLAY: ${agentName} metrics come directly from TRUE counter (same as Total Leads)`);
             }
-        });
-
-        console.log(`📊 ${agentName}: ${totalConnectedCalls} total connected calls from ${agentLeads.length} leads`);
-
-        // Find and update the Total Calls display
-        console.log('🔍 Searching for Total Calls elements...');
-        const callElements = modalElement.querySelectorAll('*');
-        console.log('🔍 Found elements to check:', callElements.length);
-
-        let foundCallElement = false;
-        callElements.forEach((element, index) => {
-            if (element.textContent === '0' &&
-                element.nextElementSibling &&
-                element.nextElementSibling.textContent === 'Total Calls') {
-
-                console.log('🔧 Found Total Calls element! Updating from 0 to', totalConnectedCalls);
-                foundCallElement = true;
-                element.textContent = totalConnectedCalls;
-                element.style.color = totalConnectedCalls > 0 ? '#059669' : '#dc2626';
-
-                // Also update the parent container background
-                const parent = element.closest('div[style*="background"]');
-                if (parent && totalConnectedCalls > 0) {
-                    parent.style.background = '#f0fdf4';
-                    parent.style.borderColor = '#bbf7d0';
-                }
-            }
-        });
-
-        // Look for elements that contain "Total Calls" text
-        const textNodes = [];
-        const walker = document.createTreeWalker(
-            modalElement,
-            NodeFilter.SHOW_TEXT,
-            null,
-            false
-        );
-
-        let textNode;
-        while (textNode = walker.nextNode()) {
-            if (textNode.textContent.includes('Total Calls')) {
-                const parent = textNode.parentElement;
-                const valueElement = parent.previousElementSibling;
-                if (valueElement && valueElement.textContent === '0') {
-                    console.log('🔧 Found Total Calls element, updating...');
-                    valueElement.textContent = totalConnectedCalls;
-                    valueElement.style.color = totalConnectedCalls > 0 ? '#059669' : '#dc2626';
-                }
-            }
-        }
-
-        // Check if we found and updated any elements
-        if (!foundCallElement) {
-            console.log('❌ Could not find Total Calls element to update');
-            console.log('🔍 Searching for any elements containing "Total Calls"...');
-
-            // Alternative search
-            const allElements = modalElement.querySelectorAll('*');
-            allElements.forEach((element, index) => {
-                if (element.textContent && element.textContent.includes('Total Calls')) {
-                    console.log(`🔍 Found "Total Calls" in element ${index}:`, element.textContent, element.outerHTML.substring(0, 100));
-                }
-                if (element.textContent === '0') {
-                    console.log(`🔍 Found "0" in element ${index}:`, element.outerHTML.substring(0, 100));
-                }
-            });
-        }
-
-        // Add a small indicator that the fix was applied
-        const indicator = modalElement.querySelector('h2');
-        if (indicator && !indicator.textContent.includes('(FIXED)')) {
-            indicator.innerHTML += ' <span style="color: #10b981; font-size: 14px;">(FIXED)</span>';
         }
 
     } catch (error) {
-        console.error('❌ Error fixing call counts:', error);
+        console.error('❌ Error in disabled fix function:', error);
     }
 }
 
-// Manual trigger function for testing
-window.manualFixCallCounts = function(agentName = 'Grant') {
-    console.log(`🔧 Manual fix triggered for ${agentName}`);
+// Manual trigger function for testing (console-based)
+window.manualFixCallCounts = function(agentName = 'Carson') {
+    console.log(`🔧 CONSOLE-OVERRIDE: Manual fix triggered for ${agentName}`);
     const modal = document.querySelector('.agent-profile-modal') || document.querySelector('[class*="modal"]');
     if (modal) {
-        console.log('🔧 Found modal manually, applying fix...');
+        console.log('🔧 CONSOLE-OVERRIDE: Found modal manually, applying console-based fix...');
         fixCallCountsInModal(modal);
     } else {
-        console.log('❌ No modal found for manual fix');
+        console.log('❌ CONSOLE-OVERRIDE: No modal found for manual fix');
     }
 };
 
-// Direct fix function that finds and updates any "0" next to "Total Calls"
-window.directFixCallCounts = function(agentName = 'Grant') {
-    console.log(`🔧 DIRECT FIX for ${agentName}`);
+// Direct fix function using console-based stats
+window.directFixCallCounts = function(agentName = 'Carson') {
+    console.log(`🔧 CONSOLE-OVERRIDE: DIRECT FIX for ${agentName}`);
 
-    // Calculate correct call count
-    const allLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const agentLeads = allLeads.filter(lead => {
-        const assignedTo = lead.assignedTo || lead.agent || '';
-        return assignedTo.toLowerCase() === agentName.toLowerCase();
-    });
-
+    // Get stats from TRUE INCREMENTAL COUNTER (same system as Total Leads)
     let totalConnectedCalls = 0;
-    agentLeads.forEach(lead => {
-        if (lead.reachOut) {
-            const connected = lead.reachOut.callsConnected || 0;
-            totalConnectedCalls += connected;
-            if (connected > 0) {
-                console.log(`📞 ${lead.name}: ${connected} connected calls`);
-            }
-        }
-    });
+    let totalCallDuration = 0;
 
-    console.log(`📊 ${agentName}: ${totalConnectedCalls} total connected calls`);
+    if (window.getAgentCounters) {
+        const trueCounters = window.getAgentCounters(agentName);
+        totalConnectedCalls = trueCounters.callCount || 0;
+        totalCallDuration = trueCounters.totalCallDuration || 0;
+        console.log(`🎯 TRUE-OVERRIDE: ${agentName} TRUE stats:`, trueCounters);
+    } else {
+        console.log('⚠️ TRUE-OVERRIDE: True counter system not available, using 0');
+    }
 
-    // Find ALL elements containing "0" and check if they're near "Total Calls"
+    // Find ALL elements and update both Total Calls and Total Call Duration
     const allElements = document.querySelectorAll('*');
-    let fixed = false;
+    let fixedCalls = false;
+    let fixedDuration = false;
 
     allElements.forEach(element => {
-        if (element.textContent === '0') {
-            const parent = element.parentElement;
-            const nextSib = element.nextElementSibling;
-            const prevSib = element.previousElementSibling;
+        const nextSib = element.nextElementSibling;
+        const parent = element.parentElement;
 
-            // Check if this "0" is related to "Total Calls"
-            if (nextSib && nextSib.textContent && nextSib.textContent.includes('Total Calls')) {
-                console.log('🔧 FOUND IT! Updating Total Calls from 0 to', totalConnectedCalls);
-                element.textContent = totalConnectedCalls;
-                element.style.color = '#059669';
-                element.style.fontWeight = 'bold';
-                fixed = true;
-            } else if (parent && parent.textContent && parent.textContent.includes('Total Calls')) {
-                console.log('🔧 FOUND IT! (parent check) Updating Total Calls from 0 to', totalConnectedCalls);
-                element.textContent = totalConnectedCalls;
-                element.style.color = '#059669';
-                element.style.fontWeight = 'bold';
-                fixed = true;
-            }
+        // Only update elements that are large metric numbers (28px font size)
+        const hasLargeFontStyle = element.style && (
+            element.style.fontSize === '28px' ||
+            element.style.fontSize.includes('28px') ||
+            element.getAttribute('style')?.includes('font-size: 28px')
+        );
+
+        // Check if this element is related to "Total Calls" and is a large metric
+        if (hasLargeFontStyle && nextSib && nextSib.textContent && nextSib.textContent.includes('Total Calls')) {
+            console.log(`🔧 CONSOLE-OVERRIDE: FOUND Total Calls metric! Updating from ${element.textContent} to ${totalConnectedCalls}`);
+            element.textContent = totalConnectedCalls;
+            element.style.color = totalConnectedCalls > 0 ? '#059669' : '#dc2626';
+            element.style.fontWeight = 'bold';
+
+            // Flash to show console-based update
+            element.style.background = '#10b981';
+            element.style.color = 'white';
+            setTimeout(() => {
+                element.style.background = '';
+                element.style.color = totalConnectedCalls > 0 ? '#059669' : '#dc2626';
+            }, 500);
+
+            fixedCalls = true;
+        }
+
+        // Check if this element is related to "Total Call Duration" and is a large metric
+        if (hasLargeFontStyle && nextSib && nextSib.textContent && nextSib.textContent.includes('Total Call Duration')) {
+            console.log(`🔧 CONSOLE-OVERRIDE: FOUND Total Call Duration metric! Updating from ${element.textContent} to ${totalCallDuration}`);
+            element.textContent = totalCallDuration;
+            element.style.color = totalCallDuration > 0 ? '#0ea5e9' : '#dc2626';
+            element.style.fontWeight = 'bold';
+
+            // Flash to show console-based update
+            element.style.background = '#0ea5e9';
+            element.style.color = 'white';
+            setTimeout(() => {
+                element.style.background = '';
+                element.style.color = totalCallDuration > 0 ? '#0ea5e9' : '#dc2626';
+            }, 500);
+
+            fixedDuration = true;
         }
     });
 
-    if (!fixed) {
-        console.log('❌ Could not find Total Calls element to update');
-        // Show all elements that contain "Total Calls"
-        allElements.forEach(element => {
-            if (element.textContent && element.textContent.includes('Total Calls')) {
-                console.log('🔍 Found Total Calls element:', element.outerHTML.substring(0, 200));
-            }
-        });
-    } else {
-        console.log('✅ Successfully updated Total Calls!');
+    console.log(`✅ CONSOLE-OVERRIDE: Direct fix complete - Calls: ${fixedCalls ? 'Updated' : 'Not Found'}, Duration: ${fixedDuration ? 'Updated' : 'Not Found'}`);
+
+    // If we couldn't find elements directly, try using the live stats tracker's modal update function
+    if (!fixedCalls || !fixedDuration) {
+        if (window.liveStatsTracker && window.liveStatsTracker.updateUIIfOpen) {
+            console.log('🔧 LIVE-OVERRIDE: Trying live stats tracker modal update as fallback');
+            window.liveStatsTracker.updateUIIfOpen(agentName);
+        }
     }
 };
 
-console.log('✅ Simple call count fix loaded - will patch numbers when modals appear');
-console.log('🧪 Test with: window.manualFixCallCounts("Grant")');
+console.log('✅ CONSOLE-OVERRIDE: Simple call count fix loaded - now using console-based stats!');
+console.log('🧪 CONSOLE-OVERRIDE: Test with: window.manualFixCallCounts("Carson")');
+console.log('🔧 CONSOLE-OVERRIDE: All call counting now uses console tracker instead of lead data calculations');

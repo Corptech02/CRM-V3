@@ -4762,12 +4762,13 @@ async function loadLeadsView() {
                         return false; // Always filter out leads with invalid IDs
                     }
 
-                    // PROTECT VICIDIAL LEADS: Don't filter out ViciDial leads from deleted list
-                    const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('88') && String(lead.id).length === 9);
-                    if (isViciDialLead) {
-                        console.log(`🔓 VICIDIAL PROTECTION ACTIVE: Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name} (source: ${lead.source})`);
-                        return true; // Don't filter out ViciDial leads
-                    }
+                    // DISABLED: ViciDial protection was preventing legitimate deletions
+                    // const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('88') && String(lead.id).length === 9);
+                    // if (isViciDialLead) {
+                    //     console.log(`🔓 VICIDIAL PROTECTION ACTIVE: Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name} (source: ${lead.source})`);
+                    //     return true; // Don't filter out ViciDial leads
+                    // }
+                    console.log(`🔓 ViciDial deletion protection DISABLED - allowing normal deletion for: ${lead.id} - ${lead.name}`);
 
                     console.log(`🚫 Filtering out deleted lead: ${lead.id} - ${lead.name}`);
                     return false;
@@ -16786,8 +16787,12 @@ function viewAgentStatsWithDateRange(agentName, dateRange, periodLabel) {
         // Users must explicitly click "Apply Saved" or use dev mode reset to load saved stats
         console.log('📊 Live data preserved - dev stats not automatically applied');
 
-        // CRITICAL: Apply live stats override immediately after modal update
-        window.setTimeout(async () => {
+        // DISABLED: Live stats are now handled by fix-all-agent-live-stats.js to prevent duplicates
+        // This section was causing duplicate "EXPANDED SIMPLE OVERLAY" popups
+        console.log('📊 Live stats handling delegated to fix-all-agent-live-stats.js');
+
+        // window.setTimeout(async () => {
+            /* COMMENTED OUT TO PREVENT DUPLICATES
             try {
                 console.log('🚀 DIRECT: Applying live stats override for', agentName);
                 console.log('🚀 DIRECT: Current URL:', window.location.href);
@@ -16886,7 +16891,8 @@ function viewAgentStatsWithDateRange(agentName, dateRange, periodLabel) {
             } catch (error) {
                 console.error('❌ DIRECT: Error applying live stats override:', error);
             }
-        }, 500); // Increased timeout to allow modal to fully render
+        // }, 500); // DISABLED: Timeout block commented out to prevent duplicate live stats
+            */
 
     } catch (error) {
         console.error('Error in viewAgentStatsWithDateRange:', error);

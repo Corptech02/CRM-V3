@@ -225,6 +225,18 @@ function initializeDatabase() {
     db.run(`CREATE INDEX IF NOT EXISTS idx_documents_client_id ON documents(client_id)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_documents_policy_id ON documents(policy_id)`);
 
+    // Loss runs tracking table
+    db.run(`CREATE TABLE IF NOT EXISTS loss_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lead_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_size INTEGER,
+        file_type TEXT,
+        status TEXT DEFAULT 'uploaded',
+        uploaded_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (lead_id) REFERENCES leads(id)
+    )`);
+
     console.log('Database tables initialized');
 }
 
@@ -988,79 +1000,174 @@ app.get('/api/vicidial/data', async (req, res) => {
     const USERNAME = '6666';
     const PASSWORD = 'corp06';
 
-    console.log('🚀 Starting COMPLETE ViciDial sync with recordings and transcription...');
+    console.log('📋 Fetching ViciDial lead list (NO SYNC - just data)...');
 
-    // Use Python script for complete sync
-    const python = spawn('python3', ['/var/www/vanguard/vicidial-complete-sync.py']);
+    // DO NOT AUTO-SYNC! Only fetch lead data for selection
+    // Use Python script to ONLY fetch ViciDial leads without importing
+    const python = spawn('python3', ['-c', `
+import requests
+import urllib3
+from bs4 import BeautifulSoup
+import json
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# ViciDial credentials
+USERNAME = "6666"
+PASSWORD = "corp06"
+VICIDIAL_HOST = "204.13.233.29"
+
+session = requests.Session()
+session.verify = False
+
+try:
+    # Fetch ViciDial leads for selection (no import) - output only JSON
+
+    # Get leads from various lists
+    all_leads = []
+    lists_data = {}
+
+    # Get list information first
+    list_url = f"https://{VICIDIAL_HOST}/vicidial/admin.php?ADD=100"
+    list_response = session.get(list_url, auth=(USERNAME, PASSWORD))
+
+    if list_response.status_code == 200:
+        soup = BeautifulSoup(list_response.text, 'html.parser')
+
+        # Parse list table
+        for table in soup.find_all('table'):
+            rows = table.find_all('tr')
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) >= 9:
+                    list_id = cells[0].text.strip()
+                    list_name = cells[1].text.strip()
+                    active = cells[6].text.strip()
+
+                    if list_id and list_id.isdigit() and list_name and list_name != "TEST":
+                        lists_data[list_id] = {
+                            "name": list_name,
+                            "active": active == "Y"
+                        }
+
+    # Get leads from active lists only
+    for list_id, list_info in lists_data.items():
+        if list_info.get('active', False):
+            # Fetching leads from active list {list_id}: {list_info['name']}
+
+            # Fetch SALE leads from this list using the correct endpoint
+            lead_url = f"https://{VICIDIAL_HOST}/vicidial/admin_search_lead.php"
+            lead_response = session.get(lead_url, auth=(USERNAME, PASSWORD), params={
+                'list_id': list_id,
+                'status': 'SALE',
+                'DB': '',
+                'submit': 'submit'
+            })
+
+            if lead_response.status_code == 200:
+                soup = BeautifulSoup(lead_response.text, 'html.parser')
+
+                # Parse lead table - SALE leads have >10 columns
+                for table in soup.find_all('table'):
+                    rows = table.find_all('tr')
+                    for row in rows:
+                        cells = row.find_all('td')
+                        if len(cells) > 10:  # SALE leads table format
+                            # Based on debug: Cell 1=LEAD_ID, Cell 3=VENDOR_ID, Cell 6=PHONE, Cell 7=NAME, Cell 8=CITY
+                            lead_id = cells[1].text.strip() if len(cells) > 1 else ""
+                            vendor_id = cells[3].text.strip() if len(cells) > 3 else ""
+                            phone = cells[6].text.strip() if len(cells) > 6 else ""
+                            company_name = cells[7].text.strip() if len(cells) > 7 else ""
+                            city = cells[8].text.strip() if len(cells) > 8 else ""
+
+                            if lead_id and lead_id.isdigit():
+                                # Clean up company name - remove " Unknown Rep" suffix
+                                clean_name = company_name.replace(" Unknown Rep", "").replace("Unknown Rep", "").strip()
+                                if not clean_name:
+                                    clean_name = f"Lead {lead_id}"
+
+                                # Extract contact name (first part before company structure indicators)
+                                contact_name = clean_name.split(' LLC')[0].split(' INC')[0].split(' CORP')[0].strip()
+                                if len(contact_name.split()) > 3:
+                                    contact_name = ' '.join(contact_name.split()[:3])  # Limit to first 3 words
+
+                                # Generate email based on company name
+                                email_base = clean_name.replace(' ', '').replace('-', '').replace('&', 'and')
+                                email_base = ''.join(c for c in email_base if c.isalnum())[:20].lower()
+                                generated_email = f"{email_base}@company.com" if email_base else f"lead{lead_id}@company.com"
+
+                                all_leads.append({
+                                    "id": lead_id,
+                                    "leadId": lead_id,
+                                    "name": clean_name,
+                                    "phone": phone,
+                                    "company": clean_name,
+                                    "email": generated_email,
+                                    "contact": contact_name,
+                                    "city": city,
+                                    "vendorId": vendor_id,
+                                    "listId": list_id,
+                                    "listName": list_info['name'],
+                                    "source": "ViciDial"
+                                })
+
+    # Output results
+    result = {
+        "saleLeads": all_leads,
+        "totalLeads": len(all_leads),
+        "lists": [{"id": k, "name": v["name"], "leadCount": len([l for l in all_leads if l["listId"] == k]), "active": v["active"]} for k, v in lists_data.items()],
+        "allListsSummary": [{"listId": k, "listName": v["name"], "leadCount": len([l for l in all_leads if l["listId"] == k])} for k, v in lists_data.items()],
+        "success": True,
+        "message": f"Fetched {len(all_leads)} leads for selection (no import)"
+    }
+
+    print(json.dumps(result))
+
+except Exception as e:
+    print(json.dumps({"saleLeads": [], "totalLeads": 0, "lists": [], "allListsSummary": [], "error": str(e), "success": False}))
+    `]);
 
     let output = '';
     let errorOutput = '';
 
     python.stdout.on('data', (data) => {
         output += data.toString();
-        // Log progress from Python script
-        const lines = data.toString().split('\n');
-        lines.forEach(line => {
-            if (line.trim()) {
-                console.log('ViciDial Sync:', line.trim());
-            }
-        });
     });
 
     python.stderr.on('data', (data) => {
         errorOutput += data.toString();
-        console.error('ViciDial Error:', data.toString());
+        console.error('ViciDial Data Fetch Error:', data.toString());
     });
 
     python.on('close', (code) => {
         if (code !== 0) {
-            console.error('ViciDial sync failed with code:', code);
+            console.error('ViciDial data fetch failed with code:', code);
             console.error('Error output:', errorOutput);
 
-            // Return empty data on error
             return res.json({
                 saleLeads: [],
                 totalLeads: 0,
                 lists: [],
                 allListsSummary: [],
-                error: 'ViciDial sync failed'
+                error: 'Failed to fetch ViciDial data'
             });
         }
 
         try {
-            // Parse the JSON output from Python script
-            const lines = output.split('\n');
-            let jsonData = null;
-
-            // Find the JSON output (last non-empty line)
-            for (let i = lines.length - 1; i >= 0; i--) {
-                const line = lines[i].trim();
-                if (line && line.startsWith('{')) {
-                    jsonData = JSON.parse(line);
-                    break;
-                }
-            }
-
-            if (!jsonData) {
-                throw new Error('No JSON data in output');
-            }
-
-            console.log(`✅ ViciDial sync complete: ${jsonData.totalLeads} leads with transcriptions`);
-            res.json(jsonData);
-
-        } catch (error) {
-            console.error('Error parsing ViciDial sync output:', error);
+            const result = JSON.parse(output.trim());
+            console.log(`✅ Fetched ${result.totalLeads} ViciDial leads for selection (no auto-import)`);
+            res.json(result);
+        } catch (e) {
+            console.error('Failed to parse ViciDial data:', e);
             res.json({
                 saleLeads: [],
                 totalLeads: 0,
                 lists: [],
                 allListsSummary: [],
-                error: 'Failed to parse sync results'
+                error: 'Failed to parse ViciDial data'
             });
         }
     });
-
-    // Python script handles all the ViciDial connection and processing
 });
 
 // Get Vicidial lists for upload selection
@@ -4492,7 +4599,7 @@ app.get('/api/clients/search', (req, res) => {
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const uploadDir = '/var/www/vanguard/uploads/loss-runs/';
+        const uploadDir = '/var/www/vanguard/uploads/loss_runs/';
         // Ensure directory exists
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true, mode: 0o755 });
@@ -4610,7 +4717,7 @@ app.get('/api/loss-runs-upload', async (req, res) => {
 
         const rows = await retryDatabaseOperation((callback) => {
             db.all(`
-                SELECT id, lead_id, file_name, file_size, file_type, uploaded_date, status, notes
+                SELECT id, lead_id, file_name, file_size, file_type, uploaded_date, status
                 FROM loss_runs
                 WHERE lead_id = ?
                 ORDER BY uploaded_date DESC
@@ -4660,7 +4767,7 @@ app.delete('/api/loss-runs-upload', async (req, res) => {
         }
 
         // Delete from filesystem
-        const filePath = `/var/www/vanguard/uploads/loss-runs/${row.file_name}`;
+        const filePath = `/var/www/vanguard/uploads/loss_runs/${row.file_name}`;
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }
@@ -4712,7 +4819,7 @@ app.get('/api/loss-runs-download', (req, res) => {
             });
         }
 
-        const filePath = `/var/www/vanguard/uploads/loss-runs/${row.file_name}`;
+        const filePath = `/var/www/vanguard/uploads/loss_runs/${row.file_name}`;
 
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({
@@ -5320,6 +5427,104 @@ app.delete('/api/live-agent-stats/:agentName', (req, res) => {
             rowsDeleted: this.changes
         });
     });
+});
+
+// Call Recording Upload Endpoint
+const recordingStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const recordingsDir = '/var/www/vanguard/recordings/';
+        // Ensure directory exists
+        if (!fs.existsSync(recordingsDir)) {
+            fs.mkdirSync(recordingsDir, { recursive: true, mode: 0o755 });
+        }
+        cb(null, recordingsDir);
+    },
+    filename: function (req, file, cb) {
+        // Generate unique filename with lead ID and timestamp
+        const leadId = req.body.leadId || 'unknown';
+        const timestamp = Date.now();
+        const extension = path.extname(file.originalname);
+        const filename = `recording_${leadId}_${timestamp}${extension}`;
+        cb(null, filename);
+    }
+});
+
+const uploadCallRecording = multer({
+    storage: recordingStorage,
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB limit for audio files
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept audio files only
+        if (file.mimetype.startsWith('audio/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only audio files are allowed'), false);
+        }
+    }
+});
+
+app.post('/api/call-recording-upload', uploadCallRecording.single('recording'), async (req, res) => {
+    console.log('🎵 Call recording upload request received');
+
+    try {
+        const leadId = req.body.leadId;
+
+        if (!leadId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Lead ID is required'
+            });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No audio file uploaded'
+            });
+        }
+
+        const recordingPath = `/recordings/${req.file.filename}`;
+
+        // Update the lead in the database with recording information
+        const result = await retryDatabaseOperation((callback) => {
+            db.run(`
+                UPDATE leads
+                SET data = json_set(
+                    data,
+                    '$.recordingPath', ?,
+                    '$.hasRecording', 1
+                )
+                WHERE id = ?
+            `, [recordingPath, leadId], function(err) {
+                callback(err, err ? null : this.changes);
+            });
+        });
+
+        if (result === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Lead not found'
+            });
+        }
+
+        console.log('✅ Call recording uploaded and lead updated:', leadId, recordingPath);
+
+        res.json({
+            success: true,
+            message: 'Call recording uploaded successfully',
+            recordingPath: recordingPath,
+            fileName: req.file.filename,
+            leadId: leadId
+        });
+
+    } catch (error) {
+        console.error('Call recording upload error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
 // Export database for use in other modules

@@ -1419,6 +1419,148 @@
     <script src="js/sip-integration-bridge.js?v=1"></script>
     <script src="js/force-policies-refresh.js?v=1"></script>
     <script src="js/app.js?v=1768160600_DEV_MODE_ADDED"></script>
+
+    <!-- Console-Based Stats Tracker - LIVE SITE FIX -->
+    <script>
+        console.log('🔧 LIVE SITE: Console Call Tracker loading...');
+
+        // Bridge to Live Stats Tracker - forwards calls to the real tracker
+        window.consoleLiveStats = {
+            // Get stats from the REAL live stats tracker
+            getStats(agentName) {
+                if (window.liveStatsTracker) {
+                    return window.liveStatsTracker.getStats(agentName);
+                }
+                return {
+                    totalCalls: 0,
+                    totalCallDuration: 0,
+                    totalLeads: 0,
+                    highValueLeads: 0,
+                    sessionsStartedAt: new Date().toISOString()
+                };
+            },
+
+            // Reset stats using the REAL live stats tracker
+            resetAgent(agentName) {
+                if (window.liveStatsTracker) {
+                    window.liveStatsTracker.resetAgent(agentName);
+                    console.log(`🔄 LIVE SITE: Reset stats for ${agentName} via live tracker`);
+                } else {
+                    console.log(`⚠️ LIVE SITE: Live tracker not available for reset`);
+                }
+            },
+
+            updateModalIfOpen(agentName) {
+                setTimeout(() => {
+                    const modals = document.querySelectorAll('div[style*="position: fixed"], [class*="modal"]');
+                    modals.forEach(modal => {
+                        const titleElements = modal.querySelectorAll('h2, h1');
+                        titleElements.forEach(titleElement => {
+                            if (titleElement && titleElement.textContent.includes(agentName) && titleElement.textContent.includes('Performance Profile')) {
+                                console.log(`🔧 LIVE SITE: Found modal for ${agentName}, updating with console stats`);
+                                this.updateModalStats(modal, agentName);
+                            }
+                        });
+                    });
+                }, 200);
+            },
+
+            updateModalStats(modal, agentName) {
+                const agent = this.agents[agentName];
+                if (!agent) return;
+
+                console.log(`🎯 LIVE SITE: Updating modal for ${agentName} with console stats:`, agent);
+
+                const allElements = modal.querySelectorAll('*');
+                let foundCalls = false;
+
+                allElements.forEach((element) => {
+                    if (element.textContent && element.textContent.trim() === 'Total Calls' && !foundCalls) {
+                        const parent = element.parentElement;
+                        const numberElement = parent.querySelector('div[style*="font-size: 28px"]') ||
+                                            parent.querySelector('div[style*="font-size:28px"]') ||
+                                            parent.previousElementSibling ||
+                                            element.previousElementSibling;
+
+                        if (numberElement) {
+                            const oldValue = numberElement.textContent;
+                            console.log(`🎯 LIVE SITE: Found Total Calls element, updating from ${oldValue} to ${agent.totalCalls}`);
+                            numberElement.textContent = agent.totalCalls;
+                            numberElement.style.color = agent.totalCalls > 0 ? '#059669' : '#dc2626';
+                            foundCalls = true;
+
+                            // Flash green to show it updated
+                            numberElement.style.background = '#10b981';
+                            numberElement.style.color = 'white';
+                            setTimeout(() => {
+                                numberElement.style.background = '';
+                                numberElement.style.color = agent.totalCalls > 0 ? '#059669' : '#dc2626';
+                            }, 1000);
+                        }
+                    }
+
+                    if (element.textContent && element.textContent.includes('Total Call Duration')) {
+                        const parent = element.parentElement;
+                        const numberElement = parent.querySelector('div[style*="font-size: 28px"]') ||
+                                            parent.querySelector('div[style*="font-size:28px"]') ||
+                                            parent.previousElementSibling;
+
+                        if (numberElement) {
+                            console.log(`🎯 LIVE SITE: Found Total Call Duration element, updating to ${agent.totalCallDuration}`);
+                            numberElement.textContent = agent.totalCallDuration;
+                            numberElement.style.color = agent.totalCallDuration > 0 ? '#0ea5e9' : '#dc2626';
+                        }
+                    }
+                });
+            }
+        };
+
+        // Helper functions
+        window.checkConsoleStats = function(agentName = 'Carson') {
+            const stats = window.consoleLiveStats.getStats(agentName);
+            console.log(`🎯 LIVE SITE: Console stats for ${agentName}:`, stats);
+            return stats;
+        };
+
+        window.resetConsoleStatsNow = function(agentName = 'Carson') {
+            console.log(`🔄 LIVE SITE: Direct reset for ${agentName}`);
+            if (window.consoleLiveStats) {
+                window.consoleLiveStats.resetAgent(agentName);
+                console.log(`✅ LIVE SITE: Reset complete for ${agentName}`);
+                return true;
+            }
+            return false;
+        };
+
+        // Override existing reset function when available
+        function tryResetOverride() {
+            if (window.resetAgentCounter) {
+                const original = window.resetAgentCounter;
+                window.resetAgentCounter = function(agentName) {
+                    console.log(`🔄 LIVE SITE: Override reset called for ${agentName}`);
+
+                    // Reset console stats first
+                    if (window.consoleLiveStats) {
+                        window.consoleLiveStats.resetAgent(agentName);
+                    }
+
+                    // Call original
+                    if (original) original(agentName);
+
+                    console.log(`✅ LIVE SITE: Override reset complete for ${agentName}`);
+                };
+                console.log('🔗 LIVE SITE: Reset override installed');
+            } else {
+                setTimeout(tryResetOverride, 1000);
+            }
+        }
+
+        // Start override attempt
+        setTimeout(tryResetOverride, 3000);
+
+        console.log('✅ LIVE SITE: Console tracker loaded - use checkConsoleStats("Carson") and resetConsoleStatsNow("Carson")');
+    </script>
+
     <!-- Universal Live Stats Fix - MUST load after app.js -->
     <script src="js/fix-all-agent-live-stats.js?v=5"></script>
     <!-- Enhanced Lead Management with DELETE functionality - MUST load after app.js -->
@@ -1903,6 +2045,15 @@
     <!-- Selective Vicidial Sync - Choose which leads to import - MUST BE ABSOLUTELY LAST -->
     <script src="js/selective-vicidial-sync-clean.js?v=21"></script>
 
+    <!-- Fix ViciDial Deleted Filter - Clear ViciDial leads from deleted list -->
+    <script src="js/fix-vicidial-deleted-filter.js?v=1"></script>
+
+    <!-- Incremental Agent Performance Tracking System -->
+    <script src="js/incremental-agent-tracking.js?v=1"></script>
+
+    <!-- Enhanced Agent Performance with Time-Based Reports and Reset Button -->
+    <script src="js/enhanced-agent-performance.js?v=1"></script>
+
     <!-- Force Add ViciDial Report Button to Agent Performance -->
     <script src="js/add-vicidial-button.js?v=4"></script>
 
@@ -2173,6 +2324,340 @@
     <script src="js/force-quote-modal-front.js"></script>
     <script src="js/enhanced-quote-form.js"></script>
     <script src="js/enhanced-quote-modal.js?v=11"></script>
+
+    <!-- Independent Agent Tracking System - Load Early -->
+    <script src="js/independent-agent-tracking.js"></script>
+    <script src="js/independent-enhanced-modal.js"></script>
+
+    <!-- TEMPORARY DEBUG SCRIPT -->
+    <script src="js/debug-lead-ids.js"></script>
+
+    <!-- FORCE SIMPLE COUNTER SYSTEM -->
+    <script>
+        // Block ALL modal systems immediately
+        window.FORCE_SIMPLE_COUNTER = true;
+
+        // Immediate simple modal function
+        window.showSimpleCounter = function(agentName) {
+            console.log('🎯 [EMERGENCY SIMPLE] Creating basic counter for:', agentName);
+
+            // Remove any existing modals
+            document.querySelectorAll('.simple-counter-modal, .modal-overlay').forEach(el => el.remove());
+
+            const modal = document.createElement('div');
+            modal.className = 'simple-counter-modal';
+            modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white !important;border-radius:12px !important;max-width:1000px !important;width:95% !important;max-height:90vh !important;overflow-y:auto !important;box-shadow:rgba(0,0,0,0.3) 0px 20px 40px !important;z-index:999999;animation:0.3s ease-out 0s 1 normal none running modalSlideIn !important;';
+
+            // Get current counter values - CONSOLE-BASED STATS INTEGRATION
+            let counters = window.getAgentCounters ? window.getAgentCounters(agentName) : {
+                leadCount: 0, callCount: 0, saleCount: 0, resetTimestamp: null
+            };
+
+            // The counters already include call duration from getAgentCounters - no override needed!
+            // getAgentCounters now includes totalCallDuration from console message tracking
+            console.log(`🎯 MODAL-OVERRIDE: Using TRUE incremental counters for ${agentName}:`, counters);
+            console.log(`🔧 MODAL-OVERRIDE: Calls: ${counters.callCount}, Duration: ${counters.totalCallDuration} from TRUE counter system`);
+
+            // Get lead data for additional analysis
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const agentLeads = leads.filter(lead => lead.assignedTo === agentName);
+
+            // Calculate additional metrics
+            let totalCallTime = 0;
+            let highValueLeads = 0;
+            let lowValueLeads = 0;
+            let contactedLeads = 0;
+
+            agentLeads.forEach(lead => {
+                // Call time calculation
+                if (lead.callLogs) {
+                    lead.callLogs.forEach(call => {
+                        totalCallTime += call.duration || 0;
+                    });
+                }
+                if (lead.reachOut && lead.reachOut.callLogs) {
+                    lead.reachOut.callLogs.forEach(call => {
+                        totalCallTime += call.duration || 0;
+                    });
+                }
+
+                // High/Low value classification
+                const premium = parseFloat(lead.premium || 0);
+                if (premium > 5000) {
+                    highValueLeads++;
+                } else if (premium < 1000) {
+                    lowValueLeads++;
+                }
+
+                // Contact tracking
+                if (lead.reachOut && lead.reachOut.contacted) {
+                    contactedLeads++;
+                }
+            });
+
+            const contactRate = agentLeads.length > 0 ? (contactedLeads / agentLeads.length * 100).toFixed(1) : '0.0';
+            const conversionRate = counters.leadCount > 0 ? (counters.saleCount / counters.leadCount * 100).toFixed(1) : '0.0';
+
+            // USE TRUE COUNTER SYSTEM CALL DURATION
+            let finalCallDuration = counters.totalCallDuration * 60; // Convert TRUE counter minutes to seconds for consistency
+            if (finalCallDuration === 0) {
+                finalCallDuration = totalCallTime; // Fallback to calculated if no TRUE data
+            }
+            console.log(`🎯 MODAL-OVERRIDE: Using TRUE counter call duration: ${counters.totalCallDuration} minutes`);
+            const avgCallTime = counters.callCount > 0 ? (finalCallDuration / counters.callCount / 60).toFixed(1) : '0';
+
+            // Calculate averages (mock data for now)
+            const avgStats = {
+                totalLeads: 29,
+                highValueLeads: 12,
+                lowValueLeads: 58.6,
+                totalCalls: 45,
+                callDuration: 382.5,
+                contactRate: 93.1,
+                leadsToBrokers: 7,
+                nonGreenTime: 18.2
+            };
+
+            // Calculate vs average differences
+            const vsAvg = {
+                totalLeads: counters.leadCount - avgStats.totalLeads,
+                highValueLeads: highValueLeads - avgStats.highValueLeads,
+                lowValueLeads: (agentLeads.length > 0 ? ((lowValueLeads / agentLeads.length) * 100) : 0) - avgStats.lowValueLeads,
+                totalCalls: counters.callCount - avgStats.totalCalls,
+                callDuration: counters.totalCallDuration - avgStats.callDuration,
+                contactRate: parseFloat(contactRate) - avgStats.contactRate,
+                leadsToBrokers: counters.leadsToBrokers - avgStats.leadsToBrokers,
+                nonGreenTime: 0 - avgStats.nonGreenTime
+            };
+
+            // Helper function to get card style based on performance
+            const getCardStyle = (value, isGood = false) => {
+                if (value === 0) {
+                    return 'background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;';
+                }
+                return isGood ?
+                    'background: #f0fdf4; border: 1px solid #bbf7d0; color: #059669;' :
+                    'background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;';
+            };
+
+            modal.innerHTML = `
+                <!-- Header -->
+                <div style="padding: 24px; border-bottom: 1px solid #e5e7eb;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h2 style="margin: 0; color: #1f2937; font-size: 24px; font-weight: 600;">
+                            <i class="fas fa-user-circle" style="margin-right: 12px; color: #3b82f6;"></i>${agentName} Performance Profile (Since Reset)
+                        </h2>
+                        <button onclick="this.closest('.simple-counter-modal').remove()" style="
+                            background: none;
+                            border: none;
+                            font-size: 28px;
+                            cursor: pointer;
+                            color: #6b7280;
+                            padding: 4px;
+                            line-height: 1;
+                        ">×</button>
+                    </div>
+                    <div class="time-filter-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button style="padding: 8px 16px; background: rgb(37, 99, 235); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Since Reset</button>
+                        <button onclick="alert('Day view - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Day</button>
+                        <button onclick="alert('Weekly view - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Weekly</button>
+                        <button onclick="alert('Monthly view - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Monthly</button>
+                        <button onclick="alert('YTD view - Coming soon!')" style="padding: 8px 16px; background: rgb(243, 244, 246); color: rgb(55, 65, 81); border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">YTD</button>
+                        <button onclick="alert('Custom date range - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Custom</button>
+                        <button onclick="
+                            if(window.resetAgentCounter) {
+                                window.resetAgentCounter('${agentName}');
+                                alert('Counter reset to 0!');
+                                window.showSimpleCounter('${agentName}');
+                            }
+                        " style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;"><i class="fas fa-redo"></i> Reset</button>
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div style="padding: 24px; color: #1f2937 !important;">
+
+                    <!-- Lead Distribution Group -->
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Lead Distribution</h3>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(counters.leadCount)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${counters.leadCount}</div>
+                                <div style="font-size: 14px;">Total Leads</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.totalLeads > 0 ? '+' : ''}${vsAvg.totalLeads.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.totalLeads}</div>
+                            </div>
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(highValueLeads)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${highValueLeads}</div>
+                                <div style="font-size: 14px;">High Value Leads</div>
+                                <div style="font-size: 12px; margin-top: 4px;">${agentLeads.length > 0 ? ((highValueLeads / agentLeads.length) * 100).toFixed(1) : '0'}% of total</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.highValueLeads > 0 ? '+' : ''}${vsAvg.highValueLeads.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.highValueLeads}</div>
+                            </div>
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(lowValueLeads, true)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${agentLeads.length > 0 ? ((lowValueLeads / agentLeads.length) * 100).toFixed(1) : '0'}%</div>
+                                <div style="font-size: 14px;">Low Value Leads</div>
+                                <div style="font-size: 12px; margin-top: 4px;">${lowValueLeads} total leads</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.lowValueLeads > 0 ? '+' : ''}${vsAvg.lowValueLeads.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.lowValueLeads}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Call Activity Group -->
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Call Activity</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(counters.callCount)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${counters.callCount}</div>
+                                <div style="font-size: 14px;">Total Calls</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.totalCalls > 0 ? '+' : ''}${vsAvg.totalCalls.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.totalCalls}</div>
+                            </div>
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(finalCallDuration)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${counters.totalCallDuration}</div>
+                                <div style="font-size: 14px;">Total Call Duration (min)</div>
+                                <div style="font-size: 12px; margin-top: 4px;">Avg: ${avgCallTime} min/call</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.callDuration > 0 ? '+' : ''}${vsAvg.callDuration.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.callDuration}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Metrics -->
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Performance Metrics</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(parseFloat(contactRate))} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${contactRate}%</div>
+                                <div style="font-size: 14px;">Contact Rate</div>
+                                <div style="font-size: 12px; margin-top: 4px;">%</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.contactRate > 0 ? '+' : ''}${vsAvg.contactRate.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.contactRate}%</div>
+                            </div>
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(counters.leadsToBrokers)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${counters.leadsToBrokers}</div>
+                                <div style="font-size: 14px;">Leads to Brokers</div>
+                                <div style="font-size: 12px; margin-top: 4px;">${counters.leadCount > 0 ? ((counters.leadsToBrokers / counters.leadCount) * 100).toFixed(1) : (counters.leadsToBrokers > 0 ? '100' : '0')}% of total</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.leadsToBrokers > 0 ? '+' : ''}${vsAvg.leadsToBrokers.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.leadsToBrokers}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Areas for Improvement -->
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Areas for Improvement</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(0)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">0</div>
+                                <div style="font-size: 14px;">Time on Non-Green Leads</div>
+                                <div style="font-size: 12px; margin-top: 4px;">Time spent on low-priority leads</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.nonGreenTime > 0 ? '+' : ''}${vsAvg.nonGreenTime.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.nonGreenTime}</div>
+                            </div>
+
+                            <div style="text-align: center; padding: 20px; ${getCardStyle(lowValueLeads, true)} border-radius: 12px;">
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px;">${agentLeads.length > 0 ? ((lowValueLeads / agentLeads.length) * 100).toFixed(1) : '0'}%</div>
+                                <div style="font-size: 14px;">Low Value Lead Rate</div>
+                                <div style="font-size: 12px; margin-top: 4px;">Percentage of leads with low potential</div>
+                                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${vsAvg.lowValueLeads > 0 ? '+' : ''}${vsAvg.lowValueLeads.toFixed(1)} vs avg</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgStats.lowValueLeads}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Summary -->
+                    <div style="margin-top: 24px; padding: 20px; background: #f8fafc; border-radius: 12px; border-left: 4px solid #3b82f6;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 18px;">Performance Summary</h3>
+                        <p style="margin: 0; color: #4b5563; line-height: 1.6;">
+                            ${agentName} has managed <strong>${counters.leadCount} total leads since reset</strong> with
+                            <strong style="color: #059669;">${highValueLeads} high-value leads</strong> (${agentLeads.length > 0 ? ((highValueLeads / agentLeads.length) * 100).toFixed(1) : '0'}%) and
+                            <strong style="color: #dc2626;">${lowValueLeads} low-value leads</strong> (${agentLeads.length > 0 ? ((lowValueLeads / agentLeads.length) * 100).toFixed(1) : '0'}%).
+                            Contact rate: <strong>${contactRate}%</strong>.
+                            0 leads were referred to brokers (0%).
+                            ${counters.resetTimestamp ? `<br><br><em style="opacity:0.7;">📅 Counter reset on: ${new Date(counters.resetTimestamp).toLocaleDateString()}</em>` : ''}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Bottom Action Section -->
+                <div style="padding: 24px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                    <!-- Action Buttons Left Side -->
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button onclick="
+                            if(window.incrementLeadCounter) window.incrementLeadCounter('${agentName}');
+                            window.showSimpleCounter('${agentName}');
+                        " style="background: #16a34a; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;">+1 Lead</button>
+
+                        <button onclick="
+                            if(window.incrementCallCounter) window.incrementCallCounter('${agentName}');
+                            window.showSimpleCounter('${agentName}');
+                        " style="background: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;">+1 Call</button>
+
+                        <button onclick="
+                            if(window.incrementSaleCounter) window.incrementSaleCounter('${agentName}');
+                            window.showSimpleCounter('${agentName}');
+                        " style="background: #8b5cf6; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;">+1 Sale</button>
+                    </div>
+
+                    <!-- Download/Close Buttons Right Side -->
+                    <div style="text-align: right;">
+                        <button onclick="alert('PDF download - Coming soon!')" style="
+                            padding: 12px 24px;
+                            background: #059669;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 16px;
+                            font-weight: 500;
+                            margin-right: 12px;
+                        ">
+                            <i class="fas fa-file-pdf" style="margin-right: 8px;"></i>Download PDF Report
+                        </button>
+                        <button onclick="this.closest('.simple-counter-modal').remove()" style="
+                            padding: 12px 24px;
+                            background: #6b7280;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 16px;
+                            font-weight: 500;
+                        ">Close Profile</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            console.log('✅ Emergency simple modal created');
+        };
+
+        // Override everything immediately
+        window.viewAgentStats = function(agentName) {
+            console.log('🎯 [IMMEDIATE BLOCK] Using emergency simple counter');
+            return window.showSimpleCounter(agentName);
+        };
+
+        window.enhancedViewAgentStats = function(agentName) {
+            console.log('🎯 [IMMEDIATE BLOCK] Enhanced blocked, using simple counter');
+            return window.showSimpleCounter(agentName);
+        };
+    </script>
+
+    <!-- True Incremental Counter System - Load Last -->
+    <script src="js/true-incremental-counter.js"></script>
+    <script src="js/vicidial-import-listener.js"></script>
+    <script src="js/simple-counter-modal.js"></script>
 
     <!-- Mobile Enhancements -->
     <script src="js/mobile-enhancements.js?v=1"></script>

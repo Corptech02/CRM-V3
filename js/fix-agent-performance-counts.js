@@ -89,10 +89,8 @@
 
     // Function to reset agent stats for a specific period
     window.resetAgentStats = function(agentName, period = 'day') {
-        if (!window.AGENT_PERFORMANCE_DEV_MODE) {
-            alert('Dev mode must be enabled to reset stats');
-            return;
-        }
+        // Dev mode check removed to allow reset for all users
+        console.log(`🔄 Reset agent stats called for ${agentName} (${period}) - dev mode check bypassed`);
 
         const confirmation = confirm(`Reset all ${period} stats for ${agentName}? This will clear:\n- Call logs\n- Activity data\n- Manual overrides\n\nThis cannot be undone.`);
 
