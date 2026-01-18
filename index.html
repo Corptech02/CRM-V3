@@ -2712,6 +2712,79 @@
                     if (confirmReset) {
                         console.log(`🔢 PERIOD RESET: Calling resetAgentCounterForPeriod('${agentName}', '${currentPeriod}')`);
                         window.resetAgentCounterForPeriod(agentName, currentPeriod);
+
+                        // Refresh the modal to show period-filtered reset values (0s)
+                        setTimeout(() => {
+                            console.log(`🔄 RESET-REFRESH: Refreshing modal after period reset for ${agentName} (${currentFilter})`);
+
+                            // Get the period-filtered counters (should be 0 since we just reset)
+                            const resetCounters = window.getAgentCountersForPeriod ?
+                                window.getAgentCountersForPeriod(agentName, currentPeriod) :
+                                { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+
+                            console.log(`🔄 RESET-REFRESH: Post-reset counters for ${currentPeriod}:`, resetCounters);
+
+                            const modal = document.getElementById('agent-profile-modal') ||
+                                         document.querySelector('.simple-counter-modal') ||
+                                         document.querySelector('[class*="modal"]');
+
+                            if (modal) {
+                                console.log(`🔄 RESET-REFRESH: Found modal, updating metrics to show reset values`);
+
+                                // Find and update all metric values
+                                const metricElements = modal.querySelectorAll('[style*="font-size: 28px"], [style*="font-size:28px"]');
+                                console.log(`🔄 RESET-REFRESH: Found ${metricElements.length} metric elements to update`);
+
+                                metricElements.forEach((element, index) => {
+                                    const nextElement = element.nextElementSibling;
+                                    const parentElement = element.parentElement;
+
+                                    if (nextElement && nextElement.textContent) {
+                                        const labelText = nextElement.textContent.trim();
+                                        console.log(`🔄 RESET-REFRESH: Processing metric ${index + 1}: "${labelText}"`);
+
+                                        let newValue = 0;
+                                        let newColor = '#dc2626'; // Red for 0 values
+
+                                        // Update based on label text
+                                        if (labelText.includes('Total Leads')) {
+                                            newValue = resetCounters.leadCount;
+                                            newColor = resetCounters.leadCount > 0 ? '#059669' : '#dc2626';
+                                        } else if (labelText.includes('Total Calls')) {
+                                            newValue = resetCounters.callCount;
+                                            newColor = resetCounters.callCount > 0 ? '#059669' : '#dc2626';
+                                        } else if (labelText.includes('Sales')) {
+                                            newValue = resetCounters.saleCount;
+                                            newColor = resetCounters.saleCount > 0 ? '#059669' : '#dc2626';
+                                        } else if (labelText.includes('Leads to Brokers')) {
+                                            newValue = resetCounters.leadsToBrokers || 0;
+                                            newColor = (resetCounters.leadsToBrokers || 0) > 0 ? '#10b981' : '#dc2626';
+                                        } else if (labelText.includes('Total Call Duration')) {
+                                            newValue = resetCounters.totalCallDuration || 0;
+                                            newColor = (resetCounters.totalCallDuration || 0) > 0 ? '#0ea5e9' : '#dc2626';
+                                        }
+
+                                        console.log(`🔄 RESET-REFRESH: Updating "${labelText}" from ${element.textContent} to ${newValue}`);
+                                        element.textContent = newValue;
+                                        element.style.color = newColor;
+                                        element.style.fontWeight = 'bold';
+
+                                        // Flash green to show update
+                                        element.style.background = '#10b981';
+                                        element.style.color = 'white';
+                                        setTimeout(() => {
+                                            element.style.background = '';
+                                            element.style.color = newColor;
+                                        }, 300);
+                                    }
+                                });
+
+                                console.log(`✅ RESET-REFRESH: Modal updated with reset values for ${agentName} (${currentFilter})`);
+                            } else {
+                                console.log(`❌ RESET-REFRESH: No modal found to update`);
+                            }
+                        }, 200);
+
                         alert(`✅ ${currentFilter} counter reset for ${agentName}!`);
                         console.log(`🔢 Period-specific reset applied: ${currentPeriod} for ${agentName}`);
                         return;
