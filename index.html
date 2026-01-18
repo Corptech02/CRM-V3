@@ -2477,12 +2477,32 @@
                         ">×</button>
                     </div>
                     <div class="time-filter-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button id="filter-since-reset" onclick="applyTimeFilter('${agentName}', 'since-reset')" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🔄 Reset Counters</button>
+                        <!-- Period-specific reset (new) -->
+                        <button id="filter-since-reset" onclick="applyTimeFilter('${agentName}', 'since-reset')" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🔄 Reset Current Period</button>
+
+                        <!-- Time period filters -->
                         <button id="filter-day" onclick="applyTimeFilter('${agentName}', 'day')" style="padding: 8px 16px; background: rgb(37, 99, 235); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Today</button>
                         <button id="filter-week" onclick="applyTimeFilter('${agentName}', 'week')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">This Week</button>
                         <button id="filter-month" onclick="applyTimeFilter('${agentName}', 'month')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">This Month</button>
                         <button id="filter-ytd" onclick="applyTimeFilter('${agentName}', 'ytd')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Year to Date</button>
                         <button id="filter-custom" onclick="applyTimeFilter('${agentName}', 'custom')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Custom Range</button>
+
+                        <!-- Full reset (old working version) -->
+                        <button onclick="
+                            if(window.resetAgentCounter) {
+                                const confirmReset = confirm('Reset ALL counters for ${agentName} to 0?\\n\\nThis will reset all time periods and is the original full reset.');
+                                if (confirmReset) {
+                                    console.log('🔄 OLD RESET: Using original resetAgentCounter');
+                                    window.resetAgentCounter('${agentName}');
+                                    alert('✅ All counters reset to 0 for ${agentName}!');
+                                    setTimeout(() => {
+                                        window.showSimpleCounter('${agentName}');
+                                    }, 500);
+                                }
+                            } else {
+                                alert('Reset function not available');
+                            }
+                        " style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;"><i class="fas fa-redo"></i> Reset ALL (Original)</button>
                     </div>
                 </div>
 
