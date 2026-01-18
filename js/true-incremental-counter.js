@@ -22,45 +22,39 @@
         return {
             agents: {
                 'Grant': {
-                    // Global/lifetime counters - these always increment
+                    // Overall counter for backward compatibility
                     leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
 
-                    // Period baselines - each period shows (global - baseline)
-                    periodBaselines: {
-                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null }
-                    }
+                    // SEPARATE CONTAINERS - One per filter, all track simultaneously
+                    todayCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    weekCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    monthCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    ytdCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    customCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
                 },
                 'Hunter': {
                     leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
 
-                    periodBaselines: {
-                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null }
-                    }
+                    todayCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    weekCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    monthCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    ytdCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    customCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
                 },
                 'Carson': {
                     leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
 
-                    periodBaselines: {
-                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
-                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null }
-                    }
+                    todayCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    weekCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    monthCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    ytdCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    customCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
                 }
             },
-            version: '3.0'
+            version: '4.0'
         };
     }
 
@@ -96,46 +90,57 @@
         return true;
     }
 
-    // Reset agent counter for specific time period - GENUINELY reset the actual counter
+    // Reset agent counter for specific time period - RESET ONLY THAT CONTAINER
     function resetAgentCounterForPeriod(agentName, period) {
         const counterData = getCounterData();
-        const resetTimestamp = new Date().toISOString();
 
         if (!counterData.agents[agentName]) {
             counterData.agents[agentName] = {
                 leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                 resetTimestamp: null,
-                periodCounters: {
-                    day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                    week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                    month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                    ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                    custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
-                }
+                todayCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                weekCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                monthCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                ytdCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                customCounters: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
             };
         }
 
-        // Initialize periodCounters if not present (migration)
-        if (!counterData.agents[agentName].periodCounters) {
-            counterData.agents[agentName].periodCounters = {
-                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
-            };
+        // Initialize separate containers if not present (migration)
+        if (!counterData.agents[agentName].todayCounters) {
+            counterData.agents[agentName].todayCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].weekCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].monthCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].ytdCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].customCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
         }
 
-        // ACTUALLY RESET the specific period counter to 0
-        const oldValues = { ...counterData.agents[agentName].periodCounters[period] };
-        counterData.agents[agentName].periodCounters[period] = {
+        // Map period to container name
+        const periodToContainer = {
+            'day': 'todayCounters',
+            'week': 'weekCounters',
+            'month': 'monthCounters',
+            'ytd': 'ytdCounters',
+            'custom': 'customCounters'
+        };
+
+        const containerName = periodToContainer[period];
+        if (!containerName) {
+            console.log(`❌ RESET ERROR: Unknown period '${period}'`);
+            return false;
+        }
+
+        // RESET ONLY THE SPECIFIC CONTAINER
+        const oldValues = { ...counterData.agents[agentName][containerName] };
+        counterData.agents[agentName][containerName] = {
             leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0
         };
 
         saveCounterData(counterData);
-        console.log(`🔢 GENUINE RESET: ${period} counter for ${agentName} - ALL VALUES RESET TO 0`);
-        console.log(`🔢 OLD VALUES: Leads: ${oldValues.leadCount}, Calls: ${oldValues.callCount}, Sales: ${oldValues.saleCount}`);
-        console.log(`🔢 NEW VALUES: Leads: 0, Calls: 0, Sales: 0`);
+        console.log(`🔢 CONTAINER RESET: ${period} (${containerName}) for ${agentName} - ONLY THIS CONTAINER RESET`);
+        console.log(`🔢 OLD ${period}: Leads: ${oldValues.leadCount}, Calls: ${oldValues.callCount}, Sales: ${oldValues.saleCount}`);
+        console.log(`🔢 NEW ${period}: Leads: 0, Calls: 0, Sales: 0`);
+        console.log(`✅ OTHER CONTAINERS UNCHANGED`);
         return true;
     }
 
@@ -157,22 +162,27 @@
             };
         }
 
-        // Initialize periodCounters if not present (migration)
-        if (!counterData.agents[agentName].periodCounters) {
-            counterData.agents[agentName].periodCounters = {
-                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
-            };
+        // Initialize separate containers if not present (migration)
+        if (!counterData.agents[agentName].todayCounters) {
+            counterData.agents[agentName].todayCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].weekCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].monthCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].ytdCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].customCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
         }
 
-        // Increment ONLY the global counter - periods calculated as (global - baseline)
+        // Increment overall counter
         counterData.agents[agentName].leadCount += 1;
 
+        // INCREMENT ALL SEPARATE CONTAINERS SIMULTANEOUSLY
+        counterData.agents[agentName].todayCounters.leadCount += 1;
+        counterData.agents[agentName].weekCounters.leadCount += 1;
+        counterData.agents[agentName].monthCounters.leadCount += 1;
+        counterData.agents[agentName].ytdCounters.leadCount += 1;
+        counterData.agents[agentName].customCounters.leadCount += 1;
+
         saveCounterData(counterData);
-        console.log(`🔢 +1 Lead for ${agentName}: Global: ${counterData.agents[agentName].leadCount}`);
+        console.log(`🔢 +1 Lead for ${agentName}: Today: ${counterData.agents[agentName].todayCounters.leadCount}, Week: ${counterData.agents[agentName].weekCounters.leadCount}, Month: ${counterData.agents[agentName].monthCounters.leadCount}`);
 
         return counterData.agents[agentName].leadCount;
     }
@@ -195,29 +205,27 @@
             };
         }
 
-        // Initialize periodCounters if not present (migration)
-        if (!counterData.agents[agentName].periodCounters) {
-            counterData.agents[agentName].periodCounters = {
-                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
-            };
+        // Initialize separate containers if not present (migration)
+        if (!counterData.agents[agentName].todayCounters) {
+            counterData.agents[agentName].todayCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].weekCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].monthCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].ytdCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].customCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
         }
 
         // Increment overall counter
         counterData.agents[agentName].callCount += 1;
 
-        // ALSO increment ALL period counters
-        counterData.agents[agentName].periodCounters.day.callCount += 1;
-        counterData.agents[agentName].periodCounters.week.callCount += 1;
-        counterData.agents[agentName].periodCounters.month.callCount += 1;
-        counterData.agents[agentName].periodCounters.ytd.callCount += 1;
-        counterData.agents[agentName].periodCounters.custom.callCount += 1;
+        // INCREMENT ALL SEPARATE CONTAINERS SIMULTANEOUSLY
+        counterData.agents[agentName].todayCounters.callCount += 1;
+        counterData.agents[agentName].weekCounters.callCount += 1;
+        counterData.agents[agentName].monthCounters.callCount += 1;
+        counterData.agents[agentName].ytdCounters.callCount += 1;
+        counterData.agents[agentName].customCounters.callCount += 1;
 
         saveCounterData(counterData);
-        console.log(`🔢 +1 Call for ${agentName}: Overall: ${counterData.agents[agentName].callCount}, Day: ${counterData.agents[agentName].periodCounters.day.callCount}`);
+        console.log(`🔢 +1 Call for ${agentName}: Today: ${counterData.agents[agentName].todayCounters.callCount}, Week: ${counterData.agents[agentName].weekCounters.callCount}, Month: ${counterData.agents[agentName].monthCounters.callCount}`);
 
         return counterData.agents[agentName].callCount;
     }
@@ -240,29 +248,27 @@
             };
         }
 
-        // Initialize periodCounters if not present (migration)
-        if (!counterData.agents[agentName].periodCounters) {
-            counterData.agents[agentName].periodCounters = {
-                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
-            };
+        // Initialize separate containers if not present (migration)
+        if (!counterData.agents[agentName].todayCounters) {
+            counterData.agents[agentName].todayCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].weekCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].monthCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].ytdCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            counterData.agents[agentName].customCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
         }
 
         // Increment overall counter
         counterData.agents[agentName].saleCount += 1;
 
-        // ALSO increment ALL period counters
-        counterData.agents[agentName].periodCounters.day.saleCount += 1;
-        counterData.agents[agentName].periodCounters.week.saleCount += 1;
-        counterData.agents[agentName].periodCounters.month.saleCount += 1;
-        counterData.agents[agentName].periodCounters.ytd.saleCount += 1;
-        counterData.agents[agentName].periodCounters.custom.saleCount += 1;
+        // INCREMENT ALL SEPARATE CONTAINERS SIMULTANEOUSLY
+        counterData.agents[agentName].todayCounters.saleCount += 1;
+        counterData.agents[agentName].weekCounters.saleCount += 1;
+        counterData.agents[agentName].monthCounters.saleCount += 1;
+        counterData.agents[agentName].ytdCounters.saleCount += 1;
+        counterData.agents[agentName].customCounters.saleCount += 1;
 
         saveCounterData(counterData);
-        console.log(`🔢 +1 Sale for ${agentName}: Overall: ${counterData.agents[agentName].saleCount}, Day: ${counterData.agents[agentName].periodCounters.day.saleCount}`);
+        console.log(`🔢 +1 Sale for ${agentName}: Today: ${counterData.agents[agentName].todayCounters.saleCount}, Week: ${counterData.agents[agentName].weekCounters.saleCount}, Month: ${counterData.agents[agentName].monthCounters.saleCount}`);
 
         return counterData.agents[agentName].saleCount;
     }
@@ -326,39 +332,47 @@
             };
         }
 
-        // Initialize periodCounters if not present (migration)
-        if (!agent.periodCounters) {
-            agent.periodCounters = {
-                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
-            };
+        // Initialize separate containers if not present (migration)
+        if (!agent.todayCounters) {
+            agent.todayCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            agent.weekCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            agent.monthCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            agent.ytdCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            agent.customCounters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
             saveCounterData(counterData);
         }
 
-        // Get the specific period counter - REAL COUNTER VALUES
-        const periodCounter = agent.periodCounters[period];
-        if (!periodCounter) {
-            console.log(`📊 PERIOD NOT FOUND: ${period} counter doesn't exist for ${agentName}`);
+        // Map period to container name
+        const periodToContainer = {
+            'day': 'todayCounters',
+            'week': 'weekCounters',
+            'month': 'monthCounters',
+            'ytd': 'ytdCounters',
+            'custom': 'customCounters'
+        };
+
+        const containerName = periodToContainer[period];
+        if (!containerName || !agent[containerName]) {
+            console.log(`📊 CONTAINER NOT FOUND: ${period} (${containerName}) doesn't exist for ${agentName}`);
             return {
                 leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
                 totalCallDuration: 0, resetTimestamp: null
             };
         }
 
-        console.log(`📊 GENUINE PERIOD COUNTERS: ${agentName} ${period} - Leads: ${periodCounter.leadCount}, Calls: ${periodCounter.callCount}, Sales: ${periodCounter.saleCount}`);
+        // Get the specific container values
+        const container = agent[containerName];
+        console.log(`📊 SEPARATE CONTAINER: ${agentName} ${period} (${containerName}) - Leads: ${container.leadCount}, Calls: ${container.callCount}, Sales: ${container.saleCount}`);
 
         return {
-            leadCount: periodCounter.leadCount || 0,
-            callCount: periodCounter.callCount || 0,
-            saleCount: periodCounter.saleCount || 0,
-            leadsToBrokers: periodCounter.leadsToBrokers || 0,
-            totalCallDuration: periodCounter.totalCallDuration || 0,
-            resetTimestamp: null, // Period counters don't have individual timestamps
-            contactRate: periodCounter.callCount > 0 ? ((periodCounter.callCount * 0.8) / periodCounter.callCount * 100).toFixed(1) : 0,
-            conversionRate: periodCounter.leadCount > 0 ? (periodCounter.saleCount / periodCounter.leadCount * 100).toFixed(1) : 0
+            leadCount: container.leadCount || 0,
+            callCount: container.callCount || 0,
+            saleCount: container.saleCount || 0,
+            leadsToBrokers: container.leadsToBrokers || 0,
+            totalCallDuration: container.totalCallDuration || 0,
+            resetTimestamp: null, // Separate containers don't have individual timestamps
+            contactRate: container.callCount > 0 ? ((container.callCount * 0.8) / container.callCount * 100).toFixed(1) : 0,
+            conversionRate: container.leadCount > 0 ? (container.saleCount / container.leadCount * 100).toFixed(1) : 0
         };
     }
 
