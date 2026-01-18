@@ -22,45 +22,45 @@
         return {
             agents: {
                 'Grant': {
-                    // Overall/lifetime counters (for backward compatibility)
+                    // Global/lifetime counters - these always increment
                     leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
 
-                    // Separate counters for each time period - these get incremented independently
-                    periodCounters: {
-                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+                    // Period baselines - each period shows (global - baseline)
+                    periodBaselines: {
+                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null }
                     }
                 },
                 'Hunter': {
                     leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
 
-                    periodCounters: {
-                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+                    periodBaselines: {
+                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null }
                     }
                 },
                 'Carson': {
                     leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
 
-                    periodCounters: {
-                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
-                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+                    periodBaselines: {
+                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null },
+                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0, resetTime: null }
                     }
                 }
             },
-            version: '2.0'
+            version: '3.0'
         };
     }
 
@@ -168,18 +168,11 @@
             };
         }
 
-        // Increment by exactly 1 in overall counter
+        // Increment ONLY the global counter - periods calculated as (global - baseline)
         counterData.agents[agentName].leadCount += 1;
 
-        // ALSO increment ALL period counters (leads should count towards all periods)
-        counterData.agents[agentName].periodCounters.day.leadCount += 1;
-        counterData.agents[agentName].periodCounters.week.leadCount += 1;
-        counterData.agents[agentName].periodCounters.month.leadCount += 1;
-        counterData.agents[agentName].periodCounters.ytd.leadCount += 1;
-        counterData.agents[agentName].periodCounters.custom.leadCount += 1;
-
         saveCounterData(counterData);
-        console.log(`🔢 +1 Lead for ${agentName}: Overall: ${counterData.agents[agentName].leadCount}, Day: ${counterData.agents[agentName].periodCounters.day.leadCount}`);
+        console.log(`🔢 +1 Lead for ${agentName}: Global: ${counterData.agents[agentName].leadCount}`);
 
         return counterData.agents[agentName].leadCount;
     }
