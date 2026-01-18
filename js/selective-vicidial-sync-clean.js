@@ -10,13 +10,19 @@ let availableVicidialLeads = [];
 
 // Function to determine assignment tag based on list ID and name
 function getAssignmentTag(listId, listName) {
+    // Convert listId to number to handle string/number comparison issues
+    const numericListId = parseInt(listId);
+
     const hunterLists = [998, 999, 1000]; // Hunter lists
     const grantLists = [1001, 1005, 1006]; // Grant lists
+    const carsonLists = [1007, 1008, 1009]; // Carson lists
 
-    if (hunterLists.includes(listId) || (listName && listName.toLowerCase().includes('hunter'))) {
+    if (hunterLists.includes(numericListId) || (listName && listName.toLowerCase().includes('hunter'))) {
         return { tag: 'HUNTER', color: '#3b82f6', bgColor: '#dbeafe' }; // Blue
-    } else if (grantLists.includes(listId) || (listName && listName.toLowerCase().includes('grant'))) {
+    } else if (grantLists.includes(numericListId) || (listName && listName.toLowerCase().includes('grant'))) {
         return { tag: 'GRANT', color: '#7c3aed', bgColor: '#ede9fe' }; // Purple
+    } else if (carsonLists.includes(numericListId) || (listName && listName.toLowerCase().includes('carson'))) {
+        return { tag: 'CARSON', color: '#059669', bgColor: '#d1fae5' }; // Green
     }
     return null;
 }
@@ -36,9 +42,10 @@ window.syncVicidialLeads = async function() {
         if (window.location.hostname === 'localhost') {
             API_URLS = ['http://localhost:3001', '/'];
         } else {
-            // For production, try: 1) Port-specific, 2) Relative URL (through nginx proxy)
+            // For production, use HTTPS to match the page protocol
+            const protocol = window.location.protocol; // Gets 'https:' or 'http:'
             API_URLS = [
-                `http://${window.location.hostname}:3001`,
+                `${protocol}//${window.location.hostname}:3001`,
                 '/' // Relative URL (goes through nginx proxy)
             ];
         }
@@ -393,6 +400,17 @@ function showLeadSelectionPopup(leads, data) {
                     cursor: pointer;
                     font-size: 14px;
                 ">Cancel</button>
+                <button onclick="importSelectedLeads(true)" style="
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    margin-right: 12px;
+                ">⚡ Quick Import</button>
                 <button onclick="importSelectedLeads()" style="
                     background: #3b82f6;
                     color: white;
@@ -490,7 +508,7 @@ function closeLeadSelectionPopup() {
     }
 }
 
-async function importSelectedLeads() {
+async function importSelectedLeads(quickMode = false) {
     const selectedCheckboxes = document.querySelectorAll('#leads-container input[type="checkbox"]:checked');
     const allCheckboxes = document.querySelectorAll('#leads-container input[type="checkbox"]');
 
@@ -503,6 +521,18 @@ async function importSelectedLeads() {
         console.log(`  - Checkbox ${i}: id=${cb.id}, checked=${cb.checked}`);
     });
 
+    // If more than 1 selected, investigate the issue
+    if (selectedCheckboxes.length > 1) {
+        console.warn('🚨 INVESTIGATION: Multiple checkboxes checked unexpectedly');
+        console.warn('🚨 Selected checkbox details:');
+        selectedCheckboxes.forEach(checkbox => {
+            const index = parseInt(checkbox.id.replace('lead-', ''));
+            const lead = availableVicidialLeads[index];
+            console.warn(`  - ${checkbox.id} (index ${index}) -> ${lead?.name || 'LEAD NOT FOUND'}`);
+        });
+        console.warn('🚨 Total available leads:', availableVicidialLeads.length);
+    }
+
     if (selectedCheckboxes.length === 0) {
         alert('Please select at least one lead to import.');
         return;
@@ -513,7 +543,8 @@ async function importSelectedLeads() {
         return availableVicidialLeads[parseInt(index)];
     });
 
-    console.log('🚀 Importing', selectedLeads.length, 'selected ViciDial leads with full transcription data...');
+    const importType = quickMode ? 'Quick Import (no transcription)' : 'full import with transcription data';
+    console.log(`🚀 Importing ${selectedLeads.length} selected ViciDial leads with ${importType}...`);
     console.log('📋 Selected checkboxes:', selectedCheckboxes.length, 'checkboxes');
     console.log('📋 Selected lead IDs:', selectedLeads.map(lead => lead.id));
     console.log('📋 Available leads total:', availableVicidialLeads.length);
@@ -533,15 +564,17 @@ async function importSelectedLeads() {
         if (window.location.hostname === 'localhost') {
             API_URLS = ['http://localhost:3001', '/'];
         } else {
-            // For production, try: 1) Port-specific, 2) Relative URL (through nginx proxy)
+            // For production, use HTTPS to match the page protocol
+            const protocol = window.location.protocol; // Gets 'https:' or 'http:'
             API_URLS = [
-                `http://${window.location.hostname}:3001`,
+                `${protocol}//${window.location.hostname}:3001`,
                 '/' // Relative URL (goes through nginx proxy)
             ];
         }
 
         if (window.updateTranscriptionProgress) {
-            window.updateTranscriptionProgress(10, 'Connecting to ViciDial...');
+            const statusMessage = quickMode ? 'Quick Import - Connecting to ViciDial...' : 'Connecting to ViciDial...';
+            window.updateTranscriptionProgress(10, statusMessage);
         }
 
         console.log('🔄 Available sync endpoints to try:', API_URLS);
@@ -552,7 +585,8 @@ async function importSelectedLeads() {
 
         for (let i = 0; i < API_URLS.length; i++) {
             const baseUrl = API_URLS[i];
-            const fullUrl = `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}api/vicidial/sync-sales`;
+            const endpoint = quickMode ? 'api/vicidial/quick-import' : 'api/vicidial/sync-with-premium';
+            const fullUrl = `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}${endpoint}`;
 
             console.log(`🔄 Attempting sync import ${i + 1}/${API_URLS.length}:`, fullUrl);
 
@@ -574,6 +608,12 @@ async function importSelectedLeads() {
                     }
                     return lead;
                 });
+
+                // SAFETY CHECK: Ensure we're not sending more leads than originally selected
+                if (leadsWithAutoAssignment.length !== selectedLeads.length) {
+                    console.error(`🚨 MISMATCH: Original selection ${selectedLeads.length} leads, but auto-assignment created ${leadsWithAutoAssignment.length} leads`);
+                    console.error('🚨 This suggests a bug in auto-assignment logic');
+                }
 
                 const requestBody = {
                     selectedLeads: leadsWithAutoAssignment,
@@ -624,7 +664,47 @@ async function importSelectedLeads() {
         const result = await response.json();
         console.log('Selective import initiated:', result);
 
-        // Poll the backend status to track real transcription progress
+        // Handle Quick Import differently - it completes immediately
+        if (quickMode && result.success) {
+            console.log('✅ Quick Import completed immediately');
+            if (window.updateTranscriptionProgress) {
+                window.updateTranscriptionProgress(100, 'Quick Import complete!');
+            }
+
+            // Show completion immediately
+            setTimeout(() => {
+                if (window.showTranscriptionComplete) {
+                    window.showTranscriptionComplete(result.imported || selectedLeads.length);
+                }
+
+                // Refresh leads view
+                setTimeout(async () => {
+                    console.log('🔄 Reloading leads after Quick Import...');
+                    try {
+                        const baseUrl = window.location.hostname === 'localhost'
+                            ? 'http://localhost:3001'
+                            : `${window.location.protocol}//${window.location.hostname}:3001`;
+
+                        const response = await fetch(`${baseUrl}/api/leads`);
+                        if (response.ok) {
+                            const freshLeads = await response.json();
+                            localStorage.setItem('insurance_leads', JSON.stringify(freshLeads));
+                            console.log('✅ Leads reloaded after Quick Import');
+                        }
+                    } catch (error) {
+                        console.warn('Failed to reload leads:', error);
+                    }
+
+                    if (typeof loadLeadsView === 'function') {
+                        loadLeadsView();
+                    }
+                }, 1000);
+            }, 500);
+
+            return; // Exit early for Quick Import
+        }
+
+        // Poll the backend status to track real transcription progress (only for regular import)
         if (window.updateTranscriptionProgress) {
             window.updateTranscriptionProgress(25, 'Processing selected leads...');
         }
@@ -746,7 +826,7 @@ async function importSelectedLeads() {
                     // Use same URL strategy as the import to avoid URL manipulation issues
                     const baseUrl = window.location.hostname === 'localhost'
                         ? 'http://localhost:3001'
-                        : `http://${window.location.hostname}:3001`;
+                        : `${window.location.protocol}//${window.location.hostname}:3001`;
 
                     console.log('📡 Fetching fresh leads from:', `${baseUrl}/api/leads`);
 
@@ -779,102 +859,7 @@ async function importSelectedLeads() {
     }
 }
 
-// Local tracker functions (disabled - using global ones from transcription-progress.js)
-// Simple Lead Sync Tracker (Top-Right Corner)
-function showTranscriptionProgress_local(selectedLeads) {
-    // Remove any existing progress
-    hideTranscriptionProgress();
-
-    const notification = document.createElement('div');
-    notification.id = 'transcription-progress';
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        z-index: 100001;
-        max-width: 350px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    `;
-
-    // Create lead list
-    const leadsList = selectedLeads.map((lead, index) => `
-        <div id="lead-sync-${index}" style="padding: 5px 0; font-size: 13px; opacity: 0.8;">
-            <i class="fas fa-clock" style="margin-right: 5px; color: #fbbf24;"></i>
-            ${lead.name || lead.company || lead.phone || `Lead ${index + 1}`}
-        </div>
-    `).join('');
-
-    notification.innerHTML = `
-        <h4 style="margin: 0 0 15px 0; font-size: 16px;">
-            <i class="fas fa-sync fa-spin"></i> Syncing ${selectedLeads.length} leads
-        </h4>
-        <div id="leads-sync-list" style="max-height: 200px; overflow-y: auto;">
-            ${leadsList}
-        </div>
-    `;
-
-    document.body.appendChild(notification);
-}
-
-function updateTranscriptionProgress_local(percentage, message) {
-    // Update header with current status
-    const notification = document.getElementById('transcription-progress');
-    if (notification) {
-        const header = notification.querySelector('h4');
-        if (header && message) {
-            header.innerHTML = `
-                <i class="fas fa-sync fa-spin"></i> ${message}
-            `;
-        }
-
-        // Mark leads as completed based on percentage
-        const leadElements = notification.querySelectorAll('[id^="lead-sync-"]');
-        const completedCount = Math.floor((percentage / 100) * leadElements.length);
-
-        leadElements.forEach((leadElement, index) => {
-            if (index < completedCount) {
-                // Mark as completed
-                const icon = leadElement.querySelector('i');
-                if (icon && icon.classList.contains('fa-clock')) {
-                    icon.className = 'fas fa-check-circle';
-                    icon.style.color = '#10b981';
-                }
-            }
-        });
-    }
-}
-
-function showTranscriptionComplete_local(count) {
-    const notification = document.getElementById('transcription-progress');
-    if (notification) {
-        notification.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-        notification.innerHTML = `
-            <h4 style="margin: 0 0 15px 0; font-size: 16px;">
-                <i class="fas fa-check-circle"></i> Sync Complete!
-            </h4>
-            <p style="margin: 0; font-size: 14px; text-align: center;">
-                ✅ ${count} leads synced successfully
-            </p>
-        `;
-
-        // Auto hide after 3 seconds
-        setTimeout(() => {
-            hideTranscriptionProgress();
-        }, 3000);
-    }
-}
-
-function hideTranscriptionProgress_local() {
-    const notification = document.getElementById('transcription-progress');
-    if (notification) {
-        notification.remove();
-    }
-}
+// Removed quickImportSelectedLeads() function - now using importSelectedLeads(quickMode)
 
 function showNoLeadsPopup() {
     const popup = document.createElement('div');

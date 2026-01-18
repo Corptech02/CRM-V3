@@ -8,8 +8,12 @@ const DataSync = {
         : window.location.hostname.includes('github.io')
         ? 'http://162-220-14-239.nip.io:3001/api'
         : window.location.hostname.includes('nip.io')
-        ? 'http://162-220-14-239.nip.io:3001/api'
-        : 'http://162.220.14.239:3001/api',
+        ? (window.location.protocol === 'https:'
+            ? `https://${window.location.hostname}/api`
+            : 'http://162-220-14-239.nip.io:3001/api')
+        : (window.location.protocol === 'https:'
+            ? `https://${window.location.hostname}/api`
+            : 'http://162.220.14.239:3001/api'),
 
     // Initialize data sync
     async init() {
@@ -375,25 +379,68 @@ const DataSync = {
     },
 
     // Delete policy from server
-    async deletePolicy(policyId) {
+    async deletePolicy(policyId, policyData = null) {
         try {
-            const response = await fetch(`${this.API_URL}/policies/${policyId}`, {
-                method: 'DELETE'
-            });
+            let response;
+
+            // If policyId is empty, null, undefined, or "N/A", try to delete by policy number
+            if (!policyId || policyId === 'N/A' || policyId === '') {
+                console.log('Policy has no valid ID, attempting deletion by policy number');
+
+                // Get policy data from localStorage to find policy number
+                if (!policyData) {
+                    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                    policyData = policies.find(p => p.id === policyId || !p.id || p.id === 'N/A');
+                }
+
+                if (policyData && policyData.policyNumber) {
+                    console.log(`Deleting policy by number: ${policyData.policyNumber}`);
+                    response = await fetch(`${this.API_URL}/policies/by-number/${policyData.policyNumber}`, {
+                        method: 'DELETE'
+                    });
+                } else {
+                    console.error('Cannot delete policy: no ID or policy number available');
+                    return false;
+                }
+            } else {
+                // Normal deletion by ID
+                response = await fetch(`${this.API_URL}/policies/${policyId}`, {
+                    method: 'DELETE'
+                });
+            }
 
             if (response.ok) {
-                // Also update localStorage
+                console.log('Policy deleted from server successfully');
+                // Also update localStorage - remove by ID OR by policy number
                 const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-                const filtered = policies.filter(p => p.id !== policyId);
+                let filtered;
+
+                if (policyData && policyData.policyNumber) {
+                    // Filter by policy number if we used that for deletion
+                    filtered = policies.filter(p => p.policyNumber !== policyData.policyNumber);
+                } else {
+                    // Filter by ID for normal deletion
+                    filtered = policies.filter(p => p.id !== policyId);
+                }
+
                 localStorage.setItem('insurance_policies', JSON.stringify(filtered));
                 return true;
+            } else {
+                console.error('Server deletion failed:', response.status, response.statusText);
             }
         } catch (error) {
             console.error('Error deleting policy:', error);
             // Fall back to localStorage only
             const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-            const filtered = policies.filter(p => p.id !== policyId);
+            let filtered;
+
+            if (policyData && policyData.policyNumber) {
+                filtered = policies.filter(p => p.policyNumber !== policyData.policyNumber);
+            } else {
+                filtered = policies.filter(p => p.id !== policyId);
+            }
             localStorage.setItem('insurance_policies', JSON.stringify(filtered));
+            console.log('Fallback: Policy removed from localStorage only');
         }
         return false;
     },

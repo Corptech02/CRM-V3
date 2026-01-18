@@ -46,9 +46,6 @@
                         <h1>Lead Profile: ${lead.name}</h1>
                     </div>
                     <div class="header-actions">
-                        <button class="btn-secondary" onclick="editLead(${lead.id})">
-                            <i class="fas fa-edit"></i> Edit Lead
-                        </button>
                         <button class="btn-danger" onclick="deleteLead(${lead.id})">
                             <i class="fas fa-trash"></i> Delete Lead
                         </button>

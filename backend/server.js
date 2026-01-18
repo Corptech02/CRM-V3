@@ -1,3 +1,4 @@
+require('dotenv').config({ override: true });
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -386,26 +387,40 @@ app.get('/api/policies', (req, res) => {
             return;
         }
 
-        // Deduplicate by policyNumber and limit results
-        const uniquePolicies = [];
+        // Deduplicate by policyNumber and limit results - FIXED FOR NESTED FORMAT
+        const allPolicies = [];
         const seen = new Set();
 
         for (const row of rows) {
             try {
-                const policy = JSON.parse(row.data);
-                const policyNumber = policy.policyNumber || policy.id;
+                const data = JSON.parse(row.data);
 
-                if (!seen.has(policyNumber) && uniquePolicies.length < limit) {
-                    seen.add(policyNumber);
-                    uniquePolicies.push(policy);
+                // Handle nested format: {policies: [...]}
+                let policies = [];
+                if (data.policies && Array.isArray(data.policies)) {
+                    policies = data.policies;
+                } else if (data.id || data.policy_number) {
+                    // Direct policy object
+                    policies = [data];
+                }
+
+                // Process each policy from this row
+                for (const policy of policies) {
+                    const policyNumber = policy.policyNumber || policy.policy_number || policy.id;
+
+                    if (policyNumber && !seen.has(policyNumber) && allPolicies.length < limit) {
+                        seen.add(policyNumber);
+                        allPolicies.push(policy);
+                        console.log(`✅ SERVER: Added policy ${policyNumber} - ${policy.insured_name}`);
+                    }
                 }
             } catch (e) {
                 console.error('Error parsing policy data:', e);
             }
         }
 
-        console.log(`Returning ${uniquePolicies.length} unique policies (requested limit: ${limit})`);
-        res.json(uniquePolicies);
+        console.log(`✅ SERVER: Returning ${allPolicies.length} unique policies (requested limit: ${limit})`);
+        res.json(allPolicies);
     });
 });
 
@@ -425,19 +440,83 @@ app.get('/api/policies/all', (req, res) => {
 // Save/Update policy
 app.post('/api/policies', (req, res) => {
     const policy = req.body;
-    const id = policy.id;
-    const clientId = policy.clientId;
-    const data = JSON.stringify(policy);
+    console.log('📝 POST /api/policies - Received policy data:', {
+        hasId: !!policy.id,
+        hasClientId: !!policy.clientId,
+        hasPolicyNumber: !!policy.policyNumber,
+        hasClientName: !!policy.clientName,
+        vehicleCount: policy.vehicles?.length || 0,
+        driverCount: policy.drivers?.length || 0
+    });
+
+    // Generate proper IDs if missing
+    let id = policy.id;
+    let clientId = policy.clientId;
+
+    // If no ID provided, generate one based on policy number
+    if (!id && policy.policyNumber) {
+        id = `policy_${policy.policyNumber}`;
+        policy.id = id;
+        console.log('🔧 Generated policy ID:', id);
+    }
+
+    // If no clientId but have client name, try to use policy number
+    if (!clientId && policy.policyNumber) {
+        clientId = policy.policyNumber;
+        policy.clientId = clientId;
+        console.log('🔧 Set client ID to policy number:', clientId);
+    }
+
+    // Structure data in the same nested format as existing policies
+    const policyData = {
+        policies: [{
+            ...policy,
+            id: id,
+            policy_number: policy.policyNumber,
+            policyNumber: policy.policyNumber,
+            insured_name: policy.clientName || policy.insuredName || 'Unknown',
+            carrier: policy.carrier || 'Unknown',
+            effective_date: policy.effectiveDate,
+            expiration_date: policy.expirationDate,
+            premium: policy.premium || policy.annualPremium,
+            agent: policy.agent || '',
+            created_date: new Date().toISOString(),
+            updated_date: new Date().toISOString(),
+            synced_from_crm: false,
+            has_detailed_data: !!(policy.vehicles?.length || policy.drivers?.length || policy.coverage),
+            vehicles: policy.vehicles || [],
+            drivers: policy.drivers || [],
+            trailers: policy.trailers || [],
+            coverage: policy.coverage || {}
+        }]
+    };
+
+    const data = JSON.stringify(policyData);
+    console.log('💾 Saving policy with structure:', {
+        id: id,
+        clientId: clientId,
+        nested: true,
+        dataLength: data.length
+    });
 
     db.run(`INSERT INTO policies (id, client_id, data) VALUES (?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET data = ?, client_id = ?, updated_at = CURRENT_TIMESTAMP`,
         [id, clientId, data, data, clientId],
         function(err) {
             if (err) {
+                console.error('❌ Error saving policy:', err);
                 res.status(500).json({ error: err.message });
                 return;
             }
-            res.json({ id: id, success: true });
+            console.log('✅ Policy saved successfully:', id);
+            res.json({
+                id: id,
+                success: true,
+                vehicleCount: policy.vehicles?.length || 0,
+                driverCount: policy.drivers?.length || 0,
+                trailerCount: policy.trailers?.length || 0,
+                message: 'Policy saved with detailed data'
+            });
         }
     );
 });
@@ -452,6 +531,106 @@ app.delete('/api/policies/:id', (req, res) => {
             return;
         }
         res.json({ success: true, deleted: this.changes });
+    });
+});
+
+// Delete policy by policy number (for policies with NULL IDs)
+app.delete('/api/policies/by-number/:policyNumber', (req, res) => {
+    const policyNumber = req.params.policyNumber;
+    console.log(`Attempting to delete policy by number: ${policyNumber}`);
+
+    db.run('DELETE FROM policies WHERE json_extract(data, "$.policyNumber") = ?', [policyNumber], function(err) {
+        if (err) {
+            console.error('Error deleting policy by number:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        console.log(`Deleted ${this.changes} policy(ies) with number ${policyNumber}`);
+        res.json({ success: true, deleted: this.changes });
+    });
+});
+
+// Update policy with detailed vehicle and driver data
+app.put('/api/policies/:id', (req, res) => {
+    const policyId = req.params.id;
+    const updatedPolicy = req.body;
+
+    console.log(`🔄 Updating policy ${policyId} with detailed data:`, {
+        vehicleCount: updatedPolicy.vehicles?.length || 0,
+        driverCount: updatedPolicy.drivers?.length || 0,
+        trailerCount: updatedPolicy.trailers?.length || 0
+    });
+
+    // First, get the existing policy to merge data - search by multiple identifiers including nested structure
+    db.get('SELECT * FROM policies WHERE id = ? OR client_id = ? OR json_extract(data, "$.id") = ? OR json_extract(data, "$.policy_number") = ? OR json_extract(data, "$.policyNumber") = ? OR json_extract(data, "$.policies[0].id") = ? OR json_extract(data, "$.policies[0].policy_number") = ? OR json_extract(data, "$.policies[0].policyNumber") = ?',
+           [policyId, policyId, policyId, policyId, policyId, policyId, policyId, policyId], (err, row) => {
+        if (err) {
+            console.error('Error fetching existing policy:', err);
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (!row) {
+            return res.status(404).json({ error: 'Policy not found' });
+        }
+
+        // Parse existing policy data
+        let existingPolicyData;
+        try {
+            existingPolicyData = JSON.parse(row.data);
+            // Handle nested policies structure
+            if (existingPolicyData.policies && existingPolicyData.policies.length > 0) {
+                existingPolicyData = existingPolicyData.policies[0];
+            }
+        } catch (parseErr) {
+            console.error('Error parsing existing policy data:', parseErr);
+            return res.status(500).json({ error: 'Invalid existing policy data' });
+        }
+
+        // Merge the updated data with existing data
+        const mergedPolicy = {
+            ...existingPolicyData,
+            ...updatedPolicy,
+            // Ensure these critical fields are preserved/updated
+            id: policyId,
+            updated_date: new Date().toISOString(),
+            last_updated_by: 'admin_dashboard',
+            has_detailed_data: true,
+            vehicles: updatedPolicy.vehicles || existingPolicyData.vehicles || [],
+            drivers: updatedPolicy.drivers || existingPolicyData.drivers || [],
+            trailers: updatedPolicy.trailers || existingPolicyData.trailers || []
+        };
+
+        // Wrap back in policies array if original was nested
+        const finalData = row.data.includes('"policies":[') ?
+            { policies: [mergedPolicy] } : mergedPolicy;
+
+        const dataToStore = JSON.stringify(finalData);
+
+        // Update the database
+        db.run(
+            'UPDATE policies SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? OR client_id = ? OR json_extract(data, "$.id") = ? OR json_extract(data, "$.policy_number") = ? OR json_extract(data, "$.policyNumber") = ? OR json_extract(data, "$.policies[0].id") = ? OR json_extract(data, "$.policies[0].policy_number") = ? OR json_extract(data, "$.policies[0].policyNumber") = ?',
+            [dataToStore, policyId, policyId, policyId, policyId, policyId, policyId, policyId, policyId],
+            function(updateErr) {
+                if (updateErr) {
+                    console.error('Error updating policy:', updateErr);
+                    return res.status(500).json({ error: updateErr.message });
+                }
+
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Policy not found for update' });
+                }
+
+                console.log(`✅ Successfully updated policy ${policyId} with detailed data`);
+                res.json({
+                    success: true,
+                    id: policyId,
+                    vehicleCount: mergedPolicy.vehicles?.length || 0,
+                    driverCount: mergedPolicy.drivers?.length || 0,
+                    trailerCount: mergedPolicy.trailers?.length || 0,
+                    message: 'Policy updated with detailed vehicle and driver data'
+                });
+            }
+        );
     });
 });
 
@@ -924,7 +1103,7 @@ def get_vicidial_lists():
     all_lists = []
 
     # Check specific lists that we know exist
-    known_lists = ["998", "999", "1000", "1001", "1005", "1006"]
+    known_lists = ["998", "999", "1000", "1001", "1002", "1005", "1006", "1007", "1008", "1009"]
 
     for list_id in known_lists:
         try:
@@ -1119,6 +1298,89 @@ app.post('/api/vicidial/sync-with-premium', async (req, res) => {
             });
         }
     }, 60000);
+});
+
+// Quick import endpoint (no transcription processing)
+app.post('/api/vicidial/quick-import', async (req, res) => {
+    console.log('⚡ Starting quick Vicidial import using main sync system...');
+    const { spawn } = require('child_process');
+
+    try {
+        const { selectedLeads } = req.body;
+
+        if (!selectedLeads || !Array.isArray(selectedLeads)) {
+            return res.status(400).json({
+                success: false,
+                error: 'No leads provided',
+                message: 'Selected leads array is required'
+            });
+        }
+
+        console.log(`⚡ Processing ${selectedLeads.length} selected leads for quick import`);
+        console.log(`📋 Selected lead IDs:`, selectedLeads.map(l => l.id || l.name));
+
+        // Use the selective sync Python script with full extraction logic
+        console.log('🐍 Running selective ViciDial sync with full extraction...');
+
+        const leadsJson = JSON.stringify(selectedLeads);
+        const python = spawn('python3', ['/var/www/vanguard/vanguard_vicidial_sync_selective.py', leadsJson], {
+            stdio: 'pipe'
+        });
+
+        const result = await new Promise((resolve, reject) => {
+            let output = '';
+            let errorOutput = '';
+
+            python.stdout.on('data', (data) => {
+                output += data.toString();
+                console.log('🐍 Selective Sync:', data.toString().trim());
+            });
+
+            python.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+                console.error('🐍 Selective Sync Error:', data.toString().trim());
+            });
+
+            python.on('close', (code) => {
+                if (code !== 0) {
+                    console.error('🐍 Selective sync failed with exit code:', code);
+                    console.error('🐍 Error output:', errorOutput);
+                    reject(new Error(`Selective sync failed: ${errorOutput}`));
+                } else {
+                    try {
+                        const result = JSON.parse(output || '{"success": false, "imported": 0}');
+                        console.log('🐍 Selective sync result:', result);
+                        resolve(result);
+                    } catch (e) {
+                        console.error('🐍 Failed to parse selective sync result:', e);
+                        resolve({ success: false, imported: 0, error: 'Failed to parse result' });
+                    }
+                }
+            });
+
+            setTimeout(() => {
+                python.kill();
+                reject(new Error('Selective sync timeout'));
+            }, 60000); // 1 minute timeout
+        });
+
+        console.log(`✅ Quick import completed: ${result.imported} leads imported with full premium/insurance extraction`);
+
+        res.json({
+            success: result.success,
+            imported: result.imported || 0,
+            message: result.message || `Successfully quick imported ${result.imported || 0} leads with premium and insurance data`,
+            errors: result.error ? [result.error] : undefined
+        });
+
+    } catch (error) {
+        console.error('❌ Quick import error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Quick import failed',
+            message: error.message
+        });
+    }
 });
 
 // Upload leads to Vicidial endpoint
@@ -1565,6 +1827,98 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
             const assignedAgent = getAssignedAgentFromList(lead.listId);
             console.log(`📋 List ${lead.listId} → Assigned to: ${assignedAgent}`);
 
+            // DEBUG: Log all available fields in ViciDial lead
+            console.log(`🔍 ViciDial Raw Lead Data:`, {
+                comments: lead.comments,
+                address1: lead.address1,
+                address2: lead.address2,
+                address3: lead.address3,
+                city: lead.city,
+                state: lead.state,
+                postal_code: lead.postal_code,
+                alt_phone: lead.alt_phone,
+                email: lead.email,
+                security_phrase: lead.security_phrase,
+                date_of_birth: lead.date_of_birth,
+                gender: lead.gender,
+                called_since_last_reset: lead.called_since_last_reset,
+                entry_date: lead.entry_date,
+                modify_date: lead.modify_date,
+                status: lead.status,
+                user: lead.user,
+                vendor_lead_code: lead.vendor_lead_code,
+                source_id: lead.source_id,
+                rank: lead.rank,
+                owner: lead.owner,
+                entry_list_id: lead.entry_list_id
+            });
+
+            // Extract fleet size and calculate premium from comments
+            let fleetSize = 0;
+            let calculatedPremium = 0;
+            const comments = lead.comments || '';
+
+            if (comments) {
+                // Fleet size extraction patterns
+                const fleetPatterns = [
+                    /Insurance Expires:.*?\|\s*Fleet Size:?\s*(\d+)/i,
+                    /Fleet Size:?\s*(\d+)/i,
+                    /Fleet\s*Size\s*:\s*(\d+)/i,
+                    /(\d+)\s*vehicles?/i,
+                    /fleet\s*of\s*(\d+)/i,
+                    /(\d+)\s*units?/i,
+                    /(\d+)\s*trucks?/i,
+                    /(\d+)\s*power\s*units?/i,
+                    /units?\s*:\s*(\d+)/i,
+                    /truck\s*count\s*:\s*(\d+)/i,
+                    /total\s*vehicles?\s*:\s*(\d+)/i
+                ];
+
+                for (const pattern of fleetPatterns) {
+                    const match = comments.match(pattern);
+                    if (match) {
+                        fleetSize = parseInt(match[1]);
+                        calculatedPremium = fleetSize * 14400; // $14,400 per unit
+                        console.log(`✓ Fleet size extracted: ${fleetSize} units, calculated premium: $${calculatedPremium.toLocaleString()}`);
+                        break;
+                    }
+                }
+            }
+
+            // Extract insurance company from address fields
+            let insuranceCompany = '';
+            const address1 = lead.address1 || '';
+            const address2 = lead.address2 || '';
+
+            const insurancePatterns = [
+                /(State Farm|Progressive|Nationwide|Geico|Allstate|Liberty|USAA|Farmers|Travelers)/i,
+                /(\w+\s+Insurance)/i,
+                /(\w+\s+Mutual)/i,
+                /(\w+\s+General)/i
+            ];
+
+            // Check address1 first, then address2
+            for (const addressField of [address1, address2]) {
+                if (addressField) {
+                    for (const pattern of insurancePatterns) {
+                        const match = addressField.match(pattern);
+                        if (match) {
+                            insuranceCompany = match[1].replace(/\b\w/g, l => l.toUpperCase()); // Title case
+                            console.log(`✓ Insurance company extracted: "${insuranceCompany}" from address field`);
+                            break;
+                        }
+                    }
+                    if (insuranceCompany) break;
+                }
+            }
+
+            // Add extracted data to lead object
+            lead.fleetSize = fleetSize > 0 ? fleetSize.toString() : "Unknown";
+            lead.calculatedPremium = calculatedPremium;
+            lead.insuranceCompany = insuranceCompany;
+
+            console.log(`📊 Enhanced data - Fleet: ${lead.fleetSize}, Premium: $${calculatedPremium.toLocaleString()}, Insurance: "${insuranceCompany}"`);
+
             // Ensure lead has required fields in proper Vanguard format
             const leadToSave = {
                 id: leadId,
@@ -1582,11 +1936,12 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
                     year: "numeric"
                 }),
                 renewalDate: renewalDate,
-                premium: 0,
+                premium: lead.calculatedPremium || 0,
                 dotNumber: lead.dotNumber || '',
                 mcNumber: lead.mcNumber || '',
                 yearsInBusiness: "Unknown",
-                fleetSize: "Unknown",
+                fleetSize: lead.fleetSize || "Unknown",
+                insuranceCompany: lead.insuranceCompany || "",
                 address: "",
                 city: (lead.city || '').toUpperCase(),
                 state: lead.state || 'OH',
@@ -2712,6 +3067,9 @@ app.delete('/api/renewal-completions/:policyKey', (req, res) => {
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Serve recorded audio files
+app.use('/recordings', express.static(path.join(__dirname, '../recordings')));
+
 // Lead Generation - Real Expiring Carriers API (simple version for stability)
 require('./real-expiring-carriers-simple')(app);
 
@@ -2816,12 +3174,17 @@ app.post('/api/twilio/make-call', async (req, res) => {
 
         console.log(`📞 Making Twilio Voice call from ${from} to ${to}`);
 
-        // Create TwiML URL for the call
-        const twimlUrl = `${req.protocol}://${req.get('host')}/api/twilio/twiml`;
+        // Create TwiML URL for the call with target number
+        const twimlUrl = `${req.protocol}://${req.get('host')}/api/twilio/twiml?target=${encodeURIComponent(to)}`;
 
-        // Make the call using Twilio Voice API
+        // For outbound calls: call the AGENT first, then connect them to target
+        const agentPhoneNumber = process.env.AGENT_PHONE_NUMBER || '+13306369079';
+
+        console.log(`🔄 Corrected flow: Calling agent ${agentPhoneNumber} first, then connecting to ${to}`);
+
+        // Make the call using Twilio Voice API - call AGENT first
         const call = await twilioClient.calls.create({
-            to: to,
+            to: agentPhoneNumber,  // Call the agent (you) first
             from: from,
             url: twimlUrl,
             statusCallback: `${req.protocol}://${req.get('host')}/api/twilio/call-status`,
@@ -2874,19 +3237,128 @@ app.post('/api/twilio/make-call', async (req, res) => {
 // TwiML Endpoint - Returns instructions for the call
 app.all('/api/twilio/twiml', (req, res) => {
     console.log('🎵 TwiML requested for Voice API call');
+    console.log('📞 TwiML request data:', req.body);
+    console.log('📞 TwiML query params:', req.query);
+
+    // Get the target number from query params
+    const targetNumber = req.query.target || req.body.target;
+    const agentPhoneNumber = process.env.AGENT_PHONE_NUMBER || '+13306369079';
+
+    console.log(`🎯 Call flow: Agent ${agentPhoneNumber} → Target ${targetNumber}`);
 
     res.type('text/xml');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+
+    if (targetNumber && targetNumber !== agentPhoneNumber) {
+        // This is an outbound call - connect agent to target number
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="Polly.Joanna">Hello! This call is from your Vanguard Insurance system. Please hold while we connect you.</Say>
-    <Pause length="2"/>
-    <Say voice="Polly.Joanna">Thank you for your patience. This is a test call from the Vanguard system.</Say>
+    <Say voice="Polly.Joanna">Hello! Connecting your call now.</Say>
+    <Dial timeout="30" callerId="+13306369079">
+        <Number>${targetNumber}</Number>
+    </Dial>
+    <Say voice="Polly.Joanna">The call could not be completed. Please try again.</Say>
 </Response>`);
+    } else {
+        // Default response for other calls
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Hello! This call is from Vanguard Insurance.</Say>
+    <Dial timeout="30" callerId="+13306369079">
+        <Number>${agentPhoneNumber}</Number>
+    </Dial>
+    <Say voice="Polly.Joanna">We're sorry, all agents are currently busy. Please try again later.</Say>
+</Response>`);
+    }
+});
+
+// Twilio Voice SDK Access Token Endpoint
+app.post('/api/twilio/token', (req, res) => {
+    const { identity } = req.body;
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+    if (!accountSid || !authToken) {
+        return res.status(503).json({
+            error: 'Twilio credentials not configured'
+        });
+    }
+
+    try {
+        const AccessToken = require('twilio').jwt.AccessToken;
+        const VoiceGrant = AccessToken.VoiceGrant;
+
+        // For JWT tokens, we need actual API keys, not Account SID
+        // If no API keys, we can't create proper JWT tokens for Voice SDK
+        if (!process.env.TWILIO_API_KEY || !process.env.TWILIO_API_SECRET) {
+            console.error('❌ Missing TWILIO_API_KEY and TWILIO_API_SECRET for JWT generation');
+            return res.status(503).json({
+                error: 'Twilio API Keys required for Voice SDK. Please configure TWILIO_API_KEY and TWILIO_API_SECRET environment variables.'
+            });
+        }
+
+        // Create access token with proper API keys
+        const accessToken = new AccessToken(
+            accountSid,
+            process.env.TWILIO_API_KEY,
+            process.env.TWILIO_API_SECRET,
+            { identity: identity || 'vanguard-user' }
+        );
+
+        // Create voice grant
+        const voiceGrant = new VoiceGrant({
+            outgoingApplicationSid: process.env.TWILIO_TWIML_APP_SID,
+            incomingAllow: true
+        });
+
+        // If no TwiML App SID, create a basic grant for outgoing calls only
+        if (!process.env.TWILIO_TWIML_APP_SID) {
+            console.warn('⚠️ TWILIO_TWIML_APP_SID not configured, creating basic grant');
+            const basicVoiceGrant = new VoiceGrant({
+                incomingAllow: false // Only allow outgoing calls without TwiML app
+            });
+            accessToken.addGrant(basicVoiceGrant);
+        } else {
+            accessToken.addGrant(voiceGrant);
+        }
+
+        console.log('✅ Twilio access token generated for:', identity || 'vanguard-user');
+
+        res.json({
+            identity: identity || 'vanguard-user',
+            token: accessToken.toJwt()
+        });
+
+    } catch (error) {
+        console.error('❌ Token generation error:', error);
+        res.status(500).json({
+            error: 'Failed to generate access token'
+        });
+    }
+});
+
+// Voice Bridge - TwiML endpoint to connect calls to agent
+app.all('/api/twilio/voice-bridge', (req, res) => {
+    const voiceBridge = require('../api/twilio/voice-bridge');
+    voiceBridge(req, res);
 });
 
 // Call Status Webhook for Voice API
 app.post('/api/twilio/call-status', (req, res) => {
     console.log('📊 Twilio Voice API call status update:', req.body);
+    res.status(200).send('OK');
+});
+
+// Recording Status Webhook
+app.post('/api/twilio/recording-status', (req, res) => {
+    console.log('🎙️ Call recording status:', req.body);
+    res.status(200).send('OK');
+});
+
+// Voicemail Transcription Webhook
+app.post('/api/twilio/voicemail-transcription', (req, res) => {
+    console.log('📝 Voicemail transcription received:', req.body);
+    // TODO: Save voicemail transcription to database
     res.status(200).send('OK');
 });
 
@@ -3020,7 +3492,37 @@ app.get('/api/twilio/events', (req, res) => {
 app.post('/api/twilio/incoming-call', (req, res) => {
     console.log('📞 Incoming call webhook received:', req.body);
 
-    const { CallSid, From, To, CallStatus } = req.body;
+    const { CallSid, From, To, CallStatus, Direction } = req.body;
+
+    // Only process truly external incoming calls, not Twilio outbound calls to agent
+    if (Direction !== 'inbound') {
+        console.log('🚫 Ignoring outbound call (Twilio calling agent):', CallSid, 'From:', From, 'To:', To);
+        res.type('text/xml');
+        res.send('<Response></Response>');
+        return;
+    }
+
+    // Also ignore calls FROM our own Twilio number or known internal numbers
+    const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
+    const agentNumber = process.env.AGENT_PHONE_NUMBER;
+
+    if (From === twilioNumber || From === agentNumber) {
+        console.log('🚫 Ignoring call from our own number:', CallSid, 'From:', From);
+        res.type('text/xml');
+        res.send('<Response></Response>');
+        return;
+    }
+
+    // Determine which line was called
+    const isMainLine = To === '+13304600872';
+    const isPersonalLine = To === '+13306369079';
+
+    let lineType = 'Unknown Line';
+    if (isMainLine) {
+        lineType = 'Main Line';
+    } else if (isPersonalLine) {
+        lineType = "Grant's Direct Line";
+    }
 
     // Send incoming call notification to all connected SSE clients
     const callData = {
@@ -3028,29 +3530,103 @@ app.post('/api/twilio/incoming-call', (req, res) => {
         callControlId: CallSid,
         from: From,
         to: To,
+        lineType: lineType,
+        isMainLine: isMainLine,
+        isPersonalLine: isPersonalLine,
         status: CallStatus,
         timestamp: new Date().toISOString()
     };
 
-    console.log('📡 Broadcasting incoming call to', sseClients.size, 'connected clients');
+    console.log(`📡 Scheduling delayed broadcast of ${lineType} call from ${From} in 10 seconds...`);
 
-    // Broadcast to all connected SSE clients
-    sseClients.forEach(client => {
-        try {
-            client.write(`data: ${JSON.stringify(callData)}\n\n`);
-        } catch (error) {
-            console.error('Error sending SSE message:', error);
-            sseClients.delete(client);
-        }
-    });
+    // Delay the broadcast by 10 seconds to allow intro to play first
+    setTimeout(() => {
+        console.log(`📡 Broadcasting ${lineType} call from ${From} to`, sseClients.size, 'connected clients');
 
-    // Respond with TwiML to handle the call
+        // Broadcast to all connected SSE clients after delay
+        sseClients.forEach(client => {
+            try {
+                client.write(`data: ${JSON.stringify(callData)}\n\n`);
+            } catch (error) {
+                console.error('Error sending SSE message:', error);
+                sseClients.delete(client);
+            }
+        });
+    }, 10000); // 10 second delay
+
+    // Store the call for potential answer/reject actions
+    global.incomingCalls = global.incomingCalls || {};
+    global.incomingCalls[CallSid] = {
+        from: From,
+        to: To,
+        callSid: CallSid,
+        timestamp: new Date().toISOString(),
+        status: 'ringing'
+    };
+
+    // Different TwiML response based on which line was called
     res.type('text/xml');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+
+    if (isMainLine) {
+        // Main office line - original Vanguard Insurance welcome audio with 2-minute timeout
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="Polly.Joanna">Please hold while we connect you to an agent.</Say>
-    <Play loop="3">https://demo.twilio.com/docs/classic.mp3</Play>
+    <Play>https://corn-tapir-5435.twil.io/assets/welcome.mp3</Play>
+    <Play loop="5">https://raw.githubusercontent.com/Corptech02/LLCinfo/main/ES_Doze%20Off%20-%20Martin%20Landstr%C3%B6m%20(Version%20dcea32a8)%20-%20fullmix_preview.mp3</Play>
+    <Redirect>/api/twilio/call-timeout/${CallSid}</Redirect>
 </Response>`);
+    } else {
+        // Grant's direct line - ring and wait for answer in CRM
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Pause length="5"/>
+    <Redirect>/api/twilio/call-status/${CallSid}</Redirect>
+</Response>`);
+    }
+});
+
+// Call status check endpoint for redirects
+app.all('/api/twilio/call-status/:callSid', (req, res) => {
+    const callSid = req.params.callSid;
+    console.log('📞 Checking call status for:', callSid);
+
+    const callData = global.incomingCalls && global.incomingCalls[callSid];
+
+    if (!callData) {
+        console.log('❌ Call not found:', callSid);
+        res.type('text/xml');
+        res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+        return;
+    }
+
+    if (callData.status === 'answered') {
+        console.log('✅ Call answered, connecting...');
+        res.type('text/xml');
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Connecting you now.</Say>
+    <Dial timeout="30">
+        <Client>agent</Client>
+    </Dial>
+</Response>`);
+    } else if (callData.status === 'rejected') {
+        console.log('❌ Call rejected');
+        res.type('text/xml');
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">We're sorry, no agents are available.</Say>
+    <Hangup/>
+</Response>`);
+    } else {
+        // Still ringing, continue waiting
+        console.log('🔄 Call still ringing, continuing to wait...');
+        res.type('text/xml');
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Play loop="1">https://demo.twilio.com/docs/classic.mp3</Play>
+    <Redirect>/api/twilio/call-status/${callSid}</Redirect>
+</Response>`);
+    }
 });
 
 // Answer incoming call endpoint (for existing UI compatibility)
@@ -3067,17 +3643,577 @@ app.post('/api/twilio/answer/:callSid', async (req, res) => {
     try {
         const callSid = req.params.callSid;
 
-        // Update call to connect it (this is handled by TwiML, but we acknowledge the answer)
-        console.log('✅ Call answered via CRM interface:', callSid);
+        // Mark call as answered
+        if (global.incomingCalls && global.incomingCalls[callSid]) {
+            global.incomingCalls[callSid].status = 'answered';
+            global.incomingCalls[callSid].answeredAt = new Date().toISOString();
+        }
+
+        // Create a unique conference name for this call
+        const conferenceName = `call-${callSid}`;
+
+        // First, stop any playing media by updating with silence
+        await twilioClient.calls(callSid).update({
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Thank you for calling Vanguard Insurance. An agent will be with you shortly.</Say>
+    <Pause length="1"/>
+</Response>`
+        });
+
+        console.log('✅ Stopped hold music, establishing connection...');
+
+        // Create a direct dial to your phone number and bridge the calls
+        const agentPhoneNumber = process.env.AGENT_PHONE_NUMBER || '+13306369079';
+
+        // Update the original call to dial your number directly
+        const updatedCall = await twilioClient.calls(callSid).update({
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Connecting you to an agent now.</Say>
+    <Dial timeout="30" record="true" recordingStatusCallback="/api/twilio/recording-status">
+        <Number>${agentPhoneNumber}</Number>
+    </Dial>
+    <Say voice="Polly.Joanna">The agent is currently unavailable. Please leave a message after the beep.</Say>
+    <Record maxLength="300" timeout="10" finishOnKey="#" recordingStatusCallback="/api/twilio/recording-status"/>
+</Response>`
+        });
+
+        // Store call info for frontend
+        if (global.incomingCalls && global.incomingCalls[callSid]) {
+            global.incomingCalls[callSid].agentNumber = agentPhoneNumber;
+            global.incomingCalls[callSid].callMode = 'direct_dial';
+        }
+
+        console.log('✅ Call updated to connect mode:', updatedCall.status);
 
         res.json({
             success: true,
             message: 'Call answered',
-            callSid: callSid
+            callSid: callSid,
+            conferenceName: conferenceName,
+            needsAgentCall: true
         });
 
     } catch (error) {
         console.error('❌ Error answering call:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Dial agent into conference endpoint
+app.post('/api/twilio/dial-agent/:conferenceName', async (req, res) => {
+    console.log('📞 Dialing agent into conference:', req.params.conferenceName);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const conferenceName = req.params.conferenceName;
+        const agentPhone = process.env.AGENT_PHONE_NUMBER || '+13306369079';
+        const twilioPhone = process.env.TWILIO_PHONE_NUMBER || '+13306369079';
+
+        // Check if agent phone is the same as Twilio phone (would cause infinite loop)
+        if (agentPhone === twilioPhone) {
+            console.log('⚠️ Agent phone same as Twilio phone - keeping call in conference for manual join');
+
+            // Keep the original conference approach but indicate that manual joining is required
+            // The client is already in the conference from the answer TwiML
+            console.log('✅ Client is in conference, agent must join manually');
+
+            res.json({
+                success: true,
+                message: 'Conference created - agent must join manually (same number as Twilio)',
+                agentCallSid: null,
+                conferenceName: conferenceName,
+                requiresManualJoin: true
+            });
+            return;
+        }
+
+        // Create call to agent and connect them to conference
+        const call = await twilioClient.calls.create({
+            to: agentPhone,
+            from: twilioPhone,
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Incoming call from client. Joining conference now.</Say>
+    <Dial>
+        <Conference waitUrl="" startConferenceOnEnter="true" endConferenceOnExit="true">${conferenceName}</Conference>
+    </Dial>
+</Response>`
+        });
+
+        console.log('✅ Agent call initiated:', call.sid);
+
+        res.json({
+            success: true,
+            message: 'Agent dialed into conference',
+            agentCallSid: call.sid,
+            conferenceName: conferenceName
+        });
+
+    } catch (error) {
+        console.error('❌ Error dialing agent:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// TwiML Application endpoint for browser calls
+app.post('/api/twilio/voice', (req, res) => {
+    console.log('📞 TwiML Voice request:', req.body);
+
+    const { conference } = req.body;
+
+    let twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>`;
+
+    if (conference) {
+        // Join specified conference
+        console.log('🎧 Browser joining conference:', conference);
+        twiml += `
+    <Say voice="Polly.Joanna">Joining conference call.</Say>
+    <Dial>
+        <Conference waitUrl="" startConferenceOnEnter="false" endConferenceOnExit="false">${conference}</Conference>
+    </Dial>`;
+    } else {
+        // Default response
+        twiml += `
+    <Say voice="Polly.Joanna">Hello from Vanguard CRM.</Say>
+    <Hangup/>`;
+    }
+
+    twiml += `
+</Response>`;
+
+    console.log('📞 Sending TwiML:', twiml);
+
+    res.type('text/xml');
+    res.send(twiml);
+});
+
+// Generate Twilio Client token for browser-based calling
+app.get('/api/twilio/token', async (req, res) => {
+    console.log('📞 Generating Twilio Client token');
+
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio credentials not configured'
+        });
+    }
+
+    try {
+        const AccessToken = require('twilio').jwt.AccessToken;
+        const VoiceGrant = AccessToken.VoiceGrant;
+
+        // Create an access token which we will sign and return to the client
+        const token = new AccessToken(
+            process.env.TWILIO_ACCOUNT_SID,
+            process.env.TWILIO_ACCOUNT_SID, // Use Account SID as API key for simplicity
+            process.env.TWILIO_AUTH_TOKEN,   // Use Auth Token as API secret
+            { identity: 'vanguard-agent-' + Date.now() } // Unique identity
+        );
+
+        // Create a Voice grant and add it to the token
+        const grant = new VoiceGrant({
+            // For testing, we'll use a simple outbound configuration
+            incomingAllow: false, // Disable incoming for now
+            outgoingApplicationSid: null, // Will be handled by params
+        });
+        token.addGrant(grant);
+
+        console.log('✅ Client token generated');
+
+        res.json({
+            success: true,
+            token: token.toJwt(),
+            identity: 'vanguard-agent'
+        });
+
+    } catch (error) {
+        console.error('❌ Error generating token:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Bridge call directly (simple approach)
+app.post('/api/twilio/bridge-direct', async (req, res) => {
+    console.log('📞 Bridging call directly (simple):', req.body);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const { callSid } = req.body;
+
+        if (!callSid) {
+            return res.status(400).json({
+                success: false,
+                error: 'Call SID is required'
+            });
+        }
+
+        const agentPhone = process.env.AGENT_PHONE_NUMBER || '+13306369079';
+
+        // Update the call to connect directly to agent phone
+        const updatedCall = await twilioClient.calls(callSid).update({
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Connecting you directly to our agent now.</Say>
+    <Dial timeout="30" record="true">
+        <Number>${agentPhone}</Number>
+    </Dial>
+</Response>`
+        });
+
+        console.log('✅ Call bridged directly to agent phone:', updatedCall.status);
+
+        res.json({
+            success: true,
+            message: 'Call bridged directly to agent phone',
+            callSid: callSid,
+            agentPhone: agentPhone,
+            bridgeType: 'direct_phone'
+        });
+
+    } catch (error) {
+        console.error('❌ Error bridging call directly:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Simple pickup call - just answer without dialing anywhere else
+app.post('/api/twilio/pickup-call', async (req, res) => {
+    console.log('📞 Picking up call directly:', req.body);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const { callSid } = req.body;
+
+        if (!callSid) {
+            return res.status(400).json({
+                success: false,
+                error: 'Call SID is required'
+            });
+        }
+
+        // Direct dial to your phone to connect the calls
+        const agentPhoneNumber = process.env.AGENT_PHONE_NUMBER || '+13306369079';
+
+        console.log('📞 Connecting caller directly to agent phone:', agentPhoneNumber);
+
+        const updatedCall = await twilioClient.calls(callSid).update({
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Thank you for calling Vanguard Insurance. Connecting you now.</Say>
+    <Dial timeout="30" record="true">
+        <Number>${agentPhoneNumber}</Number>
+    </Dial>
+</Response>`
+        });
+
+        // Mark as answered in our tracking
+        if (global.incomingCalls && global.incomingCalls[callSid]) {
+            global.incomingCalls[callSid].status = 'answered';
+            global.incomingCalls[callSid].answeredAt = new Date().toISOString();
+            global.incomingCalls[callSid].connectedTo = agentPhoneNumber;
+        }
+
+        console.log('✅ Call picked up and connecting to agent phone:', agentPhoneNumber);
+
+        res.json({
+            success: true,
+            message: 'Call answered - connecting to your phone now',
+            callSid: callSid,
+            status: 'picked_up',
+            connectedTo: agentPhoneNumber,
+            needsAgentJoin: false
+        });
+
+    } catch (error) {
+        console.error('❌ Error picking up call:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Generate Twilio Voice access token for browser softphone
+app.post('/api/twilio/voice-token', (req, res) => {
+    console.log('🎧 Generating Twilio Voice access token');
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const AccessToken = require('twilio').jwt.AccessToken;
+        const VoiceGrant = AccessToken.VoiceGrant;
+
+        // Get identity from request or use default
+        const { identity } = req.body;
+        const tokenIdentity = identity || 'vanguard-agent-' + Date.now();
+
+        console.log('🎧 Creating access token for identity:', tokenIdentity);
+
+        // Create an access token which we will sign and return to the client
+        const accessToken = new AccessToken(
+            process.env.TWILIO_ACCOUNT_SID,
+            process.env.TWILIO_API_KEY || process.env.TWILIO_ACCOUNT_SID, // Use account SID if no API key
+            process.env.TWILIO_API_SECRET || process.env.TWILIO_AUTH_TOKEN, // Use auth token if no API secret
+            { identity: tokenIdentity }
+        );
+
+        // Create a Voice grant and add to the access token
+        const voiceGrant = new VoiceGrant({
+            outgoingApplicationSid: process.env.TWILIO_VOICE_APP_SID || 'default',
+            incomingAllow: true
+        });
+        accessToken.addGrant(voiceGrant);
+
+        // Generate the token string
+        const token = accessToken.toJwt();
+
+        console.log('✅ Voice access token generated');
+
+        res.json({
+            success: true,
+            token: token,
+            identity: tokenIdentity
+        });
+
+    } catch (error) {
+        console.error('❌ Error generating voice token:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Bridge call directly to WebRTC (bypassing conference)
+app.post('/api/twilio/bridge-to-webrtc', async (req, res) => {
+    console.log('🎧 Bridging call to WebRTC:', req.body);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const { callSid, webrtcReady } = req.body;
+
+        if (!callSid) {
+            return res.status(400).json({
+                success: false,
+                error: 'Call SID is required'
+            });
+        }
+
+        // Update the call to connect directly to agent (no conference)
+        // This creates a direct bridge between client and WebRTC
+        const updatedCall = await twilioClient.calls(callSid).update({
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Connecting you directly to agent.</Say>
+    <Dial timeout="30" record="true">
+        <Stream url="wss://your-webrtc-endpoint.com/stream" />
+    </Dial>
+</Response>`
+        });
+
+        console.log('✅ Call bridged to WebRTC:', updatedCall.status);
+
+        res.json({
+            success: true,
+            message: 'Call bridged to WebRTC',
+            callSid: callSid,
+            streamUrl: 'wss://webrtc-stream',
+            bridgeType: 'webrtc'
+        });
+
+    } catch (error) {
+        console.error('❌ Error bridging call to WebRTC:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Hangup call endpoint
+app.post('/api/twilio/hangup/:callSid', async (req, res) => {
+    console.log('📞 Hangup request for call:', req.params.callSid);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const callSid = req.params.callSid;
+
+        // Hang up the call
+        const call = await twilioClient.calls(callSid).update({
+            status: 'completed'
+        });
+
+        console.log('✅ Call hung up:', callSid);
+
+        res.json({
+            success: true,
+            message: 'Call ended',
+            callSid: callSid,
+            status: call.status
+        });
+
+    } catch (error) {
+        console.error('❌ Error hanging up call:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Join conference with browser audio support
+app.post('/api/twilio/join-conference-browser', async (req, res) => {
+    console.log('📞 Browser audio conference join:', req.body);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const { conferenceName, useBrowserAudio } = req.body;
+
+        if (!conferenceName) {
+            return res.status(400).json({
+                success: false,
+                error: 'Conference name is required'
+            });
+        }
+
+        const phoneToCall = process.env.AGENT_PHONE_NUMBER || '+13306369079';
+
+        // Create a call to the agent to join the existing conference
+        // This will be the audio bridge for browser audio
+        const call = await twilioClient.calls.create({
+            to: phoneToCall,
+            from: process.env.TWILIO_PHONE_NUMBER || '+13306369079',
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Browser audio bridge connecting to conference.</Say>
+    <Dial>
+        <Conference waitUrl="" startConferenceOnEnter="false" endConferenceOnExit="false">${conferenceName}</Conference>
+    </Dial>
+</Response>`
+        });
+
+        console.log('✅ Browser audio bridge call initiated:', call.sid);
+
+        res.json({
+            success: true,
+            message: 'Browser audio bridge created - answer your phone to connect',
+            callSid: call.sid,
+            conferenceName: conferenceName,
+            instructions: `Answer your phone and you'll be connected to the conference. Your browser microphone will be available for advanced controls.`
+        });
+
+    } catch (error) {
+        console.error('❌ Error creating browser audio bridge:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Join conference endpoint - creates a call to agent to join existing conference
+app.post('/api/twilio/join-conference', async (req, res) => {
+    console.log('📞 Agent joining conference:', req.body);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const { conferenceName, agentPhone } = req.body;
+
+        if (!conferenceName) {
+            return res.status(400).json({
+                success: false,
+                error: 'Conference name is required'
+            });
+        }
+
+        const phoneToCall = agentPhone || process.env.AGENT_PHONE_NUMBER || '+13306369079';
+
+        // Create a call to the agent to join the existing conference
+        const call = await twilioClient.calls.create({
+            to: phoneToCall,
+            from: process.env.TWILIO_PHONE_NUMBER || '+13306369079',
+            twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Joining conference call with client.</Say>
+    <Dial>
+        <Conference waitUrl="" startConferenceOnEnter="false" endConferenceOnExit="true">${conferenceName}</Conference>
+    </Dial>
+</Response>`
+        });
+
+        console.log('✅ Conference join call initiated:', call.sid);
+
+        res.json({
+            success: true,
+            message: 'Conference join call created',
+            callSid: call.sid,
+            conferenceName: conferenceName
+        });
+
+    } catch (error) {
+        console.error('❌ Error joining conference:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -3098,6 +4234,12 @@ app.post('/api/twilio/reject/:callSid', async (req, res) => {
 
     try {
         const callSid = req.params.callSid;
+
+        // Mark call as rejected so the redirect endpoint knows to hang up
+        if (global.incomingCalls && global.incomingCalls[callSid]) {
+            global.incomingCalls[callSid].status = 'rejected';
+            global.incomingCalls[callSid].rejectedAt = new Date().toISOString();
+        }
 
         // Hang up the call
         const call = await twilioClient.calls(callSid).update({
@@ -3128,7 +4270,7 @@ app.post('/api/twilio/call-status-callback', (req, res) => {
 
     const { CallSid, From, To, CallStatus, Direction } = req.body;
 
-    // Only trigger popup for INCOMING calls when they start ringing
+    // Handle incoming calls when they start ringing
     if (Direction === 'inbound' && CallStatus === 'ringing') {
         console.log('📞 Incoming call detected - triggering popup');
 
@@ -3148,6 +4290,39 @@ app.post('/api/twilio/call-status-callback', (req, res) => {
         sseClients.forEach(client => {
             try {
                 client.write(`data: ${JSON.stringify(callData)}\n\n`);
+            } catch (error) {
+                console.error('Error sending SSE message:', error);
+                sseClients.delete(client);
+            }
+        });
+    }
+
+    // Handle call completion (any direction, any reason)
+    if (CallStatus === 'completed' || CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed' || CallStatus === 'canceled') {
+        console.log(`📞 Call ended - Status: ${CallStatus}, Direction: ${Direction}, CallSid: ${CallSid}`);
+
+        // Clean up stored call data
+        if (global.incomingCalls && global.incomingCalls[CallSid]) {
+            delete global.incomingCalls[CallSid];
+        }
+
+        // Notify all connected clients that the call has ended
+        const callEndData = {
+            type: 'call_ended',
+            callControlId: CallSid,
+            from: From,
+            to: To,
+            status: CallStatus,
+            direction: Direction,
+            timestamp: new Date().toISOString()
+        };
+
+        console.log('📡 Broadcasting call end to', sseClients.size, 'connected clients');
+
+        // Broadcast to all connected SSE clients
+        sseClients.forEach(client => {
+            try {
+                client.write(`data: ${JSON.stringify(callEndData)}\n\n`);
             } catch (error) {
                 console.error('Error sending SSE message:', error);
                 sseClients.delete(client);
@@ -3179,6 +4354,139 @@ app.post('/api/twilio/sip-routing', (req, res) => {
     res.status(200).send(twiml);
 });
 
+// Call timeout endpoint - handles 2-minute timeout for unanswered calls
+app.all('/api/twilio/call-timeout/:callSid', (req, res) => {
+    const callSid = req.params.callSid;
+    console.log('⏰ Call timeout check for:', callSid);
+
+    const callData = global.incomingCalls && global.incomingCalls[callSid];
+
+    if (!callData) {
+        console.log('❌ Call not found in timeout check:', callSid);
+        res.type('text/xml');
+        res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+        return;
+    }
+
+    if (callData.status === 'answered') {
+        console.log('✅ Call was answered, continuing...');
+        res.type('text/xml');
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Connecting you now.</Say>
+    <Pause length="1"/>
+    <Say voice="Polly.Joanna">You are now connected with an agent.</Say>
+    <Record timeout="3600" action="/api/twilio/recording-complete" playBeep="false" />
+</Response>`);
+    } else {
+        // Call was not answered within 2 minutes
+        console.log('⏰ Call timeout - playing goodbye message and hanging up');
+
+        // Clean up stored call data
+        if (global.incomingCalls && global.incomingCalls[callSid]) {
+            delete global.incomingCalls[callSid];
+        }
+
+        res.type('text/xml');
+        res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Play>https://corn-tapir-5435.twil.io/assets/have%20a%20good%20day.mp3</Play>
+    <Hangup/>
+</Response>`);
+    }
+});
+
+// Hangup call endpoint - when agent hangs up in CRM
+app.post('/api/twilio/hangup/:callSid', async (req, res) => {
+    console.log('📞 Hangup request for call:', req.params.callSid);
+
+    if (!twilioClient) {
+        return res.status(500).json({
+            success: false,
+            error: 'Twilio client not initialized'
+        });
+    }
+
+    try {
+        const callSid = req.params.callSid;
+
+        // Terminate the call
+        const call = await twilioClient.calls(callSid).update({
+            status: 'completed'
+        });
+
+        console.log('✅ Call terminated by agent:', callSid);
+
+        // Clean up stored call data
+        if (global.incomingCalls && global.incomingCalls[callSid]) {
+            delete global.incomingCalls[callSid];
+        }
+
+        res.json({
+            success: true,
+            message: 'Call terminated',
+            callSid: callSid
+        });
+
+    } catch (error) {
+        console.error('❌ Failed to terminate call:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Recording complete endpoint
+app.post('/api/twilio/recording-complete', (req, res) => {
+    console.log('📹 Recording completed:', req.body);
+
+    res.type('text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna">Thank you for your call. Goodbye.</Say>
+    <Hangup/>
+</Response>`);
+});
+
+// Conference status callback
+app.post('/api/twilio/conference-status', (req, res) => {
+    console.log('📞 Conference event:', req.body);
+
+    const { ConferenceSid, StatusCallbackEvent, FriendlyName } = req.body;
+
+    if (StatusCallbackEvent === 'conference-start') {
+        console.log('✅ Conference started:', FriendlyName);
+    } else if (StatusCallbackEvent === 'conference-end') {
+        console.log('📞 Conference ended:', FriendlyName);
+    } else if (StatusCallbackEvent === 'participant-join') {
+        console.log('👤 Participant joined conference:', FriendlyName);
+    } else if (StatusCallbackEvent === 'participant-leave') {
+        console.log('👋 Participant left conference:', FriendlyName);
+    }
+
+    res.status(200).send('OK');
+});
+
+// Client search endpoint for incoming call lookup
+app.get('/api/clients/search', (req, res) => {
+    console.log('📞 Client search request:', req.query);
+
+    const { phone } = req.query;
+    if (!phone) {
+        return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // For now, return empty result since client database search would require
+    // integration with your specific client storage system
+    // This allows the incoming call system to work and fall back to localStorage
+    res.json({
+        client: null,
+        policies: [],
+        message: 'Client search endpoint active - integrate with your client database'
+    });
+});
+
 // Loss Runs File Upload Endpoints
 
 // Configure multer for file uploads
@@ -3207,7 +4515,7 @@ const upload = multer({
 });
 
 // Upload files endpoint
-app.post('/api/loss-runs-upload', upload.array('files'), (req, res) => {
+app.post('/api/loss-runs-upload', upload.array('files'), async (req, res) => {
     console.log('📤 Loss runs upload request received');
 
     try {
@@ -3229,32 +4537,46 @@ app.post('/api/loss-runs-upload', upload.array('files'), (req, res) => {
 
         const uploadedFiles = [];
 
-        // Process each uploaded file
-        req.files.forEach((file) => {
+        // Process each uploaded file with proper async database operations
+        for (const file of req.files) {
             const fileId = path.basename(file.filename, path.extname(file.filename));
 
-            // Insert file metadata into database
-            db.run(`
-                INSERT INTO loss_runs (id, lead_id, file_name, file_size, file_type, status)
-                VALUES (?, ?, ?, ?, ?, 'uploaded')
-            `, [fileId, leadId, file.filename, file.size, file.mimetype], function(err) {
-                if (err) {
-                    console.error('Database insert error:', err);
-                } else {
-                    console.log('✅ File metadata inserted:', fileId);
-                }
-            });
+            try {
+                // Insert file metadata into database using the retry operation
+                const result = await retryDatabaseOperation((callback) => {
+                    db.run(`
+                        INSERT INTO loss_runs (lead_id, file_name, file_size, file_type, status)
+                        VALUES (?, ?, ?, ?, 'uploaded')
+                    `, [leadId, file.filename, file.size, file.mimetype], function(err) {
+                        callback(err, err ? null : this.lastID);
+                    });
+                });
 
-            uploadedFiles.push({
-                id: fileId,
-                lead_id: leadId,
-                file_name: file.filename,
-                original_name: file.originalname,
-                file_size: file.size,
-                file_type: file.mimetype,
-                uploaded_date: new Date().toISOString()
+                const insertedId = result;
+                console.log('✅ File metadata inserted with ID:', insertedId);
+
+                uploadedFiles.push({
+                    id: insertedId,
+                    lead_id: leadId,
+                    file_name: file.filename,
+                    original_name: file.originalname,
+                    file_size: file.size,
+                    file_type: file.mimetype,
+                    uploaded_date: new Date().toISOString()
+                });
+
+            } catch (dbError) {
+                console.error('Database insert error for file:', fileId, dbError);
+                // Continue processing other files even if one fails
+            }
+        }
+
+        if (uploadedFiles.length === 0) {
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to save file metadata to database'
             });
-        });
+        }
 
         res.json({
             success: true,
@@ -3858,6 +5180,144 @@ app.delete('/api/documents/:docId', (req, res) => {
                 success: true,
                 message: 'Document deleted successfully'
             });
+        });
+    });
+});
+
+// Agent Dev Stats API endpoints
+// Save dev stats to server
+app.post('/api/agent-dev-stats', (req, res) => {
+    const { agentName, filter, stats } = req.body;
+
+    if (!agentName || !filter || !stats) {
+        return res.status(400).json({ error: 'Agent name, filter, and stats are required' });
+    }
+
+    const key = `dev_stats_${agentName}_${filter}`;
+    const value = JSON.stringify(stats);
+
+    db.run(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+        [key, value],
+        function(err) {
+            if (err) {
+                console.error('Error saving dev stats:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            console.log(`💾 Saved dev stats for ${agentName} ${filter}:`, stats);
+            res.json({ success: true, agentName, filter, stats });
+        }
+    );
+});
+
+// Get dev stats from server
+app.get('/api/agent-dev-stats/:agentName/:filter', (req, res) => {
+    const { agentName, filter } = req.params;
+    const key = `dev_stats_${agentName}_${filter}`;
+
+    db.get('SELECT value FROM settings WHERE key = ?', [key], (err, row) => {
+        if (err) {
+            console.error('Error getting dev stats:', err);
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (!row) {
+            return res.json({ stats: null });
+        }
+
+        try {
+            const stats = JSON.parse(row.value);
+            console.log(`📊 Retrieved dev stats for ${agentName} ${filter}:`, stats);
+            res.json({ stats });
+        } catch (parseErr) {
+            console.error('Error parsing dev stats:', parseErr);
+            res.status(500).json({ error: 'Invalid stats data' });
+        }
+    });
+});
+
+// Delete dev stats from server
+app.delete('/api/agent-dev-stats/:agentName/:filter', (req, res) => {
+    const { agentName, filter } = req.params;
+    const key = `dev_stats_${agentName}_${filter}`;
+
+    db.run('DELETE FROM settings WHERE key = ?', [key], function(err) {
+        if (err) {
+            console.error('Error deleting dev stats:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log(`🗑️ Deleted dev stats for ${agentName} ${filter}`);
+        res.json({ success: true, deleted: this.changes > 0 });
+    });
+});
+
+// Live Agent Stats API endpoints (for real-time tracking)
+// Save live agent stats
+app.post('/api/live-agent-stats', (req, res) => {
+    const { agentName, stats } = req.body;
+
+    if (!agentName || !stats) {
+        return res.status(400).json({ error: 'Agent name and stats are required' });
+    }
+
+    const key = `live_stats_${agentName}`;
+    const value = JSON.stringify(stats);
+
+    db.run(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+        [key, value],
+        function(err) {
+            if (err) {
+                console.error('Error saving live stats:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            console.log(`📊 Saved live stats for ${agentName}:`, stats);
+            res.json({ success: true, agentName, stats });
+        }
+    );
+});
+
+// Get live agent stats
+app.get('/api/live-agent-stats/:agentName', (req, res) => {
+    const { agentName } = req.params;
+    const key = `live_stats_${agentName}`;
+
+    db.get('SELECT value FROM settings WHERE key = ?', [key], (err, row) => {
+        if (err) {
+            console.error('Error getting live stats:', err);
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (!row) {
+            return res.json({ stats: null });
+        }
+
+        try {
+            const stats = JSON.parse(row.value);
+            console.log(`📊 Retrieved live stats for ${agentName}:`, stats);
+            res.json({ stats });
+        } catch (parseErr) {
+            console.error('Error parsing live stats:', parseErr);
+            res.status(500).json({ error: 'Invalid stats data' });
+        }
+    });
+});
+
+// Delete live agent stats (for reset functionality)
+app.delete('/api/live-agent-stats/:agentName', (req, res) => {
+    const { agentName } = req.params;
+    const key = `live_stats_${agentName}`;
+
+    db.run('DELETE FROM settings WHERE key = ?', [key], function(err) {
+        if (err) {
+            console.error('Error deleting live stats:', err);
+            res.status(500).json({ error: 'Failed to clear live stats' });
+            return;
+        }
+
+        console.log(`🗑️ Cleared live stats for ${agentName}`);
+        res.json({
+            success: true,
+            message: `Live stats cleared for ${agentName}`,
+            rowsDeleted: this.changes
         });
     });
 });

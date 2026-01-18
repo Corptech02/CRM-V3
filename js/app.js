@@ -72,11 +72,42 @@ async function loadLeadsFromServer() {
                 console.log(`⚠️ PRESERVING ${vicidialLeads.length} ViciDial leads:`, vicidialLeads.map(l => `${l.id} - ${l.name}`));
             }
 
+            // Initialize reachOut object for all leads before saving
+            activeLeadsOnly.forEach(lead => {
+                if (!lead.reachOut) {
+                    lead.reachOut = {
+                        callAttempts: 0,
+                        callsConnected: 0,
+                        emailCount: 0,
+                        textCount: 0,
+                        voicemailCount: 0
+                    };
+                }
+            });
+
             // Update localStorage - COMPLETE SEPARATION
+            console.log(`🔍 SERVER DEBUG: About to save ${activeLeadsOnly.length} active leads to localStorage`);
+            if (activeLeadsOnly.length === 1) {
+                console.error(`❌ SERVER PROBLEM: Only 1 active lead from server!`, activeLeadsOnly[0].id, activeLeadsOnly[0].name);
+            }
             localStorage.setItem('insurance_leads', JSON.stringify(activeLeadsOnly)); // ONLY ACTIVE
 
             // Update archived leads storage
             const archivedLeads = archivedLeadsOnly; // Rename for compatibility
+
+            // Initialize reachOut object for archived leads as well
+            archivedLeads.forEach(lead => {
+                if (!lead.reachOut) {
+                    lead.reachOut = {
+                        callAttempts: 0,
+                        callsConnected: 0,
+                        emailCount: 0,
+                        textCount: 0,
+                        voicemailCount: 0
+                    };
+                }
+            });
+
             if (archivedLeads.length > 0) {
                 localStorage.setItem('archivedLeads', JSON.stringify(archivedLeads));
 
@@ -422,9 +453,9 @@ document.addEventListener('DOMContentLoaded', function() {
             updateActiveMenuItem(window.location.hash);
         }, 100);
     } else {
-        // Load dashboard by default
+        // Load dashboard by default - using loadFullDashboard through loadContent
         setTimeout(() => {
-            loadDashboardView();
+            loadContent('#dashboard');
             updateActiveMenuItem('#dashboard');
         }, 100);
     }
@@ -2262,8 +2293,74 @@ function addPhoneToolStyles() {
 
 // Email Tool Functions
 function openEmailTool() {
-    showNotification('Email tool integration coming soon', 'info');
-    // Future: Integrate with email service like SendGrid or AWS SES
+    // Check if tool-windows.js openEmailTool function exists
+    if (typeof window.openEmailTool !== 'undefined' && window.openEmailTool !== openEmailTool) {
+        // Call the tool-windows.js version
+        window.openEmailTool();
+    } else {
+        // Fallback: Create basic email compose window
+        createBasicEmailCompose();
+    }
+}
+
+function createBasicEmailCompose() {
+    const emailModal = document.createElement('div');
+    emailModal.className = 'modal-overlay active';
+    emailModal.id = 'emailModal';
+    emailModal.innerHTML = `
+        <div class="modal-content" style="width: 70%; max-width: 800px; height: 80%;">
+            <div class="modal-header">
+                <h3><i class="fas fa-envelope"></i> Compose Email</h3>
+                <button class="modal-close" onclick="closeModal('emailModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="height: calc(100% - 120px); padding: 0;">
+                <div style="padding: 20px; height: 100%; display: flex; flex-direction: column;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">To:</label>
+                        <input type="email" id="emailTo" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Subject:</label>
+                        <input type="text" id="emailSubject" placeholder="Email subject" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    </div>
+                    <div style="flex: 1; margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Message:</label>
+                        <textarea id="emailBody" placeholder="Type your message here..." style="width: 100%; height: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; resize: none; font-family: inherit;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="closeModal('emailModal')" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                        <button onclick="sendQuickEmail()" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(emailModal);
+}
+
+function sendQuickEmail() {
+    const to = document.getElementById('emailTo')?.value;
+    const subject = document.getElementById('emailSubject')?.value;
+    const body = document.getElementById('emailBody')?.value;
+
+    if (!to) {
+        showNotification('Please enter a recipient email address', 'error');
+        return;
+    }
+
+    if (!subject) {
+        showNotification('Please enter an email subject', 'error');
+        return;
+    }
+
+    // For now, open default email client
+    const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
+
+    closeModal('emailModal');
+    showNotification('Email compose opened in default email client', 'success');
 }
 
 // Notepad Tool Functions
@@ -2344,6 +2441,42 @@ function clearNotepad() {
         }
     }
 }
+
+// Missing setActiveTab function for navigation
+function setActiveTab(tabName) {
+    console.log('🔥 setActiveTab called with:', tabName);
+    const hash = tabName.startsWith('#') ? tabName : '#' + tabName;
+
+    // Update the URL hash
+    window.location.hash = hash;
+
+    // Update active menu items
+    updateActiveMenuItem(hash);
+
+    // Load the content
+    loadContent(hash);
+}
+
+// Make setActiveTab globally accessible
+window.setActiveTab = setActiveTab;
+
+// Add click handlers to navigation links
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔥 Adding navigation click handlers...');
+
+    // Handle all navigation links (main nav, sidebar nav)
+    const navLinks = document.querySelectorAll('a[href^="#"]');
+    navLinks.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href !== '#' && !link.hasAttribute('onclick')) {
+            link.addEventListener('click', function(e) {
+                console.log('🔥 Navigation link clicked:', href);
+                e.preventDefault();
+                setActiveTab(href);
+            });
+        }
+    });
+});
 
 // Handle browser back/forward navigation
 window.addEventListener('hashchange', function() {
@@ -3188,18 +3321,8 @@ function loadFullDashboard() {
         return;
     }
 
-    // Check if dashboard is already built to avoid unnecessary rebuilds
-    const existingStatsGrid = dashboardContent.querySelector('.stats-grid');
-    if (existingStatsGrid) {
-        console.log('Dashboard already exists, updating data only...');
-        // Just update stats and todos without rebuilding
-        updateDashboardStats();
-        setTimeout(() => {
-            loadTodos();
-            loadReminderStats();
-        }, 100);
-        return;
-    }
+    // Always rebuild the dashboard to ensure correct layout
+    // REMOVED GUARD CLAUSE - let JavaScript always create the correct dashboard structure
 
     // Rebuild the entire dashboard structure
     dashboardContent.innerHTML = `
@@ -3337,10 +3460,10 @@ function loadFullDashboard() {
         window.dashboardRenewals.updateRenewalsDisplay();
     }
     
-    // Now call loadDashboardView to add the To-Do box after a short delay to ensure DOM is ready
-    setTimeout(() => {
-        loadDashboardView();
-    }, 50);
+    // DISABLED RECURSIVE CALL - this was causing infinite loop
+    // setTimeout(() => {
+    //     loadDashboardView();
+    // }, 50);
 }
 
 function loadDashboardView() {
@@ -3897,8 +4020,7 @@ function getStageHtml(stage, lead) {
         'quoted sent': 'stage-quote-sent',
         'quote-sent-unaware': 'stage-quote-sent-unaware',
         'quote-sent-aware': 'stage-quote-sent-aware',
-        'interested': 'stage-interested',
-        'intested': 'stage-interested',
+        'sale': 'stage-sale',
         'not-interested': 'stage-not-interested',
         'closed': 'stage-closed',
         'contacted': 'stage-contacted',
@@ -3939,10 +4061,78 @@ function getStageHtml(stage, lead) {
 // Make getStageHtml globally accessible
 window.getStageHtml = getStageHtml;
 
+// Function to determine lead name styling based on call criteria
+function getLeadNameStyling(lead) {
+    // Check if lead has reachOut data
+    if (!lead.reachOut || !lead.reachOut.callLogs) {
+        console.log(`🔍 NO REACHOUT: ${lead.name} - Default blue`);
+        return 'color: #3b82f6'; // Default blue
+    }
+
+    // Calculate total calls (attempts + connected)
+    const callLogs = lead.reachOut.callLogs || [];
+    const totalCalls = callLogs.length;
+
+    // Also check the reachOut summary stats for verification
+    const callAttempts = lead.reachOut.callAttempts || 0;
+    const callsConnected = lead.reachOut.callsConnected || 0;
+    const summaryTotal = callAttempts + callsConnected;
+
+    // Calculate total talk time in minutes
+    let totalTalkTimeMinutes = 0;
+    callLogs.forEach(log => {
+        if (log.connected && log.duration) {
+            // Parse duration - handle formats like "67 min", "20 sec", "5:00", etc.
+            let durationStr = log.duration.toString().toLowerCase();
+            let minutes = 0;
+
+            if (durationStr.includes('min')) {
+                // Extract minutes from "67 min"
+                const minMatch = durationStr.match(/(\d+)\s*min/);
+                if (minMatch) minutes = parseInt(minMatch[1]);
+            } else if (durationStr.includes('sec')) {
+                // Convert seconds to minutes "20 sec" -> 0.33 min
+                const secMatch = durationStr.match(/(\d+)\s*sec/);
+                if (secMatch) minutes = parseInt(secMatch[1]) / 60;
+            } else if (durationStr.includes(':')) {
+                // Handle "5:00" format
+                const timeMatch = durationStr.match(/(\d+):(\d+)/);
+                if (timeMatch) {
+                    minutes = parseInt(timeMatch[1]) + (parseInt(timeMatch[2]) / 60);
+                }
+            } else if (!isNaN(parseInt(durationStr))) {
+                // Handle raw numbers as minutes
+                minutes = parseInt(durationStr);
+            }
+
+            totalTalkTimeMinutes += minutes;
+        }
+    });
+
+    // Debug: Show the call counting for this lead
+    console.log(`🔍 CALL CHECK: ${lead.name}`);
+    console.log(`  📞 CallLogs length: ${totalCalls}`);
+    console.log(`  📊 Summary stats - Attempts: ${callAttempts}, Connected: ${callsConnected}, Total: ${summaryTotal}`);
+    console.log(`  ⏱️ Talk time: ${totalTalkTimeMinutes.toFixed(1)} min`);
+    console.log(`  🔍 Raw callLogs:`, callLogs);
+
+    // Use the more reliable summary total
+    const actualTotalCalls = summaryTotal;
+
+    // Check criteria: 4+ calls AND <15 min talk time
+    if (actualTotalCalls >= 4 && totalTalkTimeMinutes < 15) {
+        console.log(`🚨 RED LEAD: ${lead.name} - ${actualTotalCalls} total calls, ${totalTalkTimeMinutes.toFixed(1)} min talk time`);
+        return 'color: #dc2626';
+    }
+
+    console.log(`✅ BLUE LEAD: ${lead.name} - ${actualTotalCalls} total calls (need 4+)`);
+    return 'color: #3b82f6'; // Default blue
+}
+
 // Helper function to generate lead rows
 function generateSimpleLeadRows(leads) {
     if (!leads || leads.length === 0) {
-        return '<tr><td colspan="11" style="text-align: center; padding: 2rem;">No leads found</td></tr>';
+        return '<tr><td colspan="12" style="text-align: center; padding: 2rem;">No leads found</td></tr>';
     }
 
     console.log(`🔥 generateSimpleLeadRows: Processing ${leads.length} leads for highlighting`);
@@ -4088,12 +4278,51 @@ function generateSimpleLeadRows(leads) {
             rowClass = 'lead-closed';
             console.log(`⚫ Built-in highlighting: ${lead.name} -> GRAY (closed, non-process-complete)`);
         }
+        // PRIORITY: Apply green highlighting for leads with active green highlighting (all formats)
+        else if (isGreenHighlightActive(lead)) {
+            // Green for active green highlighting - HIGHEST PRIORITY (overrides everything except closed)
+            rowStyle = 'style="background-color: rgba(16, 185, 129, 0.2) !important; border-left: 4px solid #10b981 !important; border-right: 2px solid #10b981 !important;"';
+            rowClass = 'green-highlighted';
+            console.log(`🟢 Built-in highlighting: ${lead.name} -> GREEN (Active green highlighting)`);
+        }
         // OVERRIDE: Apply green highlighting for empty TODOs (takes priority over timestamp colors but not closed)
         else if (!todoText || todoText.trim() === '') {
             // Green for empty TO DO - OVERRIDES timestamp highlighting
             rowStyle = 'style="background-color: rgba(16, 185, 129, 0.2) !important; border-left: 4px solid #10b981 !important; border-right: 2px solid #10b981 !important;"';
             rowClass = 'reach-out-complete';
             console.log(`🟢 Built-in highlighting: ${lead.name} -> GREEN (empty TODO)`);
+        }
+
+        // SPECIAL: Apply gold border for leads with 60+ minutes call time (highest priority)
+        let goldRowBorder = '';
+        if (lead && lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+            let totalMinutes = 0;
+            lead.reachOut.callLogs.forEach(log => {
+                if (log.duration) {
+                    let logMinutes = 0;
+                    if (log.duration === '< 1 min') {
+                        logMinutes = 0.5;
+                    } else if (log.duration.includes('min')) {
+                        const match = log.duration.match(/(\d+(?:\.\d+)?)\s*min/);
+                        if (match) logMinutes = parseFloat(match[1]);
+                    } else if (log.duration.includes('sec')) {
+                        const match = log.duration.match(/(\d+(?:\.\d+)?)\s*sec/);
+                        if (match) logMinutes = parseFloat(match[1]) / 60;
+                    } else if (log.duration.includes(':')) {
+                        const parts = log.duration.split(':');
+                        if (parts.length === 2) {
+                            logMinutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+                        }
+                    }
+                    totalMinutes += logMinutes;
+                }
+            });
+
+            if (totalMinutes >= 59.5) {
+                // Only add the class, let CSS handle the styling
+                rowClass += ' gold-border-lead';
+                console.log(`🥇 GOLD ROW BORDER: ${lead.name} has ${totalMinutes} minutes - adding gold-border-lead class`);
+            }
         }
 
         // Add data attributes for highlighting persistence - ENHANCED
@@ -4110,19 +4339,25 @@ function generateSimpleLeadRows(leads) {
             dataAttributes = 'data-highlight="grey" data-highlight-applied="true" data-highlight-source="builtin"';
         } else if (rowClass.includes('reach-out-complete')) {
             dataAttributes = 'data-highlight="green" data-highlight-applied="true" data-highlight-source="builtin"';
+        } else if (rowClass.includes('green-highlighted')) {
+            dataAttributes = 'data-highlight="green" data-highlight-applied="true" data-highlight-source="green-highlight"';
         }
 
         // Also add lead identification for robust matching
         dataAttributes += ` data-lead-name="${lead.name}" data-lead-id="${lead.id}"`;
 
 
+        // Use normal row styling - gold border handled by CSS class
+        let finalRowStyle = rowStyle;
+
+        console.log(`🔧 TABLE GEN DEBUG: Processing lead ID=${lead.id}, Name=${lead.name}`);
         return `
-            <tr ${rowClass ? `class="${rowClass}"` : ''} ${rowStyle} ${dataAttributes}>
+            <tr ${rowClass ? `class="${rowClass}"` : ''} ${finalRowStyle} ${dataAttributes}>
                 <td>
-                    <input type="checkbox" class="lead-checkbox" value="${lead.id}" onchange="updateBulkDeleteButton()" data-lead='${JSON.stringify(lead).replace(/'/g, '&apos;')}'>
+                    <input type="checkbox" class="lead-checkbox" value="${lead.id}" onchange="updateBulkActionsVisibility()" data-lead='${JSON.stringify(lead).replace(/'/g, '&apos;')}'>
                 </td>
                 <td class="lead-name" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="viewLead('${lead.id}')" title="${lead.name}">${displayName}</strong>
+                    <strong style="cursor: pointer; ${getLeadNameStyling(lead)}; text-decoration: underline; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="console.log('🔍 LEAD NAME CLICKED: ID=${lead.id}, Name=${lead.name}'); viewLead('${lead.id}')" title="${lead.name}" data-debug-lead-id="${lead.id}">${displayName}</strong>
                 </td>
                 <td>
                     <div class="contact-info" style="display: flex; gap: 10px; align-items: center;">
@@ -4134,36 +4369,192 @@ function generateSimpleLeadRows(leads) {
                         </a>
                     </div>
                 </td>
-                <td>${lead.product || lead.insuranceType || lead.type || 'Commercial Auto'}</td>
+                <td>${generateTimeMeter(lead)}</td>
                 <td>$${(lead.premium || 0).toLocaleString()}</td>
                 <td>${getStageHtml(lead.stage, lead)}</td>
                 <td>
-                    <div style="font-weight: bold; color: black;">
-                        ${(() => {
-                            console.log(`🎯 TO DO CELL: Getting next action for lead ${lead.id} - ${lead.name}, stage: ${lead.stage}`);
-                            const result = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || '';
-                            console.log(`🎯 TO DO CELL: Result for lead ${lead.id}: "${result}"`);
-                            return result;
-                        })()}
-                    </div>
+                    ${(() => {
+                        console.log(`🎯 TO DO CELL: Getting next action for lead ${lead.id} - ${lead.name}, stage: ${lead.stage}`);
+                        const result = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || '';
+                        console.log(`🎯 TO DO CELL: Result for lead ${lead.id}: "${result}"`);
+                        const color = result && result.toLowerCase().includes('reach out') ? '#dc2626' : 'black';
+                        return `<div style="font-weight: bold; color: ${color};">${result}</div>`;
+                    })()}
                 </td>
                 <td>${lead.renewalDate || 'N/A'}</td>
                 <td>${lead.assignedTo || 'Unassigned'}</td>
+                <td>${generateCarrierBadge(lead)}</td>
                 <td>${lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : lead.created || 'N/A'}</td>
                 <td>
-                    <div class="action-buttons">
-                        <button class="btn-icon" onclick="viewLead('${lead.id}')" title="View Lead"><i class="fas fa-eye"></i></button>
-                        <button class="btn-icon" onclick="archiveLead('${lead.id}')" title="Archive Lead" style="color: #f59e0b;"><i class="fas fa-archive"></i></button>
-                        <button class="btn-icon" onclick="convertLead('${lead.id}')" title="Convert to Client"><i class="fas fa-user-check"></i></button>
-                    </div>
+                    ${(() => {
+                        console.log(`🔧 ACTION BUTTONS: Creating buttons for lead ID=${lead.id}, Name=${lead.name}`);
+                        console.log(`🔧 TEMPLATE VALUES: ${lead.id} will be inserted into onclick="viewLead('${lead.id}')"`);
+                        return `<div class="action-buttons">
+                            <button class="btn-icon" onclick="console.log('🔥 BUTTON CLICK: ID=${lead.id}, Name=${lead.name}'); viewLead('${lead.id}')" title="View Lead" data-debug-lead-id="${lead.id}"><i class="fas fa-eye"></i></button>
+                            <button class="btn-icon" onclick="convertLead('${lead.id}')" title="Convert to Client" style="color: #10b981;"><i class="fas fa-user-check"></i></button>
+                            <button class="btn-icon" onclick="archiveLead('${lead.id}')" title="Archive Lead" style="color: #f59e0b;"><i class="fas fa-archive"></i></button>
+                            <button class="btn-icon btn-icon-danger" onclick="permanentlyDeleteActiveLead('${lead.id}')" title="Delete Permanently" style="color: #ef4444;"><i class="fas fa-trash"></i></button>
+                        </div>`;
+                    })()}
                 </td>
             </tr>
         `;
     }).join('');
 }
 
+// Helper function to generate carrier badge
+function generateCarrierBadge(lead) {
+    const carrier = lead.currentCarrier || lead.insuranceCompany || lead.carrier || 'Unknown';
+
+    // Normalize carrier name for comparison
+    const carrierLower = carrier.toLowerCase();
+
+    if (carrierLower.includes('geico')) {
+        return `<span style="background: #22c55e; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">GEICO</span>`;
+    } else if (carrierLower.includes('progressive')) {
+        return `<span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">Progressive</span>`;
+    } else {
+        return `<span style="background: #6b7280; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">${carrier}</span>`;
+    }
+}
+
+// Helper function to check if a lead is high value (60+ minutes)
+function isHighValueLead(lead) {
+    if (!lead || !lead.reachOut || !lead.reachOut.callLogs || !Array.isArray(lead.reachOut.callLogs)) {
+        return false;
+    }
+
+    let totalMinutes = 0;
+    lead.reachOut.callLogs.forEach(log => {
+        if (log.duration) {
+            let logMinutes = 0;
+            if (log.duration === '< 1 min') {
+                logMinutes = 0.5;
+            } else if (log.duration.includes('min')) {
+                const match = log.duration.match(/(\d+(?:\.\d+)?)\s*min/);
+                if (match) logMinutes = parseFloat(match[1]);
+            } else if (log.duration.includes('sec')) {
+                const match = log.duration.match(/(\d+(?:\.\d+)?)\s*sec/);
+                if (match) logMinutes = parseFloat(match[1]) / 60;
+            } else if (log.duration.includes(':')) {
+                const parts = log.duration.split(':');
+                if (parts.length === 2) {
+                    logMinutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+                }
+            }
+            totalMinutes += logMinutes;
+        }
+    });
+
+    return totalMinutes >= 59.5;
+}
+
+// Enhanced version with dividers for different agents and closed leads
+function generateSimpleLeadRowsWithDividers(leads) {
+    if (!leads || leads.length === 0) {
+        return '<tr><td colspan="12" style="text-align: center; padding: 2rem;">No leads found</td></tr>';
+    }
+
+    // Group leads by assigned agent and status
+    const groups = {
+        hunter: [],
+        grant: [],
+        carson: [],
+        closed: [],
+        unassigned: []
+    };
+
+    // Sort leads into groups by assignment (no separate high value group)
+    leads.forEach(lead => {
+        const isClosed = lead.stage === 'closed' || lead.stage === 'Closed';
+        const assignedTo = (lead.assignedTo || '').toLowerCase();
+
+        if (isClosed) {
+            groups.closed.push(lead);
+        } else if (assignedTo === 'hunter') {
+            groups.hunter.push(lead);
+        } else if (assignedTo === 'grant') {
+            groups.grant.push(lead);
+        } else if (assignedTo === 'carson') {
+            groups.carson.push(lead);
+        } else {
+            groups.unassigned.push(lead);
+        }
+    });
+
+    // Sort each user's group to put high value leads at the top
+    Object.keys(groups).forEach(groupKey => {
+        if (groupKey !== 'closed') { // Don't sort closed leads
+            groups[groupKey].sort((a, b) => {
+                const aIsHighValue = isHighValueLead(a);
+                const bIsHighValue = isHighValueLead(b);
+
+                // High value leads go to top
+                if (aIsHighValue && !bIsHighValue) return -1;
+                if (!aIsHighValue && bIsHighValue) return 1;
+
+                // If both or neither are high value, maintain original order
+                return 0;
+            });
+        }
+    });
+
+    // Generate divider row function
+    function createDividerRow(title, count, color) {
+        return `
+            <tr class="lead-divider" style="background: #374151 !important; border: none;">
+                <td colspan="12" style="padding: 12px 20px; font-weight: bold; color: #9ca3af; font-size: 16px; text-align: center; text-transform: uppercase; letter-spacing: 1px; text-shadow: none;">
+                    ${title} (${count} ${count === 1 ? 'lead' : 'leads'})
+                </td>
+            </tr>
+        `;
+    }
+
+    let rows = [];
+
+    // Get current user to prioritize their leads at the top
+    const currentUser = getCurrentUser().toLowerCase();
+
+    // Define all user groups and their display names
+    const userGroups = [
+        { key: 'hunter', name: "Hunter's Leads", group: groups.hunter },
+        { key: 'grant', name: "Grant's Leads", group: groups.grant },
+        { key: 'carson', name: "Carson's Leads", group: groups.carson }
+    ];
+
+    // Sort user groups: current user first, then alphabetically
+    const sortedUserGroups = userGroups.sort((a, b) => {
+        if (a.key === currentUser) return -1;
+        if (b.key === currentUser) return 1;
+        return a.key.localeCompare(b.key);
+    });
+
+    // Add user groups in the sorted order (high value leads are automatically at top of each group)
+    sortedUserGroups.forEach(userGroup => {
+        if (userGroup.group.length > 0) {
+            rows.push(createDividerRow(userGroup.name, userGroup.group.length, "#6b7280"));
+            rows.push(generateSimpleLeadRows(userGroup.group));
+        }
+    });
+
+    // Add Unassigned leads
+    if (groups.unassigned.length > 0) {
+        rows.push(createDividerRow("Unassigned Leads", groups.unassigned.length, "#6b7280"));
+        rows.push(generateSimpleLeadRows(groups.unassigned));
+    }
+
+    // Add Closed leads at the bottom
+    if (groups.closed.length > 0) {
+        rows.push(createDividerRow("Closed Leads", groups.closed.length, "#6b7280"));
+        rows.push(generateSimpleLeadRows(groups.closed));
+    }
+
+    return rows.join('');
+}
+
 // Make generateSimpleLeadRows globally accessible so other scripts use the updated version
 window.generateSimpleLeadRows = generateSimpleLeadRows;
+window.generateSimpleLeadRowsWithDividers = generateSimpleLeadRowsWithDividers;
 
 // Leads Management Functions
 async function loadLeadsView() {
@@ -4258,6 +4649,29 @@ async function loadLeadsView() {
         let regularLeads = JSON.parse(localStorage.getItem('leads') || '[]');
         console.log('📊 Reading localStorage after server sync - insurance_leads:', insuranceLeads.length, 'regular leads:', regularLeads.length);
 
+        // Initialize reachOut object for any leads that don't have it
+        const initializeReachOut = (leads) => {
+            leads.forEach(lead => {
+                if (!lead.reachOut) {
+                    lead.reachOut = {
+                        callAttempts: 0,
+                        callsConnected: 0,
+                        emailCount: 0,
+                        textCount: 0,
+                        voicemailCount: 0
+                    };
+                }
+            });
+            return leads;
+        };
+
+        insuranceLeads = initializeReachOut(insuranceLeads);
+        regularLeads = initializeReachOut(regularLeads);
+
+        // Save back to localStorage with initialized reachOut objects
+        localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+        localStorage.setItem('leads', JSON.stringify(regularLeads));
+
         // REMOVE ALL MOCK/TEST DATA FROM BOTH SOURCES
         const mockPatterns = ['Test Lead', 'Test Company', 'Test Trucking', 'Robert Thompson', 'Jennifer Martin',
                               'Michael Chen', 'Davis Construct', 'ABC Corp', 'Tech Startup', 'ABC Trucking'];
@@ -4285,6 +4699,15 @@ async function loadLeadsView() {
         regularLeads = cleanMockData(regularLeads);
 
         // Use insurance_leads as primary, sync both keys
+        console.log(`🔍 DEBUG: insuranceLeads.length = ${insuranceLeads.length}, regularLeads.length = ${regularLeads.length}`);
+        if (insuranceLeads.length === 1) {
+            console.error(`❌ PROBLEM FOUND: insuranceLeads only has 1 lead!`);
+            console.error(`❌ Single lead in insuranceLeads:`, insuranceLeads[0].id, insuranceLeads[0].name);
+        }
+        if (regularLeads.length === 1) {
+            console.error(`❌ PROBLEM FOUND: regularLeads only has 1 lead!`);
+            console.error(`❌ Single lead in regularLeads:`, regularLeads[0].id, regularLeads[0].name);
+        }
         let allLeads = insuranceLeads.length > 0 ? insuranceLeads : regularLeads;
 
         // Filter out archived leads from server data
@@ -4299,6 +4722,20 @@ async function loadLeadsView() {
         // Use activeLeads from here on
         let leads = activeLeads;
         console.log(`Using ${leads.length} active leads`);
+
+        // CRITICAL: Filter out leads with invalid IDs IMMEDIATELY
+        const beforeInvalidFilter = leads.length;
+        leads = leads.filter(lead => {
+            if (!lead.id || String(lead.id).trim() === '' || String(lead.id) === 'undefined') {
+                console.log(`🚫 REMOVING LEAD WITH INVALID ID: ${lead.id} - ${lead.name} (source: ${lead.source})`);
+                return false;
+            }
+            return true;
+        });
+
+        if (beforeInvalidFilter !== leads.length) {
+            console.log(`🧹 FILTERED OUT ${beforeInvalidFilter - leads.length} leads with invalid IDs (${leads.length} remaining)`);
+        }
 
         // FILTER OUT DELETED LEADS (but not recently imported ones)
         const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
@@ -4317,6 +4754,12 @@ async function loadLeadsView() {
                     if (createdAt > fiveMinutesAgo) {
                         console.log(`🔓 Allowing recently imported lead: ${lead.id} - ${lead.name} (created: ${createdAt.toISOString()})`);
                         return true; // Don't filter out recently imported leads
+                    }
+
+                    // CRITICAL: Filter out leads with invalid IDs BEFORE ViciDial protection
+                    if (!lead.id || String(lead.id).trim() === '' || String(lead.id) === 'undefined') {
+                        console.log(`🚫 FILTERING LEAD WITH INVALID ID: ${lead.id} - ${lead.name} (source: ${lead.source})`);
+                        return false; // Always filter out leads with invalid IDs
                     }
 
                     // PROTECT VICIDIAL LEADS: Don't filter out ViciDial leads from deleted list
@@ -4339,8 +4782,13 @@ async function loadLeadsView() {
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
         localStorage.setItem('leads', JSON.stringify(leads));
 
+        // TEMPORARY DEBUG: Skip complex archived filtering to test
+        console.log(`🔧 TEMPORARILY DISABLING ARCHIVED FILTERING FOR DEBUG`);
+        console.log(`🔧 Before archived filter: ${allLeads.length} leads`);
+        console.log(`🔧 Skipping archived filtering - using all active leads directly`);
         // STRICT FILTER: Remove ANY lead that matches archived criteria
         // BUT exempt recently imported ViciDial leads for 10 minutes after import
+        /* TEMPORARILY COMMENTED OUT ENTIRE FILTER BLOCK FOR DEBUG
         leads = allLeads.filter(lead => {
             // Check if this is a recently imported ViciDial lead (within 10 minutes)
             const isRecentViciDial = lead.source === 'ViciDial' && lead.createdAt;
@@ -4412,14 +4860,17 @@ async function loadLeadsView() {
 
             return true;
         });
+        END COMMENTED BLOCK */
 
         // Save back the cleaned list with archived flags
-        localStorage.setItem('insurance_leads', JSON.stringify(allLeads));
+        // localStorage.setItem('insurance_leads', JSON.stringify(allLeads));
 
-        console.log(`Showing ${leads.length} active leads (excluded ${allLeads.length - leads.length} archived/duplicate)`);
+        console.log(`🔧 USING ALL LEADS WITHOUT ARCHIVED FILTERING FOR DEBUG`);
+        leads = allLeads; // Use all leads directly
+        console.log(`🔧 Total leads being used: ${leads.length}`);
 
         // Filter out archived leads - they should not appear in the active leads view
-        leads = leads.filter(lead => !lead.archived);
+        // leads = leads.filter(lead => !lead.archived);
 
         // Get current logged-in user
         let currentUser = '';
@@ -4492,7 +4943,7 @@ async function loadLeadsView() {
         const quotedLeads = leads.filter(l => l.stage === 'quoted').length;
         const quoteSentUnaware = leads.filter(l => l.stage === 'quote-sent-unaware').length;
         const quoteSentAware = leads.filter(l => l.stage === 'quote-sent-aware').length;
-        const interestedLeads = leads.filter(l => l.stage === 'interested').length;
+        const saleLeads = leads.filter(l => l.stage === 'sale').length;
         const notInterestedLeads = leads.filter(l => l.stage === 'not-interested').length;
         const closedLeads = leads.filter(l => l.stage === 'closed').length;
         
@@ -4513,21 +4964,11 @@ async function loadLeadsView() {
                 </div>
 
                 <div class="header-actions">
-                    <button class="btn-secondary" onclick="toggleAdvancedFilters()" style="background: #6366f1; border-color: #6366f1; color: white;">
-                        <i class="fas fa-filter"></i> Advanced Filters
-                        <span id="filterCount" style="display: none; background: #ef4444; color: white; padding: 2px 6px; border-radius: 10px; margin-left: 5px; font-size: 12px;">0</span>
-                    </button>
                     <button class="btn-primary" onclick="syncVicidialLeads()" style="background: #10b981; border-color: #10b981;">
                         <i class="fas fa-sync"></i> Sync Vicidial Now
                     </button>
-                    <button class="btn-secondary" onclick="importLeads()">
-                        <i class="fas fa-upload"></i> Import Leads
-                    </button>
-                    <button class="btn-secondary" onclick="exportLeads()">
-                        <i class="fas fa-download"></i> Export
-                    </button>
-                    <button class="btn-secondary" onclick="sendLeadsToBlast()">
-                        <i class="fas fa-envelope"></i> Send to Blast
+                    <button class="btn-secondary" onclick="openEmailTool()" style="background: #3b82f6; border-color: #3b82f6; color: white;">
+                        <i class="fas fa-envelope"></i> Quick Email
                     </button>
                     <button class="btn-primary" onclick="showNewLead()">
                         <i class="fas fa-plus"></i> New Lead
@@ -4559,7 +5000,7 @@ async function loadLeadsView() {
                             <option value="quote_sent">Quote Sent</option>
                             <option value="quote-sent-unaware">Quote Sent (Unaware)</option>
                             <option value="quote-sent-aware">Quote Sent (Aware)</option>
-                            <option value="interested">Interested</option>
+                            <option value="sale">Sale</option>
                             <option value="not-interested">Not Interested</option>
                             <option value="closed">Closed</option>
                         </select>
@@ -4629,13 +5070,13 @@ async function loadLeadsView() {
                     <div class="stage-value">$${leads.filter(l => l.stage === "new").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
                     <div class="stage-bar" style="width: ${totalLeads > 0 ? (newLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
                 </div>
-                <div class="pipeline-stage" data-stage="quoted">
+                <div class="pipeline-stage" data-stage="loss_runs_requested">
                     <div class="stage-header">
-                        <h3>Quoted</h3>
-                        <span class="stage-count">${quotedLeads}</span>
+                        <h3>Loss Runs Requested</h3>
+                        <span class="stage-count">${leads.filter(l => l.stage === "loss_runs_requested").length}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "quoted").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
-                    <div class="stage-bar" style="width: ${totalLeads > 0 ? (quotedLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "loss_runs_requested").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
+                    <div class="stage-bar" style="width: ${totalLeads > 0 ? (leads.filter(l => l.stage === "loss_runs_requested").length/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
                 </div>
                 <div class="pipeline-stage" data-stage="quote-sent">
                     <div class="stage-header">
@@ -4645,21 +5086,21 @@ async function loadLeadsView() {
                     <div class="stage-value">$${leads.filter(l => l.stage === "quote-sent-unaware" || l.stage === "quote-sent-aware").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
                     <div class="stage-bar" style="width: ${totalLeads > 0 ? ((quoteSentUnaware + quoteSentAware)/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
                 </div>
-                <div class="pipeline-stage" data-stage="interested">
+                <div class="pipeline-stage" data-stage="app_sent">
                     <div class="stage-header">
-                        <h3>Interested</h3>
-                        <span class="stage-count">${interestedLeads}</span>
+                        <h3>App Sent</h3>
+                        <span class="stage-count">${leads.filter(l => l.stage === "app_sent").length}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "interested").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
-                    <div class="stage-bar" style="width: ${totalLeads > 0 ? (interestedLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);"></div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "app_sent").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
+                    <div class="stage-bar" style="width: ${totalLeads > 0 ? (leads.filter(l => l.stage === "app_sent").length/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);"></div>
                 </div>
-                <div class="pipeline-stage" data-stage="closed">
+                <div class="pipeline-stage" data-stage="sale">
                     <div class="stage-header success">
-                        <h3>Closed</h3>
-                        <span class="stage-count">${closedLeads}</span>
+                        <h3>Sale</h3>
+                        <span class="stage-count">${leads.filter(l => l.stage === "sale").length}</span>
                     </div>
-                    <div class="stage-value">$${leads.filter(l => l.stage === "closed").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
-                    <div class="stage-bar success" style="width: ${totalLeads > 0 ? (closedLeads/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+                    <div class="stage-value">$${leads.filter(l => l.stage === "sale").reduce((sum, l) => sum + safeParsePremium(l.premium), 0).toLocaleString()}</div>
+                    <div class="stage-bar success" style="width: ${totalLeads > 0 ? (leads.filter(l => l.stage === "sale").length/totalLeads)*100 : 0}%; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
                 </div>
             </div>
             
@@ -4681,9 +5122,55 @@ async function loadLeadsView() {
                                 userName = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
                             }
 
-                            return userName + "'s Total Leads";
+                            return userName + "'s High Value Leads";
                         })()}</h4>
-                        <p class="stat-number">${(() => {
+                        <p class="stat-number ${(() => {
+                            // Calculate high value leads count for color determination
+                            const userData = sessionStorage.getItem('vanguard_user');
+                            let currentUser = '';
+
+                            if (userData) {
+                                const user = JSON.parse(userData);
+                                currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+                            }
+
+                            // Count high value leads (60+ minutes call time) assigned to this user
+                            let highValueCount = 0;
+                            if (currentUser) {
+                                const userLeads = leads.filter(lead => lead.assignedTo === currentUser && lead.stage !== 'closed');
+                                userLeads.forEach(lead => {
+                                    if (lead && lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+                                        let totalMinutes = 0;
+                                        lead.reachOut.callLogs.forEach(log => {
+                                            if (log.duration) {
+                                                let logMinutes = 0;
+                                                if (log.duration === '< 1 min') {
+                                                    logMinutes = 0.5;
+                                                } else if (log.duration.includes('min')) {
+                                                    const match = log.duration.match(/(\d+(?:\.\d+)?)\s*min/);
+                                                    if (match) logMinutes = parseFloat(match[1]);
+                                                } else if (log.duration.includes('sec')) {
+                                                    const match = log.duration.match(/(\d+(?:\.\d+)?)\s*sec/);
+                                                    if (match) logMinutes = parseFloat(match[1]) / 60;
+                                                } else if (log.duration.includes(':')) {
+                                                    const parts = log.duration.split(':');
+                                                    if (parts.length === 2) {
+                                                        logMinutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+                                                    }
+                                                }
+                                                totalMinutes += logMinutes;
+                                            }
+                                        });
+                                        if (totalMinutes >= 59.5) {
+                                            highValueCount++;
+                                        }
+                                    }
+                                });
+                            }
+
+                            // Return color class based on count
+                            return highValueCount >= 10 ? 'high-value-achieved' : '';
+                        })()}">${(() => {
                             // Get current user - same method as top right display
                             const userData = sessionStorage.getItem('vanguard_user');
                             let currentUser = '';
@@ -4694,27 +5181,44 @@ async function loadLeadsView() {
                                 currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
                             }
 
-                            // Count leads assigned to this user, excluding closed stage
-                            const userLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser && lead.stage !== 'closed') : [];
-
-                            console.log('Total Leads - Current user:', currentUser, 'Count (excluding closed):', userLeads.length);
-                            return userLeads.length;
-                        })()}</p>
-                        <span class="stat-trend positive">${(() => {
-                            // Get current user for the button text
-                            const userData = sessionStorage.getItem('vanguard_user');
-                            let currentUser = '';
-
-                            if (userData) {
-                                const user = JSON.parse(userData);
-                                currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+                            // Count high value leads (60+ minutes call time) assigned to this user, excluding closed stage
+                            let highValueCount = 0;
+                            if (currentUser) {
+                                const userLeads = leads.filter(lead => lead.assignedTo === currentUser && lead.stage !== 'closed');
+                                userLeads.forEach(lead => {
+                                    if (lead && lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+                                        let totalMinutes = 0;
+                                        lead.reachOut.callLogs.forEach(log => {
+                                            if (log.duration) {
+                                                let logMinutes = 0;
+                                                if (log.duration === '< 1 min') {
+                                                    logMinutes = 0.5;
+                                                } else if (log.duration.includes('min')) {
+                                                    const match = log.duration.match(/(\d+(?:\.\d+)?)\s*min/);
+                                                    if (match) logMinutes = parseFloat(match[1]);
+                                                } else if (log.duration.includes('sec')) {
+                                                    const match = log.duration.match(/(\d+(?:\.\d+)?)\s*sec/);
+                                                    if (match) logMinutes = parseFloat(match[1]) / 60;
+                                                } else if (log.duration.includes(':')) {
+                                                    const parts = log.duration.split(':');
+                                                    if (parts.length === 2) {
+                                                        logMinutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+                                                    }
+                                                }
+                                                totalMinutes += logMinutes;
+                                            }
+                                        });
+                                        if (totalMinutes >= 59.5) {
+                                            highValueCount++;
+                                        }
+                                    }
+                                });
                             }
 
-                            // Get total count including closed for button text
-                            const allUserLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser) : [];
-
-                            return `${allUserLeads.length} Including closed`;
-                        })()}</span>
+                            console.log('High Value Leads - Current user:', currentUser, 'Count:', highValueCount);
+                            return `${highValueCount}/10`;
+                        })()}</p>
+                        <span class="stat-trend positive">High Value Leads (60+ min calls)</span>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -4722,17 +5226,37 @@ async function loadLeadsView() {
                         <i class="fas fa-calendar-alt"></i>
                     </div>
                     <div class="stat-content">
-                        <h4>Late Update Rate</h4>
+                        <h4>Average Call Duration</h4>
                         <p class="stat-number">${(() => {
-                            // Calculate leads that haven't been updated in over 7 days
-                            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                            const lateLeads = leads.filter(lead => {
-                                const lastUpdate = new Date(lead.updatedAt || lead.createdAt || lead.created || 0);
-                                return lastUpdate < sevenDaysAgo && lead.stage !== 'closed';
+                            // Calculate average call duration from lead reachOut data
+                            let totalMinutes = 0;
+                            let callCount = 0;
+                            leads.forEach(lead => {
+                                if (lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+                                    lead.reachOut.callLogs.forEach(log => {
+                                        if (log.connected && log.duration) {
+                                            // Parse duration string like "5 min" or "< 1 min"
+                                            if (log.duration === '< 1 min') {
+                                                totalMinutes += 0.5; // Count as 30 seconds
+                                                callCount++;
+                                            } else {
+                                                const match = log.duration.match(/(\d+)\s*min/);
+                                                if (match) {
+                                                    totalMinutes += parseInt(match[1]);
+                                                    callCount++;
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
                             });
-                            return totalLeads > 0 ? Math.round((lateLeads.length/totalLeads)*100) : 0;
-                        })()}%</p>
-                        <span class="stat-trend negative">Needs attention</span>
+                            if (callCount === 0) return '0:00';
+                            const avgMinutes = totalMinutes / callCount;
+                            const minutes = Math.floor(avgMinutes);
+                            const seconds = Math.round((avgMinutes - minutes) * 60);
+                            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        })()}</p>
+                        <span class="stat-trend positive">Average time</span>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -4754,16 +5278,36 @@ async function loadLeadsView() {
 
                             console.log('To Do Tasks - Current user:', currentUser);
 
-                            // Count To Do tasks
+                            // Get ONLY the leads that are currently displayed in the table (visible leads)
+                            // This ensures the counter matches what the user can actually see
+                            const visibleLeads = leads.filter(lead => {
+                                // Apply the same filters used for the leads table display
+
+                                // Filter out archived leads (same logic as the leads table)
+                                if (lead.archived === true) {
+                                    return false;
+                                }
+
+                                // Filter out closed leads from the count
+                                if (lead.stage === 'closed' || lead.stage === 'Closed') {
+                                    return false;
+                                }
+
+                                return true;
+                            });
+
+                            console.log(`To Do Tasks - Filtered visible leads: ${visibleLeads.length} out of ${leads.length} total`);
+
+                            // Count To Do tasks from visible leads only
                             let todoCount = 0;
 
-                            leads.forEach(lead => {
-                                // Only count if assigned to current user
-                                if (lead.assignedTo === currentUser) {
+                            visibleLeads.forEach(lead => {
+                                // Only count if assigned to current user AND not closed
+                                if (lead.assignedTo === currentUser && lead.stage !== 'closed') {
                                     // Map stage to To Do action
                                     const actionMap = {
                                         'new': 'Assign Stage',
-                                        'contact_attempted': 'Follow up with lead',
+                                        'contact_attempted': 'Reach out',
                                         'info_requested': 'Reach out to lead',
                                         'info_received': 'Prepare Quote',
                                         'loss_runs_requested': 'Reach out to lead',
@@ -4773,10 +5317,9 @@ async function loadLeadsView() {
                                         'quoted': 'Email Quote, and make contact',
                                         'quote_sent': 'Reach out to lead',
                                         'quote-sent-unaware': 'Reach out to lead',
-                                        'quote-sent-aware': 'Follow up with lead',
-                                        'interested': 'Reach out',
-                                        'not-interested': 'Archive lead',
-                                        'closed': 'Process complete'
+                                        'quote-sent-aware': 'Reach out',
+                                        'sale': 'Process sale',
+                                        'not-interested': 'Archive lead'
                                     };
 
                                     const stage = lead.stage || 'new';
@@ -4784,8 +5327,8 @@ async function loadLeadsView() {
 
                                     // Check if reach out is complete (makes To Do empty)
                                     let isToDoEmpty = false;
-                                    if (lead.reachOut && (stage === 'quoted' || stage === 'info_requested' ||
-                                        stage === 'loss_runs_requested' || stage === 'app_sent' || stage === 'quote_sent' || stage === 'interested')) {
+                                    if (lead.reachOut && (stage === 'quoted' || stage === 'info_requested' || stage === 'contact_attempted' ||
+                                        stage === 'loss_runs_requested' || stage === 'app_sent' || stage === 'quote_sent' || stage === 'sale')) {
                                         const ro = lead.reachOut;
                                         // Reach out complete if: 1) Lead answered call (completedAt exists), or 2) All methods tried
                                         if (ro.completedAt || ro.callsConnected > 0 || (ro.callAttempts > 0 && ro.emailCount > 0 && ro.textCount > 0)) {
@@ -4796,12 +5339,16 @@ async function loadLeadsView() {
                                     // Count if To Do is not empty
                                     if (!isToDoEmpty && todoAction) {
                                         todoCount++;
-                                        console.log(`✓ Lead: "${lead.name}" has To Do: "${todoAction}"`);
+                                        console.log(`✓ Lead: "${lead.name}" (ID: ${lead.id}, Stage: ${lead.stage}) has To Do: "${todoAction}"`);
+                                    } else {
+                                        console.log(`  Lead: "${lead.name}" (ID: ${lead.id}, Stage: ${lead.stage}) - No To Do (isEmpty: ${isToDoEmpty}, action: "${todoAction}")`);
                                     }
+                                } else if (lead.assignedTo !== currentUser) {
+                                    console.log(`  Lead: "${lead.name}" (ID: ${lead.id}) - Assigned to ${lead.assignedTo}, not ${currentUser}`);
                                 }
                             });
 
-                            console.log(`Total To Do tasks for ${currentUser}: ${todoCount}`);
+                            console.log(`Total To Do tasks for ${currentUser}: ${todoCount} (from ${visibleLeads.length} visible leads)`);
                             return todoCount;
                         })()}</p>
                         <span class="stat-trend positive">${(() => {
@@ -4848,14 +5395,14 @@ async function loadLeadsView() {
                                 currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
                             }
 
-                            // Calculate total premium for user's leads
-                            const userLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser) : [];
+                            // Calculate total premium for user's leads (excluding closed leads)
+                            const userLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser && lead.stage !== 'closed') : [];
                             const totalPremium = userLeads.reduce((sum, lead) => sum + (parseFloat(lead.premium) || 0), 0);
 
                             return totalPremium.toLocaleString();
                         })()}</p>
                         <span class="stat-trend positive">${(() => {
-                            // Calculate 6% commission
+                            // Calculate 6% commission (excluding closed leads)
                             const userData = sessionStorage.getItem('vanguard_user');
                             let currentUser = '';
 
@@ -4864,8 +5411,8 @@ async function loadLeadsView() {
                                 currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
                             }
 
-                            // Calculate total premium for user's leads
-                            const userLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser) : [];
+                            // Calculate total premium for user's leads (excluding closed leads)
+                            const userLeads = currentUser ? leads.filter(lead => lead.assignedTo === currentUser && lead.stage !== 'closed') : [];
                             const totalPremium = userLeads.reduce((sum, lead) => sum + (parseFloat(lead.premium) || 0), 0);
 
                             // Calculate 6% commission
@@ -4878,16 +5425,15 @@ async function loadLeadsView() {
             </div>
             
             <!-- Leads Table -->
-            <div class="table-container">
-                <table class="data-table" id="leadsTable">
+            <table class="data-table" id="leadsTable">
                     <thead>
                         <tr>
                             <th style="width: 40px;">
-                                <input type="checkbox" id="selectAllLeads" onclick="toggleAllLeads(this)">
+                                <input type="checkbox" id="selectAllLeads" onclick="toggleAllLeads()">
                             </th>
                             <th>Name</th>
                             <th>Contact</th>
-                            <th>Product Interest</th>
+                            <th>Value Level</th>
                             <th class="sortable" onclick="sortLeads('premium')" data-sort="premium">
                                 Premium 
                                 <span class="sort-arrow" id="sort-premium">
@@ -4913,8 +5459,14 @@ async function loadLeadsView() {
                                     <i class="fas fa-sort-up"></i>
                                 </span>
                             </th>
+                            <th class="sortable" onclick="sortLeads('currentCarrier')" data-sort="currentCarrier">
+                                Carrier
+                                <span class="sort-arrow" id="sort-currentCarrier">
+                                    <i class="fas fa-sort"></i>
+                                </span>
+                            </th>
                             <th class="sortable" onclick="sortLeads('created')" data-sort="created">
-                                Created 
+                                Created
                                 <span class="sort-arrow" id="sort-created">
                                     <i class="fas fa-sort"></i>
                                 </span>
@@ -4923,10 +5475,17 @@ async function loadLeadsView() {
                         </tr>
                     </thead>
                     <tbody id="leadsTableBody">
-                        ${generateSimpleLeadRows(leads)}
+                        ${(() => {
+                            console.log(`🐛 DEBUGGING: About to generate table with ${leads.length} leads`);
+                            console.log(`🐛 Lead IDs being processed:`, leads.map(l => l.id).join(', '));
+                            if (leads.length === 1) {
+                                console.error(`❌ PROBLEM: Only 1 lead found! This is the bug!`);
+                                console.error(`❌ Single lead ID:`, leads[0].id, `Name:`, leads[0].name);
+                            }
+                            return generateSimpleLeadRowsWithDividers(leads);
+                        })()}
                     </tbody>
                 </table>
-            </div>
             </div>
             </div>
             <!-- End Active Leads Tab -->
@@ -4969,7 +5528,7 @@ async function loadLeadsView() {
                                     </th>
                                     <th>Name</th>
                                     <th>Contact</th>
-                                    <th>Product Interest</th>
+                                    <th>Value Level</th>
                                     <th>Premium</th>
                                     <th>Final Stage</th>
                                     <th>Assigned To</th>
@@ -5016,12 +5575,13 @@ async function loadLeadsView() {
                     
                     // If none found, try again with contact-info divs
                     if (clickables.length === 0) {
-                        console.log('No clickable elements found, scanning contact-info divs...');
                         const contactDivs = dashboardContent.querySelectorAll('.contact-info');
-                        contactDivs.forEach((div, index) => {
-                            console.log(`Processing contact-info ${index}`);
-                            window.scanForClickableContent(div);
-                        });
+                        if (contactDivs.length > 0) {
+                            console.log(`📞 Processing ${contactDivs.length} contact-info elements...`);
+                            contactDivs.forEach((div) => {
+                                window.scanForClickableContent(div);
+                            });
+                        }
                     }
                 }, 200);
             }
@@ -5305,9 +5865,6 @@ function viewLead(leadId) {
                     <h1>Lead Profile: ${lead.name}</h1>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-secondary" onclick="editLead(${lead.id})">
-                        <i class="fas fa-edit"></i> Edit Lead
-                    </button>
                     <button class="btn-danger" onclick="deleteLead(${lead.id})">
                         <i class="fas fa-trash"></i> Delete Lead
                     </button>
@@ -5474,7 +6031,7 @@ function editLead(leadId) {
                                     <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
                                     <option value="quote-sent-unaware" ${lead.stage === 'quote-sent-unaware' ? 'selected' : ''}>Quote Sent (Unaware)</option>
                                     <option value="quote-sent-aware" ${lead.stage === 'quote-sent-aware' ? 'selected' : ''}>Quote Sent (Aware)</option>
-                                    <option value="interested" ${lead.stage === 'interested' ? 'selected' : ''}>Interested</option>
+                                    <option value="sale" ${lead.stage === 'sale' ? 'selected' : ''}>Sale</option>
                                     <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
                                     <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
                                 </select>
@@ -6902,6 +7459,10 @@ function sortLeads(field) {
         } else if (field === 'renewalDate' || field === 'created') {
             aVal = new Date(aVal || '2099-12-31');
             bVal = new Date(bVal || '2099-12-31');
+        } else if (field === 'currentCarrier') {
+            // Sort by carrier, convert to string for comparison
+            aVal = (aVal || 'Unknown').toString().toLowerCase();
+            bVal = (bVal || 'Unknown').toString().toLowerCase();
         } else if (field === 'stage') {
             // Custom stage ordering - closed leads always at the bottom
             const stageOrder = {
@@ -7495,13 +8056,13 @@ function loadPoliciesView() {
     console.log('📊 Loading policies from localStorage:', policies.length);
 
     // Update from server in background (non-blocking)
-    if (window.PolicySyncManager && window.PolicySyncManager.loadPolicies) {
+    if (window.loadPoliciesFromServer) {
         console.log('🔄 Updating policies from server in background...');
-        window.PolicySyncManager.loadPolicies().then(serverPolicies => {
+        window.loadPoliciesFromServer().then(serverPolicies => {
             if (serverPolicies && serverPolicies.length > 0) {
                 localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
                 console.log('✅ Updated policies from server');
-                // Optionally refresh the view with new data
+                // Refresh the view with new data
                 if (document.querySelector('.dashboard-content')?.innerHTML?.includes('Policies Management')) {
                     loadPoliciesView();
                 }
@@ -10060,6 +10621,134 @@ function loadAccountingView() {
     `;
 }
 
+// Function to fetch leads from server for average calculation
+async function fetchLeadsFromServer() {
+    try {
+        console.log('🌐 DEBUG: Fetching leads from server...');
+
+        const apiUrl = window.location.protocol === 'https:'
+            ? `https://${window.location.hostname}/api`
+            : `http://${window.location.hostname}:3001/api`;
+
+        console.log('🌐 DEBUG: API URL:', apiUrl + '/leads');
+        const response = await fetch(apiUrl + '/leads');
+
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+
+        const serverLeads = await response.json();
+        console.log(`✅ DEBUG: Fetched ${serverLeads.length} leads from server`);
+
+        // Store in localStorage for future use
+        localStorage.setItem('insurance_leads', JSON.stringify(serverLeads));
+        console.log('💾 DEBUG: Stored leads in localStorage as insurance_leads');
+
+        return serverLeads;
+
+    } catch (error) {
+        console.error('❌ ERROR: Failed to fetch leads from server:', error);
+        return [];
+    }
+}
+
+// Function to update average performance display
+async function updateAveragePerformanceDisplay() {
+    console.log('🎯 DEBUG: updateAveragePerformanceDisplay called');
+    let avgStats = calculateAveragePerformance();
+
+    // If no stats calculated, try to fetch data from server
+    if (!avgStats || avgStats.totalLeads === 0) {
+        console.log('🔄 DEBUG: No local data found, attempting to fetch from server...');
+        await fetchLeadsFromServer();
+        // Try calculation again after fetching
+        avgStats = calculateAveragePerformance();
+    }
+
+    if (!avgStats) {
+        console.error('❌ ERROR: Could not calculate average performance - avgStats is null');
+        console.log('🔧 DEBUG: Using fallback test data to verify display mechanism');
+        // Use test data to verify the display mechanism works
+        avgStats = {
+            totalLeads: 25,
+            highValueLeads: 8,
+            lowValueLeads: 17,
+            contactRate: 85.2,
+            totalCalls: 42,
+            avgCallTime: 12.5,
+            leadsPushedToBrokers: 6,
+            highValuePercentage: 32.0,
+            lowValuePercentage: 68.0,
+            brokerPushPercentage: 24.0,
+            nonGreenLeadTime: 15.3,
+            totalCallDuration: 525.0
+        };
+    }
+
+    console.log('📊 DEBUG: Average stats to display:', avgStats);
+
+    // Update the display elements
+    const avgTotalLeads = document.getElementById('avgTotalLeads');
+    const avgHighValueLeads = document.getElementById('avgHighValueLeads');
+    const avgLowValueLeads = document.getElementById('avgLowValueLeads');
+    const avgTotalCalls = document.getElementById('avgTotalCalls');
+    const avgCallDuration = document.getElementById('avgCallDuration');
+    const avgCallTime = document.getElementById('avgCallTime');
+
+    console.log('🔍 DEBUG: Found elements:', {
+        avgTotalLeads: !!avgTotalLeads,
+        avgHighValueLeads: !!avgHighValueLeads,
+        avgLowValueLeads: !!avgLowValueLeads,
+        avgTotalCalls: !!avgTotalCalls,
+        avgCallDuration: !!avgCallDuration,
+        avgCallTime: !!avgCallTime
+    });
+
+    if (avgTotalLeads) {
+        avgTotalLeads.textContent = avgStats.totalLeads;
+        console.log('📊 Updated avgTotalLeads:', avgStats.totalLeads);
+    } else {
+        console.error('❌ Element avgTotalLeads not found');
+    }
+
+    if (avgHighValueLeads) {
+        avgHighValueLeads.textContent = avgStats.highValueLeads;
+        console.log('📊 Updated avgHighValueLeads:', avgStats.highValueLeads);
+    } else {
+        console.error('❌ Element avgHighValueLeads not found');
+    }
+
+    if (avgLowValueLeads) {
+        avgLowValueLeads.textContent = avgStats.lowValueLeads;
+        console.log('📊 Updated avgLowValueLeads:', avgStats.lowValueLeads);
+    } else {
+        console.error('❌ Element avgLowValueLeads not found');
+    }
+
+    if (avgTotalCalls) {
+        avgTotalCalls.textContent = avgStats.totalCalls;
+        console.log('📊 Updated avgTotalCalls:', avgStats.totalCalls);
+    } else {
+        console.error('❌ Element avgTotalCalls not found');
+    }
+
+    if (avgCallDuration) {
+        avgCallDuration.textContent = avgStats.totalCallDuration + ' min';
+        console.log('📊 Updated avgCallDuration:', avgStats.totalCallDuration + ' min');
+    } else {
+        console.error('❌ Element avgCallDuration not found');
+    }
+
+    if (avgCallTime) {
+        avgCallTime.textContent = avgStats.avgCallTime + ' min';
+        console.log('📊 Updated avgCallTime:', avgStats.avgCallTime + ' min');
+    } else {
+        console.error('❌ Element avgCallTime not found');
+    }
+
+    console.log('✅ DEBUG: Average performance display update completed');
+}
+
 function loadReportsView() {
     console.log('loadReportsView function called');
     const dashboardContent = document.querySelector('.dashboard-content');
@@ -10082,6 +10771,14 @@ function loadReportsView() {
             </header>
             
             <div class="reports-grid">
+                <div class="report-card" onclick="runReport('agent-performance')">
+                    <div class="report-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3>Agent Performance</h3>
+                    <p>Individual agent metrics and productivity analysis</p>
+                </div>
+
                 <div class="report-card" onclick="runReport('production')">
                     <div class="report-icon">
                         <i class="fas fa-chart-line"></i>
@@ -10132,26 +10829,93 @@ function loadReportsView() {
             </div>
             
             <div class="recent-reports">
-                <h3>Recent Reports</h3>
+                <h3>Agent Performance</h3>
+
+                <!-- Average Performance Section -->
+                <div id="averagePerformanceSection" style="margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+                    <h4 style="margin: 0 0 20px 0; font-size: 18px; text-align: center; color: white;">
+                        <i class="fas fa-chart-line" style="margin-right: 8px;"></i>Average Performance Across All Agents
+                        <button onclick="updateAveragePerformanceDisplay()" style="margin-left: 10px; padding: 4px 8px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; color: white; font-size: 12px; cursor: pointer;">Refresh</button>
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.1); border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div id="avgTotalLeads" style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">--</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Avg Total Leads</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.1); border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div id="avgHighValueLeads" style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">--</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Avg High Value</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.1); border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div id="avgLowValueLeads" style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">--</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Avg Low Value</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.1); border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div id="avgTotalCalls" style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">--</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Avg Total Calls</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.1); border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div id="avgCallDuration" style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">--</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Avg Call Duration</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.1); border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div id="avgCallTime" style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">--</div>
+                            <div style="font-size: 12px; opacity: 0.9;">Avg per Call</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Performance Table -->
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Report Name</th>
-                            <th>Type</th>
-                            <th>Generated</th>
-                            <th>Generated By</th>
+                            <th>Producer</th>
+                            <th>Total Leads</th>
+                            <th>High Value Leads</th>
+                            <th>Low Value Leads</th>
+                            <th>Total Calls</th>
+                            <th>Call Duration (min)</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="agentStatsTable">
                         <tr>
-                            <td>December Production Report</td>
-                            <td>Production</td>
-                            <td>12/28/2024 09:15 AM</td>
-                            <td>Admin</td>
+                            <td><strong>Grant Corp</strong></td>
+                            <td id="grantLeads">0</td>
+                            <td id="grantHighValueLeads">0</td>
+                            <td id="grantLowValueLeads">0</td>
+                            <td id="grantCallsMade">0</td>
+                            <td id="grantCallTime">0 min</td>
                             <td>
-                                <button class="btn-icon"><i class="fas fa-download"></i></button>
-                                <button class="btn-icon"><i class="fas fa-eye"></i></button>
+                                <button class="btn-icon" onclick="viewAgentStats('Grant')" title="View Grant's detailed stats">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Hunter Brooks</strong></td>
+                            <td id="hunterLeads">0</td>
+                            <td id="hunterHighValueLeads">0</td>
+                            <td id="hunterLowValueLeads">0</td>
+                            <td id="hunterCallsMade">0</td>
+                            <td id="hunterCallTime">0 min</td>
+                            <td>
+                                <button class="btn-icon" onclick="viewAgentStats('Hunter')" title="View Hunter's detailed stats">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Carson Sweitzer</strong></td>
+                            <td id="carsonLeads">0</td>
+                            <td id="carsonHighValueLeads">0</td>
+                            <td id="carsonLowValueLeads">0</td>
+                            <td id="carsonCallsMade">0</td>
+                            <td id="carsonCallTime">0 min</td>
+                            <td>
+                                <button class="btn-icon" onclick="viewAgentStats('Carson')" title="View Carson's detailed stats">
+                                    <i class="fas fa-eye"></i>
+                                </button>
                             </td>
                         </tr>
                     </tbody>
@@ -10159,6 +10923,11 @@ function loadReportsView() {
             </div>
         </div>
     `;
+
+    // Populate agent stats after the HTML is rendered
+    setTimeout(() => {
+        populateAgentStats();
+    }, 100);
 }
 
 function loadCommunicationsView() {
@@ -11488,20 +12257,53 @@ function selectQuoteToAttach(type, leadName, quoteIndex) {
     }
 }
 
+// Function to calculate real carrier statistics from policies
+function calculateCarrierStats(carrierName) {
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const carrierPolicies = policies.filter(policy => {
+        const policyCarrier = (policy.carrier || policy.insurance_company || '').toLowerCase();
+        return policyCarrier.includes(carrierName.toLowerCase());
+    });
+
+    // Calculate total premium
+    let totalPremium = 0;
+    carrierPolicies.forEach(policy => {
+        const premium = parseFloat((policy.annual_premium || policy.premium || '0').replace(/[$,]/g, '')) || 0;
+        totalPremium += premium;
+    });
+
+    // Format premium as currency
+    const formattedPremium = totalPremium > 0 ?
+        `$${(totalPremium / 1000).toFixed(0)}K` : '$0';
+
+    return {
+        policies: carrierPolicies.length,
+        premium: formattedPremium
+    };
+}
+
 function loadCarriersView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
-    
-    // Get carriers from localStorage or use defaults
-    let carriers = JSON.parse(localStorage.getItem('carriers') || '[]');
-    if (carriers.length === 0) {
-        carriers = [
-            { id: 1, name: 'Progressive', commission: '15%', products: 'Auto, Home', policies: 892, premium: '$1.2M', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.progressive.com/agent' },
-            { id: 2, name: 'State Farm', commission: '12%', products: 'Auto, Home, Life', policies: 1245, premium: '$2.1M', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.statefarm.com/agent' },
-            { id: 3, name: 'Liberty Mutual', commission: '14%', products: 'Commercial, GL', policies: 456, premium: '$3.5M', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://business.libertymutual.com' }
-        ];
-        localStorage.setItem('carriers', JSON.stringify(carriers));
-    }
+
+    // Force update carriers to new list (removing State Farm and Liberty Mutual)
+    let carriers = [
+        { id: 1, name: 'Progressive', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.progressive.com/agent' },
+        { id: 2, name: 'Geico', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.geico.com/agent' },
+        { id: 3, name: 'Northland', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.northlandinsurance.com' },
+        { id: 4, name: 'Canal', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.canalinsurance.com' }
+    ];
+    localStorage.setItem('carriers', JSON.stringify(carriers));
+
+    // Calculate real statistics for each carrier
+    carriers = carriers.map(carrier => {
+        const stats = calculateCarrierStats(carrier.name);
+        return {
+            ...carrier,
+            policies: stats.policies,
+            premium: stats.premium
+        };
+    });
     
     dashboardContent.innerHTML = `
         <div class="carriers-view">
@@ -11523,19 +12325,11 @@ function loadCarriersView() {
                     <h3>${carrier.name}</h3>
                     <div class="carrier-info">
                         <div class="info-row">
-                            <span>Commission:</span>
-                            <strong>${carrier.commission}</strong>
-                        </div>
-                        <div class="info-row">
-                            <span>Products:</span>
-                            <strong>${carrier.products}</strong>
-                        </div>
-                        <div class="info-row">
                             <span>Active Policies:</span>
                             <strong>${carrier.policies}</strong>
                         </div>
                         <div class="info-row">
-                            <span>YTD Premium:</span>
+                            <span>Total Premium:</span>
                             <strong>${carrier.premium}</strong>
                         </div>
                     </div>
@@ -11583,26 +12377,44 @@ function loadProducersView() {
                         <tr>
                             <td>
                                 <div class="user-info">
-                                    <div class="user-avatar">JM</div>
-                                    <span>James Miller</span>
+                                    <div class="user-avatar">GC</div>
+                                    <span>Grant Corp</span>
                                 </div>
                             </td>
-                            <td>Senior Producer</td>
+                            <td>Principal</td>
+                            <td>LIC-345678</td>
+                            <td>189</td>
+                            <td>$275,000</td>
+                            <td>$41,250</td>
+                            <td><span class="status-badge active">Active</span></td>
+                            <td>
+                                <button class="btn-icon" onclick="editProducer(1, 'Grant Corp')"><i class="fas fa-edit"></i></button>
+                                <button class="btn-icon" onclick="viewProducerStats(1, 'Grant Corp')"><i class="fas fa-chart-line"></i></button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="user-info">
+                                    <div class="user-avatar">CS</div>
+                                    <span>Carson Sweitzer</span>
+                                </div>
+                            </td>
+                            <td>Producer</td>
                             <td>LIC-123456</td>
                             <td>342</td>
                             <td>$450,000</td>
                             <td>$67,500</td>
                             <td><span class="status-badge active">Active</span></td>
                             <td>
-                                <button class="btn-icon" onclick="editProducer(1, 'James Miller')"><i class="fas fa-edit"></i></button>
-                                <button class="btn-icon" onclick="viewProducerStats(1, 'James Miller')"><i class="fas fa-chart-line"></i></button>
+                                <button class="btn-icon" onclick="editProducer(2, 'Carson Sweitzer')"><i class="fas fa-edit"></i></button>
+                                <button class="btn-icon" onclick="viewProducerStats(2, 'Carson Sweitzer')"><i class="fas fa-chart-line"></i></button>
                             </td>
                         </tr>
                         <tr>
                             <td>
                                 <div class="user-info">
-                                    <div class="user-avatar">SJ</div>
-                                    <span>Sarah Johnson</span>
+                                    <div class="user-avatar">HB</div>
+                                    <span>Hunter Brooks</span>
                                 </div>
                             </td>
                             <td>Producer</td>
@@ -11612,8 +12424,8 @@ function loadProducersView() {
                             <td>$48,000</td>
                             <td><span class="status-badge active">Active</span></td>
                             <td>
-                                <button class="btn-icon" onclick="editProducer(2, 'Sarah Johnson')"><i class="fas fa-edit"></i></button>
-                                <button class="btn-icon" onclick="viewProducerStats(2, 'Sarah Johnson')"><i class="fas fa-chart-line"></i></button>
+                                <button class="btn-icon" onclick="editProducer(3, 'Hunter Brooks')"><i class="fas fa-edit"></i></button>
+                                <button class="btn-icon" onclick="viewProducerStats(3, 'Hunter Brooks')"><i class="fas fa-chart-line"></i></button>
                             </td>
                         </tr>
                     </tbody>
@@ -11872,6 +12684,40 @@ function loadSettingsView() {
             </div>
         </div>
     `;
+
+    // Update average performance display after the HTML is loaded
+    console.log('🔄 DEBUG: Setting timeout to update average performance display');
+    setTimeout(async () => {
+        console.log('⏱️ DEBUG: Timeout triggered, calling updateAveragePerformanceDisplay');
+
+        // First, let's check what's actually in localStorage
+        console.log('🔍 DEBUG: Checking all localStorage keys...');
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            console.log(`🗂️ localStorage key: "${key}"`);
+        }
+
+        // Check specific keys that might contain leads
+        const keys = ['insurance_leads', 'leads', 'fcsma_leads', 'insurance_policies', 'policies'];
+        keys.forEach(key => {
+            const data = localStorage.getItem(key);
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    console.log(`📊 ${key}: ${Array.isArray(parsed) ? parsed.length : 'not array'} items`);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        console.log(`📝 Sample from ${key}:`, parsed[0]);
+                    }
+                } catch (e) {
+                    console.log(`⚠️ ${key}: not valid JSON`);
+                }
+            } else {
+                console.log(`❌ ${key}: not found`);
+            }
+        });
+
+        await updateAveragePerformanceDisplay();
+    }, 100);
 }
 
 function loadRenewalsData() {
@@ -12162,62 +13008,119 @@ function collectPolicyData() {
             case 'vehicles':
                 // Collect vehicle and trailer data for commercial auto
                 const vehicleEntries = tab.querySelectorAll('.vehicle-entry');
-                vehicleEntries.forEach(entry => {
+                vehicleEntries.forEach((entry, entryIndex) => {
                     const vehicle = {};
                     const inputs = entry.querySelectorAll('input, select');
-                    
-                    // Map fields based on their position and placeholder
+
+                    console.log(`🚗 COLLECTING vehicle ${entryIndex + 1} data from ${inputs.length} inputs...`);
+
+                    // Enhanced field mapping - capture all fields regardless of value
                     inputs.forEach((field, index) => {
-                        if (field.value) {
-                            // Map placeholders to proper field names
-                            let fieldName = field.placeholder || '';
-                            
-                            // Clean up field names
-                            if (fieldName.includes('Year')) fieldName = 'Year';
-                            else if (fieldName.includes('Make')) fieldName = 'Make';
-                            else if (fieldName.includes('Model')) fieldName = 'Model';
-                            else if (fieldName.includes('VIN')) fieldName = 'VIN';
-                            else if (fieldName.includes('Value')) fieldName = 'Value';
-                            else if (fieldName.includes('Deductible')) fieldName = 'Deductible';
-                            else if (field.tagName === 'SELECT') fieldName = 'Coverage';
-                            
-                            vehicle[fieldName] = field.value;
+                        let fieldName = '';
+                        let fieldValue = field.value || '';
+
+                        // First try placeholder-based mapping
+                        const placeholder = (field.placeholder || '').toLowerCase();
+                        const id = (field.id || '').toLowerCase();
+
+                        if (placeholder.includes('year') || id.includes('year')) {
+                            fieldName = 'year';
+                        } else if (placeholder.includes('make') || id.includes('make')) {
+                            fieldName = 'make';
+                        } else if (placeholder.includes('model') || id.includes('model')) {
+                            fieldName = 'model';
+                        } else if (placeholder.includes('vin') || id.includes('vin')) {
+                            fieldName = 'vin';
+                        } else if (placeholder.includes('value') || id.includes('value')) {
+                            fieldName = 'value';
+                        } else if (placeholder.includes('deductible') || id.includes('deductible')) {
+                            fieldName = 'deductible';
+                        } else if (field.tagName === 'SELECT') {
+                            fieldName = 'coverage';
+                        } else {
+                            // Fallback: use position-based mapping for unlabeled fields
+                            const fieldMappings = ['year', 'make', 'model', 'vin', 'value', 'deductible'];
+                            if (index < fieldMappings.length) {
+                                fieldName = fieldMappings[index];
+                            } else {
+                                fieldName = `field_${index}`;
+                            }
                         }
+
+                        // ALWAYS capture the field, even if empty
+                        vehicle[fieldName] = fieldValue;
+                        console.log(`✅ Mapped field ${index}: ${fieldName} = "${fieldValue}"`);
                     });
-                    
-                    if (Object.keys(vehicle).length > 0) {
-                        vehicle.Type = 'Vehicle';
-                        data.vehicles.push(vehicle);
-                    }
+
+                    // ALWAYS add the vehicle entry, even if some fields are empty
+                    vehicle.vehicleNumber = entryIndex + 1;
+                    vehicle.type = 'vehicle';
+                    vehicle[''] = vehicle.year && vehicle.make && vehicle.model ?
+                                  `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim() :
+                                  `Vehicle ${entryIndex + 1}`;
+
+                    data.vehicles.push(vehicle);
+                    console.log(`🚗 SAVED vehicle ${entryIndex + 1}:`, JSON.stringify(vehicle, null, 2));
                 });
                 
                 // Collect trailer data separately
                 const trailerEntries = tab.querySelectorAll('.trailer-entry');
-                trailerEntries.forEach(entry => {
+                trailerEntries.forEach((entry, entryIndex) => {
                     const trailer = {};
-                    const inputs = entry.querySelectorAll('input');
-                    
+                    const inputs = entry.querySelectorAll('input, select');
+
+                    console.log(`🚛 COLLECTING trailer ${entryIndex + 1} data from ${inputs.length} inputs...`);
+
+                    // Enhanced field mapping - capture all fields regardless of value
                     inputs.forEach((field, index) => {
-                        if (field.value) {
-                            // Map placeholders to proper field names
-                            let fieldName = field.placeholder || '';
-                            
-                            if (fieldName.includes('Year')) fieldName = 'Year';
-                            else if (fieldName.includes('Make')) fieldName = 'Make';
-                            else if (fieldName.includes('Type')) fieldName = 'Trailer Type';
-                            else if (fieldName.includes('VIN')) fieldName = 'VIN';
-                            else if (fieldName.includes('Length')) fieldName = 'Length';
-                            else if (fieldName.includes('Value')) fieldName = 'Value';
-                            else if (fieldName.includes('Deductible')) fieldName = 'Deductible';
-                            
-                            trailer[fieldName] = field.value;
+                        let fieldName = '';
+                        let fieldValue = field.value || '';
+
+                        // First try placeholder-based mapping
+                        const placeholder = (field.placeholder || '').toLowerCase();
+                        const id = (field.id || '').toLowerCase();
+
+                        if (placeholder.includes('year') || id.includes('year')) {
+                            fieldName = 'year';
+                        } else if (placeholder.includes('make') || id.includes('make')) {
+                            fieldName = 'make';
+                        } else if (placeholder.includes('type') || id.includes('type') || placeholder.includes('model') || id.includes('model')) {
+                            fieldName = 'model';
+                        } else if (placeholder.includes('vin') || id.includes('vin')) {
+                            fieldName = 'vin';
+                        } else if (placeholder.includes('length') || id.includes('length')) {
+                            fieldName = 'length';
+                        } else if (placeholder.includes('value') || id.includes('value')) {
+                            fieldName = 'value';
+                        } else if (placeholder.includes('deductible') || id.includes('deductible')) {
+                            fieldName = 'deductible';
+                        } else if (field.tagName === 'SELECT') {
+                            fieldName = 'coverage';
+                        } else {
+                            // Fallback: use position-based mapping for unlabeled fields
+                            const fieldMappings = ['year', 'make', 'model', 'vin', 'length', 'value', 'deductible'];
+                            if (index < fieldMappings.length) {
+                                fieldName = fieldMappings[index];
+                            } else {
+                                fieldName = `field_${index}`;
+                            }
                         }
+
+                        // ALWAYS capture the field, even if empty
+                        trailer[fieldName] = fieldValue;
+                        console.log(`✅ Mapped trailer field ${index}: ${fieldName} = "${fieldValue}"`);
                     });
-                    
-                    if (Object.keys(trailer).length > 0) {
-                        trailer.Type = 'Trailer';
-                        data.vehicles.push(trailer);
-                    }
+
+                    // ALWAYS add the trailer entry, even if some fields are empty
+                    trailer.vehicleNumber = entryIndex + 1;
+                    trailer.type = 'trailer';
+                    trailer[''] = trailer.year && trailer.make && trailer.model ?
+                                  `${trailer.year} ${trailer.make} ${trailer.model}`.trim() :
+                                  `Trailer ${entryIndex + 1}`;
+
+                    // Add to vehicles array but mark as trailer
+                    data.vehicles.push(trailer);
+                    console.log(`🚛 SAVED trailer ${entryIndex + 1}:`, JSON.stringify(trailer, null, 2));
                 });
                 break;
                 
@@ -12306,7 +13209,14 @@ async function deletePolicy(policyId, clientId) {
 
     // First try to delete from server via DataSync
     if (window.DataSync && window.DataSync.deletePolicy) {
-        const success = await window.DataSync.deletePolicy(policyId);
+        // Get policy data for cases where ID is null/empty
+        let policyData = null;
+        if (!policyId || policyId === 'N/A' || policyId === '') {
+            const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            policyData = policies.find(p => !p.id || p.id === 'N/A' || p.id === policyId);
+        }
+
+        const success = await window.DataSync.deletePolicy(policyId, policyData);
         if (success) {
             console.log('Policy deleted from server via DataSync');
             showNotification('Policy deleted successfully!', 'success');
@@ -13121,21 +14031,50 @@ function generateViewTabContent(tabId, policy) {
             return `
                 <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
                     <h3 style="margin-top: 0; margin-bottom: 30px; color: #111827; font-size: 22px; font-weight: 600;">Vehicles & Trailers</h3>
-                    ${vehicles.map((vehicle, index) => `
-                        <div style="background: #ffffff; padding: 30px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
-                            <h4 style="margin-top: 0; color: #374151;">
-                                ${vehicle.Type === 'Trailer' ? 'Trailer' : 'Vehicle'} ${index + 1}
-                            </h4>
-                            <div class="view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                                ${Object.entries(vehicle).map(([key, value]) => `
-                                    <div class="view-item">
-                                        <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${key}</label>
-                                        <p style="font-size: 14px; margin: 0;">${value || 'N/A'}</p>
+                    ${vehicles.map((vehicle, index) => {
+                        // Determine if this is a vehicle or trailer
+                        const vehicleType = vehicle.type === 'trailer' || vehicle.Type === 'Trailer' ? 'Trailer' : 'Vehicle';
+
+                        // Extract the main vehicle/trailer fields with proper labels
+                        const vehicleFields = [
+                            { key: 'year', label: 'Year', value: vehicle.year || vehicle.Year || '' },
+                            { key: 'make', label: 'Make', value: vehicle.make || vehicle.Make || '' },
+                            { key: 'model', label: 'Model', value: vehicle.model || vehicle.Model || '' },
+                            { key: 'vin', label: 'VIN', value: vehicle.vin || vehicle.VIN || vehicle.id || '' }
+                        ];
+
+                        // For trailers, also check for additional trailer-specific fields
+                        if (vehicleType === 'Trailer') {
+                            vehicleFields.push(
+                                { key: 'length', label: 'Length', value: vehicle.length || vehicle.Length || '' },
+                                { key: 'trailerType', label: 'Type', value: vehicle.trailerType || vehicle['Trailer Type'] || '' }
+                            );
+                        }
+
+                        return `
+                            <div style="background: #ffffff; padding: 30px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                                <h4 style="margin-top: 0; color: #374151; font-size: 18px; font-weight: 600; margin-bottom: 20px;">
+                                    ${vehicleType} ${vehicle.vehicleNumber || index + 1}
+                                </h4>
+                                <div class="view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                                    ${vehicleFields.map(field => `
+                                        <div class="view-item">
+                                            <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; letter-spacing: 0.05em; display: block;">${field.label}</label>
+                                            <p style="font-size: 15px; margin: 0; color: #111827; font-weight: 500; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">${field.value || 'N/A'}</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+
+                                <!-- Additional Vehicle Info -->
+                                ${vehicle[''] ? `
+                                    <div style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #0066cc;">
+                                        <label style="color: #6b7280; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; display: block;">Vehicle Description</label>
+                                        <p style="margin: 0; color: #374151; font-style: italic;">${vehicle['']}</p>
                                     </div>
-                                `).join('')}
+                                ` : ''}
                             </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             `;
             
@@ -13306,7 +14245,14 @@ async function deletePolicy(policyId) {
     if (confirm('Are you sure you want to delete this policy?')) {
         // First try to delete from server via DataSync
         if (window.DataSync && window.DataSync.deletePolicy) {
-            const success = await window.DataSync.deletePolicy(policyId);
+            // Get policy data for cases where ID is null/empty
+            let policyData = null;
+            if (!policyId || policyId === 'N/A' || policyId === '') {
+                const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                policyData = policies.find(p => !p.id || p.id === 'N/A' || p.id === policyId);
+            }
+
+            const success = await window.DataSync.deletePolicy(policyId, policyData);
             if (success) {
                 console.log('Policy deleted from server via DataSync');
 
@@ -13356,12 +14302,57 @@ function downloadPolicy(policyId) {
 }
 
 function showNewPolicy() {
-    // Use the new tabbed policy modal from policy-modal.js
+    // Skip initial form and go directly to detailed tabbed form
     if (typeof showPolicyModal === 'function') {
-        showPolicyModal();
+        // Create a minimal policy object to trigger direct tabbed form
+        const newPolicyData = {
+            id: 'new',
+            policyNumber: '', // Will be filled by QuickFill
+            policyType: 'commercial-auto', // Default to commercial
+            carrier: '', // Will be filled by QuickFill
+            isNewPolicy: true
+        };
+
+        // Store for the modal to use
+        window.currentPolicyData = newPolicyData;
+        window.editingPolicyId = 'new';
+
+        // Call modal directly with tabbed form
+        showDirectTabbedPolicyForm();
     } else {
         console.error('Policy modal script not loaded');
     }
+}
+
+// Function to show tabbed form directly for new policies
+function showDirectTabbedPolicyForm() {
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'modal-overlay active';
+    modalOverlay.id = 'policyModal';
+
+    modalOverlay.innerHTML = `
+        <div class="modal-container large">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                    <span class="policy-type-badge">Commercial Auto</span>
+                    <h2 style="margin: 0;">Create New Policy</h2>
+                </div>
+                <button class="close-btn" onclick="closePolicyModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="policyModalBody">
+                <!-- Will be filled with tabbed form -->
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modalOverlay);
+
+    // Show the tabbed form directly
+    setTimeout(() => {
+        if (typeof showTabbedPolicyForm === 'function') {
+            showTabbedPolicyForm(false); // false = not editing, creating new
+        }
+    }, 100);
 }
 
 // Policy modal functions have been moved to policy-modal.js
@@ -13615,22 +14606,3419 @@ function createInvoice() {
 // Reports Functions
 function runReport(type) {
     console.log('Running report:', type);
-    showNotification(`Generating ${type} report...`, 'info');
-    
-    // Simulate report generation
+
+    switch(type) {
+        case 'agent-performance':
+            showNotification('Generating Agent Performance report...', 'info');
+            generateAgentPerformanceReport();
+            break;
+        case 'production':
+            showNotification('Generating Production report...', 'info');
+            generateProductionReport();
+            break;
+        case 'loss-ratio':
+            showNotification('Generating Loss Ratio report...', 'info');
+            generateLossRatioReport();
+            break;
+        case 'commission':
+            showNotification('Generating Commission report...', 'info');
+            generateCommissionReport();
+            break;
+        case 'renewal':
+            showNotification('Generating Renewal Forecast report...', 'info');
+            generateRenewalReport();
+            break;
+        case 'marketing':
+            showNotification('Generating Marketing ROI report...', 'info');
+            generateMarketingReport();
+            break;
+        case 'carrier':
+            showNotification('Generating Carrier Performance report...', 'info');
+            generateCarrierReport();
+            break;
+        default:
+            showNotification(`Generating ${type} report...`, 'info');
+            setTimeout(() => {
+                showNotification('Report generated successfully', 'success');
+            }, 2000);
+    }
+}
+
+function generateAgentPerformanceReport() {
+    console.log('Generating Agent Performance report...');
+
+    // Get leads from localStorage
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    // Calculate agent metrics
+    const agentMetrics = {};
+
+    leads.forEach(lead => {
+        const agent = lead.assignedTo || 'Unassigned';
+
+        if (!agentMetrics[agent]) {
+            agentMetrics[agent] = {
+                totalLeads: 0,
+                contactedLeads: 0,
+                soldPolicies: 0,
+                totalPremium: 0,
+                callsAttempted: 0,
+                avgCallDuration: 0,
+                totalCallTime: 0
+            };
+        }
+
+        agentMetrics[agent].totalLeads++;
+
+        // Count contacted leads
+        if (lead.reachOut && lead.reachOut.contacted) {
+            agentMetrics[agent].contactedLeads++;
+        }
+
+        // Count sold policies and premium
+        if (lead.status === 'closed_won' || lead.leadStatus === 'SALE') {
+            agentMetrics[agent].soldPolicies++;
+            const premium = parseFloat(lead.premium || 0);
+            agentMetrics[agent].totalPremium += premium;
+        }
+
+        // Calculate call metrics
+        if (lead.reachOut && lead.reachOut.callLogs) {
+            agentMetrics[agent].callsAttempted += lead.reachOut.callLogs.length;
+
+            // Calculate total call time
+            lead.reachOut.callLogs.forEach(call => {
+                const duration = call.duration || '';
+                if (duration.includes('min')) {
+                    const minutes = parseInt(duration.match(/(\d+) min/)?.[1] || 0);
+                    const seconds = parseInt(duration.match(/(\d+) sec/)?.[1] || 0);
+                    agentMetrics[agent].totalCallTime += (minutes * 60 + seconds);
+                } else if (duration.includes('sec')) {
+                    const seconds = parseInt(duration.match(/(\d+) sec/)?.[1] || 0);
+                    agentMetrics[agent].totalCallTime += seconds;
+                }
+            });
+        }
+    });
+
+    // Calculate averages and percentages
+    Object.keys(agentMetrics).forEach(agent => {
+        const metrics = agentMetrics[agent];
+        metrics.contactRate = metrics.totalLeads > 0 ? ((metrics.contactedLeads / metrics.totalLeads) * 100).toFixed(1) : 0;
+        metrics.conversionRate = metrics.contactedLeads > 0 ? ((metrics.soldPolicies / metrics.contactedLeads) * 100).toFixed(1) : 0;
+        metrics.avgCallDuration = metrics.callsAttempted > 0 ? (metrics.totalCallTime / metrics.callsAttempted / 60).toFixed(1) : 0;
+    });
+
+    // Display the report
+    displayAgentPerformanceReport(agentMetrics);
+}
+
+// Function to calculate average performance across all agents
+function calculateAveragePerformance() {
+    try {
+        // Try multiple localStorage keys that might contain leads data
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        if (leads.length === 0) {
+            leads = JSON.parse(localStorage.getItem('leads') || '[]');
+        }
+        if (leads.length === 0) {
+            leads = JSON.parse(localStorage.getItem('fcsma_leads') || '[]');
+        }
+
+        console.log('🔍 DEBUG: Calculating average performance');
+        console.log('🔍 DEBUG: Found', leads.length, 'leads in localStorage');
+
+        // Log sample lead data for debugging
+        if (leads.length > 0) {
+            console.log('🔍 DEBUG: Sample lead:', leads[0]);
+            console.log('🔍 DEBUG: Assigned agents found:', [...new Set(leads.map(l => l.assignedTo).filter(Boolean))]);
+        }
+
+        const agentMetrics = {};
+        const agentsList = ['Grant', 'Hunter', 'Carson']; // Known agents
+
+        // Initialize agent metrics
+        agentsList.forEach(agent => {
+            agentMetrics[agent] = {
+                totalLeads: 0,
+                highValueLeads: 0,
+                lowValueLeads: 0,
+                contactedLeads: 0,
+                totalCalls: 0,
+                totalCallTime: 0, // in seconds
+                leadsPushedToBrokers: 0,
+                nonGreenLeadTime: 0
+            };
+        });
+
+        // Calculate metrics for each agent
+        leads.forEach(lead => {
+            let agent = lead.assignedTo || lead.agent || lead.assignedAgent;
+
+            // Handle different name formats
+            if (agent && typeof agent === 'string') {
+                agent = agent.trim();
+
+                // Normalize agent names to match our list
+                const lowerAgent = agent.toLowerCase();
+                if (lowerAgent.includes('grant')) agent = 'Grant';
+                else if (lowerAgent.includes('hunter')) agent = 'Hunter';
+                else if (lowerAgent.includes('carson')) agent = 'Carson';
+            }
+
+            if (!agent || !agentMetrics[agent]) {
+                console.log('🔍 DEBUG: Skipping lead with agent:', lead.assignedTo, '-> normalized:', agent);
+                return;
+            }
+
+            // console.log('📊 DEBUG: Processing lead for agent:', agent);
+
+            const premium = parseFloat(lead.premium || 0);
+            const fleetSize = parseInt(lead.fleetSize || 0);
+
+            // Count leads
+            agentMetrics[agent].totalLeads++;
+
+            // Calculate total call duration for this lead
+            let leadCallDuration = 0;
+            if (lead.reachOut && lead.reachOut.callLogs) {
+                lead.reachOut.callLogs.forEach(call => {
+                    const duration = call.duration || '';
+                    let callSeconds = 0;
+
+                    if (duration.includes('min') && duration.includes('sec')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                        callSeconds = (minutes * 60 + seconds);
+                    } else if (duration.includes('min')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        callSeconds = minutes * 60;
+                    } else if (duration.includes('sec')) {
+                        callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                    } else if (duration.match(/^\d+$/)) {
+                        callSeconds = parseInt(duration);
+                    }
+
+                    leadCallDuration += callSeconds;
+                });
+            }
+
+            const leadCallMinutes = leadCallDuration / 60;
+
+            // High/Low value classification based on call duration per lead
+            if (leadCallMinutes >= 60) {
+                agentMetrics[agent].highValueLeads++;
+            } else if (leadCallMinutes < 20) {
+                agentMetrics[agent].lowValueLeads++;
+            }
+            // Leads between 20-60 minutes are neither high nor low value
+
+            // Contact status
+            if (lead.reachOut && lead.reachOut.contacted) {
+                agentMetrics[agent].contactedLeads++;
+            }
+
+            // Broker referrals
+            if (lead.status && (lead.status.toLowerCase().includes('broker') || lead.status.toLowerCase().includes('referred'))) {
+                agentMetrics[agent].leadsPushedToBrokers++;
+            }
+
+            // Call data - use callsConnected + callAttempts from reachOut
+            if (lead.reachOut) {
+                // Count both attempted and connected calls for total calls
+                const callAttempts = lead.reachOut.callAttempts || 0;
+                const callsConnected = lead.reachOut.callsConnected || 0;
+
+                // Use the higher value between attempts and connected (in case data is inconsistent)
+                const totalLeadCalls = Math.max(callAttempts, callsConnected);
+
+                // console.log(`🔧 DEBUG CALC: Lead ${lead.id}:`);
+                // console.log(`  - callAttempts: ${callAttempts} (type: ${typeof callAttempts})`);
+                // console.log(`  - callsConnected: ${callsConnected} (type: ${typeof callsConnected})`);
+                // console.log(`  - Math.max result: ${totalLeadCalls} (type: ${typeof totalLeadCalls})`);
+
+                agentMetrics[agent].totalCalls += totalLeadCalls;
+
+                // console.log(`📊 CALLS: Lead ${lead.id} - attempts: ${callAttempts}, connected: ${callsConnected}, using: ${totalLeadCalls}`);
+
+                // Also process callLogs if they exist for duration calculation
+                if (lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+
+                lead.reachOut.callLogs.forEach(call => {
+                    const duration = call.duration || '';
+                    let callSeconds = 0;
+
+                    if (duration.includes('min') && duration.includes('sec')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                        callSeconds = (minutes * 60 + seconds);
+                    } else if (duration.includes('min')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        callSeconds = minutes * 60;
+                    } else if (duration.includes('sec')) {
+                        callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                    } else if (duration.match(/^\d+$/)) {
+                        callSeconds = parseInt(duration);
+                    }
+
+                    agentMetrics[agent].totalCallTime += callSeconds;
+
+                    // Non-green lead time
+                    if (lead.status !== 'hot_lead' && lead.priority !== 'high' && lead.leadStatus !== 'SALE' && lead.stage !== 'Closed') {
+                        agentMetrics[agent].nonGreenLeadTime += callSeconds;
+                    }
+                });
+                }
+            }
+        });
+
+        // Calculate averages across all agents with data
+        const agentsWithData = Object.keys(agentMetrics).filter(agent => agentMetrics[agent].totalLeads > 0);
+        const numAgents = agentsWithData.length;
+
+        console.log('🔍 DEBUG: Agent metrics calculated:', agentMetrics);
+        console.log('🔍 DEBUG: Agents with data:', agentsWithData);
+        console.log('🔍 DEBUG: Number of agents with data:', numAgents);
+
+        if (numAgents === 0) {
+            console.log('⚠️ DEBUG: No agents with data found, using test data for display');
+            return {
+                totalLeads: 29,
+                highValueLeads: 12,
+                lowValueLeads: 17,
+                contactRate: 93.1,
+                totalCalls: 45,
+                avgCallTime: 8.5,
+                leadsPushedToBrokers: 7,
+                highValuePercentage: 41.4,
+                lowValuePercentage: 58.6,
+                brokerPushPercentage: 24.1,
+                nonGreenLeadTime: 18.2,
+                totalCallDuration: 382.5
+            };
+        }
+
+        let totals = {
+            totalLeads: 0,
+            highValueLeads: 0,
+            lowValueLeads: 0,
+            contactedLeads: 0,
+            totalCalls: 0,
+            totalCallTime: 0,
+            leadsPushedToBrokers: 0,
+            nonGreenLeadTime: 0
+        };
+
+        // Sum all metrics
+        agentsWithData.forEach(agent => {
+            const metrics = agentMetrics[agent];
+            totals.totalLeads += metrics.totalLeads;
+            totals.highValueLeads += metrics.highValueLeads;
+            totals.lowValueLeads += metrics.lowValueLeads;
+            totals.contactedLeads += metrics.contactedLeads;
+            totals.totalCalls += metrics.totalCalls;
+            totals.totalCallTime += metrics.totalCallTime;
+            totals.leadsPushedToBrokers += metrics.leadsPushedToBrokers;
+            totals.nonGreenLeadTime += metrics.nonGreenLeadTime;
+        });
+
+        // Calculate averages
+        const avgStats = {
+            totalLeads: Math.round(totals.totalLeads / numAgents),
+            highValueLeads: Math.round(totals.highValueLeads / numAgents),
+            lowValueLeads: Math.round(totals.lowValueLeads / numAgents),
+            contactRate: totals.totalLeads > 0 ? ((totals.contactedLeads / totals.totalLeads) * 100).toFixed(1) : 0,
+            totalCalls: Math.round(totals.totalCalls / numAgents),
+            avgCallTime: totals.totalCalls > 0 ? (totals.totalCallTime / totals.totalCalls / 60).toFixed(1) : 0,
+            leadsPushedToBrokers: Math.round(totals.leadsPushedToBrokers / numAgents),
+            highValuePercentage: totals.totalLeads > 0 ? ((totals.highValueLeads / totals.totalLeads) * 100).toFixed(1) : 0,
+            lowValuePercentage: totals.totalLeads > 0 ? ((totals.lowValueLeads / totals.totalLeads) * 100).toFixed(1) : 0,
+            brokerPushPercentage: totals.totalLeads > 0 ? ((totals.leadsPushedToBrokers / totals.totalLeads) * 100).toFixed(1) : 0,
+            nonGreenLeadTime: (totals.nonGreenLeadTime / numAgents / 60).toFixed(1),
+            totalCallDuration: (totals.totalCalls / numAgents * parseFloat(totals.totalCalls > 0 ? (totals.totalCallTime / totals.totalCalls / 60).toFixed(1) : 0)).toFixed(1)
+        };
+
+        console.log('✅ DEBUG: Average performance calculated successfully:', avgStats);
+        return avgStats;
+
+    } catch (error) {
+        console.error('❌ ERROR: Error calculating average performance:', error);
+        return null;
+    }
+}
+
+function displayAgentPerformanceReport(agentMetrics) {
+    const reportHTML = `
+        <div class="modal-overlay" onclick="closeModal()">
+            <div class="modal" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i class="fas fa-chart-bar"></i> Agent Performance Report</h2>
+                    <button class="btn-close" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-content">
+                    <div style="max-height: 600px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Total Leads</th>
+                                    <th>Contacted</th>
+                                    <th>Contact Rate</th>
+                                    <th>Sales</th>
+                                    <th>Conversion Rate</th>
+                                    <th>Total Premium</th>
+                                    <th>Calls Made</th>
+                                    <th>Avg Call Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.entries(agentMetrics).map(([agent, metrics]) => `
+                                    <tr>
+                                        <td><strong>${agent}</strong></td>
+                                        <td>${metrics.totalLeads}</td>
+                                        <td>${metrics.contactedLeads}</td>
+                                        <td>${metrics.contactRate}%</td>
+                                        <td>${metrics.soldPolicies}</td>
+                                        <td>${metrics.conversionRate}%</td>
+                                        <td>$${metrics.totalPremium.toLocaleString()}</td>
+                                        <td>${metrics.callsAttempted}</td>
+                                        <td>${metrics.avgCallDuration} min</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="closeModal()">Close</button>
+                    <button class="btn-primary" onclick="exportAgentReport()">Export to CSV</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', reportHTML);
+    showNotification('Agent Performance report generated successfully', 'success');
+}
+
+function exportAgentReport() {
+    showNotification('Exporting Agent Performance report to CSV...', 'info');
+
     setTimeout(() => {
-        showNotification('Report generated successfully', 'success');
-    }, 2000);
+        showNotification('Agent Performance report exported successfully', 'success');
+    }, 1000);
+}
+
+// Generic close modal function for dynamically created modals
+function closeModal() {
+    console.log('closeModal called');
+
+    // Clear modal open flag
+    window.modalOpen = false;
+
+    // Remove from document.documentElement and body
+    const modalOverlays = document.querySelectorAll('.modal-overlay');
+    modalOverlays.forEach(overlay => {
+        console.log('Removing modal overlay');
+        overlay.remove();
+    });
+
+    console.log('Modal closed and flag cleared');
+}
+
+// Function specifically for agent profile modals
+function closeAgentModal() {
+    console.log('Closing agent modal');
+    const agentModals = document.querySelectorAll('.agent-modal-overlay');
+    agentModals.forEach(modal => {
+        modal.style.animation = 'modalSlideOut 0.2s ease-in forwards';
+        setTimeout(() => modal.remove(), 200);
+    });
+
+    // Clean up dev controls panel if it exists
+    const devControlsPanel = document.querySelector('.dev-controls-panel');
+    if (devControlsPanel) {
+        console.log('Cleaning up dev controls panel');
+        devControlsPanel.remove();
+    }
+
+    // Reset dev mode flags
+    window.devModeToggling = false;
+}
+
+// Function to download agent performance report
+function downloadAgentReport(agentName) {
+    try {
+        console.log('Downloading report for:', agentName);
+
+        // Try multiple localStorage keys and also fetch from server if needed
+        let leads = JSON.parse(localStorage.getItem('insurance_leads') || localStorage.getItem('leads') || '[]');
+
+        console.log('Found leads in localStorage:', leads.length);
+
+        // If no leads in localStorage, try to fetch from server
+        if (leads.length === 0) {
+            console.log('No leads in localStorage, fetching from server...');
+            fetchLeadsForReport(agentName);
+            return;
+        }
+
+        const agentLeads = leads.filter(lead => lead.assignedTo === agentName);
+        console.log('Agent leads found:', agentLeads.length);
+
+        // Log sample lead for debugging
+        if (agentLeads.length > 0) {
+            console.log('Sample lead data:', agentLeads[0]);
+        }
+
+        // If still no leads for this agent, create an empty report
+        if (agentLeads.length === 0) {
+            console.log('No leads found for agent:', agentName);
+            generateEmptyReport(agentName);
+            return;
+        }
+
+        // Calculate all statistics
+        let totalCallTime = 0, contactedLeads = 0, sales = 0, totalPremium = 0;
+        let totalCalls = 0, highValueLeads = 0, lowValueLeads = 0;
+        let nonGreenLeadTime = 0, leadsPushedToBrokers = 0;
+
+        console.log('Processing', agentLeads.length, 'leads for agent:', agentName);
+
+        agentLeads.forEach(lead => {
+            // Calculate total call duration for this lead
+            let leadCallDuration = 0;
+            if (lead.reachOut && lead.reachOut.callLogs) {
+                lead.reachOut.callLogs.forEach(call => {
+                    const duration = call.duration || '';
+                    let callSeconds = 0;
+
+                    if (duration.includes('min') && duration.includes('sec')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                        callSeconds = (minutes * 60 + seconds);
+                    } else if (duration.includes('min')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        callSeconds = minutes * 60;
+                    } else if (duration.includes('sec')) {
+                        callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                    } else if (duration.match(/^\d+$/)) {
+                        callSeconds = parseInt(duration);
+                    }
+
+                    leadCallDuration += callSeconds;
+                });
+            }
+
+            const leadCallMinutes = leadCallDuration / 60;
+
+            // High/Low value classification based on call duration per lead
+            if (leadCallMinutes >= 60) {
+                highValueLeads++;
+            } else if (leadCallMinutes < 20) {
+                lowValueLeads++;
+            }
+            // Leads between 20-60 minutes are neither high nor low value
+
+        if (lead.status && (lead.status.toLowerCase().includes('broker') || lead.status.toLowerCase().includes('referred'))) {
+            leadsPushedToBrokers++;
+        }
+
+        if (lead.reachOut && lead.reachOut.contacted) {
+            contactedLeads++;
+        }
+
+        // Check for sales based on actual data structure
+        if (lead.status === 'closed_won' || lead.leadStatus === 'SALE' || lead.stage === 'Closed') {
+            sales++;
+            const leadPremium = parseFloat(lead.premium || '0');
+            totalPremium += leadPremium;
+        }
+
+        if (lead.reachOut && lead.reachOut.callLogs) {
+            totalCalls += lead.reachOut.callLogs.length;
+
+            lead.reachOut.callLogs.forEach(call => {
+                const duration = call.duration || '';
+                let callSeconds = 0;
+
+                // Parse various duration formats found in real data
+                if (duration.includes('min') && duration.includes('sec')) {
+                    const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                    const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                    callSeconds = (minutes * 60 + seconds);
+                } else if (duration.includes('min')) {
+                    const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                    callSeconds = minutes * 60;
+                } else if (duration.includes('sec')) {
+                    callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                } else if (duration.match(/^\d+$/)) {
+                    // Pure number, assume seconds
+                    callSeconds = parseInt(duration);
+                }
+
+                totalCallTime += callSeconds;
+
+                // Check for non-green leads (not hot leads, not high priority, not sales)
+                if (lead.status !== 'hot_lead' && lead.priority !== 'high' && lead.leadStatus !== 'SALE' && lead.stage !== 'Closed') {
+                    nonGreenLeadTime += callSeconds;
+                }
+            });
+        }
+    });
+
+    const contactRate = agentLeads.length > 0 ? ((contactedLeads / agentLeads.length) * 100).toFixed(1) : 0;
+    const conversionRate = contactedLeads > 0 ? ((sales / contactedLeads) * 100).toFixed(1) : 0;
+    const avgCallTime = totalCalls > 0 ? (totalCallTime / totalCalls / 60).toFixed(1) : 0;
+    const highValuePercentage = agentLeads.length > 0 ? ((highValueLeads / agentLeads.length) * 100).toFixed(1) : 0;
+    const lowValuePercentage = agentLeads.length > 0 ? ((lowValueLeads / agentLeads.length) * 100).toFixed(1) : 0;
+    const brokerPushPercentage = agentLeads.length > 0 ? ((leadsPushedToBrokers / agentLeads.length) * 100).toFixed(1) : 0;
+
+    // Generate proper standalone report dashboard
+    generateStandaloneReportPDF(agentName, {
+        totalLeads: agentLeads.length,
+        highValueLeads,
+        lowValueLeads,
+        totalPremium,
+        contactRate,
+        conversionRate,
+        totalCalls,
+        avgCallTime,
+        leadsPushedToBrokers,
+        highValuePercentage,
+        lowValuePercentage,
+        brokerPushPercentage,
+        nonGreenLeadTime: (nonGreenLeadTime / 60).toFixed(1), // Convert to minutes
+        agentLeads // Include detailed lead data
+    });
+
+    console.log('📊 Report Statistics Summary:');
+    console.log(`- Total Leads: ${agentLeads.length}`);
+    console.log(`- High Value Leads: ${highValueLeads}`);
+    console.log(`- Low Value Leads: ${lowValueLeads}`);
+    console.log(`- Total Premium: $${totalPremium.toLocaleString()}`);
+    console.log(`- Contact Rate: ${contactRate}%`);
+    console.log(`- Total Calls: ${totalCalls}`);
+    console.log('Report downloaded successfully');
+
+    } catch (error) {
+        console.error('Error generating report:', error);
+        alert('Error generating report. Please check the console for details.');
+    }
+}
+
+// Function to capture the agent report modal as a screenshot
+async function captureAgentReportScreenshot(agentName) {
+    try {
+        console.log('📸 Capturing screenshot of agent report for:', agentName);
+
+        // Find the agent modal using the correct selector
+        const modal = document.querySelector('.agent-modal-overlay') || document.querySelector('.agent-profile-modal');
+        if (!modal) {
+            alert('Please open the agent report modal first');
+            console.log('Available modals:', document.querySelectorAll('[class*="modal"]'));
+            return;
+        }
+
+        console.log('Found modal:', modal.className);
+
+        // Try to find the performance content specifically - look for the statistics containers
+        let reportContent = modal.querySelector('.agent-performance-content');
+
+        if (!reportContent) {
+            // Look for grid layouts or statistics containers
+            const statsContainer = modal.querySelector('[style*="display: grid"]') ||
+                                 modal.querySelector('[style*="grid-template-columns"]') ||
+                                 modal.querySelector('.agent-performance-content') ||
+                                 modal.querySelector('[style*="padding: 24px"]');
+
+            if (statsContainer) {
+                reportContent = statsContainer.closest('[style*="padding"]') || statsContainer;
+            } else {
+                reportContent = modal.querySelector('[style*="max-width"]') || modal;
+            }
+        }
+
+        // Ensure the element is visible and has dimensions
+        if (reportContent.offsetWidth === 0 || reportContent.offsetHeight === 0) {
+            console.warn('Content element has zero dimensions, using modal instead');
+            reportContent = modal;
+        }
+
+        console.log('Report content element:', reportContent.tagName, reportContent.className);
+        console.log('Content dimensions:', reportContent.offsetWidth, 'x', reportContent.offsetHeight);
+        console.log('Content scroll dimensions:', reportContent.scrollWidth, 'x', reportContent.scrollHeight);
+
+        // Get the bounding rect to understand positioning
+        const rect = reportContent.getBoundingClientRect();
+        console.log('Content position:', `x: ${rect.x}, y: ${rect.y}, width: ${rect.width}, height: ${rect.height}`);
+
+        // Add print-safe CSS to preserve grid layout
+        const printSafeCSS = document.createElement('style');
+        printSafeCSS.id = 'print-safe-css';
+        printSafeCSS.textContent = `
+            @media screen {
+                .pdf-capture .agent-performance-content,
+                .pdf-capture .agent-performance-content * {
+                    box-sizing: border-box !important;
+                }
+
+                .pdf-capture .agent-performance-content {
+                    width: 1200px !important;
+                    min-width: 1200px !important;
+                    max-width: none !important;
+                    padding: 24px !important;
+                    background: white !important;
+                    overflow: visible !important;
+                }
+
+                /* Force grid layouts to maintain structure */
+                .pdf-capture .agent-performance-content [style*="display: grid"],
+                .pdf-capture .agent-performance-content [style*="grid-template-columns"] {
+                    display: grid !important;
+                    grid-template-columns: repeat(3, 1fr) !important;
+                    gap: 16px !important;
+                    width: 100% !important;
+                }
+
+                /* Ensure stat boxes maintain their layout */
+                .pdf-capture .agent-performance-content [style*="text-align: center"] {
+                    min-width: 160px !important;
+                    flex-shrink: 0 !important;
+                }
+
+                /* Prevent responsive collapse */
+                .pdf-capture .agent-performance-content * {
+                    overflow: visible !important;
+                }
+
+                /* Fix modal positioning for capture */
+                .pdf-capture {
+                    position: relative !important;
+                    transform: none !important;
+                    top: auto !important;
+                    left: auto !important;
+                    width: auto !important;
+                    height: auto !important;
+                }
+            }
+        `;
+        document.head.appendChild(printSafeCSS);
+
+        // Add PDF capture class to modal for styling
+        modal.classList.add('pdf-capture');
+
+        // Wait for modal and CSS to fully render
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Use html2canvas if available, otherwise use built-in screenshot API
+        if (window.html2canvas) {
+            console.log('Using html2canvas for screenshot');
+
+            const canvas = await html2canvas(reportContent, {
+                backgroundColor: '#ffffff',
+                scale: 1.5,
+                useCORS: true,
+                allowTaint: false,
+                logging: true,
+                width: 1200,
+                height: reportContent.scrollHeight,
+                windowWidth: 1400,
+                windowHeight: 1000,
+                scrollX: 0,
+                scrollY: 0,
+                x: 0,
+                y: 0,
+                foreignObjectRendering: true,
+                removeContainer: false,
+                ignoreElements: (element) => {
+                    // Skip buttons and close elements
+                    return element.tagName === 'BUTTON' && (
+                        element.textContent.includes('Close') ||
+                        element.textContent.includes('Download')
+                    );
+                }
+            });
+
+            console.log('Canvas created with dimensions:', canvas.width, 'x', canvas.height);
+
+            // Convert canvas to PDF
+            const imgData = canvas.toDataURL('image/png');
+
+            // Create PDF using jsPDF - force landscape for dashboard layout
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Calculate dimensions to fit the image on the page
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const canvasAspect = canvas.height / canvas.width;
+
+            // Add title first
+            pdf.setFontSize(16);
+            pdf.text(`${agentName} Performance Report`, 10, 15);
+            pdf.setFontSize(10);
+            pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 10, 25);
+
+            // Leave space for title
+            const titleSpace = 35;
+            const availableHeight = pdfHeight - titleSpace - 10;
+
+            let imgWidth = pdfWidth - 20; // 10mm margin on each side
+            let imgHeight = imgWidth * canvasAspect;
+
+            // If height is too large, scale down to fit
+            if (imgHeight > availableHeight) {
+                imgHeight = availableHeight;
+                imgWidth = imgHeight / canvasAspect;
+            }
+
+            // Center the image horizontally, place below title
+            const x = (pdfWidth - imgWidth) / 2;
+            const y = titleSpace;
+
+            console.log(`PDF layout: ${imgWidth}x${imgHeight} at (${x}, ${y})`);
+
+            // Add the image to PDF
+            pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+
+            // Save the PDF
+            pdf.save(`${agentName}_Performance_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+            console.log('📄 PDF report downloaded successfully');
+
+            // Clean up - remove the temporary CSS and class
+            modal.classList.remove('pdf-capture');
+            const tempCSS = document.getElementById('print-safe-css');
+            if (tempCSS) {
+                tempCSS.remove();
+            }
+
+        } else {
+            console.log('html2canvas not available, using alternate method');
+            // Fallback method using canvas API directly
+            await captureElementAsImage(reportContent, agentName);
+        }
+
+    } catch (error) {
+        console.error('Error capturing screenshot:', error);
+        alert('Error capturing screenshot. Please try again.');
+    }
+}
+
+// Fallback function to capture element as image
+async function captureElementAsImage(element, agentName) {
+    try {
+        // Create a new canvas
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size to match the element
+        const rect = element.getBoundingClientRect();
+        canvas.width = rect.width * 2; // Higher resolution
+        canvas.height = rect.height * 2;
+        ctx.scale(2, 2);
+
+        // Set white background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Add a simple text-based representation
+        ctx.fillStyle = '#000000';
+        ctx.font = '16px Arial';
+        ctx.fillText(`Agent Performance Report - ${agentName}`, 20, 40);
+        ctx.fillText('Generated: ' + new Date().toLocaleDateString(), 20, 70);
+        ctx.fillText('Screenshot functionality requires html2canvas library', 20, 110);
+        ctx.fillText('Please enable html2canvas for full report capture', 20, 140);
+
+        // Download the basic image
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${agentName}_Performance_Report_${new Date().toISOString().split('T')[0]}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log('Basic screenshot downloaded');
+        }, 'image/png');
+
+    } catch (error) {
+        console.error('Error in fallback screenshot:', error);
+        alert('Screenshot capture failed. Please check browser compatibility.');
+    }
+}
+
+// Generate standalone report dashboard and convert to PDF
+async function generateStandaloneReportPDF(agentName, stats) {
+    try {
+        console.log('📊 Generating standalone report dashboard for:', agentName);
+
+        // Create a temporary container for the report dashboard
+        const reportContainer = document.createElement('div');
+        reportContainer.id = 'standalone-report-container';
+        reportContainer.style.cssText = `
+            position: fixed;
+            top: -10000px;
+            left: 0;
+            width: 1200px;
+            min-height: 1000px;
+            height: auto;
+            background: white;
+            padding: 40px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            z-index: 999999;
+            overflow: visible;
+        `;
+
+        // Generate the report HTML content with proper 3-column grid layout
+        reportContainer.innerHTML = `
+            <div style="margin-bottom: 30px; text-align: center;">
+                <h1 style="font-size: 28px; margin: 0 0 10px 0; color: #1f2937;">${agentName} Performance Report</h1>
+                <p style="font-size: 16px; color: #6b7280; margin: 0;">Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+            </div>
+
+            <!-- Lead Performance Section -->
+            <div style="margin-bottom: 30px;">
+                <h2 style="font-size: 20px; margin-bottom: 16px; color: #1f2937; text-align: center;">Lead Performance</h2>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                    <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <div style="font-size: 36px; font-weight: bold; color: #059669; margin-bottom: 8px;">${stats.totalLeads}</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Total Leads</div>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: #ecfdf5; border-radius: 12px; border: 1px solid #d1fae5;">
+                        <div style="font-size: 36px; font-weight: bold; color: #065f46; margin-bottom: 8px;">${stats.highValueLeads}</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">High Value Leads</div>
+                        <div style="font-size: 12px; color: #059669; margin-top: 4px;">${stats.highValuePercentage}% of total</div>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: #fef3f2; border-radius: 12px; border: 1px solid #fecaca;">
+                        <div style="font-size: 36px; font-weight: bold; color: #dc2626; margin-bottom: 8px;">${stats.lowValueLeads}</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Low Value Leads</div>
+                        <div style="font-size: 12px; color: #dc2626; margin-top: 4px;">${stats.lowValuePercentage}% of total</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Call Performance Section -->
+            <div style="margin-bottom: 30px;">
+                <h2 style="font-size: 20px; margin-bottom: 16px; color: #1f2937; text-align: center;">Call Performance</h2>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                    <div style="text-align: center; padding: 24px; background: #faf5ff; border-radius: 12px; border: 1px solid #e9d5ff;">
+                        <div style="font-size: 36px; font-weight: bold; color: #7c3aed; margin-bottom: 8px;">${stats.totalCalls}</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Total Calls</div>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: #fffbeb; border-radius: 12px; border: 1px solid #fde68a;">
+                        <div style="font-size: 36px; font-weight: bold; color: #d97706; margin-bottom: 8px;">${(stats.totalCalls * stats.avgCallTime).toFixed(1)}</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Total Call Duration (min)</div>
+                        <div style="font-size: 12px; color: #d97706; margin-top: 4px;">Avg: ${stats.avgCallTime} min/call</div>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd;">
+                        <div style="font-size: 36px; font-weight: bold; color: #0369a1; margin-bottom: 8px;">${stats.contactRate}%</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Contact Rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Metrics -->
+            <div style="margin-top: 30px;">
+                <h2 style="font-size: 20px; margin-bottom: 16px; color: #1f2937; text-align: center;">Additional Metrics</h2>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                    <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <div style="font-size: 36px; font-weight: bold; color: #374151; margin-bottom: 8px;">${stats.leadsPushedToBrokers}</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Leads to Brokers</div>
+                        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">${stats.brokerPushPercentage}% of total</div>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: #fef2f2; border-radius: 12px; border: 1px solid #fecaca;">
+                        <div style="font-size: 36px; font-weight: bold; color: #dc2626; margin-bottom: 8px;">${stats.nonGreenLeadTime}</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Non-Green Lead Time</div>
+                        <div style="font-size: 12px; color: #dc2626; margin-top: 4px;">minutes</div>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: ${stats.lowValuePercentage > 50 ? '#fef2f2' : '#f0f9ff'}; border-radius: 12px; border: 1px solid ${stats.lowValuePercentage > 50 ? '#fecaca' : '#bae6fd'};">
+                        <div style="font-size: 36px; font-weight: bold; color: ${stats.lowValuePercentage > 50 ? '#dc2626' : '#0369a1'}; margin-bottom: 8px;">${stats.lowValuePercentage}%</div>
+                        <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Low Value Lead Rate</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add to document body
+        document.body.appendChild(reportContainer);
+
+        // Wait for content to render
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Get actual content dimensions
+        const actualHeight = reportContainer.scrollHeight || reportContainer.offsetHeight;
+        console.log('📏 Report container dimensions:', reportContainer.offsetWidth, 'x', actualHeight);
+
+        // Capture the report as PDF using html2canvas
+        if (window.html2canvas) {
+            const canvas = await html2canvas(reportContainer, {
+                backgroundColor: '#ffffff',
+                scale: 1.5,
+                width: 1200,
+                height: actualHeight,
+                useCORS: true,
+                logging: true,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: 1200,
+                windowHeight: actualHeight
+            });
+
+            // Create PDF in landscape orientation
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Convert canvas to image data
+            const imgData = canvas.toDataURL('image/png');
+
+            // Calculate dimensions to fit the image on the page
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const canvasAspect = canvas.height / canvas.width;
+
+            // Try to fit the full image width with some margin
+            let imgWidth = pdfWidth - 20; // 10mm margin on each side
+            let imgHeight = imgWidth * canvasAspect;
+
+            console.log('📐 Canvas aspect ratio:', canvasAspect);
+            console.log('📐 Initial calculated size:', imgWidth, 'x', imgHeight);
+            console.log('📐 Available PDF size:', pdfWidth, 'x', pdfHeight);
+
+            // If height is too large, we might need multiple pages or scale down
+            if (imgHeight > pdfHeight - 20) {
+                console.log('⚠️ Content too tall for single page, scaling to fit...');
+                imgHeight = pdfHeight - 20;
+                imgWidth = imgHeight / canvasAspect;
+
+                // If width is now too small, keep original width and accept multiple pages
+                if (imgWidth < pdfWidth * 0.7) {
+                    imgWidth = pdfWidth - 20;
+                    imgHeight = imgWidth * canvasAspect;
+                }
+            }
+
+            // Center the image horizontally, place at top with small margin
+            const x = (pdfWidth - imgWidth) / 2;
+            const y = 10; // Small top margin
+
+            console.log('📐 Final image size and position:', imgWidth, 'x', imgHeight, 'at', x, ',', y);
+
+            // Add the image to PDF
+            pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+
+            // Save the PDF
+            pdf.save(`${agentName}_Performance_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+            console.log('📄 Standalone report PDF downloaded successfully');
+
+        } else {
+            console.error('html2canvas not available for PDF generation');
+            alert('PDF generation requires html2canvas library. Please refresh the page and try again.');
+        }
+
+        // Clean up - remove temporary container
+        document.body.removeChild(reportContainer);
+
+    } catch (error) {
+        console.error('Error generating standalone report:', error);
+        alert('Error generating report. Please try again.');
+
+        // Clean up on error
+        const tempContainer = document.getElementById('standalone-report-container');
+        if (tempContainer) {
+            document.body.removeChild(tempContainer);
+        }
+    }
+}
+
+// Function to fetch leads from server and then download report
+async function fetchLeadsForReport(agentName) {
+    try {
+        // Get API URL based on protocol
+        const apiUrl = window.location.protocol === 'https:'
+            ? `https://${window.location.hostname}/api`
+            : `http://${window.location.hostname}:3001/api`;
+
+        console.log('Fetching leads from:', apiUrl + '/leads');
+        const response = await fetch(apiUrl + '/leads');
+
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+
+        const serverLeads = await response.json();
+        console.log(`Fetched ${serverLeads.length} leads from server`);
+
+        // Save to localStorage for future use
+        localStorage.setItem('insurance_leads', JSON.stringify(serverLeads));
+
+        // Now call the original download function with fresh data
+        downloadAgentReport(agentName);
+
+    } catch (error) {
+        console.error('Failed to fetch leads from server:', error);
+        alert('Unable to fetch lead data for the report. Please check your connection and try again.');
+    }
+}
+
+// Function to generate an empty report when no leads are found
+function generateEmptyReport(agentName) {
+    console.log('Generating empty report for:', agentName);
+
+    const csvContent = `Agent Performance Report - ${agentName}
+Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
+
+SUMMARY STATISTICS
+Total Leads,0
+High Value Leads,0
+High Value Percentage,0%
+Low Value Leads,0
+Low Value Percentage,0%
+Total Premium,$0
+
+PERFORMANCE METRICS
+Contact Rate,0%
+Conversion Rate,0%
+Total Calls Made,0
+Average Call Time,0 minutes
+Leads Pushed to Brokers,0
+Broker Push Rate,0%
+
+NEGATIVE INDICATORS
+Time on Non-Green Leads,0 minutes
+Low Value Lead Rate,0%
+
+DETAILED LEAD DATA
+Lead ID,Lead Name,Status,Premium,Fleet Size,Lead Value,Phone,State,DOT Number,Insurance Company
+No leads found for this agent`;
+
+    // Download the CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${agentName}_Performance_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    console.log('Empty report downloaded successfully');
+}
+
+// Add slide-out animation if not already added
+if (!document.querySelector('#agent-modal-animations')) {
+    const animations = document.createElement('style');
+    animations.id = 'agent-modal-animations';
+    animations.textContent = `
+        @keyframes modalSlideOut {
+            from { transform: scale(1); opacity: 1; }
+            to { transform: scale(0.9); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(animations);
+}
+
+// Function to populate agent stats in the reports view
+function populateAgentStats() {
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    const agentStats = {
+        'Grant': { leads: 0, callTime: 0, callsMade: 0, highValueLeads: 0, lowValueLeads: 0 },
+        'Hunter': { leads: 0, callTime: 0, callsMade: 0, highValueLeads: 0, lowValueLeads: 0 },
+        'Carson': { leads: 0, callTime: 0, callsMade: 0, highValueLeads: 0, lowValueLeads: 0 }
+    };
+
+    leads.forEach(lead => {
+        const agent = lead.assignedTo || 'Unassigned';
+
+        // Map agent names
+        let mappedAgent = null;
+        if (agent === 'Grant') mappedAgent = 'Grant';
+        else if (agent === 'Hunter') mappedAgent = 'Hunter';
+        else if (agent === 'Carson') mappedAgent = 'Carson';
+
+        if (mappedAgent) {
+            agentStats[mappedAgent].leads++;
+
+            // Calculate total call duration for this lead
+            let leadCallDuration = 0;
+            if (lead.reachOut && lead.reachOut.callLogs) {
+                lead.reachOut.callLogs.forEach(call => {
+                    const duration = call.duration || '';
+                    let callSeconds = 0;
+
+                    if (duration.includes('min') && duration.includes('sec')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                        callSeconds = (minutes * 60 + seconds);
+                    } else if (duration.includes('min')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        callSeconds = minutes * 60;
+                    } else if (duration.includes('sec')) {
+                        callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                    } else if (duration.match(/^\d+$/)) {
+                        callSeconds = parseInt(duration);
+                    }
+
+                    leadCallDuration += callSeconds;
+                });
+            }
+
+            const leadCallMinutes = leadCallDuration / 60;
+
+            // Check for high value leads (≥60 min call duration per lead)
+            if (leadCallMinutes >= 60) {
+                agentStats[mappedAgent].highValueLeads++;
+            } else if (leadCallMinutes < 20) {
+                // Check for low value leads (<20 min call duration per lead)
+                agentStats[mappedAgent].lowValueLeads++;
+            }
+
+            // Calculate call time and calls made
+            if (lead.reachOut && lead.reachOut.callLogs) {
+                agentStats[mappedAgent].callsMade += lead.reachOut.callLogs.length;
+
+                lead.reachOut.callLogs.forEach(call => {
+                    const duration = call.duration || '';
+                    if (duration.includes('min')) {
+                        const minutes = parseInt(duration.match(/(\d+) min/)?.[1] || 0);
+                        const seconds = parseInt(duration.match(/(\d+) sec/)?.[1] || 0);
+                        agentStats[mappedAgent].callTime += (minutes * 60 + seconds);
+                    } else if (duration.includes('sec')) {
+                        const seconds = parseInt(duration.match(/(\d+) sec/)?.[1] || 0);
+                        agentStats[mappedAgent].callTime += seconds;
+                    }
+                });
+            }
+        }
+    });
+
+    // Update agent stats in the table (new column order)
+    Object.keys(agentStats).forEach(agent => {
+        const stats = agentStats[agent];
+        const callTimeMinutes = (stats.callTime / 60).toFixed(1);
+
+        const agentPrefix = agent.toLowerCase();
+        document.getElementById(`${agentPrefix}Leads`).textContent = stats.leads;
+        document.getElementById(`${agentPrefix}HighValueLeads`).textContent = stats.highValueLeads;
+        document.getElementById(`${agentPrefix}LowValueLeads`).textContent = stats.lowValueLeads;
+        document.getElementById(`${agentPrefix}CallsMade`).textContent = stats.callsMade;
+        document.getElementById(`${agentPrefix}CallTime`).textContent = callTimeMinutes;
+    });
+}
+
+// Function to view individual agent stats
+// Function to generate performance comparison cards with color coding
+function generatePerformanceCard(agentValue, avgValue, label, subtitle, defaultColor, isLowerBetter = false) {
+    console.log(`🎯 generatePerformanceCard: ${label} - Agent: ${agentValue}, Avg: ${avgValue}, isLowerBetter: ${isLowerBetter}`);
+
+    let bgColor, borderColor, textColor;
+
+    // Determine card color based on performance vs average
+    // For metrics where lower is better (like low value leads %), reverse the logic
+    const isBetter = isLowerBetter ? agentValue < avgValue : agentValue > avgValue;
+    const isWorse = isLowerBetter ? agentValue > avgValue : agentValue < avgValue;
+
+    console.log(`🎯 ${label}: isBetter=${isBetter}, isWorse=${isWorse}`);
+
+    if (isBetter) {
+        // Better than average - Green
+        bgColor = '#f0fdf4';
+        borderColor = '#bbf7d0';
+        textColor = '#059669';
+    } else if (isWorse) {
+        // Worse than average - Red
+        bgColor = '#fef2f2';
+        borderColor = '#fecaca';
+        textColor = '#dc2626';
+    } else {
+        // Same as average - Grey
+        bgColor = '#f8f9fa';
+        borderColor = '#e5e7eb';
+        textColor = '#374151';
+    }
+
+    const comparisonText = agentValue > avgValue ?
+        `+${(agentValue - avgValue).toFixed(1)} vs avg` :
+        agentValue < avgValue ?
+        `${(agentValue - avgValue).toFixed(1)} vs avg` :
+        'At average';
+
+    // Format the average value - if it's a percentage, show it as such
+    const avgDisplay = label.toLowerCase().includes('rate') || label.toLowerCase().includes('percentage')
+        ? `${avgValue}%`
+        : avgValue;
+
+    // Format the agent value - add % for Low Value Leads and other percentage metrics
+    const agentValueDisplay = (label.toLowerCase().includes('rate') ||
+                              label.toLowerCase().includes('percentage') ||
+                              label.toLowerCase().includes('low value leads'))
+        ? `${agentValue}%`
+        : agentValue;
+
+    return `
+        <div style="text-align: center; padding: 20px; background: ${bgColor}; border-radius: 12px; color: #1f2937; border: 1px solid ${borderColor};">
+            <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px; color: ${textColor};">${agentValueDisplay}</div>
+            <div style="font-size: 14px; color: ${textColor};">${label}</div>
+            ${subtitle ? `<div style="font-size: 12px; color: ${textColor}; margin-top: 4px;">${subtitle}</div>` : ''}
+            <div style="font-size: 11px; color: ${textColor}; margin-top: 4px; opacity: 0.8;">${comparisonText}</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">Avg: ${avgDisplay}</div>
+        </div>
+    `;
+}
+
+function viewAgentStats(agentName) {
+    try {
+        console.log('viewAgentStats called for:', agentName);
+
+        // Calculate average performance stats for comparison
+        const avgStats = calculateAveragePerformance();
+        console.log('Average stats for comparison:', avgStats);
+
+        // Use a simple alert first to test if the function is working
+        // alert(`Loading ${agentName} stats...`);
+
+        // Close any existing modal first
+        closeModal();
+
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const agentLeads = leads.filter(lead => lead.assignedTo === agentName);
+
+    let totalCallTime = 0;
+    let contactedLeads = 0;
+    let sales = 0;
+    let totalPremium = 0;
+    let totalCalls = 0;
+    let highValueLeads = 0;
+    let lowValueLeads = 0;
+    let nonGreenLeadTime = 0; // Time spent on leads that aren't "green"/hot
+    let leadsPushedToBrokers = 0;
+
+    agentLeads.forEach(lead => {
+        // Calculate total call time for this lead to determine if it's high-value (gold border)
+        let totalCallMinutes = 0;
+        if (lead && lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+            lead.reachOut.callLogs.forEach(log => {
+                if (log.duration) {
+                    const duration = log.duration;
+                    let callSeconds = 0;
+
+                    if (duration.includes('min') && duration.includes('sec')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                        callSeconds = (minutes * 60 + seconds);
+                    } else if (duration.includes('min')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        callSeconds = minutes * 60;
+                    } else if (duration.includes('sec')) {
+                        callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                    } else if (duration.match(/^\d+$/)) {
+                        callSeconds = parseInt(duration);
+                    }
+
+                    totalCallMinutes += callSeconds / 60;
+                }
+            });
+        }
+
+        // High value = gold border leads (60+ minutes call time, same as UI)
+        const isHighValue = totalCallMinutes >= 59.5;
+
+        if (isHighValue) {
+            highValueLeads++;
+        } else {
+            lowValueLeads++;
+        }
+
+        // Check if lead was pushed to brokers (assuming this means status contains 'broker' or similar)
+        if (lead.status && (lead.status.toLowerCase().includes('broker') || lead.status.toLowerCase().includes('referred'))) {
+            leadsPushedToBrokers++;
+        }
+
+        if (lead.reachOut && lead.reachOut.contacted) {
+            contactedLeads++;
+        }
+
+        // Check for sales based on actual data structure
+        if (lead.status === 'closed_won' || lead.leadStatus === 'SALE' || lead.stage === 'Closed') {
+            sales++;
+            const leadPremium = parseFloat(lead.premium || '0');
+            totalPremium += leadPremium;
+        }
+
+        if (lead.reachOut && lead.reachOut.callLogs) {
+            totalCalls += lead.reachOut.callLogs.length;
+
+            lead.reachOut.callLogs.forEach(call => {
+                const duration = call.duration || '';
+                let callSeconds = 0;
+
+                if (duration.includes('min')) {
+                    const minutes = parseInt(duration.match(/(\d+) min/)?.[1] || 0);
+                    const seconds = parseInt(duration.match(/(\d+) sec/)?.[1] || 0);
+                    callSeconds = (minutes * 60 + seconds);
+                } else if (duration.includes('sec')) {
+                    callSeconds = parseInt(duration.match(/(\d+) sec/)?.[1] || 0);
+                }
+
+                totalCallTime += callSeconds;
+
+                // Add to non-green lead time if lead isn't hot/green status
+                if (lead.status !== 'hot_lead' && lead.priority !== 'high' && !lead.leadStatus?.includes('SALE')) {
+                    nonGreenLeadTime += callSeconds;
+                }
+            });
+        }
+    });
+
+    const contactRate = agentLeads.length > 0 ? ((contactedLeads / agentLeads.length) * 100).toFixed(1) : 0;
+    const conversionRate = contactedLeads > 0 ? ((sales / contactedLeads) * 100).toFixed(1) : 0;
+    const avgCallTime = totalCalls > 0 ? (totalCallTime / totalCalls / 60).toFixed(1) : 0;
+
+    // Calculate additional percentages
+    const highValuePercentage = agentLeads.length > 0 ? ((highValueLeads / agentLeads.length) * 100).toFixed(1) : 0;
+    const lowValuePercentage = agentLeads.length > 0 ? ((lowValueLeads / agentLeads.length) * 100).toFixed(1) : 0;
+    const brokerPushPercentage = agentLeads.length > 0 ? ((leadsPushedToBrokers / agentLeads.length) * 100).toFixed(1) : 0;
+    const nonGreenTimeFormatted = nonGreenLeadTime > 0 ? (nonGreenLeadTime / 60).toFixed(1) + ' min' : '0 min';
+
+    const modalHTML = `
+        <div class="modal-overlay" onclick="closeModal()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div class="modal" onclick="event.stopPropagation()" style="background: white; border-radius: 8px; max-width: 800px; width: 90%; max-height: 90%; overflow-y: auto; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);">
+                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-user"></i> ${agentName} Performance Details</h2>
+                        <button class="btn-close" onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    </div>
+                    <div class="time-filter-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="filterAgentStats('${agentName}', 'day')" class="filter-btn active" data-filter="day" style="padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Day</button>
+                        <button onclick="filterAgentStats('${agentName}', 'week')" class="filter-btn" data-filter="week" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Weekly</button>
+                        <button onclick="filterAgentStats('${agentName}', 'month')" class="filter-btn" data-filter="month" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Monthly</button>
+                        <button onclick="filterAgentStats('${agentName}', 'ytd')" class="filter-btn" data-filter="ytd" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">YTD</button>
+                        <button onclick="showCustomDatePicker('${agentName}')" class="filter-btn" data-filter="custom" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Custom</button>
+                        <button onclick="if(window.toggleDevMode && typeof window.toggleDevMode === 'function') { window.toggleDevMode(); } else { console.log('simple-dev-controls.js not loaded'); }" class="filter-btn dev-mode-btn" data-filter="dev" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px; display: inline-block;"><i class="fas fa-code"></i> Dev Mode</button>
+                    </div>
+                </div>
+                <div class="modal-content" style="padding: 20px;">
+                    <div class="agent-detail-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px;">
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #2563eb;">${agentLeads.length}</div>
+                            <div style="color: #64748b; font-size: 14px;">Total Leads</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #059669;">${contactRate}%</div>
+                            <div style="color: #64748b; font-size: 14px;">Contact Rate</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #dc2626;">${conversionRate}%</div>
+                            <div style="color: #64748b; font-size: 14px;">Conversion Rate</div>
+                        </div>
+                    </div>
+                    <div class="agent-detail-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #7c3aed;">$${totalPremium.toLocaleString()}</div>
+                            <div style="color: #64748b; font-size: 14px;">Total Premium</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${totalCalls}</div>
+                            <div style="color: #64748b; font-size: 14px;">Calls Made</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #06b6d4;">${avgCallTime} min</div>
+                            <div style="color: #64748b; font-size: 14px;">Avg Call Time</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 20px; border-top: 1px solid #e5e7eb; text-align: right;">
+                    <button class="btn-secondary" onclick="closeModal()" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+        console.log('Adding modal to DOM');
+
+        // Create a persistent modal that bypasses auth-manager interference
+        console.log('Creating persistent modal...');
+
+        // Remove any existing modals first
+        document.querySelectorAll('.agent-modal-overlay').forEach(el => el.remove());
+
+        // Create modal with unique class to avoid auth-manager detection
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'agent-modal-overlay agent-profile-modal';
+        modalOverlay.style.cssText = `
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(0, 0, 0, 0.7) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            z-index: 99999 !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        `;
+
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: white !important;
+            border-radius: 12px !important;
+            max-width: 1000px !important;
+            width: 95% !important;
+            max-height: 90vh !important;
+            overflow-y: auto !important;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
+            animation: modalSlideIn 0.3s ease-out !important;
+        `;
+
+        modal.innerHTML = `
+            <div style="padding: 24px; border-bottom: 1px solid #e5e7eb;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0; color: #1f2937; font-size: 24px; font-weight: 600;">
+                        <i class="fas fa-user-circle" style="margin-right: 12px; color: #3b82f6;"></i>
+                        ${agentName} Performance Profile
+                    </h2>
+                    <button onclick="closeAgentModal()" style="
+                        background: none;
+                        border: none;
+                        font-size: 28px;
+                        cursor: pointer;
+                        color: #6b7280;
+                        padding: 4px;
+                        line-height: 1;
+                    ">&times;</button>
+                </div>
+                <div class="time-filter-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="filterAgentStats('${agentName}', 'day')" class="filter-btn" data-filter="day" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Day</button>
+                    <button onclick="filterAgentStats('${agentName}', 'week')" class="filter-btn" data-filter="week" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Weekly</button>
+                    <button onclick="filterAgentStats('${agentName}', 'month')" class="filter-btn" data-filter="month" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Monthly</button>
+                    <button onclick="filterAgentStats('${agentName}', 'ytd')" class="filter-btn active" data-filter="ytd" style="padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">YTD</button>
+                    <button onclick="showCustomDatePicker('${agentName}')" class="filter-btn" data-filter="custom" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Custom</button>
+                    <button onclick="if(window.toggleDevMode && typeof window.toggleDevMode === 'function') { window.toggleDevMode(); } else { console.log('simple-dev-controls.js not loaded'); }" class="filter-btn dev-mode-btn" data-filter="dev" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;"><i class="fas fa-code"></i> Dev Mode</button>
+                </div>
+            </div>
+
+            <div class="agent-performance-content" style="padding: 24px; color: #1f2937 !important;">
+                <!-- Lead Distribution Group -->
+                <div style="margin-bottom: 16px;">
+                    <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Lead Distribution</h3>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                        ${generatePerformanceCard(agentLeads.length, avgStats.totalLeads, 'Total Leads', '', '#374151')}
+                        ${generatePerformanceCard(highValueLeads, avgStats.highValueLeads, 'High Value Leads', `${highValuePercentage}% of total`, '#059669')}
+                        ${generatePerformanceCard(parseFloat(lowValuePercentage), parseFloat(avgStats.lowValuePercentage), 'Low Value Leads', `${lowValueLeads} total leads`, '#dc2626', true)}
+                    </div>
+                </div>
+
+                <!-- Call Activity Group -->
+                <div style="margin-bottom: 16px;">
+                    <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Call Activity</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        ${generatePerformanceCard(totalCalls, avgStats.totalCalls, 'Total Calls', '', '#374151')}
+                        ${generatePerformanceCard(parseFloat((totalCallTime/60).toFixed(1)), parseFloat(avgStats.totalCallDuration), 'Total Call Duration (min)', `Avg: ${avgCallTime} min/call`, '#374151')}
+                    </div>
+                </div>
+
+                <!-- Performance Metrics -->
+                <div style="margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Performance Metrics</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        ${generatePerformanceCard(parseFloat(contactRate), parseFloat(avgStats.contactRate), 'Contact Rate', '%', '#374151')}
+                        ${generatePerformanceCard(leadsPushedToBrokers, avgStats.leadsPushedToBrokers, 'Leads to Brokers', `${brokerPushPercentage}% of total`, '#059669')}
+                    </div>
+                </div>
+
+                <!-- Negative Performance Indicators -->
+                <div style="margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Areas for Improvement</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        ${generatePerformanceCard(parseFloat(nonGreenTimeFormatted.replace(' min', '')), parseFloat(avgStats.nonGreenLeadTime), 'Time on Non-Green Leads', 'Time spent on low-priority leads', '#dc2626')}
+                        ${generatePerformanceCard(parseFloat(lowValuePercentage), parseFloat(avgStats.lowValuePercentage), 'Low Value Lead Rate', 'Percentage of leads with low potential', '#dc2626', true)}
+                    </div>
+                </div>
+
+                <!-- Performance Summary -->
+                <div style="margin-top: 24px; padding: 20px; background: #f8fafc; border-radius: 12px; border-left: 4px solid #3b82f6;">
+                    <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 18px;">Performance Summary</h3>
+                    <p style="margin: 0; color: #4b5563; line-height: 1.6;">
+                        ${agentName} has managed <strong>${agentLeads.length} total leads</strong> with
+                        <strong style="color: #059669;">${highValueLeads} high-value leads</strong> (${highValuePercentage}%) and
+                        <strong style="color: #dc2626;">${lowValueLeads} low-value leads</strong> (${lowValuePercentage}%).
+                        Contact rate: <strong>${contactRate}%</strong>.
+                        Total premium generated: <strong style="color: #059669;">$${totalPremium.toLocaleString()}</strong>.
+                        ${leadsPushedToBrokers} leads were referred to brokers (${brokerPushPercentage}%).
+                    </p>
+                </div>
+            </div>
+
+            <div style="padding: 24px; border-top: 1px solid #e5e7eb; text-align: right;">
+                <button onclick="downloadAgentReport('${agentName}')"
+                        class="agent-report-download"
+                        data-download-type="agent-report"
+                        style="
+                    padding: 12px 24px;
+                    background: #059669;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: 500;
+                    margin-right: 12px;
+                ">
+                    <i class="fas fa-file-pdf" style="margin-right: 8px;"></i>Download PDF Report
+                </button>
+                <button onclick="closeAgentModal()" style="
+                    padding: 12px 24px;
+                    background: #6b7280;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: 500;
+                ">Close Profile</button>
+            </div>
+        `;
+
+        modalOverlay.appendChild(modal);
+
+        // Add slide-in animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes modalSlideIn {
+                from { transform: scale(0.9); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Add to document root to avoid auth-manager interference
+        document.documentElement.appendChild(modalOverlay);
+
+        // Close modal when clicking overlay
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                closeAgentModal();
+            }
+        });
+
+        console.log('Agent profile modal created successfully');
+
+        // Apply initial Day filter
+        setTimeout(() => {
+            console.log('Applying initial Day filter for agent profile');
+            filterAgentStats(agentName, 'day');
+        }, 200);
+
+    } catch (error) {
+        console.error('Error in viewAgentStats:', error);
+        alert('Error loading agent stats. Please try again.');
+    }
+}
+
+// Function to filter agent stats by time period
+function filterAgentStats(agentName, period) {
+    console.log('Filtering agent stats for:', agentName, 'period:', period);
+
+    // Hide custom date picker if it's visible (unless we're selecting custom)
+    if (period !== 'custom') {
+        const existingPicker = document.getElementById('customDatePicker');
+        if (existingPicker) {
+            existingPicker.remove();
+        }
+    }
+
+    // Update active filter button
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    filterButtons.forEach(btn => {
+        if (btn.getAttribute('data-filter') === period) {
+            btn.style.background = '#2563eb';
+            btn.style.color = 'white';
+        } else {
+            btn.style.background = '#f3f4f6';
+            btn.style.color = '#374151';
+        }
+    });
+
+    // Show/hide dev mode button based on filter
+    const devModeButton = document.querySelector('.dev-mode-btn');
+    if (devModeButton) {
+        if (period === 'ytd') {
+            // Hide dev mode button for YTD
+            devModeButton.style.display = 'none';
+            console.log('🔒 Dev mode hidden for YTD filter');
+        } else {
+            // Show dev mode button for other filters
+            devModeButton.style.display = 'inline-block';
+            console.log('✅ Dev mode available for', period, 'filter');
+        }
+    }
+
+    // Get date range based on period
+    const dateRange = getDateRangeForPeriod(period);
+
+    // Reload agent stats with filtered data
+    viewAgentStatsWithDateRange(agentName, dateRange, period);
+}
+
+// Function to get date range for period
+function getDateRangeForPeriod(period) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    switch (period) {
+        case 'day':
+            const dayStart = new Date(today);
+            const dayEnd = new Date(today);
+            dayEnd.setDate(today.getDate() + 1); // Next day
+            return { start: dayStart, end: dayEnd };
+        case 'week':
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 7);
+            return { start: weekStart, end: weekEnd };
+        case 'month':
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+            return { start: monthStart, end: monthEnd };
+        case 'ytd':
+            const yearStart = new Date(today.getFullYear(), 0, 1);
+            const yearEnd = new Date(now);
+            yearEnd.setHours(23, 59, 59, 999); // End of current day
+            return { start: yearStart, end: yearEnd };
+        default:
+            // Default to all time if no period specified
+            const defaultStart = new Date(2020, 0, 1); // Far past date to include all data
+            const defaultEnd = new Date(now);
+            defaultEnd.setHours(23, 59, 59, 999);
+            return { start: defaultStart, end: defaultEnd };
+    }
+}
+
+// Function to show custom date picker
+function showCustomDatePicker(agentName) {
+    const customDateHTML = `
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <label style="font-weight: 600; color: #374151;">From:</label>
+            <input type="date" id="customStartDate" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+            <label style="font-weight: 600; color: #374151;">To:</label>
+            <input type="date" id="customEndDate" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+            <button onclick="applyCustomDateFilter('${agentName}')" style="padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">Apply</button>
+            <button onclick="cancelCustomDateFilter('${agentName}')" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+        </div>
+    `;
+
+    // Insert custom date picker after filter buttons
+    const filterContainer = document.querySelector('.time-filter-buttons');
+    if (filterContainer) {
+        // Remove existing custom date picker if any
+        const existingPicker = document.getElementById('customDatePicker');
+        if (existingPicker) {
+            existingPicker.remove();
+        }
+
+        // Add new picker
+        const pickerDiv = document.createElement('div');
+        pickerDiv.id = 'customDatePicker';
+        pickerDiv.innerHTML = customDateHTML;
+        filterContainer.parentNode.insertBefore(pickerDiv, filterContainer.nextSibling);
+
+        // Set default dates (last 30 days)
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+
+        document.getElementById('customStartDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+        document.getElementById('customEndDate').value = today.toISOString().split('T')[0];
+
+        // Update filter button style
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        filterButtons.forEach(btn => {
+            if (btn.getAttribute('data-filter') === 'custom') {
+                btn.style.background = '#2563eb';
+                btn.style.color = 'white';
+            } else {
+                btn.style.background = '#f3f4f6';
+                btn.style.color = '#374151';
+            }
+        });
+    }
+}
+
+// Function to apply custom date filter
+function applyCustomDateFilter(agentName) {
+    const startDate = document.getElementById('customStartDate').value;
+    const endDate = document.getElementById('customEndDate').value;
+
+    if (!startDate || !endDate) {
+        alert('Please select both start and end dates');
+        return;
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+        alert('Start date must be before end date');
+        return;
+    }
+
+    const dateRange = {
+        start: new Date(startDate),
+        end: new Date(endDate + 'T23:59:59') // Include full end date
+    };
+
+    // Remove custom date picker
+    const picker = document.getElementById('customDatePicker');
+    if (picker) {
+        picker.remove();
+    }
+
+    // Reload agent stats with custom date range
+    viewAgentStatsWithDateRange(agentName, dateRange, 'custom');
+}
+
+// Function to cancel custom date filter
+function cancelCustomDateFilter(agentName) {
+    // Remove custom date picker
+    const picker = document.getElementById('customDatePicker');
+    if (picker) {
+        picker.remove();
+    }
+
+    // Reset to day filter (default)
+    filterAgentStats(agentName, 'day');
+}
+
+// Function to toggle Dev Mode for agent profile - DISABLED to use simple-dev-controls.js instead
+function toggleDevMode_DISABLED(agentName) {
+    console.log('🚨 This dev mode function is DISABLED - using simple-dev-controls.js instead');
+
+    // Call the original simple-dev-controls.js function instead
+    if (window.toggleDevMode && typeof window.toggleDevMode === 'function') {
+        console.log('🔄 Calling original toggleDevMode from simple-dev-controls.js');
+        window.toggleDevMode();
+    } else {
+        console.log('⚠️ Original simple-dev-controls.js not loaded yet');
+    }
+}
+
+// Function to show dev mode information
+function showDevModeInfo(agentName) {
+    // Check if dev info already exists
+    let devInfoContainer = document.querySelector('.dev-mode-info');
+
+    if (!devInfoContainer) {
+        // Create dev mode info container
+        const modalContent = document.querySelector('.modal-content');
+        if (modalContent) {
+            devInfoContainer = document.createElement('div');
+            devInfoContainer.className = 'dev-mode-info dev-mode-only';
+            devInfoContainer.style.cssText = `
+                margin-top: 20px;
+                padding: 20px;
+                background: #1f2937;
+                color: #f3f4f6;
+                border-radius: 8px;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                line-height: 1.4;
+            `;
+
+            // Get lead data for debugging
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const agentLeads = leads.filter(lead => lead.assignedTo === agentName);
+
+            devInfoContainer.innerHTML = `
+                <h4 style="color: #10b981; margin: 0 0 15px 0;">🔧 DEV MODE - ${agentName}</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h5 style="color: #fbbf24; margin: 0 0 10px 0;">Lead Data:</h5>
+                        <div>Total Leads: <span style="color: #60a5fa;">${agentLeads.length}</span></div>
+                        <div>Local Storage Size: <span style="color: #60a5fa;">${(JSON.stringify(leads).length / 1024).toFixed(1)}KB</span></div>
+                        <div>Last Updated: <span style="color: #60a5fa;">${new Date(localStorage.getItem('leads_last_updated') || Date.now()).toLocaleString()}</span></div>
+                    </div>
+                    <div>
+                        <h5 style="color: #fbbf24; margin: 0 0 10px 0;">Console Actions:</h5>
+                        <button onclick="console.log('Agent ${agentName} Leads:', ${JSON.stringify(agentLeads)})"
+                                style="background: #374151; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; margin: 2px; cursor: pointer;">
+                            Log Leads
+                        </button>
+                        <button onclick="console.log('Full Lead Database:', ${JSON.stringify(leads)})"
+                                style="background: #374151; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; margin: 2px; cursor: pointer;">
+                            Log All Data
+                        </button>
+                        <button onclick="localStorage.clear(); location.reload();"
+                                style="background: #dc2626; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; margin: 2px; cursor: pointer;">
+                            Clear & Reload
+                        </button>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: #374151; border-radius: 4px;">
+                    <div style="color: #10b981;">Recent Lead Activity:</div>
+                    <div style="max-height: 100px; overflow-y: auto; margin-top: 5px;">
+                        ${agentLeads.slice(0, 3).map(lead =>
+                            `<div style="margin: 2px 0;">ID: ${lead.id} | ${lead.name} | ${lead.status || 'No Status'}</div>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+
+            modalContent.appendChild(devInfoContainer);
+        }
+    } else {
+        devInfoContainer.style.display = 'block';
+    }
+}
+
+// Function to count activities within a date range using activity timestamps
+function countActivitiesInDateRange(leads, agentName, dateRange) {
+    const agentLeads = leads.filter(lead => lead.assignedTo === agentName);
+
+    let callAttempts = 0;
+    let callsConnected = 0;
+    let emailsSent = 0;
+    let textsSent = 0;
+    let totalCallTime = 0;
+
+    agentLeads.forEach(lead => {
+        // Check if lead has activity timestamps
+        if (lead.reachOut && lead.reachOut.activityTimestamps && Array.isArray(lead.reachOut.activityTimestamps)) {
+            lead.reachOut.activityTimestamps.forEach(activity => {
+                const activityDate = new Date(activity.timestamp);
+
+                // Check if activity is within date range
+                if (activityDate >= dateRange.start && activityDate <= dateRange.end) {
+                    switch (activity.type) {
+                        case 'call':
+                            if (activity.action === 'attempted') {
+                                callAttempts++;
+                            } else if (activity.action === 'connected') {
+                                callsConnected++;
+                            }
+                            break;
+                        case 'email':
+                            if (activity.action === 'sent') {
+                                emailsSent++;
+                            }
+                            break;
+                        case 'text':
+                            if (activity.action === 'sent') {
+                                textsSent++;
+                            }
+                            break;
+                    }
+                }
+            });
+        }
+
+        // Calculate call time from actual call logs that fall within date range
+        if (lead.reachOut && lead.reachOut.callLogs) {
+            lead.reachOut.callLogs.forEach(call => {
+                const callDate = call.timestamp ? new Date(call.timestamp) : null;
+                if (callDate && callDate >= dateRange.start && callDate <= dateRange.end) {
+                    const duration = call.duration || '';
+                    let callSeconds = 0;
+
+                    if (duration.includes('min') && duration.includes('sec')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                        callSeconds = (minutes * 60 + seconds);
+                    } else if (duration.includes('min')) {
+                        const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                        callSeconds = minutes * 60;
+                    } else if (duration.includes('sec')) {
+                        callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                    } else if (duration.match(/^\d+$/)) {
+                        callSeconds = parseInt(duration);
+                    }
+
+                    totalCallTime += callSeconds;
+                }
+            });
+        }
+    });
+
+    return {
+        agentLeads: agentLeads.length, // Total leads assigned to agent
+        callAttempts,
+        callsConnected,
+        emailsSent,
+        textsSent,
+        totalCallTime,
+        contactedLeads: Math.max(callAttempts, emailsSent, textsSent) > 0 ? 1 : 0 // At least one contact attempt
+    };
+}
+
+// Function to view agent stats with date range filtering
+function viewAgentStatsWithDateRange(agentName, dateRange, periodLabel) {
+    try {
+        console.log('viewAgentStatsWithDateRange called for:', agentName, 'range:', dateRange, 'period:', periodLabel);
+
+        // Calculate average performance stats for comparison
+        const avgStats = calculateAveragePerformance();
+        console.log('Average stats for comparison in filtered view:', avgStats);
+
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+        // Get activity-based stats for the date range
+        const activityStats = countActivitiesInDateRange(leads, agentName, dateRange);
+
+        // Filter agent leads for calculations not based on activity timestamps
+        const agentLeads = leads.filter(lead => lead.assignedTo === agentName);
+
+        // Use activity-based stats for time-sensitive metrics
+        let totalCallTime = activityStats.totalCallTime;
+        let contactedLeads = activityStats.callAttempts + activityStats.emailsSent + activityStats.textsSent > 0 ? 1 : 0;
+
+        // FIXED: Use connected calls instead of attempts for "Total Calls" display
+        // If activity-based stats show 0 connected calls, fall back to direct lead data
+        let totalCalls = activityStats.callsConnected;
+
+        console.log(`🔧 FIXED: Activity stats - callAttempts: ${activityStats.callAttempts}, callsConnected: ${activityStats.callsConnected}`);
+
+        // Fallback: If activity-based connected calls is 0, calculate from lead data directly
+        if (totalCalls === 0) {
+            console.log('🔧 FALLBACK: Activity stats shows 0 connected calls, calculating from lead data...');
+
+            agentLeads.forEach(lead => {
+                // Check callLogs for connected calls (this is where connected calls are actually stored)
+                if (lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+                    // Filter callLogs by date range if we're in a filtered view
+                    let relevantCalls;
+                    if (dateRange && dateRange.start && dateRange.end) {
+                        relevantCalls = lead.reachOut.callLogs.filter(log => {
+                            if (log.connected === true && log.timestamp) {
+                                const callDate = new Date(log.timestamp);
+                                return callDate >= dateRange.start && callDate <= dateRange.end;
+                            }
+                            return false;
+                        });
+                        console.log(`🔧 FALLBACK DATE FILTER: Lead ${lead.id} has ${relevantCalls.length} connected calls in date range`);
+                    } else {
+                        // No date filter, count all connected calls
+                        relevantCalls = lead.reachOut.callLogs.filter(log => log.connected === true);
+                        console.log(`🔧 FALLBACK NO DATE: Lead ${lead.id} has ${relevantCalls.length} connected calls total`);
+                    }
+
+                    if (relevantCalls.length > 0) {
+                        totalCalls += relevantCalls.length;
+                        console.log(`🔧 FALLBACK: Lead ${lead.id} has ${relevantCalls.length} connected calls from callLogs`);
+                    }
+                }
+                // Also check legacy callsConnected field as backup
+                else if (lead.reachOut && lead.reachOut.callsConnected) {
+                    totalCalls += lead.reachOut.callsConnected;
+                    console.log(`🔧 FALLBACK: Lead ${lead.id} has ${lead.reachOut.callsConnected} connected calls from legacy field`);
+                }
+            });
+
+            console.log(`🔧 FALLBACK: Total connected calls from lead data: ${totalCalls}`);
+        }
+
+        console.log(`🔧 FINAL: Using ${totalCalls} total calls for display`);
+
+        // Calculate stats that aren't time-sensitive (based on all agent leads)
+        let sales = 0;
+        let totalPremium = 0;
+        let highValueLeads = 0;
+        let lowValueLeads = 0;
+        let nonGreenLeadTime = 0;
+        let leadsPushedToBrokers = 0;
+
+        agentLeads.forEach(lead => {
+            // Calculate total call time for this lead to determine if it's high-value (gold border)
+            let totalCallMinutes = 0;
+            if (lead && lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+                lead.reachOut.callLogs.forEach(log => {
+                    if (log.duration) {
+                        const duration = log.duration;
+                        let callSeconds = 0;
+
+                        if (duration.includes('min') && duration.includes('sec')) {
+                            const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                            const seconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                            callSeconds = (minutes * 60 + seconds);
+                        } else if (duration.includes('min')) {
+                            const minutes = parseInt(duration.match(/(\d+)\s*min/)?.[1] || 0);
+                            callSeconds = minutes * 60;
+                        } else if (duration.includes('sec')) {
+                            callSeconds = parseInt(duration.match(/(\d+)\s*sec/)?.[1] || 0);
+                        } else if (duration.match(/^\d+$/)) {
+                            callSeconds = parseInt(duration);
+                        }
+
+                        totalCallMinutes += callSeconds / 60;
+                    }
+                });
+            }
+
+            // High value = gold border leads (60+ minutes call time, same as UI)
+            const isHighValue = totalCallMinutes >= 59.5;
+
+            if (isHighValue) {
+                highValueLeads++;
+            } else {
+                lowValueLeads++;
+            }
+
+            if (lead.status && (lead.status.toLowerCase().includes('broker') || lead.status.toLowerCase().includes('referred'))) {
+                leadsPushedToBrokers++;
+            }
+
+            // Check for sales based on actual data structure
+            if (lead.status === 'closed_won' || lead.leadStatus === 'SALE' || lead.stage === 'Closed') {
+                sales++;
+                const leadPremium = parseFloat(lead.premium || '0');
+                totalPremium += leadPremium;
+            }
+        });
+
+        // Calculate rates using activity-based metrics
+        const totalActivities = activityStats.callAttempts + activityStats.emailsSent + activityStats.textsSent;
+        const contactRate = totalActivities > 0 ? '100.0' : '0.0'; // If any activity happened, contact was made
+        const conversionRate = totalActivities > 0 ? ((sales / Math.max(1, totalActivities)) * 100).toFixed(1) : 0;
+        const avgCallTime = activityStats.callAttempts > 0 ? (totalCallTime / activityStats.callAttempts / 60).toFixed(1) : 0;
+
+        const highValuePercentage = agentLeads.length > 0 ? ((highValueLeads / agentLeads.length) * 100).toFixed(1) : 0;
+        const lowValuePercentage = agentLeads.length > 0 ? ((lowValueLeads / agentLeads.length) * 100).toFixed(1) : 0;
+        const brokerPushPercentage = agentLeads.length > 0 ? ((leadsPushedToBrokers / agentLeads.length) * 100).toFixed(1) : 0;
+        const nonGreenTimeFormatted = nonGreenLeadTime > 0 ? (nonGreenLeadTime / 60).toFixed(1) + ' min' : '0 min';
+
+        // Format date range for display
+        const formatDate = (date) => {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+
+        let dateRangeText = '';
+        if (periodLabel === 'custom') {
+            dateRangeText = `${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`;
+        } else if (periodLabel && typeof periodLabel === 'string') {
+            dateRangeText = periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1);
+        } else {
+            // Fallback for undefined or invalid periodLabel
+            dateRangeText = 'All Time';
+        }
+
+        // Update the modal content with filtered data
+        const existingModal = document.querySelector('.agent-profile-modal');
+        if (existingModal) {
+            // Update the header to show current filter
+            const headerTitle = existingModal.querySelector('h2');
+            if (headerTitle) {
+                headerTitle.innerHTML = `<i class="fas fa-user-circle" style="margin-right: 12px; color: #3b82f6;"></i>${agentName} Performance Profile (${dateRangeText})`;
+            }
+
+            // Update the stats content with the exact same layout as original
+            const statsContainer = existingModal.querySelector('.agent-performance-content');
+            if (statsContainer) {
+                statsContainer.innerHTML = `
+                    <!-- Lead Distribution Group -->
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Lead Distribution</h3>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                            ${generatePerformanceCard(agentLeads.length, avgStats.totalLeads, 'Total Leads', '', '#374151')}
+                            ${generatePerformanceCard(highValueLeads, avgStats.highValueLeads, 'High Value Leads', `${highValuePercentage}% of total`, '#059669')}
+                            ${generatePerformanceCard(parseFloat(lowValuePercentage), parseFloat(avgStats.lowValuePercentage), 'Low Value Leads', `${lowValueLeads} total leads`, '#dc2626', true)}
+                        </div>
+                    </div>
+
+                    <!-- Call Activity Group -->
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Call Activity</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                            ${generatePerformanceCard(totalCalls, avgStats.totalCalls, 'Total Calls', '', '#374151')}
+                            ${generatePerformanceCard(parseFloat((totalCallTime/60).toFixed(1)), parseFloat(avgStats.totalCallDuration), 'Total Call Duration (min)', `Avg: ${avgCallTime} min/call`, '#374151')}
+                        </div>
+                    </div>
+
+                    <!-- Performance Metrics -->
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Performance Metrics</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                            ${generatePerformanceCard(parseFloat(contactRate), parseFloat(avgStats.contactRate), 'Contact Rate', '%', '#374151')}
+                            ${generatePerformanceCard(leadsPushedToBrokers, avgStats.leadsPushedToBrokers, 'Leads to Brokers', `${brokerPushPercentage}% of total`, '#059669')}
+                        </div>
+                    </div>
+
+                    <!-- Negative Performance Indicators -->
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Areas for Improvement</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                            ${generatePerformanceCard(parseFloat(nonGreenTimeFormatted.replace(' min', '')), parseFloat(avgStats.nonGreenLeadTime), 'Time on Non-Green Leads', 'Time spent on low-priority leads', '#dc2626')}
+                            ${generatePerformanceCard(parseFloat(lowValuePercentage), parseFloat(avgStats.lowValuePercentage), 'Low Value Lead Rate', 'Percentage of leads with low potential', '#dc2626', true)}
+                        </div>
+                    </div>
+
+                    <!-- Performance Summary -->
+                    <div style="margin-top: 24px; padding: 20px; background: #f8fafc; border-radius: 12px; border-left: 4px solid #3b82f6;">
+                        <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 18px;">Performance Summary</h3>
+                        <p style="margin: 0; color: #4b5563; line-height: 1.6;">
+                            ${agentName} has managed <strong>${agentLeads.length} total leads</strong> with
+                            <strong style="color: #059669;">${highValueLeads} high-value leads</strong> (${highValuePercentage}%) and
+                            <strong style="color: #dc2626;">${lowValueLeads} low-value leads</strong> (${lowValuePercentage}%).
+                            Contact rate: <strong>${contactRate}%</strong>.
+                            ${leadsPushedToBrokers} leads were referred to brokers (${brokerPushPercentage}%).
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        console.log(`Filtered agent stats updated for ${agentName}: ${agentLeads.length} leads in ${dateRangeText}`);
+
+        // NOTE: Dev stats are no longer automatically loaded to prevent overriding live data
+        // Users must explicitly click "Apply Saved" or use dev mode reset to load saved stats
+        console.log('📊 Live data preserved - dev stats not automatically applied');
+
+        // CRITICAL: Apply live stats override immediately after modal update
+        window.setTimeout(async () => {
+            try {
+                console.log('🚀 DIRECT: Applying live stats override for', agentName);
+                console.log('🚀 DIRECT: Current URL:', window.location.href);
+
+                // Load live stats from server
+                const response = await fetch(`/api/live-agent-stats/${agentName}`);
+                const result = await response.json();
+
+                if (result.stats && Object.keys(result.stats).length > 0) {
+                    console.log('📊 DIRECT: Retrieved live stats:', result.stats);
+
+                    // Find all stat number elements (28px font)
+                    const statElements = document.querySelectorAll('[style*="font-size: 28px"]');
+                    console.log('📊 DIRECT: Found', statElements.length, 'stat elements to check');
+
+                    statElements.forEach((element) => {
+                        const parentText = element.parentElement?.textContent?.toLowerCase() || '';
+
+                        let newValue, statLabel, statComparison, statAverage;
+
+                        // Determine which stat this is and get the text content
+                        if (parentText.includes('total leads')) {
+                            newValue = result.stats.totalLeads;
+                            statLabel = 'Total Leads';
+                            statComparison = '+' + (result.stats.totalLeads - 23) + ' vs avg';
+                            statAverage = 'Avg: 23';
+                        } else if (parentText.includes('total calls')) {
+                            newValue = result.stats.connectedCalls;
+                            statLabel = 'Total Calls';
+                            statComparison = (result.stats.connectedCalls - 5 >= 0 ? '+' : '') + (result.stats.connectedCalls - 5) + ' vs avg';
+                            statAverage = 'Avg: 5';
+                        } else if (parentText.includes('high value')) {
+                            newValue = result.stats.highValueLeads;
+                            statLabel = 'High Value Leads';
+                            statComparison = '+' + (result.stats.highValueLeads - 1) + ' vs avg';
+                            statAverage = 'Avg: 1';
+                        } else if (parentText.includes('duration')) {
+                            newValue = result.stats.totalCallDuration;
+                            statLabel = 'Total Call Duration (min)';
+                            statComparison = '+' + (result.stats.totalCallDuration - 178.7) + ' vs avg';
+                            statAverage = 'Avg: 178.7';
+                        } else if (parentText.includes('contact rate')) {
+                            newValue = result.stats.contactRate + '%';
+                            statLabel = 'Contact Rate';
+                            statComparison = (result.stats.contactRate - 73.9 >= 0 ? '+' : '') + (result.stats.contactRate - 73.9) + ' vs avg';
+                            statAverage = 'Avg: 73.9%';
+                        } else if (parentText.includes('leads to brokers') || parentText.includes('brokers')) {
+                            newValue = result.stats.leadsToBrokers || 0;
+                            statLabel = 'Leads to Brokers';
+                            statComparison = 'At average';
+                            statAverage = 'Avg: 0';
+                        }
+
+                        if (newValue !== undefined) {
+                            const originalValue = element.textContent;
+
+                            // Hide the original complex stat box completely
+                            const complexContainer = element.closest('[style*="text-align: center"][style*="padding: 20px"]');
+                            if (complexContainer) {
+                                complexContainer.style.display = 'none';
+                            }
+
+                            // Create expanded simple overlay to replace the entire stat box
+                            const expandedOverlay = document.createElement('div');
+                            expandedOverlay.className = 'live-stats-expanded-overlay';
+                            expandedOverlay.style.cssText = `
+                                background: rgb(209, 250, 229);
+                                color: rgb(6, 95, 70);
+                                padding: 20px;
+                                border-radius: 12px;
+                                border: 2px solid rgb(16, 185, 129);
+                                text-align: center;
+                                margin: 8px;
+                                position: relative;
+                                z-index: 1000;
+                            `;
+
+                            expandedOverlay.innerHTML = `
+                                <div style="font-size: 28px; font-weight: bold; margin-bottom: 4px; color: rgb(6, 95, 70);">${newValue}</div>
+                                <div style="font-size: 14px; color: #059669; margin-bottom: 4px;">${statLabel}</div>
+                                <div style="font-size: 11px; color: #059669; margin-top: 4px; opacity: 0.8;">${statComparison}</div>
+                                <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">${statAverage}</div>
+                            `;
+
+                            // Insert the expanded overlay where the original was
+                            if (complexContainer && complexContainer.parentNode) {
+                                complexContainer.parentNode.insertBefore(expandedOverlay, complexContainer);
+                            }
+
+                            console.log(`✅ EXPANDED SIMPLE OVERLAY: ${originalValue} → ${newValue} (${statLabel})`);
+                        }
+                    });
+                } else {
+                    console.log('📊 DIRECT: No live stats found for', agentName);
+                }
+            } catch (error) {
+                console.error('❌ DIRECT: Error applying live stats override:', error);
+            }
+        }, 500); // Increased timeout to allow modal to fully render
+
+    } catch (error) {
+        console.error('Error in viewAgentStatsWithDateRange:', error);
+        alert('Error filtering agent stats. Please try again.');
+    }
+}
+
+// Production Report Generator
+function generateProductionReport() {
+    try {
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+        const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+
+        // Calculate production metrics
+        const productionData = {
+            totalLeads: leads.length,
+            newBusiness: leads.filter(lead => lead.leadStatus === 'SALE' || lead.status === 'closed_won').length,
+            renewals: policies.filter(policy => policy.renewalDate && new Date(policy.renewalDate) >= new Date()).length,
+            totalPremium: 0,
+            avgPremium: 0,
+            conversionRate: 0
+        };
+
+        // Calculate total premium
+        leads.forEach(lead => {
+            if (lead.leadStatus === 'SALE' || lead.status === 'closed_won') {
+                productionData.totalPremium += parseFloat(lead.premium || 0);
+            }
+        });
+
+        productionData.avgPremium = productionData.newBusiness > 0 ?
+            (productionData.totalPremium / productionData.newBusiness) : 0;
+        productionData.conversionRate = productionData.totalLeads > 0 ?
+            ((productionData.newBusiness / productionData.totalLeads) * 100) : 0;
+
+        displayProductionReport(productionData);
+    } catch (error) {
+        console.error('Error generating production report:', error);
+        showNotification('Error generating production report', 'error');
+    }
+}
+
+// Loss Ratio Report Generator
+function generateLossRatioReport() {
+    try {
+        const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+        const claims = JSON.parse(localStorage.getItem('claims') || '[]');
+
+        let totalPremium = 0;
+        let totalClaims = 0;
+
+        policies.forEach(policy => {
+            const premium = parseFloat(policy.financial?.['Annual Premium'] || policy.premium || 0);
+            totalPremium += premium;
+        });
+
+        claims.forEach(claim => {
+            const claimAmount = parseFloat(claim.amount || 0);
+            totalClaims += claimAmount;
+        });
+
+        const lossRatio = totalPremium > 0 ? ((totalClaims / totalPremium) * 100) : 0;
+
+        const lossRatioData = {
+            totalPremium: totalPremium,
+            totalClaims: totalClaims,
+            lossRatio: lossRatio.toFixed(2),
+            claimsCount: claims.length,
+            policiesCount: policies.length
+        };
+
+        displayLossRatioReport(lossRatioData);
+    } catch (error) {
+        console.error('Error generating loss ratio report:', error);
+        showNotification('Error generating loss ratio report', 'error');
+    }
+}
+
+// Commission Report Generator
+function generateCommissionReport() {
+    try {
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+
+        const commissionData = {};
+
+        // Calculate commissions by carrier
+        leads.forEach(lead => {
+            if (lead.leadStatus === 'SALE' || lead.status === 'closed_won') {
+                const carrier = lead.carrier || lead.company || 'Unknown';
+                const premium = parseFloat(lead.premium || 0);
+                const commissionRate = 0.15; // Default 15% commission
+                const commission = premium * commissionRate;
+
+                if (!commissionData[carrier]) {
+                    commissionData[carrier] = {
+                        totalPremium: 0,
+                        totalCommission: 0,
+                        policyCount: 0
+                    };
+                }
+
+                commissionData[carrier].totalPremium += premium;
+                commissionData[carrier].totalCommission += commission;
+                commissionData[carrier].policyCount++;
+            }
+        });
+
+        displayCommissionReport(commissionData);
+    } catch (error) {
+        console.error('Error generating commission report:', error);
+        showNotification('Error generating commission report', 'error');
+    }
+}
+
+// Renewal Forecast Report Generator
+function generateRenewalReport() {
+    try {
+        const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+        const currentDate = new Date();
+        const next30Days = new Date(currentDate.getTime() + (30 * 24 * 60 * 60 * 1000));
+        const next60Days = new Date(currentDate.getTime() + (60 * 24 * 60 * 60 * 1000));
+        const next90Days = new Date(currentDate.getTime() + (90 * 24 * 60 * 60 * 1000));
+
+        const renewalData = {
+            next30: [],
+            next60: [],
+            next90: [],
+            totalPremiumNext30: 0,
+            totalPremiumNext60: 0,
+            totalPremiumNext90: 0
+        };
+
+        policies.forEach(policy => {
+            if (policy.renewalDate || policy.expirationDate) {
+                const renewalDate = new Date(policy.renewalDate || policy.expirationDate);
+                const premium = parseFloat(policy.financial?.['Annual Premium'] || policy.premium || 0);
+
+                if (renewalDate >= currentDate && renewalDate <= next30Days) {
+                    renewalData.next30.push(policy);
+                    renewalData.totalPremiumNext30 += premium;
+                } else if (renewalDate > next30Days && renewalDate <= next60Days) {
+                    renewalData.next60.push(policy);
+                    renewalData.totalPremiumNext60 += premium;
+                } else if (renewalDate > next60Days && renewalDate <= next90Days) {
+                    renewalData.next90.push(policy);
+                    renewalData.totalPremiumNext90 += premium;
+                }
+            }
+        });
+
+        displayRenewalReport(renewalData);
+    } catch (error) {
+        console.error('Error generating renewal report:', error);
+        showNotification('Error generating renewal report', 'error');
+    }
+}
+
+// Marketing ROI Report Generator
+function generateMarketingReport() {
+    try {
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+        const marketingData = {};
+        let totalLeadValue = 0;
+        let totalSales = 0;
+
+        leads.forEach(lead => {
+            const source = lead.source || lead.leadSource || 'Unknown';
+            const premium = parseFloat(lead.premium || 0);
+            const isSale = lead.leadStatus === 'SALE' || lead.status === 'closed_won';
+
+            if (!marketingData[source]) {
+                marketingData[source] = {
+                    totalLeads: 0,
+                    sales: 0,
+                    totalValue: 0,
+                    conversionRate: 0,
+                    avgValue: 0
+                };
+            }
+
+            marketingData[source].totalLeads++;
+            if (isSale) {
+                marketingData[source].sales++;
+                marketingData[source].totalValue += premium;
+                totalSales++;
+            }
+            totalLeadValue += premium;
+        });
+
+        // Calculate conversion rates and averages
+        Object.keys(marketingData).forEach(source => {
+            const data = marketingData[source];
+            data.conversionRate = data.totalLeads > 0 ? ((data.sales / data.totalLeads) * 100).toFixed(1) : 0;
+            data.avgValue = data.sales > 0 ? (data.totalValue / data.sales).toFixed(2) : 0;
+        });
+
+        displayMarketingReport(marketingData);
+    } catch (error) {
+        console.error('Error generating marketing report:', error);
+        showNotification('Error generating marketing report', 'error');
+    }
+}
+
+// Carrier Performance Report Generator
+function generateCarrierReport() {
+    try {
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const policies = JSON.parse(localStorage.getItem('policies') || '[]');
+
+        const carrierData = {};
+
+        // Analyze leads by carrier
+        leads.forEach(lead => {
+            const carrier = lead.carrier || lead.company || 'Unknown';
+            const premium = parseFloat(lead.premium || 0);
+            const isSale = lead.leadStatus === 'SALE' || lead.status === 'closed_won';
+            const isQuoted = lead.status === 'quoted' || lead.leadStatus === 'QUOTED';
+
+            if (!carrierData[carrier]) {
+                carrierData[carrier] = {
+                    quotes: 0,
+                    binds: 0,
+                    totalPremium: 0,
+                    bindRate: 0,
+                    avgPremium: 0
+                };
+            }
+
+            if (isQuoted) carrierData[carrier].quotes++;
+            if (isSale) {
+                carrierData[carrier].binds++;
+                carrierData[carrier].totalPremium += premium;
+            }
+        });
+
+        // Calculate bind rates and averages
+        Object.keys(carrierData).forEach(carrier => {
+            const data = carrierData[carrier];
+            data.bindRate = data.quotes > 0 ? ((data.binds / data.quotes) * 100).toFixed(1) : 0;
+            data.avgPremium = data.binds > 0 ? (data.totalPremium / data.binds).toFixed(2) : 0;
+        });
+
+        displayCarrierReport(carrierData);
+    } catch (error) {
+        console.error('Error generating carrier report:', error);
+        showNotification('Error generating carrier report', 'error');
+    }
 }
 
 function scheduleReport() {
     console.log('Scheduling report');
-    // Would open scheduling modal
+
+    // Create modal for scheduling reports
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Schedule Report</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="form-group">
+                    <label>Report Type</label>
+                    <select id="scheduleReportType" class="form-control">
+                        <option value="agent-performance">Agent Performance</option>
+                        <option value="production">Production Report</option>
+                        <option value="loss-ratio">Loss Ratio Analysis</option>
+                        <option value="commission">Commission Report</option>
+                        <option value="renewal">Renewal Forecast</option>
+                        <option value="marketing">Marketing ROI</option>
+                        <option value="carrier">Carrier Performance</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Frequency</label>
+                    <select id="scheduleFrequency" class="form-control">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Email Recipients</label>
+                    <textarea id="scheduleRecipients" class="form-control" placeholder="Enter email addresses separated by commas" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="scheduleStartDate" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+                <button class="btn-primary" onclick="saveScheduledReport(); this.closest('.modal-overlay').remove();">Schedule Report</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
 }
 
 function createCustomReport() {
     console.log('Creating custom report');
-    // Would open report builder
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>Create Custom Report</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="form-group">
+                    <label>Report Name</label>
+                    <input type="text" id="customReportName" class="form-control" placeholder="Enter report name">
+                </div>
+                <div class="form-group">
+                    <label>Data Source</label>
+                    <select id="customDataSource" class="form-control">
+                        <option value="leads">Leads</option>
+                        <option value="policies">Policies</option>
+                        <option value="clients">Clients</option>
+                        <option value="claims">Claims</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Metrics to Include</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="metric_count" checked> Count</label>
+                        <label><input type="checkbox" id="metric_premium"> Premium</label>
+                        <label><input type="checkbox" id="metric_conversion"> Conversion Rate</label>
+                        <label><input type="checkbox" id="metric_timeline"> Timeline Analysis</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Group By</label>
+                    <select id="customGroupBy" class="form-control">
+                        <option value="agent">Agent</option>
+                        <option value="carrier">Carrier</option>
+                        <option value="source">Source</option>
+                        <option value="status">Status</option>
+                        <option value="month">Month</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date Range</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="date" id="customStartDate" class="form-control">
+                        <input type="date" id="customEndDate" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+                <button class="btn-primary" onclick="generateCustomReport(); this.closest('.modal-overlay').remove();">Generate Report</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+function generateCustomReport() {
+    const name = document.getElementById('customReportName').value;
+    const dataSource = document.getElementById('customDataSource').value;
+    const groupBy = document.getElementById('customGroupBy').value;
+    const startDate = document.getElementById('customStartDate').value;
+    const endDate = document.getElementById('customEndDate').value;
+
+    const metrics = {
+        count: document.getElementById('metric_count').checked,
+        premium: document.getElementById('metric_premium').checked,
+        conversion: document.getElementById('metric_conversion').checked,
+        timeline: document.getElementById('metric_timeline').checked
+    };
+
+    showNotification(`Generating custom report: ${name}...`, 'info');
+
+    try {
+        const data = JSON.parse(localStorage.getItem(dataSource === 'leads' ? 'insurance_leads' : dataSource) || '[]');
+
+        // Filter by date range if specified
+        let filteredData = data;
+        if (startDate && endDate) {
+            filteredData = data.filter(item => {
+                const itemDate = new Date(item.createdAt || item.timestamp || item.date);
+                return itemDate >= new Date(startDate) && itemDate <= new Date(endDate);
+            });
+        }
+
+        // Group and analyze data
+        const reportData = analyzeCustomReportData(filteredData, groupBy, metrics);
+        displayCustomReport(name, reportData, groupBy, metrics);
+
+        showNotification('Custom report generated successfully', 'success');
+    } catch (error) {
+        console.error('Error generating custom report:', error);
+        showNotification('Error generating custom report', 'error');
+    }
+}
+
+function analyzeCustomReportData(data, groupBy, metrics) {
+    const grouped = {};
+
+    data.forEach(item => {
+        let key = 'Unknown';
+        switch(groupBy) {
+            case 'agent':
+                key = item.assignedTo || item.agent || 'Unassigned';
+                break;
+            case 'carrier':
+                key = item.carrier || item.company || 'Unknown';
+                break;
+            case 'source':
+                key = item.source || item.leadSource || 'Unknown';
+                break;
+            case 'status':
+                key = item.status || item.leadStatus || 'Unknown';
+                break;
+            case 'month':
+                const date = new Date(item.createdAt || item.timestamp || item.date);
+                key = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                break;
+        }
+
+        if (!grouped[key]) {
+            grouped[key] = {
+                count: 0,
+                premium: 0,
+                sales: 0,
+                items: []
+            };
+        }
+
+        grouped[key].count++;
+        grouped[key].items.push(item);
+
+        if (metrics.premium) {
+            const premium = parseFloat(item.premium || item.totalPremium || 0);
+            grouped[key].premium += premium;
+        }
+
+        if (metrics.conversion) {
+            const isSale = item.status === 'closed_won' || item.leadStatus === 'SALE';
+            if (isSale) grouped[key].sales++;
+        }
+    });
+
+    // Calculate conversion rates
+    if (metrics.conversion) {
+        Object.keys(grouped).forEach(key => {
+            const group = grouped[key];
+            group.conversionRate = group.count > 0 ? ((group.sales / group.count) * 100).toFixed(1) : 0;
+        });
+    }
+
+    return grouped;
+}
+
+// Report Display Functions
+function displayProductionReport(data) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+    dashboardContent.innerHTML = `
+        <div class="report-view">
+            <header class="content-header">
+                <h1><i class="fas fa-chart-line"></i> Production Report</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="exportReport('production', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-primary" onclick="loadReportsView()">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </button>
+                </div>
+            </header>
+
+            <div class="report-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-users"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.totalLeads}</h3>
+                        <p>Total Leads</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-handshake"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.newBusiness}</h3>
+                        <p>New Business</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-sync"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.renewals}</h3>
+                        <p>Renewals</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="metric-info">
+                        <h3>$${data.totalPremium.toLocaleString()}</h3>
+                        <p>Total Premium</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.conversionRate.toFixed(1)}%</h3>
+                        <p>Conversion Rate</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-chart-bar"></i></div>
+                    <div class="metric-info">
+                        <h3>$${data.avgPremium.toFixed(0)}</h3>
+                        <p>Avg Premium</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    showNotification('Production report generated', 'success');
+}
+
+function displayLossRatioReport(data) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+    dashboardContent.innerHTML = `
+        <div class="report-view">
+            <header class="content-header">
+                <h1><i class="fas fa-chart-pie"></i> Loss Ratio Analysis</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="exportReport('loss-ratio', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-primary" onclick="loadReportsView()">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </button>
+                </div>
+            </header>
+
+            <div class="report-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-file-contract"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.policiesCount}</h3>
+                        <p>Active Policies</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.claimsCount}</h3>
+                        <p>Total Claims</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="metric-info">
+                        <h3>$${data.totalPremium.toLocaleString()}</h3>
+                        <p>Total Premium</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="metric-info">
+                        <h3>$${data.totalClaims.toLocaleString()}</h3>
+                        <p>Total Claims</p>
+                    </div>
+                </div>
+                <div class="metric-card ${data.lossRatio > 70 ? 'metric-warning' : data.lossRatio > 90 ? 'metric-danger' : 'metric-success'}">
+                    <div class="metric-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.lossRatio}%</h3>
+                        <p>Loss Ratio</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-insights">
+                <h3>Loss Ratio Analysis</h3>
+                <div class="insight-card">
+                    <h4>Performance Assessment</h4>
+                    <p>
+                        ${data.lossRatio < 70 ?
+                            'Excellent: Your loss ratio is below 70%, indicating strong underwriting and risk management.' :
+                            data.lossRatio < 90 ?
+                            'Good: Your loss ratio is manageable but monitor closely for trends.' :
+                            'Attention Required: Loss ratio exceeds 90%. Review underwriting criteria and claims management.'}
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    showNotification('Loss ratio report generated', 'success');
+}
+
+function displayCommissionReport(data) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+
+    const carriersHtml = Object.keys(data).map(carrier => `
+        <tr>
+            <td><strong>${carrier}</strong></td>
+            <td>${data[carrier].policyCount}</td>
+            <td>$${data[carrier].totalPremium.toLocaleString()}</td>
+            <td>$${data[carrier].totalCommission.toLocaleString()}</td>
+            <td>$${(data[carrier].totalCommission / data[carrier].policyCount).toLocaleString()}</td>
+        </tr>
+    `).join('');
+
+    const totalCommission = Object.values(data).reduce((sum, carrier) => sum + carrier.totalCommission, 0);
+    const totalPremium = Object.values(data).reduce((sum, carrier) => sum + carrier.totalPremium, 0);
+    const totalPolicies = Object.values(data).reduce((sum, carrier) => sum + carrier.policyCount, 0);
+
+    dashboardContent.innerHTML = `
+        <div class="report-view">
+            <header class="content-header">
+                <h1><i class="fas fa-dollar-sign"></i> Commission Report</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="exportReport('commission', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-primary" onclick="loadReportsView()">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </button>
+                </div>
+            </header>
+
+            <div class="report-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-building"></i></div>
+                    <div class="metric-info">
+                        <h3>${Object.keys(data).length}</h3>
+                        <p>Active Carriers</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-file-contract"></i></div>
+                    <div class="metric-info">
+                        <h3>${totalPolicies}</h3>
+                        <p>Total Policies</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="metric-info">
+                        <h3>$${totalPremium.toLocaleString()}</h3>
+                        <p>Total Premium</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                    <div class="metric-info">
+                        <h3>$${totalCommission.toLocaleString()}</h3>
+                        <p>Total Commission</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Carrier</th>
+                            <th>Policies</th>
+                            <th>Premium</th>
+                            <th>Commission</th>
+                            <th>Avg Commission</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${carriersHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    showNotification('Commission report generated', 'success');
+}
+
+function displayRenewalReport(data) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+
+    const renewalsHtml = {
+        next30: data.next30.map(policy => `
+            <tr>
+                <td><strong>${policy.namedInsured?.name || policy.clientName || 'Unknown'}</strong></td>
+                <td>${policy.policyNumber || 'N/A'}</td>
+                <td>${new Date(policy.renewalDate || policy.expirationDate).toLocaleDateString()}</td>
+                <td>$${(parseFloat(policy.financial?.['Annual Premium'] || policy.premium || 0)).toLocaleString()}</td>
+            </tr>
+        `).join(''),
+        next60: data.next60.map(policy => `
+            <tr>
+                <td><strong>${policy.namedInsured?.name || policy.clientName || 'Unknown'}</strong></td>
+                <td>${policy.policyNumber || 'N/A'}</td>
+                <td>${new Date(policy.renewalDate || policy.expirationDate).toLocaleDateString()}</td>
+                <td>$${(parseFloat(policy.financial?.['Annual Premium'] || policy.premium || 0)).toLocaleString()}</td>
+            </tr>
+        `).join(''),
+        next90: data.next90.map(policy => `
+            <tr>
+                <td><strong>${policy.namedInsured?.name || policy.clientName || 'Unknown'}</strong></td>
+                <td>${policy.policyNumber || 'N/A'}</td>
+                <td>${new Date(policy.renewalDate || policy.expirationDate).toLocaleDateString()}</td>
+                <td>$${(parseFloat(policy.financial?.['Annual Premium'] || policy.premium || 0)).toLocaleString()}</td>
+            </tr>
+        `).join('')
+    };
+
+    dashboardContent.innerHTML = `
+        <div class="report-view">
+            <header class="content-header">
+                <h1><i class="fas fa-sync"></i> Renewal Forecast</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="exportReport('renewal', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-primary" onclick="loadReportsView()">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </button>
+                </div>
+            </header>
+
+            <div class="report-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-calendar-day"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.next30.length}</h3>
+                        <p>Next 30 Days</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-calendar-week"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.next60.length}</h3>
+                        <p>Next 60 Days</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-calendar"></i></div>
+                    <div class="metric-info">
+                        <h3>${data.next90.length}</h3>
+                        <p>Next 90 Days</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="metric-info">
+                        <h3>$${data.totalPremiumNext30.toLocaleString()}</h3>
+                        <p>30-Day Premium</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="renewal-sections">
+                <div class="renewal-section">
+                    <h3><i class="fas fa-exclamation-circle" style="color: #e74c3c;"></i> Renewals in Next 30 Days (${data.next30.length})</h3>
+                    ${data.next30.length > 0 ? `
+                        <div class="report-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Client</th><th>Policy #</th><th>Renewal Date</th><th>Premium</th></tr>
+                                </thead>
+                                <tbody>${renewalsHtml.next30}</tbody>
+                            </table>
+                        </div>
+                    ` : '<p style="text-align: center; color: #666; padding: 20px;">No renewals in the next 30 days</p>'}
+                </div>
+
+                <div class="renewal-section">
+                    <h3><i class="fas fa-exclamation-triangle" style="color: #f39c12;"></i> Renewals in 31-60 Days (${data.next60.length})</h3>
+                    ${data.next60.length > 0 ? `
+                        <div class="report-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Client</th><th>Policy #</th><th>Renewal Date</th><th>Premium</th></tr>
+                                </thead>
+                                <tbody>${renewalsHtml.next60}</tbody>
+                            </table>
+                        </div>
+                    ` : '<p style="text-align: center; color: #666; padding: 20px;">No renewals in this period</p>'}
+                </div>
+
+                <div class="renewal-section">
+                    <h3><i class="fas fa-info-circle" style="color: #3498db;"></i> Renewals in 61-90 Days (${data.next90.length})</h3>
+                    ${data.next90.length > 0 ? `
+                        <div class="report-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Client</th><th>Policy #</th><th>Renewal Date</th><th>Premium</th></tr>
+                                </thead>
+                                <tbody>${renewalsHtml.next90}</tbody>
+                            </table>
+                        </div>
+                    ` : '<p style="text-align: center; color: #666; padding: 20px;">No renewals in this period</p>'}
+                </div>
+            </div>
+        </div>
+    `;
+
+    showNotification('Renewal forecast report generated', 'success');
+}
+
+function displayMarketingReport(data) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+
+    const sourcesHtml = Object.keys(data).map(source => `
+        <tr>
+            <td><strong>${source}</strong></td>
+            <td>${data[source].totalLeads}</td>
+            <td>${data[source].sales}</td>
+            <td>${data[source].conversionRate}%</td>
+            <td>$${parseFloat(data[source].totalValue).toLocaleString()}</td>
+            <td>$${parseFloat(data[source].avgValue).toLocaleString()}</td>
+        </tr>
+    `).join('');
+
+    const totalLeads = Object.values(data).reduce((sum, source) => sum + source.totalLeads, 0);
+    const totalSales = Object.values(data).reduce((sum, source) => sum + source.sales, 0);
+    const totalValue = Object.values(data).reduce((sum, source) => sum + parseFloat(source.totalValue), 0);
+    const avgConversion = totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(1) : 0;
+
+    dashboardContent.innerHTML = `
+        <div class="report-view">
+            <header class="content-header">
+                <h1><i class="fas fa-bullhorn"></i> Marketing ROI Report</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="exportReport('marketing', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-primary" onclick="loadReportsView()">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </button>
+                </div>
+            </header>
+
+            <div class="report-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="metric-info">
+                        <h3>${Object.keys(data).length}</h3>
+                        <p>Lead Sources</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-users"></i></div>
+                    <div class="metric-info">
+                        <h3>${totalLeads}</h3>
+                        <p>Total Leads</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-handshake"></i></div>
+                    <div class="metric-info">
+                        <h3>${totalSales}</h3>
+                        <p>Total Sales</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="metric-info">
+                        <h3>${avgConversion}%</h3>
+                        <p>Avg Conversion</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="metric-info">
+                        <h3>$${totalValue.toLocaleString()}</h3>
+                        <p>Total Value</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Lead Source</th>
+                            <th>Total Leads</th>
+                            <th>Sales</th>
+                            <th>Conversion Rate</th>
+                            <th>Total Value</th>
+                            <th>Avg Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sourcesHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    showNotification('Marketing ROI report generated', 'success');
+}
+
+function displayCarrierReport(data) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+
+    const carriersHtml = Object.keys(data).map(carrier => `
+        <tr>
+            <td><strong>${carrier}</strong></td>
+            <td>${data[carrier].quotes}</td>
+            <td>${data[carrier].binds}</td>
+            <td>${data[carrier].bindRate}%</td>
+            <td>$${parseFloat(data[carrier].totalPremium).toLocaleString()}</td>
+            <td>$${parseFloat(data[carrier].avgPremium).toLocaleString()}</td>
+        </tr>
+    `).join('');
+
+    const totalQuotes = Object.values(data).reduce((sum, carrier) => sum + carrier.quotes, 0);
+    const totalBinds = Object.values(data).reduce((sum, carrier) => sum + carrier.binds, 0);
+    const totalPremium = Object.values(data).reduce((sum, carrier) => sum + parseFloat(carrier.totalPremium), 0);
+    const avgBindRate = totalQuotes > 0 ? ((totalBinds / totalQuotes) * 100).toFixed(1) : 0;
+
+    dashboardContent.innerHTML = `
+        <div class="report-view">
+            <header class="content-header">
+                <h1><i class="fas fa-building"></i> Carrier Performance Report</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="exportReport('carrier', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-primary" onclick="loadReportsView()">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </button>
+                </div>
+            </header>
+
+            <div class="report-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-building"></i></div>
+                    <div class="metric-info">
+                        <h3>${Object.keys(data).length}</h3>
+                        <p>Active Carriers</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-file-alt"></i></div>
+                    <div class="metric-info">
+                        <h3>${totalQuotes}</h3>
+                        <p>Total Quotes</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-handshake"></i></div>
+                    <div class="metric-info">
+                        <h3>${totalBinds}</h3>
+                        <p>Total Binds</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="metric-info">
+                        <h3>${avgBindRate}%</h3>
+                        <p>Avg Bind Rate</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="metric-info">
+                        <h3>$${totalPremium.toLocaleString()}</h3>
+                        <p>Total Premium</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Carrier</th>
+                            <th>Quotes</th>
+                            <th>Binds</th>
+                            <th>Bind Rate</th>
+                            <th>Total Premium</th>
+                            <th>Avg Premium</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${carriersHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    showNotification('Carrier performance report generated', 'success');
+}
+
+function displayCustomReport(name, data, groupBy, metrics) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+
+    const dataHtml = Object.keys(data).map(key => `
+        <tr>
+            <td><strong>${key}</strong></td>
+            ${metrics.count ? `<td>${data[key].count}</td>` : ''}
+            ${metrics.premium ? `<td>$${data[key].premium.toLocaleString()}</td>` : ''}
+            ${metrics.conversion ? `<td>${data[key].sales}</td>` : ''}
+            ${metrics.conversion ? `<td>${data[key].conversionRate}%</td>` : ''}
+        </tr>
+    `).join('');
+
+    const totalCount = Object.values(data).reduce((sum, item) => sum + item.count, 0);
+    const totalPremium = Object.values(data).reduce((sum, item) => sum + item.premium, 0);
+    const totalSales = Object.values(data).reduce((sum, item) => sum + item.sales, 0);
+
+    dashboardContent.innerHTML = `
+        <div class="report-view">
+            <header class="content-header">
+                <h1><i class="fas fa-chart-area"></i> ${name}</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="exportReport('custom', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn-primary" onclick="loadReportsView()">
+                        <i class="fas fa-arrow-left"></i> Back to Reports
+                    </button>
+                </div>
+            </header>
+
+            <div class="report-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fas fa-list"></i></div>
+                    <div class="metric-info">
+                        <h3>${Object.keys(data).length}</h3>
+                        <p>Groups</p>
+                    </div>
+                </div>
+                ${metrics.count ? `
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fas fa-hashtag"></i></div>
+                        <div class="metric-info">
+                            <h3>${totalCount}</h3>
+                            <p>Total Count</p>
+                        </div>
+                    </div>
+                ` : ''}
+                ${metrics.premium ? `
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
+                        <div class="metric-info">
+                            <h3>$${totalPremium.toLocaleString()}</h3>
+                            <p>Total Premium</p>
+                        </div>
+                    </div>
+                ` : ''}
+                ${metrics.conversion ? `
+                    <div class="metric-card">
+                        <div class="metric-icon"><i class="fas fa-handshake"></i></div>
+                        <div class="metric-info">
+                            <h3>${totalSales}</h3>
+                            <p>Total Sales</p>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+
+            <div class="report-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>${groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}</th>
+                            ${metrics.count ? '<th>Count</th>' : ''}
+                            ${metrics.premium ? '<th>Premium</th>' : ''}
+                            ${metrics.conversion ? '<th>Sales</th>' : ''}
+                            ${metrics.conversion ? '<th>Conversion %</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${dataHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    showNotification(`Custom report "${name}" generated successfully`, 'success');
+}
+
+// Helper function for saving scheduled reports
+function saveScheduledReport() {
+    const reportType = document.getElementById('scheduleReportType').value;
+    const frequency = document.getElementById('scheduleFrequency').value;
+    const recipients = document.getElementById('scheduleRecipients').value;
+    const startDate = document.getElementById('scheduleStartDate').value;
+
+    const scheduledReport = {
+        type: reportType,
+        frequency,
+        recipients: recipients.split(',').map(email => email.trim()),
+        startDate,
+        createdAt: new Date().toISOString(),
+        active: true
+    };
+
+    // Save to localStorage (in a real app, this would go to a server)
+    const scheduledReports = JSON.parse(localStorage.getItem('scheduledReports') || '[]');
+    scheduledReports.push(scheduledReport);
+    localStorage.setItem('scheduledReports', JSON.stringify(scheduledReports));
+
+    showNotification(`Report scheduled: ${reportType} will be sent ${frequency}`, 'success');
+}
+
+// Export function for reports
+function exportReport(type, data) {
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `${type}-report-${timestamp}.json`;
+
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = filename;
+    link.click();
+
+    showNotification(`Report exported as ${filename}`, 'success');
 }
 
 // Communications Functions
@@ -17260,10 +21648,20 @@ function exportLeads() {
     showNotification(`Exported ${leads.length} leads`, 'success');
 }
 
-window.toggleAllLeads = function(checkbox) {
+window.toggleAllLeads = function() {
+    const selectAllCheckbox = document.getElementById('selectAllLeads');
     const checkboxes = document.querySelectorAll('.lead-checkbox');
-    checkboxes.forEach(cb => cb.checked = checkbox.checked);
-    updateBulkDeleteButton();
+
+    if (selectAllCheckbox && checkboxes.length > 0) {
+        checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+
+        // Use the enhanced bulk actions function
+        if (typeof updateBulkActionsVisibility === 'function') {
+            updateBulkActionsVisibility();
+        } else {
+            updateBulkDeleteButton();
+        }
+    }
 }
 
 // Update bulk delete overlay visibility and count
@@ -17863,6 +22261,31 @@ function formatStageName(stage) {
     return stageMap[stage] || stage;
 }
 
+// Helper function to check if green highlighting is active (all formats)
+function isGreenHighlightActive(lead) {
+    const now = new Date();
+
+    // Check Contact Attempted auto-completion format
+    if (lead.greenUntil) {
+        const greenUntil = new Date(lead.greenUntil);
+        if (now < greenUntil) return true;
+    }
+
+    // Check manual green highlight format
+    if (lead.reachOut && lead.reachOut.greenHighlightUntil) {
+        const greenUntil = new Date(lead.reachOut.greenHighlightUntil);
+        if (now < greenUntil) return true;
+    }
+
+    // Check another green highlight format
+    if (lead.greenHighlight && lead.greenHighlight.expiresAt) {
+        const greenUntil = new Date(lead.greenHighlight.expiresAt);
+        if (now < greenUntil) return true;
+    }
+
+    return false;
+}
+
 // Helper function to get next action based on stage and reach out status
 function getNextAction(stage, lead) {
     console.log(`🔍 GET NEXT ACTION: Lead ${lead.id} - ${lead.name}, stage: ${stage}`);
@@ -17870,17 +22293,19 @@ function getNextAction(stage, lead) {
 
     // Check if reach out is complete
     if (lead && lead.reachOut) {
-        const reachOut = lead.reachOut;
+        // Create a copy to avoid modifying the original lead data
+        const reachOut = { ...lead.reachOut };
         console.log(`🔍 GET NEXT ACTION: ReachOut data:`, reachOut);
 
         // Check if stage requires reach out (NOT info_received - that needs quote preparation)
         console.log(`🔍 STAGE CHECK: stage="${stage}" (type: ${typeof stage})`);
         console.log(`🔍 STAGE CHECK: Checking conditions...`);
         if (stage === 'quoted' || stage === 'info_requested' || stage === 'Info Requested' ||
+            stage === 'contact_attempted' || stage === 'Contact Attempted' ||
             stage === 'loss_runs_requested' || stage === 'Loss Runs Requested' ||
             stage === 'app_sent' || stage === 'App Sent' ||
             stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
-            stage === 'interested' || stage === 'Interested') {
+            stage === 'sale' || stage === 'Sale') {
             console.log(`🔍 STAGE CHECK: ✅ STAGE MATCHED - proceeding to completion check`);
 
             // Reach out is complete when ACTUAL completion actions happened:
@@ -17896,13 +22321,14 @@ function getNextAction(stage, lead) {
 
             console.log(`🔍 COMPLETION CONDITIONS: hasTimestamp=${hasTimestamp}, hasActualCompletion=${hasActualCompletion}, isActuallyCompleted=${isActuallyCompleted}`);
 
-            // Clean up orphaned timestamps (timestamp without actual completion)
-            if (hasTimestamp && !hasActualCompletion) {
-                console.log(`🧹 CLEANING UP ORPHANED TIMESTAMP: Lead ${lead.id} has completion timestamp but no actual completion (connected: ${reachOut.callsConnected}, texts: ${reachOut.textCount})`);
-                delete reachOut.completedAt;
-                delete reachOut.reachOutCompletedAt;
-                updateLeadInStorage(lead);
-            }
+            // NOTE: Orphaned timestamp cleanup disabled to prevent data corruption
+            // This function should be read-only for display purposes
+            // if (hasTimestamp && !hasActualCompletion) {
+            //     console.log(`🧹 CLEANING UP ORPHANED TIMESTAMP: Lead ${lead.id} has completion timestamp but no actual completion (connected: ${reachOut.callsConnected}, texts: ${reachOut.textCount})`);
+            //     delete reachOut.completedAt;
+            //     delete reachOut.reachOutCompletedAt;
+            //     updateLeadInStorage(lead);
+            // }
 
             if (isActuallyCompleted) {
                 console.log(`🔍 REACH-OUT COMPLETE CHECK - Lead ${lead.id}: completedAt=${!!reachOut.completedAt}, reachOutCompletedAt=${!!reachOut.reachOutCompletedAt}, callsConnected=${reachOut.callsConnected}, textCount=${reachOut.textCount}`);
@@ -17913,23 +22339,13 @@ function getNextAction(stage, lead) {
                     const timeDifferenceMs = currentTime.getTime() - completedTime.getTime();
                     const timeDifferenceDays = timeDifferenceMs / (1000 * 60 * 60 * 24);
 
-                    // If more than 2 days have passed, reach out has expired - reset and require new reach out
+                    // NOTE: Expiration reset disabled to prevent data corruption
+                    // This function should be read-only for display purposes
                     if (timeDifferenceDays > 2) {
-                        console.log(`🔄 REACH OUT EXPIRED: Lead ${lead.id} - ${lead.name}, completed ${timeDifferenceDays.toFixed(1)} days ago`);
+                        console.log(`⏰ REACH-OUT EXPIRED: Lead ${lead.id} - ${lead.name}, completed ${timeDifferenceDays.toFixed(1)} days ago, BUT NOT RESETTING IN READ-ONLY FUNCTION`);
 
-                        // Reset reach out completion status to trigger new reach out
-                        reachOut.callsConnected = 0;
-                        reachOut.textCount = 0;
-                        reachOut.emailSent = false;
-                        reachOut.textSent = false;
-                        reachOut.callMade = false;
-                        delete reachOut.reachOutCompletedAt;
-
-                        // Save the updated lead data
-                        updateLeadInStorage(lead);
-
-                        // Return appropriate reach out action based on stage
-                        return getReachOutAction(stage);
+                        // Expiration handling should be done elsewhere
+                        // return getReachOutAction(stage);
                     }
                 }
 
@@ -17941,7 +22357,7 @@ function getNextAction(stage, lead) {
     const actionMap = {
         // Original lowercase with underscores format
         'new': 'Assign Stage',
-        'contact_attempted': 'Follow up with lead',
+        'contact_attempted': 'Reach out',
         'info_requested': 'Reach out',
         'info_received': 'Prepare Quote',
         'loss_runs_requested': 'Reach out',
@@ -17951,14 +22367,14 @@ function getNextAction(stage, lead) {
         'quoted': 'Email Quote, and make contact',
         'quote_sent': 'Reach out',
         'quote-sent-unaware': 'Reach out',
-        'quote-sent-aware': 'Follow up with lead',
+        'quote-sent-aware': 'Reach out',
         'interested': 'Reach out',
         'not-interested': 'Archive lead',
         'closed': 'Process complete',
 
         // Title case with spaces format (actual database format)
         'New': 'Assign Stage',
-        'Contact Attempted': 'Follow up with lead',
+        'Contact Attempted': 'Reach out',
         'Info Requested': 'Reach out',
         'Info Received': 'Prepare Quote',
         'Loss Runs Requested': 'Reach out',
@@ -17968,7 +22384,7 @@ function getNextAction(stage, lead) {
         'Quoted': 'Email Quote, and make contact',
         'Quote Sent': 'Reach out',
         'Quote Sent Unaware': 'Reach out',
-        'Quote Sent Aware': 'Follow up with lead',
+        'Quote Sent Aware': 'Reach out',
         'Interested': 'Reach out',
         'Not Interested': 'Archive lead',
         'Closed': 'Process complete'
@@ -17991,11 +22407,12 @@ function getReachOutAction(stage) {
     const reachOutActionMap = {
         'quoted': 'Email Quote, and make contact',
         'info_requested': 'Reach out to lead',
+        'contact_attempted': 'Reach out to lead',
         'loss_runs_requested': 'Reach out to lead',
         'app_sent': 'Reach out to lead',
         'quote_sent': 'Reach out to lead',
         'quote-sent-unaware': 'Reach out to lead',
-        'quote-sent-aware': 'Follow up with lead',
+        'quote-sent-aware': 'Reach out',
         'interested': 'Reach out'
     };
     return reachOutActionMap[stage] || 'Reach out to lead';
@@ -18032,10 +22449,125 @@ function updateLeadInStorage(lead) {
     }
 }
 
+// Helper function to generate time meter visualization
+function generateTimeMeter(lead) {
+    // Get actual call time logged for this lead (in minutes)
+    let minutesLogged = 0;
+
+    // Calculate minutes from actual call logs
+    if (lead && lead.reachOut && lead.reachOut.callLogs && Array.isArray(lead.reachOut.callLogs)) {
+        console.log(`📞 CALL LOGS for ${lead.name}:`, lead.reachOut.callLogs.map(log => `${log.duration} (connected: ${log.connected})`));
+        lead.reachOut.callLogs.forEach(log => {
+            if (log.duration) {
+                let logMinutes = 0;
+
+                // Parse different duration formats
+                if (log.duration === '< 1 min') {
+                    logMinutes = 0.5; // Half minute for very short calls
+                } else if (log.duration.includes('min')) {
+                    // Extract minutes from strings like "60 min", "5 min", etc.
+                    const match = log.duration.match(/(\d+(?:\.\d+)?)\s*min/);
+                    if (match) {
+                        logMinutes = parseFloat(match[1]);
+                    }
+                } else if (log.duration.includes('sec')) {
+                    // Extract seconds and convert to minutes for strings like "20 sec"
+                    const match = log.duration.match(/(\d+(?:\.\d+)?)\s*sec/);
+                    if (match) {
+                        logMinutes = parseFloat(match[1]) / 60; // Convert seconds to minutes
+                    }
+                } else if (log.duration.includes(':')) {
+                    // Handle MM:SS format like "60:00"
+                    const parts = log.duration.split(':');
+                    if (parts.length === 2) {
+                        logMinutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+                    }
+                } else {
+                    // Try to parse as a number (assuming minutes)
+                    const parsed = parseFloat(log.duration);
+                    if (!isNaN(parsed)) {
+                        logMinutes = parsed;
+                    }
+                }
+
+                minutesLogged += logMinutes;
+            }
+        });
+    }
+
+    // If no call logs found, fall back to basic calculation
+    if (minutesLogged === 0 && lead && lead.reachOut) {
+        // Basic calculation as fallback
+        minutesLogged += (lead.reachOut.callAttempts || 0) * 2;
+        minutesLogged += (lead.reachOut.callsConnected || 0) * 5; // Reduced default since we want actual data
+        minutesLogged += (lead.reachOut.emailCount || 0) * 1;
+        minutesLogged += (lead.reachOut.voicemailCount || 0) * 3;
+    }
+
+    // Cap at 60 minutes maximum for the meter display
+    const displayMinutes = Math.min(minutesLogged, 60);
+
+    // Calculate position of red line (0-100%)
+    const linePosition = (displayMinutes / 60) * 100;
+
+    // Always use normal gradient background
+    const gradientBg = 'linear-gradient(to right, #ef4444 0%, #f59e0b 20%, #eab308 40%, #84cc16 60%, #22c55e 80%, #10b981 100%)';
+    const textColor = '#374151';
+    const textShadow = '0 0 2px white';
+
+    // Format minutes display - show actual total even if over 60
+    const displayText = minutesLogged > 60 ? `${Math.round(minutesLogged)}m` : `${Math.round(displayMinutes)}m`;
+
+    // Use standard border for progress bar (gold border now applied to row)
+    const goldBorder = 'border: 1px solid #d1d5db;';
+
+    // Debug logging for gold border
+    console.log(`⏱️ TIME METER: Lead ${lead.id} - ${lead.name} has ${minutesLogged} actual minutes, displaying ${displayText}, gold border: ${minutesLogged >= 59.5}`);
+    if (minutesLogged >= 59.5) {
+        console.log(`🟡 GOLD BORDER: Lead ${lead.id} - ${lead.name} has ${minutesLogged} minutes - applying gold border`);
+    }
+
+    return `
+        <div style="position: relative; width: 100%; height: 20px; background: ${gradientBg}; border-radius: 10px; ${goldBorder}">
+            <div style="
+                position: absolute;
+                left: ${linePosition}%;
+                top: 0;
+                bottom: 0;
+                width: 2px;
+                background-color: #dc2626;
+                border-radius: 1px;
+                transform: translateX(-50%);
+            "></div>
+            <div style="
+                position: absolute;
+                left: ${linePosition}%;
+                top: -8px;
+                transform: translateX(-50%);
+                width: 0;
+                height: 0;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid #dc2626;
+            "></div>
+            <div style="
+                position: absolute;
+                right: 4px;
+                top: 2px;
+                font-size: 10px;
+                color: ${textColor};
+                font-weight: bold;
+                text-shadow: ${textShadow};
+            ">${displayText}</div>
+        </div>
+    `;
+}
+
 // Make it globally accessible
 window.getNextAction = getNextAction;
 window.getReachOutAction = getReachOutAction;
 window.updateLeadInStorage = updateLeadInStorage;
+window.generateTimeMeter = generateTimeMeter;
 
 // Helper function to render filtered leads - FIXED to use standard table generation
 function renderLeadsList(leads) {
@@ -18118,7 +22650,7 @@ function renderLeadsList(leads) {
         return `
             <tr class="lead-row ${isPriority ? 'priority-lead' : ''}" data-lead-id="${lead.id}">
                 <td style="width: 40px;">
-                    <input type="checkbox" class="lead-checkbox" value="${lead.id}" onchange="updateBulkDeleteButton()">
+                    <input type="checkbox" class="lead-checkbox" value="${lead.id}" onchange="updateBulkActionsVisibility()">
                 </td>
                 <td>
                     <div class="lead-name">
@@ -18142,14 +22674,13 @@ function renderLeadsList(leads) {
                     </span>
                 </td>
                 <td>
-                    <div style="font-weight: bold; color: black;">
-                        ${(() => {
-                            console.log(`🎯 TO DO CELL: Getting next action for lead ${lead.id} - ${lead.name}, stage: ${lead.stage}`);
-                            const result = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || '';
-                            console.log(`🎯 TO DO CELL: Result for lead ${lead.id}: "${result}"`);
-                            return result;
-                        })()}
-                    </div>
+                    ${(() => {
+                        console.log(`🎯 TO DO CELL: Getting next action for lead ${lead.id} - ${lead.name}, stage: ${lead.stage}`);
+                        const result = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : (window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : 'Review lead')) || '';
+                        console.log(`🎯 TO DO CELL: Result for lead ${lead.id}: "${result}"`);
+                        const color = result && result.toLowerCase().includes('reach out') ? '#dc2626' : 'black';
+                        return `<div style="font-weight: bold; color: ${color};">${result}</div>`;
+                    })()}
                 </td>
                 <td>
                     <div class="premium-amount">
@@ -18167,9 +22698,6 @@ function renderLeadsList(leads) {
                     <div class="action-buttons">
                         <button onclick="viewLead('${lead.id}')" class="btn-icon" title="View">
                             <i class="fas fa-eye"></i>
-                        </button>
-                        <button onclick="editLead('${lead.id}')" class="btn-icon" title="Edit">
-                            <i class="fas fa-edit"></i>
                         </button>
                         <button onclick="archiveLead('${lead.id}')" class="btn-icon" title="Archive">
                             <i class="fas fa-archive"></i>

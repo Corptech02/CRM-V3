@@ -26,7 +26,7 @@ function getReachOutStatus(lead) {
 
     // FIRST: Check if stage requires reach out (NOT info_received - that needs quote preparation)
     // If stage doesn't require reach out, return empty (no TO DO and no REACH OUT COMPLETE)
-    if (!(lead.stage === 'quoted' || lead.stage === 'info_requested' ||
+    if (!(lead.stage === 'quoted' || lead.stage === 'info_requested' || lead.stage === 'contact_attempted' ||
         lead.stage === 'quote_sent' || lead.stage === 'interested')) {
         console.log(`🐛 DEBUG getReachOutStatus - stage ${lead.stage} doesn't require reach out`);
         return ''; // No TO DO for stages that don't require reach out
@@ -1220,7 +1220,7 @@ window.updateLeadStage = async function(leadId, newStage) {
             console.log(`🎨 Found row for lead ${leadId}, handling highlight change`);
 
             // Check if new stage requires reach out
-            const stageRequiresReachOut = (newStage === 'quoted' || newStage === 'info_requested' ||
+            const stageRequiresReachOut = (newStage === 'quoted' || newStage === 'info_requested' || newStage === 'contact_attempted' ||
                                          newStage === 'quote_sent' || newStage === 'interested');
 
             if (stageRequiresReachOut) {
@@ -2356,12 +2356,18 @@ window.refreshLeadsTable = function(leadId, newPremium, winLossStatus) {
                     let updatedTodoHtml;
                     try {
                         if (typeof getNextAction === 'function') {
-                            updatedTodoHtml = `<div style="font-weight: bold; color: black;">${getNextAction(leadData.stage || 'new', leadData)}</div>`;
+                            const todoText = getNextAction(leadData.stage || 'new', leadData);
+                            const color = todoText && todoText.toLowerCase().includes('reach out') ? '#dc2626' : 'black';
+                            updatedTodoHtml = `<div style="font-weight: bold; color: ${color};">${todoText}</div>`;
                         } else if (window.getNextAction) {
-                            updatedTodoHtml = `<div style="font-weight: bold; color: black;">${window.getNextAction(leadData.stage || 'new', leadData)}</div>`;
+                            const todoText = window.getNextAction(leadData.stage || 'new', leadData);
+                            const color = todoText && todoText.toLowerCase().includes('reach out') ? '#dc2626' : 'black';
+                            updatedTodoHtml = `<div style="font-weight: bold; color: ${color};">${todoText}</div>`;
                         } else {
                             // Fallback to our getReachOutStatus if getNextAction not available
-                            updatedTodoHtml = `<div style="font-weight: bold; color: black;">${getReachOutStatus(leadData)}</div>`;
+                            const todoText = getReachOutStatus(leadData);
+                            const color = todoText && todoText.toLowerCase().includes('reach out') ? '#dc2626' : 'black';
+                            updatedTodoHtml = `<div style="font-weight: bold; color: ${color};">${todoText}</div>`;
                         }
                     } catch (error) {
                         console.error('🚨 ERROR in TO DO cell update:', error);

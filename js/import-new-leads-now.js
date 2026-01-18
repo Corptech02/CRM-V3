@@ -90,37 +90,37 @@
         
         console.log(`✅ Successfully imported ${newLeads.length} new leads!`);
         
-        // Show success notification
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #10b981;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            z-index: 100000;
-            font-size: 16px;
-            font-weight: 600;
-            max-width: 400px;
-        `;
-        notification.innerHTML = `
-            <div style="display: flex; align-items: center;">
-                <span style="font-size: 24px; margin-right: 10px;">✅</span>
-                <div>
-                    <div>Successfully imported ${newLeads.length} new leads!</div>
-                    <div style="font-size: 14px; font-weight: normal; margin-top: 5px;">
-                        ${newLeads.map(l => l.company).join(', ')}
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(notification);
-        
-        // Remove notification after 5 seconds
-        setTimeout(() => notification.remove(), 5000);
+        // Show success notification - DISABLED
+        // const notification = document.createElement('div');
+        // notification.style.cssText = `
+        //     position: fixed;
+        //     top: 20px;
+        //     right: 20px;
+        //     background: #10b981;
+        //     color: white;
+        //     padding: 20px;
+        //     border-radius: 8px;
+        //     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        //     z-index: 100000;
+        //     font-size: 16px;
+        //     font-weight: 600;
+        //     max-width: 400px;
+        // `;
+        // notification.innerHTML = `
+        //     <div style="display: flex; align-items: center;">
+        //         <span style="font-size: 24px; margin-right: 10px;">✅</span>
+        //         <div>
+        //             <div>Successfully imported ${newLeads.length} new leads!</div>
+        //             <div style="font-size: 14px; font-weight: normal; margin-top: 5px;">
+        //                 ${newLeads.map(l => l.company).join(', ')}
+        //             </div>
+        //         </div>
+        //     </div>
+        // `;
+        // document.body.appendChild(notification);
+        //
+        // // Remove notification after 5 seconds
+        // setTimeout(() => notification.remove(), 5000);
         
         // Refresh the leads view if it's visible
         if (typeof loadLeadsView === 'function') {

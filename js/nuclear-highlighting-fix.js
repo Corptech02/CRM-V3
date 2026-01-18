@@ -144,7 +144,7 @@
                 }
 
                 // Override with GREY for Process complete TODO - works for ANY stage including closed
-                const stageRequiresReachOut = (lead.stage === 'quoted' || lead.stage === 'info_requested' ||
+                const stageRequiresReachOut = (lead.stage === 'quoted' || lead.stage === 'info_requested' || lead.stage === 'contact_attempted' ||
                                              lead.stage === 'loss_runs_requested' || lead.stage === 'app_sent' || lead.stage === 'quote_sent' || lead.stage === 'interested');
 
                 const isProcessComplete = (todoText && todoText.toLowerCase().includes('process complete'));

@@ -1194,6 +1194,9 @@ body {
 .data-table thead {
     background: #f9fafb;
     border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .data-table th {
@@ -1202,6 +1205,10 @@ body {
     font-weight: 600;
     font-size: 0.875rem;
     color: var(--dark);
+    position: sticky;
+    top: 0;
+    background: #f9fafb;
+    z-index: 10;
 }
 
 .data-table th i {
@@ -1623,9 +1630,11 @@ table.data-table td.client-name .client-avatar {
     overflow-x: hidden;
 }
 
+/* .leads-view .table-container - DISABLED for natural page scroll
 .leads-view .table-container {
     overflow-x: auto;
 }
+*/
 
 
 /* Optimize column widths for leads table */
@@ -2279,11 +2288,13 @@ table.data-table td.client-name .client-avatar {
     font-size: 11px;
 }
 
-/* Fix table overflow */
+/* Fix table overflow - DISABLED for natural page scroll */
+/*
 .table-container {
     overflow-x: auto;
     max-width: 100%;
 }
+*/
 
 .data-table {
     min-width: 100%;
@@ -2622,6 +2633,187 @@ table.data-table td.client-name .client-avatar {
 
 .recent-reports h3 {
     margin-bottom: 1rem;
+}
+
+/* Report View Styles */
+.report-view {
+    background: var(--white);
+    min-height: 100vh;
+    padding: 1.5rem;
+}
+
+.report-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: var(--white);
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.metric-card.metric-success {
+    border-left: 4px solid #10b981;
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+}
+
+.metric-card.metric-warning {
+    border-left: 4px solid #f59e0b;
+    background: linear-gradient(135deg, #fffbeb 0%, #fefce8 100%);
+}
+
+.metric-card.metric-danger {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(135deg, #fef2f2 0%, #fef1f1 100%);
+}
+
+.metric-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--light-blue);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.metric-icon i {
+    font-size: 1.25rem;
+    color: var(--primary-blue);
+}
+
+.metric-info h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+    color: var(--dark);
+}
+
+.metric-info p {
+    font-size: 0.875rem;
+    color: var(--gray);
+    margin: 0;
+}
+
+/* Report Table Container */
+.report-table-container {
+    background: var(--white);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+/* Report Insights */
+.report-insights {
+    margin-top: 2rem;
+}
+
+.insight-card {
+    background: var(--white);
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.insight-card h4 {
+    color: var(--primary-blue);
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.insight-card p {
+    margin: 0;
+    color: var(--gray);
+    line-height: 1.5;
+}
+
+/* Renewal Report Sections */
+.renewal-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.renewal-section {
+    background: var(--white);
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.renewal-section h3 {
+    margin: 0 0 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.125rem;
+}
+
+/* Custom Report Styles */
+.checkbox-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary-blue);
+}
+
+/* Responsive Report Styles */
+@media (max-width: 768px) {
+    .report-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-card {
+        padding: 1rem;
+    }
+
+    .metric-info h3 {
+        font-size: 1.25rem;
+    }
+
+    .renewal-sections {
+        gap: 1rem;
+    }
+
+    .renewal-section {
+        padding: 1rem;
+    }
+
+    .report-table-container {
+        overflow-x: auto;
+    }
 }
 
 /* Communications View */
@@ -3905,6 +4097,9 @@ input:checked + .slider:before {
     color: #4b5563;
     border-bottom: 2px solid #e5e7eb;
     font-size: 0.9rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .data-table td {

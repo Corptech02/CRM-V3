@@ -34,16 +34,41 @@ window.loadPoliciesView = async function() {
 
         console.log('Policy Fix: Fetching from', API_URL + '/all-data');
 
-        const response = await fetch(`${API_URL}/all-data`);
-        if (response.ok) {
-            const data = await response.json();
-            const serverPolicies = data.policies || [];
+        // Try policies endpoint first, fallback to all-data
+        let serverPolicies = [];
 
-            // ALWAYS use server data as source of truth
+        try {
+            const policiesResponse = await fetch(`${API_URL}/policies`);
+            if (policiesResponse.ok) {
+                serverPolicies = await policiesResponse.json();
+                console.log(`Policy Fix: Loaded ${serverPolicies.length} policies from /policies endpoint`);
+            } else {
+                throw new Error('Policies endpoint failed');
+            }
+        } catch (policiesError) {
+            console.log('Policy Fix: Trying all-data endpoint as fallback...');
+            const response = await fetch(`${API_URL}/all-data`);
+            if (response.ok) {
+                const data = await response.json();
+                // Handle nested policies structure
+                serverPolicies = data.policies || [];
+
+                // Check if policies is nested (contains another policies array)
+                if (serverPolicies.length > 0 && serverPolicies[0].policies) {
+                    serverPolicies = serverPolicies[0].policies;
+                    console.log(`Policy Fix: Found nested policies structure, extracted ${serverPolicies.length} policies`);
+                }
+
+                console.log(`Policy Fix: Loaded ${serverPolicies.length} policies from /all-data endpoint`);
+            }
+        }
+
+        // ALWAYS use server data as source of truth
+        if (serverPolicies && serverPolicies.length > 0) {
             localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
-            console.log(`Policy Fix: Loaded ${serverPolicies.length} policies from server`);
+            console.log(`Policy Fix: Successfully stored ${serverPolicies.length} policies to localStorage`);
         } else {
-            console.error('Policy Fix: Server responded with', response.status);
+            console.error('Policy Fix: No policies found or failed to fetch from server');
         }
     } catch (error) {
         console.error('Policy Fix: Error fetching from server:', error);

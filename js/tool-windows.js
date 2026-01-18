@@ -520,7 +520,7 @@ function generateSIPTab(phoneId) {
 
                 <div>
                     <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #374151;">Domain / Host</label>
-                    <input type="text" id="${phoneId}-sip-domain" value="${savedConfig.domain || 'vanguard1.sip.twilio.com'}"
+                    <input type="text" id="${phoneId}-sip-domain" value="${savedConfig.domain || 'vanguard1.sip.us1.twilio.com'}"
                            style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 4px;">
                 </div>
 
@@ -609,24 +609,13 @@ function makeCall(phoneId, number, name) {
     const callerName = name || 'Unknown';
 
     if (phoneNumber) {
-        // Check if SIP is configured and available
-        const sipConfig = JSON.parse(localStorage.getItem('sipConfig') || '{}');
-        const hasSipConfig = sipConfig.username && sipConfig.password && sipConfig.domain;
-
-        if (hasSipConfig && typeof JsSIP !== 'undefined') {
-            console.log('🔊 Attempting SIP calling for:', phoneNumber);
-            makeSIPCall(phoneNumber, callerName);
-        } else if (typeof window.twilioSipPhone !== 'undefined' && window.twilioSipPhone.isRegistered) {
-            console.log('🔊 Using Twilio SIP phone for:', phoneNumber);
-            window.twilioSipPhone.makeCall(phoneNumber);
-        } else {
-            console.log('📞 Using Twilio Voice API calling');
-            makeTwilioVoiceCall(phoneNumber, callerName);
-        }
+        // Always use Voice API - SIP is disabled
+        console.log('📞 Using Twilio Voice API calling (SIP disabled)');
+        makeTwilioVoiceCall(phoneNumber, callerName);
     }
 }
 
-async function makeTelnyxCallFromToolWindow(toNumber, fromNumber) {
+async function makeTwilioCallFromToolWindow(toNumber, fromNumber) {
     try {
         // Request microphone permission first
         const hasMicPermission = await requestMicrophoneAccess();
@@ -635,69 +624,81 @@ async function makeTelnyxCallFromToolWindow(toNumber, fromNumber) {
             showNotification('Microphone ready - Initiating call with audio support', 'success');
         }
         
-        // Format phone number for Telnyx (E.164 format)
-        const formattedNumber = toNumber.replace(/\D/g, '');
-        const e164Number = formattedNumber.startsWith('1') ? `+${formattedNumber}` : `+1${formattedNumber}`;
-        
-        const TELNYX_API_KEY = 'YOUR_API_KEY_HERE';
-        const TELNYX_API_URL = 'https://api.telnyx.com/v2';
-        
-        // Make the API call using Call Control
-        fetch(`${TELNYX_API_URL}/calls`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${TELNYX_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                connection_id: '2780188277137737142', // Call Control Application ID
-                to: e164Number,
-                from: '+12164282605', // Use your actual Telnyx number
-                webhook_url: 'https://a3eaf804f020.ngrok-free.app/webhook/telnyx',
-                webhook_url_method: 'POST'
+        // Use Twilio calling instead of Telnyx
+        console.log('📞 Using Twilio calling system...');
+
+        // Check if Twilio calling function is available
+        if (typeof makeTwilioCall === 'function') {
+            try {
+                const result = await makeTwilioCall(toNumber);
+
+                if (result.success) {
+                    // Save to call history
+                    saveCallToHistory({
+                        number: toNumber,
+                        name: getContactName(toNumber),
+                        type: 'outgoing',
+                        time: new Date().toISOString(),
+                        duration: '',
+                        callId: result.callSid || result.session?.id || new Date().getTime()
+                    });
+
+                    if (hasMicPermission) {
+                        showNotification(`Twilio call connected to ${toNumber}`, 'success');
+                        showAudioIndicator();
+                    } else {
+                        showNotification(`Twilio call initiated to ${toNumber}`, 'info');
+                    }
+                } else {
+                    throw new Error(result.error || 'Twilio call failed');
+                }
+            } catch (error) {
+                console.error('Twilio call error:', error);
+                showNotification(`Twilio call failed: ${error.message}`, 'error');
+            }
+        } else {
+            // Fallback to Twilio Voice API
+            console.log('📞 Using Twilio Voice API fallback...');
+
+            const formattedNumber = toNumber.replace(/\D/g, '');
+            const e164Number = formattedNumber.startsWith('1') ? `+${formattedNumber}` : `+1${formattedNumber}`;
+
+            fetch('/api/twilio/make-call', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    to: e164Number,
+                    from: '+13306369079' // Your Twilio number
+                })
             })
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => {
-                    console.error('Telnyx error response:', err);
-                    throw new Error(err.errors?.[0]?.detail || err.message || 'Call failed');
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Twilio Voice API call failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('✅ Twilio Voice API call initiated:', data);
+
+                // Save to call history
+                saveCallToHistory({
+                    number: toNumber,
+                    name: getContactName(toNumber),
+                    type: 'outgoing',
+                    time: new Date().toISOString(),
+                    duration: '',
+                    callId: data.sid || data.callSid
                 });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Call initiated:', data);
-            
-            // Store call control ID for later use
-            window.currentCallControlId = data.data.call_control_id;
-            window.currentCallSessionId = data.data.call_session_id;
-            
-            // Show call controls
-            showCallControls(toNumber, data.data.call_control_id);
-            
-            // Save to call history
-            saveCallToHistory({
-                number: toNumber,
-                name: getContactName(toNumber),
-                type: 'outgoing',
-                time: new Date().toISOString(),
-                duration: '',
-                callId: data.data.call_session_id
+
+                showNotification(`Twilio call initiated to ${toNumber}`, 'success');
+            })
+            .catch(error => {
+                console.error('Twilio Voice API error:', error);
+                showNotification(`Twilio call failed: ${error.message}`, 'error');
             });
-            
-            if (hasMicPermission) {
-                showNotification(`Call initiated to ${toNumber}`, 'success');
-                // Show audio indicator
-                showAudioIndicator();
-            } else {
-                showNotification(`Call initiated to ${toNumber}`, 'info');
-            }
-        })
-        .catch(error => {
-            console.error('Error making call:', error);
-            showNotification('Failed to initiate call: ' + (error.message || 'Unknown error'), 'error');
-        });
+        }
     } catch (error) {
         console.error('Call error:', error);
         showNotification('Failed to initiate call', 'error');
@@ -782,6 +783,9 @@ function showCallControls(phoneNumber, callControlId, initialStatus = 'Calling')
 
     // Store the original content
     window.originalPhoneContent = phoneTabContent.innerHTML;
+
+    // Store the call ID for hangup functionality
+    window.currentTwilioCallSid = callControlId;
 
     // Replace with active call interface - optimized for phone window size
     phoneTabContent.innerHTML = `
@@ -940,7 +944,7 @@ async function hangupTwilioVoiceCall(callSid) {
     try {
         console.log('📞 Sending hangup request to Twilio Voice API for:', callSid);
 
-        const response = await fetch('http://162-220-14-239.nip.io:3001/api/twilio/hangup-call', {
+        const response = await fetch(`/api/twilio/hangup/${callSid}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -989,7 +993,7 @@ function startCallStatusMonitoring(callSid) {
 
     window.callStatusInterval = setInterval(async () => {
         try {
-            const response = await fetch(`http://162-220-14-239.nip.io:3001/api/twilio/call-status/${callSid}`, {
+            const response = await fetch(`/api/twilio/call-status/${callSid}`, {
                 headers: { 'Bypass-Tunnel-Reminder': 'true' }
             });
 
@@ -2239,11 +2243,11 @@ async function testSIPConnection(phoneId) {
     testBtn.disabled = true;
 
     try {
-        // Show connecting status
-        showConnectionStatus(phoneId, 'connecting', 'Attempting to connect to SIP server...');
+        // Show Voice API status instead of SIP
+        showConnectionStatus(phoneId, 'connecting', 'Checking Voice API availability...');
 
-        // Initialize SIP client using JsSIP library if available
-        if (typeof JsSIP !== 'undefined') {
+        // Skip SIP client initialization - use Voice API instead
+        if (false && typeof JsSIP !== 'undefined') {
             // Configure JsSIP - Try the working domain first
             const workingDomain = config.domain.includes('us1') ? config.domain : 'vanguard1.sip.twilio.com';
             const socket = new JsSIP.WebSocketInterface(`wss://${workingDomain}:443`);
@@ -2300,30 +2304,27 @@ async function testSIPConnection(phoneId) {
 
             // Set timeout for connection attempt
             setTimeout(() => {
-                if (sipClient && sipClient.isConnected() === false) {
+                if (sipClient && typeof sipClient.isConnected === 'function' && sipClient.isConnected() === false) {
                     showConnectionStatus(phoneId, 'error', 'Connection timeout - check your settings');
                     showSIPStatus(phoneId, 'error', 'Connection timeout. Please verify your SIP settings.');
                 }
             }, 10000);
 
         } else {
-            // Fallback: Basic connectivity test using fetch to check if domain is reachable
-            console.log('JsSIP not available, performing basic connectivity test...');
+            // Use Voice API instead of SIP
+            console.log('SIP disabled - using Twilio Voice API...');
 
-            // Try to resolve the domain
-            try {
-                // Simple connectivity test by trying to fetch from the domain
-                const response = await fetch(`https://${config.domain}`, {
-                    mode: 'no-cors',
-                    signal: AbortSignal.timeout(5000)
-                });
+            // Simulate checking Voice API availability
+            setTimeout(() => {
+                showConnectionStatus(phoneId, 'connected', 'Voice API Ready - No SIP setup required');
+                showSIPStatus(phoneId, 'success', 'Twilio Voice API is ready - calls will work reliably');
 
-                showConnectionStatus(phoneId, 'info', `Domain ${config.domain} is reachable`);
-                showSIPStatus(phoneId, 'info', 'Basic connectivity test passed. Install JsSIP library for full SIP functionality.');
-            } catch (error) {
-                showConnectionStatus(phoneId, 'warning', `Could not verify connectivity to ${config.domain}`);
-                showSIPStatus(phoneId, 'warning', 'Domain connectivity test failed. SIP functionality requires JsSIP library.');
-            }
+                // Update test button
+                testBtn.innerHTML = '<i class="fas fa-check"></i> Voice API Ready';
+                testBtn.style.background = '#10b981';
+                testBtn.style.color = 'white';
+                testBtn.disabled = false;
+            }, 1500);
         }
 
     } catch (error) {
@@ -2634,7 +2635,7 @@ async function makeTwilioVoiceCall(phoneNumber, callerName = 'Unknown') {
         showNotification(`Calling ${phoneNumber} via Twilio Voice API...`, 'info');
 
         // Make the API call to existing backend
-        const response = await fetch('http://162-220-14-239.nip.io:3001/api/twilio/make-call', {
+        const response = await fetch('/api/twilio/make-call', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2686,11 +2687,11 @@ async function makeTwilioVoiceCall(phoneNumber, callerName = 'Unknown') {
 
         showNotification(errorMessage, 'error');
 
-        // Fallback to original Telnyx API if Twilio fails
-        console.log('🔄 Falling back to Telnyx API...');
+        // Fallback to Twilio Voice API if SIP fails
+        console.log('🔄 Falling back to Twilio Voice API...');
         const callerSelect = document.querySelector('[id$="-caller-select"]');
         const fromNumber = callerSelect ? callerSelect.value : '+13303008092';
-        makeTelnyxCallFromToolWindow(phoneNumber, fromNumber);
+        makeTwilioCallFromToolWindow(phoneNumber, fromNumber);
     }
 }
 

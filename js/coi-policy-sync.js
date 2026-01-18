@@ -87,12 +87,12 @@ window.syncCOIPolicies = function() {
     if (window.loadRealPolicyList) {
         window.loadRealPolicyList();
 
-        // Show notification
-        const notification = document.createElement('div');
-        notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 15px 20px; border-radius: 8px; z-index: 10000;';
-        notification.innerHTML = '<i class="fas fa-check-circle"></i> Policies synced successfully';
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 2000);
+        // Show notification - DISABLED
+        // const notification = document.createElement('div');
+        // notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 15px 20px; border-radius: 8px; z-index: 10000;';
+        // notification.innerHTML = '<i class="fas fa-check-circle"></i> Policies synced successfully';
+        // document.body.appendChild(notification);
+        // setTimeout(() => notification.remove(), 2000);
     }
 };
 

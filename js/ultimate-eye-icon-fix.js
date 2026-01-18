@@ -215,11 +215,6 @@
 
                     <!-- Action Buttons -->
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button onclick="if(window.editLead) editLead('${lead.id}')"
-                                style="padding: 10px 20px; background: #667eea; color: white; border: none;
-                                       border-radius: 6px; cursor: pointer; font-weight: 600;">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
                         <button onclick="if(window.convertLead) convertLead('${lead.id}')"
                                 style="padding: 10px 20px; background: #10b981; color: white; border: none;
                                        border-radius: 6px; cursor: pointer; font-weight: 600;">

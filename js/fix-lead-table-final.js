@@ -35,7 +35,7 @@ function formatPremiumDisplay(premium) {
 
         const actionMap = {
             'new': 'Assign Stage',
-            'contact_attempted': 'Follow up with lead',
+            'contact_attempted': 'Reach out',
             'info_requested': 'Reach out to lead',
             'info_received': 'Prepare Quote',
             'loss_runs_requested': 'Reach out to lead',
@@ -44,7 +44,7 @@ function formatPremiumDisplay(premium) {
             'quoted': 'Email Quote, and make contact',
             'quote_sent': 'Reach out to lead',
             'quote-sent-unaware': 'Reach out to lead',
-            'quote-sent-aware': 'Follow up with lead',
+            'quote-sent-aware': 'Reach out',
             'interested': 'Reach out',
             'not-interested': 'Archive lead',
             'closed': 'Process complete'
@@ -191,9 +191,11 @@ function formatPremiumDisplay(premium) {
                     <td>${formatPremiumDisplay(lead.premium)}</td>
                     <td>${window.getStageHtml ? window.getStageHtml(lead.stage, lead) : getStageHtmlFixed(lead.stage)}</td>
                     <td>
-                        <div style="font-weight: bold; color: black;">
-                            ${getNextActionFixed(lead.stage || 'new', lead)}
-                        </div>
+                        ${(() => {
+                            const todoText = getNextActionFixed(lead.stage || 'new', lead);
+                            const color = todoText && todoText.toLowerCase().includes('reach out') ? '#dc2626' : 'black';
+                            return `<div style="font-weight: bold; color: ${color};">${todoText}</div>`;
+                        })()}
                     </td>
                     <td>${lead.renewalDate || 'N/A'}</td>
                     <td>${lead.assignedTo || 'Unassigned'}</td>

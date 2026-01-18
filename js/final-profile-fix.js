@@ -1,6 +1,71 @@
 // Working Enhanced Profile - Exact Working UI Design
 console.log('🔥 FINAL-PROFILE-FIX: Enhanced profile loading...');
 
+// Global function to fix all leads with incomplete reachOut data
+function fixAllLeadReachOutData() {
+    console.log('🔧 Fixing all leads with incomplete reachOut data...');
+
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    let fixed = 0;
+
+    leads.forEach(lead => {
+        let needsSave = false;
+
+        if (!lead.reachOut) {
+            lead.reachOut = {
+                callAttempts: 0,
+                callsConnected: 0,
+                emailCount: 0,
+                textCount: 0,
+                voicemailCount: 0,
+                activityTimestamps: []
+            };
+            needsSave = true;
+            fixed++;
+        } else {
+            // Fix any undefined values
+            if (typeof lead.reachOut.callAttempts !== 'number') {
+                lead.reachOut.callAttempts = 0;
+                needsSave = true;
+            }
+            if (typeof lead.reachOut.callsConnected !== 'number') {
+                lead.reachOut.callsConnected = 0;
+                needsSave = true;
+            }
+            if (typeof lead.reachOut.emailCount !== 'number') {
+                lead.reachOut.emailCount = 0;
+                needsSave = true;
+            }
+            if (typeof lead.reachOut.textCount !== 'number') {
+                lead.reachOut.textCount = 0;
+                needsSave = true;
+            }
+            if (typeof lead.reachOut.voicemailCount !== 'number') {
+                lead.reachOut.voicemailCount = 0;
+                needsSave = true;
+            }
+            if (!lead.reachOut.activityTimestamps) {
+                lead.reachOut.activityTimestamps = [];
+                needsSave = true;
+            }
+
+            if (needsSave) {
+                fixed++;
+            }
+        }
+    });
+
+    if (fixed > 0) {
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log(`✅ Fixed ${fixed} leads with incomplete reachOut data`);
+    } else {
+        console.log('✅ All leads already have proper reachOut data');
+    }
+}
+
+// Run the fix immediately when this script loads
+fixAllLeadReachOutData();
+
 // Create the enhanced profile function with exact working UI
 window.createEnhancedProfile = function(lead) {
     console.log('🔥 Enhanced Profile: Creating profile for:', lead.name);
@@ -16,13 +81,24 @@ window.createEnhancedProfile = function(lead) {
     if (!lead.trailers || !Array.isArray(lead.trailers)) lead.trailers = [];
     if (!lead.drivers || !Array.isArray(lead.drivers)) lead.drivers = [];
     if (!lead.transcriptText) lead.transcriptText = '';
-    if (!lead.reachOut) lead.reachOut = {
-        callAttempts: 0,
-        callsConnected: 0,
-        emailCount: 0,
-        textCount: 0,
-        voicemailCount: 0
-    };
+    if (!lead.reachOut) {
+        lead.reachOut = {
+            callAttempts: 0,
+            callsConnected: 0,
+            emailCount: 0,
+            textCount: 0,
+            voicemailCount: 0,
+            activityTimestamps: []
+        };
+    } else {
+        // Ensure all properties exist with proper defaults
+        if (typeof lead.reachOut.callAttempts !== 'number') lead.reachOut.callAttempts = 0;
+        if (typeof lead.reachOut.callsConnected !== 'number') lead.reachOut.callsConnected = 0;
+        if (typeof lead.reachOut.emailCount !== 'number') lead.reachOut.emailCount = 0;
+        if (typeof lead.reachOut.textCount !== 'number') lead.reachOut.textCount = 0;
+        if (typeof lead.reachOut.voicemailCount !== 'number') lead.reachOut.voicemailCount = 0;
+        if (!lead.reachOut.activityTimestamps) lead.reachOut.activityTimestamps = [];
+    }
     if (!lead.applications || !Array.isArray(lead.applications)) lead.applications = [];
     if (!lead.quotes || !Array.isArray(lead.quotes)) lead.quotes = [];
 
@@ -128,46 +204,46 @@ window.createEnhancedProfile = function(lead) {
                     <div style="display: flex; flex-direction: column; gap: 15px;">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="email-sent-${lead.id}" ${lead.reachOut.emailCount > 0 ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'email', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                                <input type="checkbox" id="email-sent-${lead.id}" ${(lead.reachOut && lead.reachOut.emailCount > 0) ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'email', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
                                 <label for="email-sent-${lead.id}" style="font-weight: 600; cursor: pointer;">Email Sent</label>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="font-weight: 600;">Sent:</span>
-                                <span id="email-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.emailCount}</span>
+                                <span id="email-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.emailCount || 0}</span>
                             </div>
                         </div>
 
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="text-sent-${lead.id}" ${lead.reachOut.textCount > 0 ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'text', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                                <input type="checkbox" id="text-sent-${lead.id}" ${(lead.reachOut && lead.reachOut.textCount > 0) ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'text', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
                                 <label for="text-sent-${lead.id}" style="font-weight: 600; cursor: pointer;">Text Sent</label>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="font-weight: 600;">Sent:</span>
-                                <span id="text-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.textCount}</span>
+                                <span id="text-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${(lead.reachOut && lead.reachOut.textCount) || 0}</span>
                             </div>
                         </div>
 
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="call-made-${lead.id}" ${lead.reachOut.callAttempts > 0 ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'call', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                                <input type="checkbox" id="call-made-${lead.id}" ${(lead.reachOut && lead.reachOut.callAttempts > 0) ? 'checked' : ''} onchange="updateReachOut('${lead.id}', 'call', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
                                 <label for="call-made-${lead.id}" style="font-weight: 600; cursor: pointer;">Called</label>
                             </div>
                             <div style="display: flex; align-items: center; gap: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-weight: 600;">Attempts:</span>
-                                    <span id="call-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.callAttempts}</span>
+                                    <span id="call-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${(lead.reachOut && lead.reachOut.callAttempts) || 0}</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-weight: 600;">Connected:</span>
-                                    <span id="call-connected-${lead.id}" style="font-weight: bold; font-size: 18px; color: #10b981; min-width: 30px; text-align: center;">${lead.reachOut.callsConnected}</span>
+                                    <span id="call-connected-${lead.id}" style="font-weight: bold; font-size: 18px; color: #10b981; min-width: 30px; text-align: center;">${(lead.reachOut && lead.reachOut.callsConnected) || 0}</span>
                                 </div>
                             </div>
                         </div>
 
                         <div style="display: flex; align-items: center; gap: 10px; padding-left: 30px;">
                             <span style="font-weight: 600;">Voicemail Sent:</span>
-                            <span id="voicemail-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #f59e0b; min-width: 30px; text-align: center;">${lead.reachOut.voicemailCount}</span>
+                            <span id="voicemail-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #f59e0b; min-width: 30px; text-align: center;">${(lead.reachOut && lead.reachOut.voicemailCount) || 0}</span>
                         </div>
                     </div>
                 </div>
@@ -296,6 +372,29 @@ window.createEnhancedProfile = function(lead) {
                 <!-- Call Transcript -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h3><i class="fas fa-microphone"></i> Call Transcript</h3>
+
+                    ${lead.recordingPath && lead.hasRecording ? `
+                        <!-- Audio Recording Player -->
+                        <div style="background: #fff; border: 2px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                <i class="fas fa-headphones" style="color: #10b981; font-size: 18px;"></i>
+                                <span style="font-weight: 600; color: #374151;">ViciDial Call Recording</span>
+                                <span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">
+                                    From Lead ${lead.id}
+                                </span>
+                            </div>
+                            <audio controls style="width: 100%; height: 40px;" preload="none">
+                                <source src="${lead.recordingPath}" type="audio/mpeg">
+                                <source src="${lead.recordingPath}" type="audio/wav">
+                                Your browser does not support the audio element.
+                            </audio>
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+                                <i class="fas fa-info-circle"></i>
+                                Original recording imported from ViciDial system
+                            </div>
+                        </div>
+                    ` : ''}
+
                     <textarea onchange="updateLeadField('${lead.id}', 'transcriptText', this.value)" style="width: 100%; min-height: 150px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace;">${lead.transcriptText || ''}</textarea>
                 </div>
 
@@ -637,15 +736,28 @@ function handleCallOutcome(leadId, answered) {
                 callMade: false,
                 callAttempts: 0,
                 callsConnected: 0,
-                voicemailCount: 0
+                voicemailCount: 0,
+                activityTimestamps: []
             };
             console.log(`🐛 DEBUG handleCallOutcome - initialized reachOut object`);
+        }
+
+        // Ensure activityTimestamps exists
+        if (!leads[leadIndex].reachOut.activityTimestamps) {
+            leads[leadIndex].reachOut.activityTimestamps = [];
         }
 
         // Always increment attempts counter (for every call)
         const oldCallAttempts = leads[leadIndex].reachOut.callAttempts || 0;
         leads[leadIndex].reachOut.callAttempts = oldCallAttempts + 1;
         leads[leadIndex].reachOut.callMade = true;
+
+        // Track timestamp for this call attempt
+        leads[leadIndex].reachOut.activityTimestamps.push({
+            type: 'call',
+            timestamp: new Date().toISOString(),
+            action: 'attempted'
+        });
 
         console.log(`🐛 DEBUG handleCallOutcome - INCREMENTED callAttempts from ${oldCallAttempts} to ${leads[leadIndex].reachOut.callAttempts}`);
         console.log(`🐛 DEBUG handleCallOutcome - AFTER changes:`, leads[leadIndex].reachOut);
@@ -659,6 +771,13 @@ function handleCallOutcome(leadId, answered) {
         if (answered) {
             // Lead answered - increment connected counter
             leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
+
+            // Track timestamp for this connected call
+            leads[leadIndex].reachOut.activityTimestamps.push({
+                type: 'call',
+                timestamp: new Date().toISOString(),
+                action: 'connected'
+            });
 
             // Update the display
             const connectedDisplay = document.getElementById(`call-connected-${leadId}`);
@@ -849,8 +968,30 @@ window.updateReachOut = function(leadId, type, checked) {
             callMade: false,
             callAttempts: 0,
             callsConnected: 0,
-            voicemailCount: 0
+            voicemailCount: 0,
+            activityTimestamps: []
         };
+    }
+
+    // Ensure all numeric properties exist and are numbers (fix NaN issues)
+    const defaultNumericProps = {
+        emailCount: 0,
+        textCount: 0,
+        callAttempts: 0,
+        callsConnected: 0,
+        voicemailCount: 0
+    };
+
+    for (const [prop, defaultValue] of Object.entries(defaultNumericProps)) {
+        if (typeof leads[leadIndex].reachOut[prop] !== 'number' || isNaN(leads[leadIndex].reachOut[prop])) {
+            console.log(`🔧 FIXING NaN/undefined: ${prop} was ${leads[leadIndex].reachOut[prop]}, setting to ${defaultValue}`);
+            leads[leadIndex].reachOut[prop] = defaultValue;
+        }
+    }
+
+    // Ensure activityTimestamps exists
+    if (!leads[leadIndex].reachOut.activityTimestamps) {
+        leads[leadIndex].reachOut.activityTimestamps = [];
     }
 
     console.log(`🐛 DEBUG BEFORE changes - lead reachOut:`, leads[leadIndex].reachOut);
@@ -864,7 +1005,8 @@ window.updateReachOut = function(leadId, type, checked) {
         } else {
             // Unchecking call - reset call data
             leads[leadIndex].reachOut.callMade = false;
-            leads[leadIndex].reachOut.callAttempts = Math.max(0, leads[leadIndex].reachOut.callAttempts - 1);
+            const currentAttempts = parseInt(leads[leadIndex].reachOut.callAttempts) || 0;
+            leads[leadIndex].reachOut.callAttempts = Math.max(0, currentAttempts - 1);
         }
     } else if (type === 'email') {
         const wasAlreadyChecked = leads[leadIndex].reachOut.emailSent;
@@ -872,11 +1014,21 @@ window.updateReachOut = function(leadId, type, checked) {
         console.log(`🐛 DEBUG EMAIL - current emailCount: ${leads[leadIndex].reachOut.emailCount}`);
 
         if (checked && !wasAlreadyChecked) {
-            leads[leadIndex].reachOut.emailCount++;
-            console.log(`🐛 DEBUG EMAIL - INCREMENTED counter from ${leads[leadIndex].reachOut.emailCount - 1} to ${leads[leadIndex].reachOut.emailCount}`);
+            const currentCount = parseInt(leads[leadIndex].reachOut.emailCount) || 0;
+            leads[leadIndex].reachOut.emailCount = currentCount + 1;
+
+            // Track timestamp for this email activity
+            leads[leadIndex].reachOut.activityTimestamps.push({
+                type: 'email',
+                timestamp: new Date().toISOString(),
+                action: 'sent'
+            });
+
+            console.log(`🐛 DEBUG EMAIL - INCREMENTED counter from ${currentCount} to ${leads[leadIndex].reachOut.emailCount}`);
         } else if (!checked && wasAlreadyChecked) {
-            leads[leadIndex].reachOut.emailCount = Math.max(0, leads[leadIndex].reachOut.emailCount - 1);
-            console.log(`🐛 DEBUG EMAIL - DECREMENTED counter from ${leads[leadIndex].reachOut.emailCount + 1} to ${leads[leadIndex].reachOut.emailCount}`);
+            const currentCount = parseInt(leads[leadIndex].reachOut.emailCount) || 0;
+            leads[leadIndex].reachOut.emailCount = Math.max(0, currentCount - 1);
+            console.log(`🐛 DEBUG EMAIL - DECREMENTED counter from ${currentCount} to ${leads[leadIndex].reachOut.emailCount}`);
         }
 
         leads[leadIndex].reachOut.emailSent = checked;
@@ -884,8 +1036,9 @@ window.updateReachOut = function(leadId, type, checked) {
         // Update display
         const emailCountDisplay = document.getElementById(`email-count-${leadId}`);
         if (emailCountDisplay) {
-            emailCountDisplay.textContent = leads[leadIndex].reachOut.emailCount;
-            console.log(`🐛 DEBUG EMAIL - updated display to show: ${leads[leadIndex].reachOut.emailCount}`);
+            const displayValue = parseInt(leads[leadIndex].reachOut.emailCount) || 0;
+            emailCountDisplay.textContent = displayValue;
+            console.log(`🐛 DEBUG EMAIL - updated display to show: ${displayValue}`);
         }
     } else if (type === 'text') {
         const wasAlreadyChecked = leads[leadIndex].reachOut.textSent;
@@ -893,11 +1046,21 @@ window.updateReachOut = function(leadId, type, checked) {
         console.log(`🐛 DEBUG TEXT - current textCount: ${leads[leadIndex].reachOut.textCount}`);
 
         if (checked && !wasAlreadyChecked) {
-            leads[leadIndex].reachOut.textCount++;
-            console.log(`🐛 DEBUG TEXT - INCREMENTED counter from ${leads[leadIndex].reachOut.textCount - 1} to ${leads[leadIndex].reachOut.textCount}`);
+            const currentCount = parseInt(leads[leadIndex].reachOut.textCount) || 0;
+            leads[leadIndex].reachOut.textCount = currentCount + 1;
+
+            // Track timestamp for this text activity
+            leads[leadIndex].reachOut.activityTimestamps.push({
+                type: 'text',
+                timestamp: new Date().toISOString(),
+                action: 'sent'
+            });
+
+            console.log(`🐛 DEBUG TEXT - INCREMENTED counter from ${currentCount} to ${leads[leadIndex].reachOut.textCount}`);
         } else if (!checked && wasAlreadyChecked) {
-            leads[leadIndex].reachOut.textCount = Math.max(0, leads[leadIndex].reachOut.textCount - 1);
-            console.log(`🐛 DEBUG TEXT - DECREMENTED counter from ${leads[leadIndex].reachOut.textCount + 1} to ${leads[leadIndex].reachOut.textCount}`);
+            const currentCount = parseInt(leads[leadIndex].reachOut.textCount) || 0;
+            leads[leadIndex].reachOut.textCount = Math.max(0, currentCount - 1);
+            console.log(`🐛 DEBUG TEXT - DECREMENTED counter from ${currentCount} to ${leads[leadIndex].reachOut.textCount}`);
         }
 
         leads[leadIndex].reachOut.textSent = checked;
@@ -905,8 +1068,9 @@ window.updateReachOut = function(leadId, type, checked) {
         // Update display
         const textCountDisplay = document.getElementById(`text-count-${leadId}`);
         if (textCountDisplay) {
-            textCountDisplay.textContent = leads[leadIndex].reachOut.textCount;
-            console.log(`🐛 DEBUG TEXT - updated display to show: ${leads[leadIndex].reachOut.textCount}`);
+            const displayValue = parseInt(leads[leadIndex].reachOut.textCount) || 0;
+            textCountDisplay.textContent = displayValue;
+            console.log(`🐛 DEBUG TEXT - updated display to show: ${displayValue}`);
         }
 
         // Check for completion when text is sent
@@ -1313,11 +1477,141 @@ window.openLossRunsUpload = function(leadId) {
 };
 
 
+// COMPREHENSIVE REACH OUT DATA FIX - Ensure no undefined values
+function ensureAllLeadsHaveReachOutData() {
+    console.log('🔧 ENSURING ALL LEADS HAVE PROPER REACH OUT DATA...');
+
+    try {
+        // Fix insurance leads
+        let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let fixedInsurance = 0;
+
+        insuranceLeads.forEach((lead, index) => {
+            if (!lead.reachOut || typeof lead.reachOut !== 'object') {
+                console.log(`🔧 FIXING MISSING REACH OUT DATA: Insurance Lead ${lead.id} (${lead.name})`);
+                insuranceLeads[index].reachOut = {
+                    emailCount: 0,
+                    textCount: 0,
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    voicemailCount: 0,
+                    callMade: false,
+                    emailSent: false,
+                    textSent: false,
+                    activityTimestamps: []
+                };
+                fixedInsurance++;
+            } else {
+                // Ensure all required properties exist with proper defaults
+                const requiredProps = {
+                    emailCount: 0,
+                    textCount: 0,
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    voicemailCount: 0,
+                    callMade: false,
+                    emailSent: false,
+                    textSent: false,
+                    activityTimestamps: []
+                };
+
+                let needsUpdate = false;
+                for (const [prop, defaultValue] of Object.entries(requiredProps)) {
+                    if (lead.reachOut[prop] === undefined || lead.reachOut[prop] === null) {
+                        insuranceLeads[index].reachOut[prop] = defaultValue;
+                        needsUpdate = true;
+                    }
+                }
+
+                if (needsUpdate) {
+                    console.log(`🔧 FIXING UNDEFINED PROPERTIES: Insurance Lead ${lead.id} (${lead.name})`);
+                    fixedInsurance++;
+                }
+            }
+        });
+
+        // Fix regular leads
+        let leads = JSON.parse(localStorage.getItem('leads') || '[]');
+        let fixedRegular = 0;
+
+        leads.forEach((lead, index) => {
+            if (!lead.reachOut || typeof lead.reachOut !== 'object') {
+                console.log(`🔧 FIXING MISSING REACH OUT DATA: Regular Lead ${lead.id} (${lead.name})`);
+                leads[index].reachOut = {
+                    emailCount: 0,
+                    textCount: 0,
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    voicemailCount: 0,
+                    callMade: false,
+                    emailSent: false,
+                    textSent: false,
+                    activityTimestamps: []
+                };
+                fixedRegular++;
+            } else {
+                // Ensure all required properties exist with proper defaults
+                const requiredProps = {
+                    emailCount: 0,
+                    textCount: 0,
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    voicemailCount: 0,
+                    callMade: false,
+                    emailSent: false,
+                    textSent: false,
+                    activityTimestamps: []
+                };
+
+                let needsUpdate = false;
+                for (const [prop, defaultValue] of Object.entries(requiredProps)) {
+                    if (lead.reachOut[prop] === undefined || lead.reachOut[prop] === null) {
+                        leads[index].reachOut[prop] = defaultValue;
+                        needsUpdate = true;
+                    }
+                }
+
+                if (needsUpdate) {
+                    console.log(`🔧 FIXING UNDEFINED PROPERTIES: Regular Lead ${lead.id} (${lead.name})`);
+                    fixedRegular++;
+                }
+            }
+        });
+
+        // Save updated data
+        if (fixedInsurance > 0) {
+            localStorage.setItem('insurance_leads', JSON.stringify(insuranceLeads));
+            console.log(`✅ FIXED ${fixedInsurance} insurance leads with reach out data issues`);
+        }
+
+        if (fixedRegular > 0) {
+            localStorage.setItem('leads', JSON.stringify(leads));
+            console.log(`✅ FIXED ${fixedRegular} regular leads with reach out data issues`);
+        }
+
+        if (fixedInsurance === 0 && fixedRegular === 0) {
+            console.log('✅ ALL LEADS ALREADY HAVE PROPER REACH OUT DATA');
+        } else {
+            console.log(`🎉 COMPREHENSIVE FIX COMPLETE: ${fixedInsurance} insurance + ${fixedRegular} regular leads fixed`);
+        }
+
+    } catch (error) {
+        console.error('❌ ERROR IN REACH OUT DATA FIX:', error);
+    }
+}
+
+// Auto-run the comprehensive fix when the script loads
+ensureAllLeadsHaveReachOutData();
+
+// Make it available globally for manual execution
+window.ensureAllLeadsHaveReachOutData = ensureAllLeadsHaveReachOutData;
+
 console.log('🔥 FINAL-PROFILE-FIX: Enhanced profile with all features loaded successfully');
 console.log('🔥 Available functions:', {
     'createEnhancedProfile': typeof window.createEnhancedProfile,
     'viewLead': typeof window.viewLead,
     'showLeadProfile': typeof window.showLeadProfile,
     'updateLeadField': typeof window.updateLeadField,
-    'openEmailDocumentation': typeof window.openEmailDocumentation
+    'openEmailDocumentation': typeof window.openEmailDocumentation,
+    'ensureAllLeadsHaveReachOutData': typeof window.ensureAllLeadsHaveReachOutData
 });

@@ -452,6 +452,19 @@ router.post('/api/telnyx/answer/:callControlId', async (req, res) => {
 
         console.log('Answer API success:', data);
 
+        // Immediately stop any playing audio/music
+        try {
+            await axios.post(`https://api.telnyx.com/v2/calls/${callControlId}/actions/playback_stop`, {}, {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log('✅ Stopped any playing audio/music');
+        } catch (stopError) {
+            console.log('No audio to stop or stop failed:', stopError.message);
+        }
+
         // Update stored call info
         if (global.incomingCalls && global.incomingCalls[callControlId]) {
             global.incomingCalls[callControlId].status = 'answered';
@@ -491,20 +504,37 @@ router.post('/api/telnyx/answer/:callControlId', async (req, res) => {
             if (conferenceResponse.status >= 400) {
                 console.warn('Could not join conference:', conferenceData);
 
-                // Fallback: Try to play hold music to keep RTP active
-                console.log('Fallback: Playing hold music...');
-                const holdResponse = await axios.post(`https://api.telnyx.com/v2/calls/${callControlId}/actions/playback_start`, {
-                    audio_url: 'https://www.telnyx.com/call_control/audio/hold_music.mp3',
-                    loop: true
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                // Fallback: Just establish RTP without music - allow direct conversation
+                console.log('Fallback: Establishing direct audio connection...');
 
-                const holdData = holdResponse.data;
-                console.log('Hold music response:', holdData);
+                try {
+                    // Stop any existing audio playback
+                    await axios.post(`https://api.telnyx.com/v2/calls/${callControlId}/actions/playback_stop`, {}, {
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                } catch (stopError) {
+                    console.log('No audio to stop');
+                }
+
+                // Start recording to maintain audio path without music
+                try {
+                    await axios.post(`https://api.telnyx.com/v2/calls/${callControlId}/actions/record_start`, {
+                        channels: 'dual',
+                        format: 'mp3',
+                        play_beep: false
+                    }, {
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    console.log('✅ Audio bridge established - ready for conversation');
+                } catch (recordError) {
+                    console.log('Recording setup failed:', recordError.message);
+                }
             } else {
                 console.log('Call successfully joined to conference');
 

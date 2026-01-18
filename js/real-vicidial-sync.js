@@ -93,7 +93,7 @@ window.syncVicidialLeads = async function() {
 
                 notification.innerHTML = `
                     <h3 style="margin: 0 0 10px 0;">✅ Imported ${apiResult.imported} Leads with Premiums!</h3>
-                    <p style="margin: 0;">All leads now have premium calculated based on fleet size × $15,600</p>
+                    <p style="margin: 0;">All leads now have premium calculated based on fleet size × $14,400</p>
                     <p style="margin-top: 10px; font-size: 14px; opacity: 0.9;">
                         Refreshing lead list now...
                     </p>

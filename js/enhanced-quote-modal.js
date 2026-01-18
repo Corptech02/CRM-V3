@@ -533,6 +533,13 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <span style="margin-left: 3px;">%</span>
                         </div>
                     </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dumptruck:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -818,6 +825,18 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="Not Included">Not Included</option>
                         </select>
                     </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Reefer Breakdown:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="$5,000">$5,000</option>
+                            <option value="$10,000">$10,000</option>
+                            <option value="$15,000" selected>$15,000</option>
+                            <option value="$25,000">$25,000</option>
+                            <option value="$50,000">$50,000</option>
+                            <option value="Included DED. $2500">Included DED. $2500</option>
+                            <option value="Not Included">Not Included</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </form>
@@ -900,7 +919,7 @@ function prefillApplicationForm(applicationData) {
             const parentDiv = input.closest('div');
             const foundLabel = parentDiv?.querySelector('label')?.textContent?.trim().replace(':', '') ||
                              parentDiv?.previousElementSibling?.textContent?.trim().replace(':', '') ||
-                             parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer)/)?.[1];
+                             parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer|Dumptruck)/)?.[1];
             if (foundLabel) {
                 label = foundLabel;
             }
@@ -934,12 +953,14 @@ function prefillApplicationForm(applicationData) {
             'Auto Hauler': formData['Auto Hauler'],
             'Box Truck': formData['Box Truck'],
             'Reefer': formData['Reefer'],
+            'Dumptruck': formData['Dumptruck'],
 
             // Coverage fields
             'Auto Liability': formData['Auto Liability'],
             'General Liability': formData['General Liability'],
             'Cargo Limit': formData['Cargo Limit'],
-            'Deductible': formData['Deductible'] || formData['Cargo Deductible']
+            'Deductible': formData['Deductible'] || formData['Cargo Deductible'],
+            'Reefer Breakdown': formData['Reefer Breakdown']
         };
 
         // Try the field mapping
@@ -1154,7 +1175,7 @@ window.saveQuoteApplication = async function() {
                     // Try to find the label within the same container
                     const label = parentDiv?.querySelector('label')?.textContent?.trim().replace(':', '') ||
                                  parentDiv?.previousElementSibling?.textContent?.trim().replace(':', '') ||
-                                 parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer)/)?.[1];
+                                 parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer|Dumptruck)/)?.[1];
 
                     if (label) {
                         rawLabel = label;
@@ -1186,7 +1207,7 @@ window.saveQuoteApplication = async function() {
 
                 // Log Class of Risk fields specifically for debugging
                 if (rawLabel.includes('Dry Van') || rawLabel.includes('Flatbed') || rawLabel.includes('Heavy Haul') ||
-                    rawLabel.includes('Auto Hauler') || rawLabel.includes('Box Truck') || rawLabel.includes('Reefer')) {
+                    rawLabel.includes('Auto Hauler') || rawLabel.includes('Box Truck') || rawLabel.includes('Reefer') || rawLabel.includes('Dumptruck')) {
                     console.log(`🔍 Class of Risk field: "${rawLabel}" = "${value}"`);
                 }
             }
@@ -1313,6 +1334,9 @@ window.saveQuoteApplication = async function() {
             } else if (parentText.includes('Reefer') || grandparentText.includes('Reefer')) {
                 formData['Reefer'] = value;
                 console.log(`🎯 Explicitly captured Reefer: "${value}"`);
+            } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
+                formData['Dumptruck'] = value;
+                console.log(`🎯 Explicitly captured Dumptruck: "${value}"`);
             }
         });
 
@@ -1545,8 +1569,8 @@ async function saveToServer(applicationData) {
             : `http://${window.location.hostname}:3001`);
 
         const serverUrl = API_URL.includes('/api')
-            ? `${API_URL}/app-submissions`
-            : `${API_URL}/api/app-submissions`;
+            ? `${API_URL}/policies`
+            : `${API_URL}/api/policies`;
 
         console.log('📡 Saving to server URL:', serverUrl);
 
@@ -1560,12 +1584,14 @@ async function saveToServer(applicationData) {
 
         if (response.ok) {
             console.log('✅ Successfully saved to server');
+            return true; // Return success
         } else {
             console.warn('⚠️ Server save failed:', response.status, response.statusText);
+            return false; // Return failure
         }
     } catch (error) {
         console.warn('⚠️ Server save error:', error);
-        throw error;
+        return false; // Return failure instead of throwing
     }
 }
 
@@ -1758,6 +1784,13 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                         <label style="display: block; margin-bottom: 3px; font-size: 12px;">Reefer:</label>
                         <div style="display: flex; align-items: center;">
                             <input type="text" value="${getSavedValue('Reefer', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dumptruck:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="${getSavedValue('Dumptruck', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
                             <span style="margin-left: 3px;">%</span>
                         </div>
                     </div>
@@ -1982,6 +2015,12 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Cargo Deductible:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             ${generateDropdownOptions(['$500', '$1,000', '$1,500', '$2,000', '$2,500', '$5,000', 'Not Included'], getSavedValue('Deductible', '$1,000'))}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Reefer Breakdown:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            ${generateDropdownOptions(['$5,000', '$10,000', '$15,000', '$25,000', '$50,000', 'Included DED. $2500', 'Not Included'], getSavedValue('Reefer Breakdown', '$15,000'))}
                         </select>
                     </div>
                 </div>
@@ -2310,6 +2349,9 @@ window.downloadQuoteApplicationPDF = function() {
             } else if (parentText.includes('Reefer') || grandparentText.includes('Reefer')) {
                 formData['Reefer'] = value;
                 console.log(`🎯 Download: Captured Reefer: "${value}"`);
+            } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
+                formData['Dumptruck'] = value;
+                console.log(`🎯 Download: Captured Dumptruck: "${value}"`);
             }
         });
 
@@ -2761,6 +2803,10 @@ function generateApplicationPDF(lead, formData) {
                 <div class="field-label">Reefer:</div>
                 <div class="field-value">${formData['Reefer'] || ''}${formData['Reefer'] ? '%' : ''}</div>
             </div>
+            <div class="field">
+                <div class="field-label">Dumptruck:</div>
+                <div class="field-value">${formData['Dumptruck'] || ''}${formData['Dumptruck'] ? '%' : ''}</div>
+            </div>
         </div>
     </div>
 
@@ -2814,6 +2860,10 @@ function generateApplicationPDF(lead, formData) {
             <div class="field">
                 <div class="field-label">Cargo Deductible:</div>
                 <div class="field-value">${formData['Deductible'] || formData['Cargo Deductible'] || '$2,500'}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Reefer Breakdown:</div>
+                <div class="field-value">${formData['Reefer Breakdown'] || '$15,000'}</div>
             </div>
         </div>
     </div>

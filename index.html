@@ -6,15 +6,19 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- Cache buster: 2025-10-28-VICIDIAL-OVERRIDE -->
+    <!-- Cache buster: 2025-01-13-VICIDIAL-BUTTON-FIX -->
     <title>Vanguard Insurance Software - All-in-One Agency Management Platform</title>
     <link rel="icon" type="image/png" href="images/V-Logo.png">
-    <link rel="stylesheet" href="css/styles.css?v=34">
+    <link rel="stylesheet" href="css/styles.css?v=35">
     <link rel="stylesheet" href="css/carrier-profile.css?v=2">
     <link rel="stylesheet" href="css/policy-modal.css?v=3">
     <link rel="stylesheet" href="css/coi-upload-styles.css?v=1">
     <link rel="stylesheet" href="css/mobile.css?v=5">
     <link rel="stylesheet" href="css/fix-sidebar-text.css?v=1">
+    <!-- Enhanced Lead Management Action Button Fixes -->
+    <link rel="stylesheet" href="css/enhanced-lead-actions.css?v=1">
+    <!-- Sticky Table Header -->
+    <link rel="stylesheet" href="css/sticky-table-header.css?v=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Dancing+Script:wght@400;600&display=swap" rel="stylesheet">
@@ -22,8 +26,14 @@
     <script src="pdf.min.js"></script>
     <!-- Critical Performance Fix - MUST LOAD FIRST -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <!-- HTML2Canvas for screenshot functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- SIP calling library for VoIP functionality -->
     <script src="js/jssip.min.js"></script>
+    <!-- Twilio Voice SDK for browser-based calling -->
+    <script src="https://sdk.twilio.com/js/voice/releases/2.12.0/twilio.min.js"></script>
     <script src="js/performance-critical-fix.js?v=1"></script>
     <script src="js/fix-localStorage-quota.js?v=1"></script>
     <script src="js/disable-heavy-scripts.js?v=1"></script>
@@ -47,11 +57,16 @@
     <!-- Call Status Fix -->
     <script src="js/call-status-fix.js?v=1"></script>
     <script src="js/simple-call-fix.js?v=1"></script>
-    <script src="js/incoming-calls.js?v=2"></script>
+    <script src="js/incoming-calls.js?v=15"></script>
+    <script src="js/simple-pickup.js?v=2"></script>
+    <script src="js/twilio-voice-softphone.js?v=1"></script>
+    <script src="js/sse-debug.js?v=1"></script>
     <script src="js/fix-call-disconnect-detection.js?v=1"></script>
 
     <!-- HEAD TEST DISABLED - Using comprehensive script only -->
     <style>
+        /* Red styling for high-call, low-talk-time leads */
+
         /* Force lead name truncation and contact icon display */
         #leadsTableBody .lead-name {
             max-width: 150px !important;
@@ -131,7 +146,7 @@
             text-align: center !important;
         }
 
-        /* Product Interest */
+        /* Value Level */
         #leadsTable th:nth-child(4),
         #leadsTable td:nth-child(4) {
             width: 160px !important;
@@ -215,7 +230,7 @@
             transform: translateY(-50%) !important;
         }
 
-        /* Ensure Product Interest text doesn't wrap unnecessarily */
+        /* Ensure Value Level text doesn't wrap unnecessarily */
         #leadsTableBody td:nth-child(4) {
             white-space: nowrap !important;
             overflow: hidden !important;
@@ -424,6 +439,59 @@
             color: #dc2626 !important; /* Red-600 */
             font-weight: bold !important;
         }
+
+        /* GREEN COLOR FOR HIGH VALUE LEADS STAT WHEN >= 10 */
+        .stat-number.high-value-achieved {
+            color: #16a34a !important;
+            font-weight: bold !important;
+        }
+
+        /* GOLD BORDER FOR 60+ MINUTE LEADS - SINGLE CONSISTENT OUTLINE */
+        tr.gold-border-lead {
+            /* Remove any existing borders */
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: none !important;
+            border-top: none !important;
+            border: none !important;
+
+            /* Single consistent gold outline */
+            outline: 6px solid #f59e0b !important;
+            outline-offset: -6px !important;
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.8) !important;
+            position: relative !important;
+            z-index: 999 !important;
+        }
+
+        /* ENHANCED: Ensure gold border shows with green highlighting but no double borders */
+        tr.gold-border-lead.reach-out-complete {
+            /* Keep green background but remove green borders */
+            background-color: rgba(16, 185, 129, 0.2) !important;
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: none !important;
+            border-top: none !important;
+            border: none !important;
+
+            /* Same single gold outline */
+            outline: 6px solid #f59e0b !important;
+            outline-offset: -6px !important;
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.8) !important;
+            z-index: 1000 !important;
+        }
+
+        /* HIGHEST PRIORITY: Force single gold border over any inline styles */
+        tr.gold-border-lead[style] {
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: none !important;
+            border-top: none !important;
+            border: none !important;
+            /* Same consistent single gold outline */
+            outline: 6px solid #f59e0b !important;
+            outline-offset: -6px !important;
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.8) !important;
+        }
     </style>
     <!-- Authentication Service -->
     <script src="js/auth-service.js"></script>
@@ -446,6 +514,59 @@
     <script src="js/preserve-original-stages.js?v=1"></script>
 </head>
 <body>
+
+    <!-- SIP Phone functionality -->
+    <script>
+        function toggleSipPhone() {
+            // Show the Twilio Voice WebRTC softphone widget
+            if (typeof toggleTwilioVoicePhone === 'function') {
+                toggleTwilioVoicePhone();
+            } else {
+                console.log('🔄 Twilio Voice phone not ready, trying to initialize...');
+                setTimeout(() => {
+                    if (typeof toggleTwilioVoicePhone === 'function') {
+                        toggleTwilioVoicePhone();
+                    } else {
+                        alert('Twilio Voice phone is loading, please try again in a moment.');
+                    }
+                }, 2000);
+            }
+        }
+
+        function launchWebRTCSoftphone() {
+            const url = '/js/ctx-softphone/index.html';
+            const features = 'menubar=no,location=no,resizable=no,scrollbars=no,status=no,addressbar=no,width=320,height=480,top=100,left=100';
+
+            // Check if phone is already open
+            if (!localStorage.getItem('ctxPhone')) {
+                const phoneWindow = window.open(url, 'ctxPhone', features);
+                console.log('📞 WebRTC Softphone launched');
+
+                // Set flag to prevent multiple instances
+                localStorage.setItem('ctxPhone', 'open');
+
+                // Clean up flag when window closes (modern browsers)
+                if (phoneWindow) {
+                    const checkClosed = setInterval(() => {
+                        if (phoneWindow.closed) {
+                            localStorage.removeItem('ctxPhone');
+                            clearInterval(checkClosed);
+                            console.log('📞 Softphone closed');
+                        }
+                    }, 1000);
+                }
+
+            } else {
+                alert('📞 WebRTC Softphone is already open');
+            }
+        }
+
+        // Global function for easy calling
+        window.launchWebRTCSoftphone = launchWebRTCSoftphone;
+
+        console.log('✅ DIRECT HTML: SIP Phone button loaded successfully');
+    </script>
+
     <!-- Header -->
     <header class="header">
         <nav class="navbar">
@@ -979,90 +1100,8 @@
                 </div>
             </div>
 
-            <!-- Main Sections -->
-            <div class="dashboard-sections">
-                <!-- Recent Activities -->
-                <div class="section-card">
-                    <div class="section-header">
-                        <h2>Recent Activities</h2>
-                        <a href="#" class="view-all">View All</a>
-                    </div>
-                    <div class="activities-list">
-                        <!-- Activities will be populated dynamically by recent-activities.js -->
-                    </div>
-                </div>
-
-
-                <section class="bottom-grid">
-                  <!-- LEFT COLUMN: TO-DO LIST -->
-                  <div class="column">
-                    <div class="column-header">To-Do List</div>
-                    <div class="card column-body">
-                      <input
-                        class="task-input"
-                        type="text"
-                        placeholder="Add a new task..."
-                      />
-                      <!-- later you can list tasks here -->
-                    </div>
-                  </div>
-
-                  <!-- RIGHT COLUMN: REMINDERS -->
-                  <div class="column">
-                    <div class="column-header">Reminders</div>
-                    <div class="card column-body">
-                      <div class="reminder-card renewals">
-                        <div class="reminder-title">60d Renewals</div>
-                        <div class="reminder-value">0</div>
-                      </div>
-
-                      <div class="reminder-card gifts">
-                        <div class="reminder-title">New Clients Gifts</div>
-                        <div class="reminder-value">0</div>
-                      </div>
-
-                      <div class="reminder-card birthdays">
-                        <div class="reminder-title">30d Birthdays</div>
-                        <div class="reminder-value">1</div>
-                      </div>
-
-                      <div class="reminder-card policies">
-                        <div class="reminder-title">Policies to Update</div>
-                        <div class="reminder-value">5</div>
-                      </div>
-
-                      <div class="reminder-card coi">
-                        <div class="reminder-title">New COI Emails</div>
-                        <div class="reminder-value">0</div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                <!-- Upcoming Renewals -->
-                <div class="section-card">
-                    <div class="section-header">
-                        <h2>Upcoming Renewals</h2>
-                        <a href="#" class="view-all">View All</a>
-                    </div>
-                    <div class="renewals-table">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Client</th>
-                                    <th>Policy Type</th>
-                                    <th>Expiry Date</th>
-                                    <th>Premium</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="renewals-tbody">
-                                <!-- Renewals will be populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            <!-- Main dashboard sections will be dynamically generated by loadFullDashboard() JavaScript function -->
+            <!-- Removed static conflicting HTML to prevent conflicts with JavaScript-generated dashboard -->
 
             <!-- Charts Section Removed -->
         </section>
@@ -1225,7 +1264,7 @@
                             <select name="assignedTo" style="width: 100%;">
                                 <option value="">Unassigned</option>
                                 <option value="Grant">Grant</option>
-                                <option value="Maureen">Maureen</option>
+                                <option value="Carson">Carson</option>
                                 <option value="Hunter">Hunter</option>
                             </select>
                         </div>
@@ -1347,8 +1386,8 @@
     <!-- Protect Vicidial leads from being removed -->
     <!-- <script src="js/protect-vicidial-leads.js?v=3"></script> DISABLED - May load leads -->
     <!-- Lead Archive System -->
-    <!-- <script src="js/lead-archive-system.js?v=2"></script> DISABLED - May load leads -->
-    <script src="js/api-service.js?v=26"></script>
+    <script src="js/lead-archive-system.js?v=2"></script>
+    <script src="js/api-service.js?v=27"></script>
     <!-- Fix ALL API ports BEFORE any other scripts -->
     <script src="js/fix-all-api-ports.js"></script>
     <script src="js/crm-api.js?v=1"></script>
@@ -1363,7 +1402,41 @@
 
     <!-- <script src="js/auto-clean-leads.js?v=3"></script> -->
     <script src="js/api-config-bridge.js?v=1"></script>
-    <script src="js/app.js?v=1733420600_STAGE_COLORS"></script>
+    <script src="js/fix-sip-configuration.js?v=1"></script>
+    <script src="js/debug-sip-realtime.js?v=1"></script>
+    <script src="js/sip-alternative-solutions.js?v=1"></script>
+    <script src="js/fix-twilio-sip-only.js?v=1"></script>
+    <script src="js/test-twilio-sip-setup.js?v=1"></script>
+    <!-- DISABLED: SIP-blocking scripts to allow SIP softphone functionality
+    <script src="js/bypass-sip-use-voice-api.js?v=1"></script>
+    <script src="js/disable-sip-completely.js?v=1"></script>
+    -->
+    <!-- DISABLED: Mock script to enable real Twilio calls -->
+    <!-- <script src="js/mock-twilio-for-testing.js?v=1"></script> -->
+    <script src="js/final-phone-system-summary.js?v=1"></script>
+    <script src="js/sip-test.js?v=2"></script>
+    <script src="js/vanguard-softphone.js?v=9"></script>
+    <script src="js/sip-integration-bridge.js?v=1"></script>
+    <script src="js/force-policies-refresh.js?v=1"></script>
+    <script src="js/app.js?v=1768160600_DEV_MODE_ADDED"></script>
+    <!-- Universal Live Stats Fix - MUST load after app.js -->
+    <script src="js/fix-all-agent-live-stats.js?v=5"></script>
+    <!-- Enhanced Lead Management with DELETE functionality - MUST load after app.js -->
+    <script src="js/enhanced-lead-management.js?v=2"></script>
+
+    <!-- Emergency fixes for hardcoded button IDs -->
+    <!-- <script src="js/emergency-viewlead-fix.js?v=1"></script> DISABLED - Breaking other tabs -->
+    <script src="js/fix-hardcoded-button-ids.js?v=2"></script>
+
+    <!-- My Leads Only Toggle - Direct Implementation -->
+    <!-- <script src="js/my-leads-toggle.js?v=9"></script> DISABLED - Complex approach -->
+    <script src="js/my-leads-toggle-direct.js?v=3"></script>
+
+    <!-- Twilio Voice WebRTC Softphone (proper Twilio implementation) -->
+    <script src="js/twilio-voice-webrtc-phone.js?v=9"></script>
+
+    <!-- Asterisk SIP Configuration for CRM-Zoiper Integration -->
+    <script src="asterisk-sip-config.js?v=1"></script>
 
     <!-- Archived Leads Functionality -->
     <script src="js/archived-leads-functionality.js?v=3"></script>
@@ -1372,7 +1445,7 @@
     <!-- <script src="js/nuclear-highlighting-fix.js?v=6"></script> DISABLED - Intercepting viewLead -->
 
     <!-- Protect ViciDial leads stored in database from localStorage clearing -->
-    <script src="js/protect-database-leads.js?v=5"></script>
+    <script src="js/protect-database-leads.js?v=6_CLEAN_LOGGING"></script>
     <!-- Protect campaign modals from global click handler interference -->
     <script src="js/protect-campaign-modal.js?v=1"></script>
 
@@ -1412,7 +1485,7 @@
     <script src="js/click-to-dial-email.js"></script>
     <script src="js/integrations-config.js"></script>
     <script src="js/dashboard-stats.js?v=27"></script>
-    <script src="js/recent-activities.js?v=32"></script>
+    <!-- <script src="js/recent-activities.js?v=32"></script> Temporarily disabled -->
     <script src="js/dashboard-renewals.js?v=2"></script>
     <script src="js/renewal-persistence-loader.js?v=1"></script>
     <script src="js/fix-renewal-finalize-update.js?v=2"></script>
@@ -1477,7 +1550,7 @@
     <!-- Disabled: Overrides viewLead incorrectly
     <script src="js/save-button-in-profile.js"></script> -->
     <!-- <script src="js/debug-lead-storage.js"></script> DISABLED - Intercepting viewLead -->
-    <script src="js/unarchive-all-leads.js"></script>
+    <!-- DISABLED: <script src="js/unarchive-all-leads.js"></script> CAUSING LEADS TO DISAPPEAR AFTER IMPORT -->
     <!-- <script src="js/fix-lead-not-found.js"></script> DISABLED - Intercepting viewLead -->
 
     <!-- ALL RECENTLY CREATED PROFILE SCRIPTS DISABLED -->
@@ -1553,7 +1626,13 @@
     
     <!-- Fix Policy Management Statistics - Calculate actual values from data -->
     <script src="js/fix-policy-stats.js?v=1"></script>
-    
+
+    <!-- Fix Policy Display Limit - Resolves 2-policy display limitation -->
+    <script src="js/fix-policy-display-limit.js?v=1"></script>
+
+    <!-- Policy Fix - Ensures policies always load from server first -->
+    <script src="js/policy-fix.js?v=1"></script>
+
     <!-- Force FMCSA Update - Temporary script to force immediate update -->
     <script src="js/force-fmcsa-update.js?v=1"></script>
     
@@ -1582,7 +1661,25 @@
     <script src="js/fix-premium-display.js?v=1733252400_FIX_CLIENT_IDS"></script>
 
     <!-- FINAL PROFILE FIX PROTECTED - MUST BE ABSOLUTELY LAST - Cannot be overridden -->
-    <script src="js/final-profile-fix-protected.js?v=1058_REMOVE_BUTTONS"></script>
+    <script src="js/final-profile-fix-protected.js?v=20250115_REMAINING_TIME_FIX"></script>
+
+    <!-- Test ReachOut Consistency -->
+    <script src="js/test-reachout-consistency.js?v=20250112_163215"></script>
+
+    <!-- Debug Lead ID Corruption -->
+    <script src="js/debug-lead-id-corruption.js?v=20250112_164500"></script>
+
+    <!-- Prevent Fast Click Timing Issue -->
+    <script src="js/prevent-fast-click-timing-issue.js?v=20250112_165000"></script>
+
+    <!-- Fix Reports Call Counting -->
+    <script src="js/fix-reports-call-counting-simple.js?v=20250112_173500"></script>
+
+    <!-- Test Agent Modal -->
+    <script src="js/test-agent-modal.js?v=20250112_172000"></script>
+
+    <!-- Policy function override - ensures policy functions take precedence in policy modals -->
+    <script src="js/policy-function-override.js?v=1"></script>
 
     <!-- PREVENT TAB SWITCHING OVERRIDE - DISABLED because it blocks legitimate lead loading -->
     <!-- <script src="js/prevent-tab-switching-override.js?v=1"></script> -->
@@ -1755,6 +1852,9 @@
     <!-- User-specific COI Customization -->
     <script src="js/user-coi-customization.js?v=1"></script>
 
+    <!-- Sticky Table Header Enhancement -->
+    <script src="js/sticky-header-enhancement.js?v=1"></script>
+
     <!-- Proper Archive System - Moves leads between tables -->
     <script src="js/proper-archive-system.js?v=1"></script>
 
@@ -1798,10 +1898,23 @@
     <script src="js/complete-lead-generation-restoration.js?v=11"></script>
 
     <!-- Fix Lead Generation to use Matched Carriers CSV Database - MUST LOAD AFTER COMPLETE RESTORATION -->
-    <script src="js/fix-lead-generation-matched-carriers.js?v=9"></script>
+    <script src="js/fix-lead-generation-matched-carriers.js?v=10"></script>
 
     <!-- Selective Vicidial Sync - Choose which leads to import - MUST BE ABSOLUTELY LAST -->
-    <script src="js/selective-vicidial-sync-clean.js?v=19"></script>
+    <script src="js/selective-vicidial-sync-clean.js?v=21"></script>
+
+    <!-- Force Add ViciDial Report Button to Agent Performance -->
+    <script src="js/add-vicidial-button.js?v=4"></script>
+
+    <!-- Fix Eye Icon Lead IDs - ensures each eye button has correct lead ID -->
+    <script src="js/fix-eye-icon-lead-ids.js?v=1"></script>
+
+    <!-- Fix Agent Performance Counts - Only count leads created in period + Dev Mode -->
+    <script src="js/fix-agent-performance-counts.js?v=2"></script>
+    <script src="js/simple-dev-controls.js?v=32"></script>
+    <script src="js/live-stats-tracker.js?v=32"></script>
+    <script src="js/live-stats-integration.js?v=32"></script>
+    <script src="js/force-live-stats-override.js?v=33"></script>
 
     <!-- Force COI to use Outlook instead of Gmail - MUST BE ABSOLUTELY LAST -->
     <!-- DISABLED: Contains mock data - <script src="js/coi-use-outlook.js?v=1"></script> -->
@@ -2139,7 +2252,144 @@
 
         // Initialize mobile renewal tabs when page loads
         document.addEventListener('DOMContentLoaded', initMobileRenewalTabs);
+
+        // CRITICAL: Vehicle/Trailer Separation Interceptor for Policy Save
+        // This fixes the issue where QuickFill saves trailers as vehicles instead of separating them
+
+        // Function to separate vehicles and trailers
+        window.separateVehiclesAndTrailers = function(policyData) {
+            console.log('🔧 SEPARATING vehicles and trailers in policy data...');
+            console.log('🔍 Input policy data:', JSON.stringify(policyData, null, 2));
+
+            if (policyData && policyData.vehicles) {
+                const actualVehicles = [];
+                const foundTrailers = [];
+
+                policyData.vehicles.forEach((vehicle, index) => {
+                    const vehicleIdentifier = vehicle[''] || vehicle.model || vehicle.description || '';
+                    console.log(`🔍 Processing item ${index + 1}: "${vehicleIdentifier}"`);
+
+                    if (vehicleIdentifier.toLowerCase().includes('trailer')) {
+                        foundTrailers.push(vehicle);
+                        console.log('🚛 MOVED to trailers:', vehicleIdentifier);
+                    } else {
+                        actualVehicles.push(vehicle);
+                        console.log('🚗 KEPT as vehicle:', vehicleIdentifier);
+                    }
+                });
+
+                policyData.vehicles = actualVehicles;
+                if (foundTrailers.length > 0) {
+                    policyData.trailers = (policyData.trailers || []).concat(foundTrailers);
+                    console.log('✅ FIXED: Moved', foundTrailers.length, 'trailers to trailers array');
+                }
+
+                console.log('✅ FINAL policy data structure:', {
+                    vehicles: policyData.vehicles.length,
+                    trailers: policyData.trailers?.length || 0,
+                    vehicleDetails: policyData.vehicles,
+                    trailerDetails: policyData.trailers
+                });
+            }
+
+            return policyData;
+        };
+
+        // Multiple interceptor strategies
+
+        // Strategy 1: Intercept savePolicy if it exists
+        function installSavePolicyInterceptor() {
+            if (typeof window.savePolicy === 'function' && !window.originalSavePolicy) {
+                console.log('🎯 STRATEGY 1: Installing savePolicy interceptor...');
+                window.originalSavePolicy = window.savePolicy;
+
+                window.savePolicy = function(policyData, callback) {
+                    console.log('🔧 INTERCEPTED savePolicy call!');
+                    policyData = window.separateVehiclesAndTrailers(policyData);
+                    return window.originalSavePolicy(policyData, callback);
+                };
+
+                console.log('✅ savePolicy interceptor installed');
+                return true;
+            }
+            return false;
+        }
+
+        // Strategy 2: Monitor for savePolicy function creation
+        let savePolicyMonitor = setInterval(() => {
+            if (installSavePolicyInterceptor()) {
+                clearInterval(savePolicyMonitor);
+            }
+        }, 500);
+
+        // Strategy 3: Intercept form data collection from DOM
+        window.interceptFormData = function() {
+            console.log('🔧 INTERCEPTING form data collection...');
+
+            // Look for vehicle form data
+            const vehicleForms = document.querySelectorAll('[id*="vehicle"], .vehicle-item, .form-section');
+            const collectedData = { vehicles: [], trailers: [] };
+
+            vehicleForms.forEach((form, index) => {
+                const inputs = form.querySelectorAll('input, select, textarea');
+                const vehicleData = {};
+
+                inputs.forEach(input => {
+                    if (input.value && input.value.trim()) {
+                        vehicleData[input.id || input.name || 'field'] = input.value.trim();
+                    }
+                });
+
+                // Check if this contains trailer data
+                const hasTrailerData = Object.values(vehicleData).some(value =>
+                    typeof value === 'string' && value.toLowerCase().includes('trailer')
+                );
+
+                if (hasTrailerData) {
+                    collectedData.trailers.push({ ...vehicleData, vehicleNumber: index + 1 });
+                    console.log('🚛 COLLECTED trailer data:', vehicleData);
+                } else if (Object.keys(vehicleData).length > 0) {
+                    collectedData.vehicles.push({ ...vehicleData, vehicleNumber: index + 1 });
+                    console.log('🚗 COLLECTED vehicle data:', vehicleData);
+                }
+            });
+
+            return collectedData;
+        };
+
+        // Strategy 4: Override localStorage.setItem to catch policy saves
+        if (!window.originalLocalStorageSetItem) {
+            window.originalLocalStorageSetItem = localStorage.setItem;
+
+            localStorage.setItem = function(key, value) {
+                if (key === 'policies' || key.includes('policy')) {
+                    console.log('🔧 INTERCEPTED localStorage.setItem for policies!');
+                    try {
+                        let policies = JSON.parse(value);
+                        if (Array.isArray(policies)) {
+                            policies = policies.map(policy => window.separateVehiclesAndTrailers(policy));
+                            value = JSON.stringify(policies);
+                        } else if (policies && typeof policies === 'object') {
+                            policies = window.separateVehiclesAndTrailers(policies);
+                            value = JSON.stringify(policies);
+                        }
+                    } catch (e) {
+                        console.log('Note: Could not parse policy data for separation');
+                    }
+                }
+                return window.originalLocalStorageSetItem.call(this, key, value);
+            };
+
+            console.log('✅ localStorage interceptor installed');
+        }
+
+        // Try initial install
+        installSavePolicyInterceptor();
+
+        console.log('✅ Multi-strategy vehicle/trailer separation interceptors installed');
     </script>
+
+    <!-- Call logs feature implemented -->
 
     <!-- REMOVED: Scripts moved earlier to ensure loading -->
 </body>

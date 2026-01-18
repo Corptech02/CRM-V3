@@ -52,6 +52,12 @@
             }
         }
 
+        // Fix HTTP to HTTPS for mixed content issues and remove port for nginx proxy
+        if (typeof fixedUrl === 'string' && fixedUrl.startsWith('http://') && window.location.protocol === 'https:') {
+            console.log(`🔒 Converting HTTP to HTTPS and removing port: ${fixedUrl}`);
+            fixedUrl = fixedUrl.replace('http://', 'https://').replace(':3001', '');
+        }
+
         // Call original fetch with fixed URL
         return originalFetch.call(this, fixedUrl, options);
     };
@@ -70,6 +76,12 @@
             if (fixedUrl.includes(':8880')) {
                 console.log(`🔄 XHR: Redirecting port 8880 → 3001: ${fixedUrl}`);
                 fixedUrl = fixedUrl.replace(':8880', ':3001');
+            }
+
+            // Fix HTTP to HTTPS for mixed content issues and remove port for nginx proxy
+            if (fixedUrl.startsWith('http://') && window.location.protocol === 'https:') {
+                console.log(`🔒 XHR: Converting HTTP to HTTPS and removing port: ${fixedUrl}`);
+                fixedUrl = fixedUrl.replace('http://', 'https://').replace(':3001', '');
             }
         }
 

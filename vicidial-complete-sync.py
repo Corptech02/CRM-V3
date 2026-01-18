@@ -56,7 +56,16 @@ class ViciDialCompleteSync:
         self.session.auth = requests.auth.HTTPBasicAuth(USERNAME, PASSWORD)
         self.session.verify = False
         self.deepgram = DeepgramTranscriber()
-        self.openai = OpenAIProcessor()
+
+        # Make OpenAI processor optional - only needed for transcription processing
+        try:
+            self.openai = OpenAIProcessor()
+            print("✅ OpenAI processor initialized")
+        except Exception as e:
+            print(f"⚠️  OpenAI processor not available: {e}")
+            print("📝 Continuing without AI transcription processing...")
+            self.openai = None
+
         self.leads_found = []
 
     def scan_all_lists(self):
@@ -64,7 +73,7 @@ class ViciDialCompleteSync:
         print(f"🔍 Connecting to ViciDial at {VICIDIAL_HOST}...")
 
         # All possible lists to scan
-        all_lists = ['998', '999', '1000', '1001', '1002', '1003', '1004', '1005', '1006']  # Real active lists
+        all_lists = ['998', '999', '1000', '1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009']  # Real active lists + Carson lists
 
         all_leads = []
         list_summary = {}
@@ -99,7 +108,10 @@ class ViciDialCompleteSync:
                     '1000': 'IN Hunter',
                     '1001': 'OH Grant',
                     '1005': 'TX Grant',
-                    '1006': 'IN Grant'
+                    '1006': 'IN Grant',
+                    '1007': 'OH Carson',
+                    '1008': 'TX Carson',
+                    '1009': 'IN Carson'
                 }
 
                 list_summary[list_id] = {
@@ -121,7 +133,10 @@ class ViciDialCompleteSync:
                     '1000': 'IN Hunter',
                     '1001': 'OH Grant',
                     '1005': 'TX Grant',
-                    '1006': 'IN Grant'
+                    '1006': 'IN Grant',
+                    '1007': 'OH Carson',
+                    '1008': 'TX Carson',
+                    '1009': 'IN Carson'
                 }
 
                 list_summary[list_id] = {
@@ -613,27 +628,43 @@ class ViciDialCompleteSync:
             lead_record['transcriptText'] = f'[Transcription failed: {str(e)[:100]}]'
             return lead_record
 
-        # Step 5: Process with OpenAI
-        print(f"  🤖 Processing with OpenAI...")
-        try:
-            structured_data = self.openai.process_transcription(formatted_transcript, {
-                'lead_id': lead_id,
-                'phone': lead['phone'],
-                'full_name': lead['name'],
-                'city': lead['city']
-            })
+        # Step 5: Process with OpenAI (optional)
+        extracted_data = {}
+        if self.openai:
+            print(f"  🤖 Processing with OpenAI...")
+            try:
+                structured_data = self.openai.process_transcription(formatted_transcript, {
+                    'lead_id': lead_id,
+                    'phone': lead['phone'],
+                    'full_name': lead['name'],
+                    'city': lead['city']
+                })
 
-            # Extract structured data - OpenAI processor returns {success: True, data: {...}}
-            if structured_data and structured_data.get('success'):
-                extracted_data = structured_data.get('data', {})
-            else:
+                # Extract structured data - OpenAI processor returns {success: True, data: {...}}
+                if structured_data and structured_data.get('success'):
+                    extracted_data = structured_data.get('data', {})
+                else:
+                    extracted_data = {}
+            except Exception as e:
+                print(f"  ⚠️  OpenAI processing failed: {e}")
                 extracted_data = {}
-
-        except Exception as e:
-            print(f"  ⚠️ OpenAI processing error: {e}")
+        else:
+            print(f"  📝 Skipping OpenAI processing (not available)")
             extracted_data = {}
 
-        # Step 6: Create complete lead record
+        # Step 6: Extract policy information from ViciDial fields (fallback if OpenAI extraction fails)
+        comments = lead_details.get('comments', '')
+        policy_info = self.extract_policy_from_comments(comments)
+
+        # Extract insurance company from address fields
+        address1 = lead_details.get('address1', '')
+        address2 = lead_details.get('address2', '')
+        insurance_company = self.extract_insurance_company(address1, address2)
+
+        # Format renewal date from address3
+        renewal_date = self.format_renewal_date(lead_details.get('address3', ''))
+
+        # Step 7: Create complete lead record (prioritize OpenAI data, fallback to ViciDial extraction)
         lead_record = {
             'id': f"8{lead_id}",
             'listId': lead['list_id'],
@@ -650,10 +681,14 @@ class ViciDialCompleteSync:
             'hasTranscription': True,
             'dotNumber': extracted_data.get('dot_number') or lead_details.get('dot_number', ''),
             'mcNumber': extracted_data.get('mc_number', ''),
-            'currentPremium': extracted_data.get('current_premium', 0),
-            'quotedPremium': extracted_data.get('quoted_premium', 0),
+            'currentPremium': extracted_data.get('current_premium', policy_info['calculated_premium']),
+            'quotedPremium': extracted_data.get('quoted_premium', policy_info['quoted_premium']),
             'savings': extracted_data.get('savings', 0),
-            'fleetSize': extracted_data.get('fleet_size', ''),
+            'fleetSize': extracted_data.get('fleet_size', str(policy_info['fleet_size']) if policy_info['fleet_size'] > 0 else ''),
+            'premium': str(extracted_data.get('current_premium', policy_info['calculated_premium']) if extracted_data.get('current_premium', policy_info['calculated_premium']) > 0 else ''),
+            'insuranceCompany': insurance_company or extracted_data.get('current_carrier', ''),
+            'currentCarrier': insurance_company or extracted_data.get('current_carrier', ''),
+            'renewalDate': renewal_date,
             'yearsInBusiness': extracted_data.get('years_in_business', ''),
             'radiusOfOperation': extracted_data.get('radius_of_operation', ''),
             'commodityHauled': extracted_data.get('commodity_hauled', ''),
@@ -739,10 +774,131 @@ Agent: Wonderful! I'm marking this as a sale and will send over the paperwork wi
             'notes': 'Sample transcription for testing'
         }
 
+    def extract_policy_from_comments(self, comments):
+        """Extract insurance policy details and fleet size from comments/notes"""
+        import re
+
+        policy_info = {
+            'current_carrier': '',
+            'current_premium': '',
+            'quoted_premium': 0,
+            'liability': '$1,000,000',
+            'cargo': '$100,000',
+            'fleet_size': 0,
+            'calculated_premium': 0
+        }
+
+        if not comments:
+            return policy_info
+
+        # Extract fleet size from multiple possible patterns
+        fleet_patterns = [
+            r'Insurance Expires:.*?\|\s*Fleet Size:?\s*(\d+)',  # Original pattern
+            r'Fleet Size:?\s*(\d+)',  # Simple "Fleet Size: x" pattern
+            r'Fleet\s*Size\s*:\s*(\d+)',  # "Fleet Size : x" with spaces
+            r'(\d+)\s*vehicles?',  # "9 vehicles" pattern
+            r'fleet\s*of\s*(\d+)',  # "fleet of 9" pattern
+            r'(\d+)\s*units?',  # "5 units" pattern
+            r'(\d+)\s*trucks?',  # "3 trucks" pattern
+            r'(\d+)\s*power\s*units?',  # "4 power units" pattern
+            r'units?\s*:\s*(\d+)',  # "Units: 5" pattern
+            r'truck\s*count\s*:\s*(\d+)',  # "Truck count: 3" pattern
+            r'total\s*vehicles?\s*:\s*(\d+)',  # "Total vehicles: 7" pattern
+        ]
+
+        fleet_size = 0
+        for pattern in fleet_patterns:
+            fleet_match = re.search(pattern, comments, re.I)
+            if fleet_match:
+                fleet_size = int(fleet_match.group(1))
+                policy_info['fleet_size'] = fleet_size
+                # Calculate premium at $14,400 per vehicle
+                calculated_premium = fleet_size * 14400
+                policy_info['calculated_premium'] = calculated_premium
+                print(f"    ✅ Fleet size extracted: {fleet_size} vehicles, calculated premium: ${calculated_premium:,}")
+                break
+
+        # Extract carrier
+        carrier_match = re.search(r'(State Farm|Progressive|Nationwide|Geico|Allstate|Liberty)', comments, re.I)
+        if carrier_match:
+            policy_info['current_carrier'] = carrier_match.group(1)
+
+        # Extract current premium
+        current_match = re.search(r'(?:paying|current)\s*\$?([\\d,]+)\s*(?:per|/)\s*month', comments, re.I)
+        if current_match:
+            amount = int(re.sub(r'[^\\d]', '', current_match.group(1)))
+            policy_info['current_premium'] = f"${amount}/month (${amount * 12:,}/year)"
+
+        # Extract quoted premium
+        quoted_match = re.search(r'(?:quoted?|offer)\s*\$?([\\d,]+)\s*(?:per|/)\s*month', comments, re.I)
+        if quoted_match:
+            policy_info['quoted_premium'] = int(re.sub(r'[^\\d]', '', quoted_match.group(1)))
+
+        return policy_info
+
+    def extract_insurance_company(self, address1, address2):
+        """Extract insurance company from address fields"""
+        import re
+
+        insurance_company = ""
+
+        # Common insurance company patterns
+        insurance_patterns = [
+            r'(State Farm|Progressive|Nationwide|Geico|Allstate|Liberty|USAA|Farmers|Travelers)',
+            r'(\w+\s+Insurance)',
+            r'(\w+\s+Mutual)',
+            r'(\w+\s+General)',
+        ]
+
+        # Check address2 first, then address1 (address2 usually has insurance)
+        for address_field in [address2, address1]:
+            if address_field:
+                for pattern in insurance_patterns:
+                    match = re.search(pattern, address_field, re.I)
+                    if match:
+                        insurance_company = match.group(1).title()
+                        print(f"    ✅ Insurance company extracted: '{insurance_company}' from address field")
+                        return insurance_company
+
+        return insurance_company
+
+    def format_renewal_date(self, raw_date):
+        """Format renewal date to M/D/YYYY format"""
+        import re
+
+        if not raw_date:
+            return ""
+
+        # Handle YYYY-MM-DD format (common in ViciDial)
+        yyyy_mm_dd = re.match(r'(\d{4})-(\d{1,2})-(\d{1,2})', raw_date)
+        if yyyy_mm_dd:
+            year, month, day = yyyy_mm_dd.groups()
+            formatted = f"{int(month)}/{int(day)}/{year}"
+            return formatted
+
+        # Handle MM/DD/YYYY format (already correct)
+        mm_dd_yyyy = re.match(r'(\d{1,2})/(\d{1,2})/(\d{4})', raw_date)
+        if mm_dd_yyyy:
+            return raw_date
+
+        return raw_date
+
     def create_basic_lead_record(self, lead, lead_details=None):
         """Create a basic lead record without transcription"""
         if lead_details is None:
             lead_details = {}
+
+        # Extract policy information from comments
+        comments = lead_details.get('comments', '')
+        policy_info = self.extract_policy_from_comments(comments)
+
+        # Extract insurance company from address fields
+        address1 = lead_details.get('address1', '')
+        address2 = lead_details.get('address2', '')
+        insurance_company = self.extract_insurance_company(address1, address2)
+
+        # Format renewal date from address3
+        renewal_date = self.format_renewal_date(lead_details.get('address3', ''))
 
         return {
             'id': f"8{lead['id']}",
@@ -760,11 +916,16 @@ Agent: Wonderful! I'm marking this as a sale and will send over the paperwork wi
             'hasTranscription': False,
             'dotNumber': lead_details.get('dot_number', ''),
             'mcNumber': '',
-            'currentPremium': 0,
-            'quotedPremium': 0,
+            'currentPremium': policy_info['calculated_premium'] if policy_info['calculated_premium'] > 0 else 0,
+            'quotedPremium': policy_info['quoted_premium'],
             'savings': 0,
+            'fleetSize': str(policy_info['fleet_size']) if policy_info['fleet_size'] > 0 else '',
+            'premium': str(policy_info['calculated_premium']) if policy_info['calculated_premium'] > 0 else '',
+            'insuranceCompany': insurance_company,
+            'currentCarrier': insurance_company,
+            'renewalDate': renewal_date,
             'address3': lead_details.get('address3', ''),  # Add renewal date field from Vicidial
-            'notes': 'No call recording found for transcription'
+            'notes': f'No call recording found for transcription. Fleet: {policy_info["fleet_size"]} vehicles, Premium: ${policy_info["calculated_premium"]:,}' if policy_info['fleet_size'] > 0 else 'No call recording found for transcription'
         }
 
     def run_sync(self):

@@ -162,7 +162,7 @@
 
         function isReachOutCompleted(lead) {
             // Check if lead has reach out data and is in a stage that requires reach out
-            const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+            const reachOutStages = ['quoted', 'info_requested', 'contact_attempted', 'quote_sent', 'interested'];
             if (!reachOutStages.includes(lead.stage) || !lead.reachOut) {
                 return false;
             }

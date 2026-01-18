@@ -2,19 +2,19 @@
 // This ensures the correct backend URL is always used
 console.log('🔧 Applying FINAL API URL fix...');
 
-// Force correct API URL
-window.VANGUARD_API_URL = "http://162-220-14-239.nip.io:3001";
+// Force correct API URL to use nginx proxy
+window.VANGUARD_API_URL = "http://162-220-14-239.nip.io";
 
-// Override EMAIL_PROVIDERS to ensure correct URLs
+// Override EMAIL_PROVIDERS to ensure correct URLs through nginx proxy
 window.EMAIL_PROVIDERS = {
     GMAIL: {
         name: 'Gmail',
-        apiBase: 'http://162-220-14-239.nip.io:3001/api/gmail',
+        apiBase: 'http://162-220-14-239.nip.io/api/gmail',
         email: 'corptech06@gmail.com'
     },
     OUTLOOK: {
         name: 'Outlook',
-        apiBase: 'http://162-220-14-239.nip.io:3001/api/outlook',
+        apiBase: 'http://162-220-14-239.nip.io/api/outlook',
         email: 'Not configured'
     }
 };

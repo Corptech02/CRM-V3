@@ -6,7 +6,10 @@ let protectedFunctions = {};
 
 // Create the enhanced profile function with exact working UI
 protectedFunctions.createEnhancedProfile = function(lead) {
-    console.log('🔥 Enhanced Profile: Creating profile for:', lead.name);
+    console.log('🔥 PROTECTED Enhanced Profile: Creating profile for:', lead.name);
+    console.log('🔍 PROTECTED Lead ID being used:', lead.id);
+    console.log('🔍 PROTECTED Lead object:', lead);
+    console.log('📍 PROTECTED: Stage dropdown will use snake_case format:', lead.stage);
 
     // Remove any existing modals
     const existing = document.getElementById('lead-profile-container');
@@ -19,13 +22,65 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     if (!lead.trailers || !Array.isArray(lead.trailers)) lead.trailers = [];
     if (!lead.drivers || !Array.isArray(lead.drivers)) lead.drivers = [];
     if (!lead.transcriptText) lead.transcriptText = '';
-    if (!lead.reachOut) lead.reachOut = {
-        callAttempts: 0,
-        callsConnected: 0,
-        emailCount: 0,
-        textCount: 0,
-        voicemailCount: 0
+    // Ensure reachOut object exists and has all required properties
+    if (!lead.reachOut) {
+        lead.reachOut = {};
+    }
+
+    // Initialize all reachOut properties with defaults if they don't exist
+    // CRITICAL: Use || 0 instead of ?? 0 to handle falsy values properly
+    // but only if the property truly doesn't exist (not if it's 0)
+    if (typeof lead.reachOut.callAttempts !== 'number') lead.reachOut.callAttempts = 0;
+    if (typeof lead.reachOut.callsConnected !== 'number') lead.reachOut.callsConnected = 0;
+    if (typeof lead.reachOut.emailCount !== 'number') lead.reachOut.emailCount = 0;
+    if (typeof lead.reachOut.textCount !== 'number') lead.reachOut.textCount = 0;
+    if (typeof lead.reachOut.voicemailCount !== 'number') lead.reachOut.voicemailCount = 0;
+
+    console.log(`🔍 LEAD ${lead.id} REACHOUT INITIALIZED:`, lead.reachOut);
+
+    // Check if lead.id is the problematic hardcoded value
+    if (String(lead.id) === '8126662') {
+        console.error(`❌ PROBLEM FOUND: Lead ID is hardcoded test value 8126662!`);
+        console.log('🔍 This explains why all IDs are showing 8126662 - the lead object itself has the wrong ID!');
+    }
+
+    // Save the corrected lead data back to localStorage to ensure proper initialization
+    try {
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const leadIndex = leads.findIndex(l => String(l.id) === String(lead.id));
+        if (leadIndex !== -1) {
+            leads[leadIndex].reachOut = { ...lead.reachOut }; // Create a copy to prevent reference sharing
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            console.log(`✅ LEAD ${lead.id} REACHOUT SAVED TO LOCALSTORAGE`);
+        }
+    } catch (error) {
+        console.error(`❌ Failed to save reachOut data for lead ${lead.id}:`, error);
+    }
+
+    // AGGRESSIVE FIX: Force unique reachOut object creation before any profile display
+    console.log(`🔧 AGGRESSIVE FIX: Ensuring lead ${lead.id} has unique reachOut object...`);
+
+    // Always create a completely new object, never reuse existing one
+    const originalData = lead.reachOut ? { ...lead.reachOut } : {};
+    lead.reachOut = {
+        callAttempts: originalData.callAttempts || 0,
+        callsConnected: originalData.callsConnected || 0,
+        emailCount: originalData.emailCount || 0,
+        textCount: originalData.textCount || 0,
+        voicemailCount: originalData.voicemailCount || 0,
+        // Preserve other properties with deep copies
+        ...(originalData.callLogs && { callLogs: JSON.parse(JSON.stringify(originalData.callLogs)) }),
+        ...(originalData.completedAt && { completedAt: originalData.completedAt }),
+        ...(originalData.reachOutCompletedAt && { reachOutCompletedAt: originalData.reachOutCompletedAt }),
+        ...(originalData.emailSent !== undefined && { emailSent: originalData.emailSent }),
+        ...(originalData.textSent !== undefined && { textSent: originalData.textSent }),
+        ...(originalData.contacted !== undefined && { contacted: originalData.contacted })
     };
+
+    console.log(`✅ AGGRESSIVE FIX: Lead ${lead.id} now has unique reachOut object:`, lead.reachOut);
+
+    // BULK FIX: Clean up all leads in localStorage to ensure unique reachOut objects
+    protectedFunctions.fixAllLeadReachOutReferences();
     if (!lead.applications || !Array.isArray(lead.applications)) lead.applications = [];
     if (!lead.quotes || !Array.isArray(lead.quotes)) lead.quotes = [];
 
@@ -53,7 +108,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
         <div class="modal-content" style="background: white; border-radius: 12px; max-width: 1200px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px; position: relative; transform: none; top: auto; left: auto;">
             <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
                 <h2 style="margin: 0; font-size: 24px;"><i class="fas fa-truck"></i> Commercial Auto Lead Profile</h2>
-                <button class="close-btn" id="profile-close-btn" onclick="document.getElementById('lead-profile-container').remove()" style="position: absolute; top: 20px; right: 20px; font-size: 30px; background: none; border: none; cursor: pointer;">×</button>
+                <button class="close-btn" id="profile-close-btn" onclick="(function(){const modal=document.getElementById('lead-profile-container');if(modal&&modal._idProtectionObserver){modal._idProtectionObserver.disconnect();}modal.remove();})();" style="position: absolute; top: 20px; right: 20px; font-size: 30px; background: none; border: none; cursor: pointer;">×</button>
             </div>
 
             <div style="padding: 20px;">
@@ -63,18 +118,18 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <div>
                         <label style="font-weight: 600; font-size: 12px;">Current Stage:</label>
                         <select id="lead-stage-${lead.id}" onchange="updateLeadStage('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-                            <option value="New" ${lead.stage === 'New' ? 'selected' : ''}>New</option>
-                            <option value="Contact Attempted" ${lead.stage === 'Contact Attempted' ? 'selected' : ''}>Contact Attempted</option>
-                            <option value="Info Requested" ${lead.stage === 'Info Requested' ? 'selected' : ''}>Info Requested</option>
-                            <option value="Info Received" ${lead.stage === 'Info Received' ? 'selected' : ''}>Info Received</option>
-                            <option value="Loss Runs Requested" ${lead.stage === 'Loss Runs Requested' ? 'selected' : ''}>Loss Runs Requested</option>
-                            <option value="Loss Runs Received" ${lead.stage === 'Loss Runs Received' ? 'selected' : ''}>Loss Runs Received</option>
-                            <option value="App Prepared" ${lead.stage === 'App Prepared' ? 'selected' : ''}>App Prepared</option>
-                            <option value="App Sent" ${lead.stage === 'App Sent' ? 'selected' : ''}>App Sent</option>
-                            <option value="Quote Sent" ${lead.stage === 'Quote Sent' ? 'selected' : ''}>Quote Sent</option>
-                            <option value="Interested" ${lead.stage === 'Interested' ? 'selected' : ''}>Interested</option>
-                            <option value="Not Interested" ${lead.stage === 'Not Interested' ? 'selected' : ''}>Not Interested</option>
-                            <option value="Closed" ${lead.stage === 'Closed' ? 'selected' : ''}>Closed</option>
+                            <option value="new" ${lead.stage === 'new' ? 'selected' : ''}>New</option>
+                            <option value="contact_attempted" ${lead.stage === 'contact_attempted' ? 'selected' : ''}>Contact Attempted</option>
+                            <option value="info_requested" ${lead.stage === 'info_requested' ? 'selected' : ''}>Info Requested</option>
+                            <option value="info_received" ${lead.stage === 'info_received' ? 'selected' : ''}>Info Received</option>
+                            <option value="loss_runs_requested" ${lead.stage === 'loss_runs_requested' ? 'selected' : ''}>Loss Runs Requested</option>
+                            <option value="loss_runs_received" ${lead.stage === 'loss_runs_received' ? 'selected' : ''}>Loss Runs Received</option>
+                            <option value="app_prepared" ${lead.stage === 'app_prepared' ? 'selected' : ''}>App Prepared</option>
+                            <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>App Sent</option>
+                            <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
+                            <option value="sale" ${lead.stage === 'sale' ? 'selected' : ''}>Sale</option>
+                            <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
+                            <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
                         </select>
                     </div>
                     <!-- Stage Timestamp with Color Coding -->
@@ -82,7 +137,12 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         <div id="lead-age-${lead.id}" style="display: flex; justify-content: center;">
                             ${(function() {
                                 // Use stage update timestamp if available, otherwise lead creation date
-                                const stageDate = lead.stageUpdatedAt || lead.createdDate || lead.created_at || new Date().toISOString();
+                                const stageDate = lead.stageUpdatedAt || lead.createdDate || lead.created_at || lead.created || lead.timestamp;
+
+                                // If no valid timestamp exists, don't show a timestamp
+                                if (!stageDate) {
+                                    return '<span style="color: #6b7280; font-style: italic;">No timestamp available</span>';
+                                }
                                 const now = new Date();
                                 const updated = new Date(stageDate);
                                 const daysDiff = Math.floor((now - updated) / (1000 * 60 * 60 * 24));
@@ -152,21 +212,21 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         <!-- Called Section - Now at top -->
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="call-made-${lead.id}" onchange="updateReachOut('${lead.id}', 'call', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                                <input type="checkbox" id="call-made-${lead.id}" onchange="console.log('🔍 CHECKBOX CLICKED: leadId=${lead.id}'); updateReachOut('${lead.id}', 'call', this.checked)" style="width: 20px; height: 20px; cursor: pointer;" data-debug-lead="${lead.id}">
                                 <label for="call-made-${lead.id}" style="font-weight: 600; cursor: pointer;">Called</label>
                             </div>
                             <div style="display: flex; align-items: center; gap: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-weight: 600;">Attempts:</span>
-                                    <span id="call-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.callAttempts}</span>
+                                    <span id="call-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.callAttempts || 0}</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-weight: 600;">Connected:</span>
-                                    <span id="call-connected-${lead.id}" style="font-weight: bold; font-size: 18px; color: #10b981; min-width: 30px; text-align: center;">${lead.reachOut.callsConnected}</span>
+                                    <span id="call-connected-${lead.id}" style="font-weight: bold; font-size: 18px; color: #10b981; min-width: 30px; text-align: center;">${lead.reachOut.callsConnected || 0}</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-weight: 600;">Voicemail Sent:</span>
-                                    <span id="voicemail-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #f59e0b; min-width: 30px; text-align: center;">${lead.reachOut.voicemailCount}</span>
+                                    <span id="voicemail-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #f59e0b; min-width: 30px; text-align: center;">${lead.reachOut.voicemailCount || 0}</span>
                                 </div>
                             </div>
                         </div>
@@ -177,7 +237,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                                 <i class="fas fa-phone-alt"></i> Call Logs
                             </button>
                             <button onclick="showCallStatus('${lead.id}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
-                                <i class="fas fa-phone-volume"></i> Call Status
+                                <i class="fas fa-highlight"></i> Highlight Duration
                             </button>
                         </div>
 
@@ -188,7 +248,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="font-weight: 600;">Sent:</span>
-                                <span id="email-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.emailCount}</span>
+                                <span id="email-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.emailCount || 0}</span>
                             </div>
                         </div>
 
@@ -199,7 +259,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="font-weight: 600;">Sent:</span>
-                                <span id="text-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.textCount}</span>
+                                <span id="text-count-${lead.id}" style="font-weight: bold; font-size: 18px; color: #0066cc; min-width: 30px; text-align: center;">${lead.reachOut.textCount || 0}</span>
                             </div>
                         </div>
                     </div>
@@ -236,7 +296,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                                 <option value="" ${!lead.assignedTo ? 'selected' : ''}>Unassigned</option>
                                 <option value="Hunter" ${lead.assignedTo === 'Hunter' ? 'selected' : ''}>Hunter</option>
                                 <option value="Grant" ${lead.assignedTo === 'Grant' ? 'selected' : ''}>Grant</option>
-                                <option value="Maureen" ${lead.assignedTo === 'Maureen' ? 'selected' : ''}>Maureen</option>
+                                <option value="Carson" ${lead.assignedTo === 'Carson' ? 'selected' : ''}>Carson</option>
                             </select>
                         </div>
                     </div>
@@ -353,6 +413,14 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Renewal Date:</label>
                             <input type="text" value="${lead.renewalDate || ''}" placeholder="MM/DD/YYYY" onchange="updateLeadField('${lead.id}', 'renewalDate', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">Insurance Company:</label>
+                            <input type="text" value="${lead.insuranceCompany || ''}" placeholder="Current Insurance Company" onchange="updateLeadField('${lead.id}', 'insuranceCompany', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 12px;">State:</label>
+                            <input type="text" value="${lead.state || ''}" placeholder="State" onchange="updateLeadField('${lead.id}', 'state', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         </div>
                     </div>
                 </div>
@@ -536,6 +604,18 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
+                ${lead.recordingPath && lead.hasRecording ? `
+                    <!-- Audio Recording Player -->
+                    <div class="profile-section" style="background: #fff; border: 2px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                        <h3><i class="fas fa-play-circle"></i> Call Recording</h3>
+                        <audio controls style="width: 100%; height: 40px;" preload="none">
+                            <source src="${lead.recordingPath}" type="audio/mpeg">
+                            <source src="${lead.recordingPath}" type="audio/wav">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                ` : ''}
+
                 <!-- Call Transcript -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h3><i class="fas fa-microphone"></i> Call Transcript</h3>
@@ -596,10 +676,28 @@ protectedFunctions.createEnhancedProfile = function(lead) {
 
     document.body.appendChild(modalContainer);
 
+    // Activate DOM protection to prevent hardcoded ID overwrites
+    protectedFunctions.protectModalIDs(lead.id, modalContainer);
+
+    // Force immediate ID fix in case any hardcoded elements are already present
+    setTimeout(() => {
+        const badElements = modalContainer.querySelectorAll('[id*="8126662"]');
+        if (badElements.length > 0) {
+            console.warn(`🔧 IMMEDIATE FIX: Found ${badElements.length} hardcoded elements on modal open`);
+            badElements.forEach(element => {
+                const oldId = element.id;
+                const newId = oldId.replace('8126662', lead.id);
+                element.id = newId;
+                console.log(`🔧 Immediate fix: ${oldId} → ${newId}`);
+            });
+        }
+    }, 10);
+
     // Apply reach-out styling based on lead's to-do status
     setTimeout(() => {
         // Check if this stage requires reach-out based on stage name
         const stagesRequiringReachOut = [
+            'Contact Attempted', 'contact_attempted',
             'Info Requested', 'info_requested',
             'Loss Runs Requested', 'loss_runs_requested',
             'Quote Sent', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware',
@@ -821,7 +919,7 @@ Thank you,`;
                 <!-- To Field -->
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; color: #374151;">To:</label>
-                    <input type="email" id="email-to-field" value="" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    <input type="email" id="email-to-field" value="Grant@vigagency.com" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                 </div>
 
                 <!-- Subject Field -->
@@ -1551,6 +1649,12 @@ window.handleCallDuration = function(leadId, duration) {
         };
         leads[leadIndex].reachOut.callLogs.push(callLog);
 
+        // Track connected call in live stats
+        if (window.liveStatsTracker && leads[leadIndex].assignedTo) {
+            const duration = parseFloat(durationNum || 0);
+            window.liveStatsTracker.addConnectedCall(leads[leadIndex].assignedTo, duration);
+        }
+
         // Mark reach-out as COMPLETE
         leads[leadIndex].reachOut.completedAt = new Date().toISOString();
         leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
@@ -1571,11 +1675,14 @@ window.handleCallDuration = function(leadId, duration) {
             backdrop.remove();
         }
 
-        // Update checkbox to checked
+        // Update checkbox to checked and set called property
         const checkbox = document.getElementById(`call-made-${leadId}`);
         if (checkbox) {
             checkbox.checked = true;
         }
+
+        // Set called property for reachout logic
+        leads[leadIndex].reachOut.called = true;
 
         // Save to localStorage
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
@@ -1610,6 +1717,9 @@ window.handleCallDuration = function(leadId, duration) {
 
         // Mark reach-out as COMPLETE with green styling
         markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt);
+
+        // Show green highlight duration popup
+        showGreenHighlightDurationPopup(leadId);
 
         showNotification(`Call connected (${durationNum > 0 ? durationNum + ' min' : '< 1 min'})! Reach-out completed.`, 'success');
 
@@ -1900,6 +2010,10 @@ protectedFunctions.showCallLogs = function(leadId) {
                 <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${voicemailCount}</div>
                 <div style="font-size: 14px; color: #6b7280;">Voicemails</div>
             </div>
+            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: bold; color: #8b5cf6;" id="avg-duration-display">0:00</div>
+                <div style="font-size: 14px; color: #6b7280;">Avg Duration</div>
+            </div>
         </div>
 
         <div style="margin-bottom: 20px;">
@@ -1939,6 +2053,36 @@ protectedFunctions.showCallLogs = function(leadId) {
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
 
+    // Calculate and set average duration
+    let totalMinutes = 0;
+    let connectedCalls = 0;
+    callLogs.forEach(log => {
+        if (log.connected && log.duration) {
+            if (log.duration === '< 1 min') {
+                totalMinutes += 0.5;
+                connectedCalls++;
+            } else {
+                const match = log.duration.match(/(\d+)\s*min/);
+                if (match) {
+                    totalMinutes += parseInt(match[1]);
+                    connectedCalls++;
+                }
+            }
+        }
+    });
+
+    const avgDisplay = document.getElementById('avg-duration-display');
+    if (avgDisplay) {
+        if (connectedCalls === 0) {
+            avgDisplay.textContent = '0:00';
+        } else {
+            const avgMinutes = totalMinutes / connectedCalls;
+            const minutes = Math.floor(avgMinutes);
+            const seconds = Math.round((avgMinutes - minutes) * 60);
+            avgDisplay.textContent = minutes + ':' + seconds.toString().padStart(2, '0');
+        }
+    }
+
     // Close modal when clicking outside
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
@@ -1949,18 +2093,106 @@ protectedFunctions.showCallLogs = function(leadId) {
 
 // Function to show call status modal
 protectedFunctions.showCallStatus = function(leadId) {
-    console.log(`📞 Showing call status for lead: ${leadId}`);
+    console.log(`🟢 Showing highlight duration for lead: ${leadId}`);
 
-    // Get the lead data
-    const leads = JSON.parse(localStorage.getItem('insurance_leads') || localStorage.getItem('leads') || '[]');
-    const lead = leads.find(l => String(l.id) === String(leadId));
+    // Get the lead data from both storage locations
+    const insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    const allLeads = [...insurance_leads, ...regular_leads];
+
+    const lead = allLeads.find(l => String(l.id) === String(leadId));
+
+    console.log(`🔍 DEBUG: Found lead:`, lead?.name, 'greenUntil:', lead?.greenUntil);
 
     if (!lead) {
         alert('Lead not found!');
         return;
     }
 
-    // Create modal for call status
+    // Check for GREEN highlight duration (from green highlight system)
+    let greenHighlightDays = 'Not Set';
+    let greenHighlightStatus = 'No Green Highlighting';
+    let daysRemaining = 0;
+
+    // Check all storage formats for green highlighting
+    let highlightExpiry = null;
+    console.log(`🔍 DEBUG: Checking highlight formats...`);
+    console.log(`🔍 lead.greenHighlight:`, lead.greenHighlight);
+    console.log(`🔍 lead.reachOut?.greenHighlightUntil:`, lead.reachOut?.greenHighlightUntil);
+    console.log(`🔍 lead.greenUntil:`, lead.greenUntil);
+
+    if (lead.greenHighlight && lead.greenHighlight.expiresAt) {
+        highlightExpiry = new Date(lead.greenHighlight.expiresAt);
+        console.log(`🔍 Using greenHighlight.expiresAt:`, lead.greenHighlight.expiresAt);
+    } else if (lead.reachOut && lead.reachOut.greenHighlightUntil) {
+        highlightExpiry = new Date(lead.reachOut.greenHighlightUntil);
+        console.log(`🔍 Using reachOut.greenHighlightUntil:`, lead.reachOut.greenHighlightUntil);
+    } else if (lead.greenUntil) {
+        highlightExpiry = new Date(lead.greenUntil);
+        console.log(`🔍 Using greenUntil:`, lead.greenUntil);
+    }
+
+    if (highlightExpiry) {
+        const now = new Date();
+        const diffMs = highlightExpiry - now;
+        daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        if (daysRemaining > 0) {
+            greenHighlightDays = `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} remaining`;
+            greenHighlightStatus = 'Active Green Highlighting';
+        } else {
+            greenHighlightDays = 'Expired';
+            greenHighlightStatus = 'Green Highlighting Expired';
+        }
+    } else {
+        // Check if this lead has reach-out completion with green highlight duration
+        if (lead.reachOut && (lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt)) {
+            console.log(`🔍 Found reach-out completion, checking for highlight duration...`);
+
+            // If a specific highlight duration was set, check the remaining time
+            if (lead.reachOut.greenHighlightUntil) {
+                const highlightExpiry = new Date(lead.reachOut.greenHighlightUntil);
+                const now = new Date();
+                const diffMs = highlightExpiry - now;
+                daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+                if (daysRemaining > 0) {
+                    const hoursRemaining = Math.ceil(diffMs / (1000 * 60 * 60));
+                    if (daysRemaining === 1 && hoursRemaining <= 24) {
+                        greenHighlightDays = `${hoursRemaining} hours remaining`;
+                    } else {
+                        greenHighlightDays = `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} remaining`;
+                    }
+                    greenHighlightStatus = 'Green Highlight Active';
+                } else {
+                    greenHighlightDays = 'Expired';
+                    greenHighlightStatus = 'Green Highlight Expired';
+                    daysRemaining = 0;
+                }
+                console.log(`🔍 Green highlight expires: ${lead.reachOut.greenHighlightUntil}, remaining: ${daysRemaining} days`);
+            } else {
+                // No specific duration set, just show reach-out complete
+                const completedAt = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
+                const completedDate = new Date(completedAt);
+                const now = new Date();
+                const diffMs = now - completedDate;
+                const hoursAgo = Math.floor(diffMs / (1000 * 60 * 60));
+                const daysAgo = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                if (daysAgo === 0) {
+                    greenHighlightDays = `Completed ${hoursAgo} hours ago`;
+                    greenHighlightStatus = 'Reach-Out Complete (No Duration Set)';
+                } else {
+                    greenHighlightDays = `Completed ${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago`;
+                    greenHighlightStatus = 'Reach-Out Complete (No Duration Set)';
+                }
+                daysRemaining = 1; // Show green styling
+                console.log(`🔍 No highlight duration set, completed: ${completedAt}`);
+            }
+        }
+    }
+
+    // Create simple modal for GREEN highlight duration
     const modal = document.createElement('div');
     modal.style.cssText = `
         position: fixed;
@@ -1980,98 +2212,29 @@ protectedFunctions.showCallStatus = function(leadId) {
         background: white;
         padding: 30px;
         border-radius: 12px;
-        max-width: 500px;
+        max-width: 400px;
         width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     `;
 
-    // Get call status data from reachOut
-    const callAttempts = lead.reachOut?.callAttempts || 0;
-    const callsConnected = lead.reachOut?.callsConnected || 0;
-    const voicemailCount = lead.reachOut?.voicemailCount || 0;
-    const emailCount = lead.reachOut?.emailCount || 0;
-    const textCount = lead.reachOut?.textCount || 0;
-    const isCompleted = lead.reachOut?.completedAt || lead.reachOut?.reachOutCompletedAt;
-
-    // Calculate call success rate
-    const successRate = callAttempts > 0 ? ((callsConnected / callAttempts) * 100).toFixed(1) : 0;
-
-    // Determine overall status
-    let overallStatus = 'Pending';
-    let statusColor = '#f59e0b';
-    let statusIcon = 'fas fa-clock';
-
-    if (isCompleted) {
-        overallStatus = 'Completed';
-        statusColor = '#10b981';
-        statusIcon = 'fas fa-check-circle';
-    } else if (callAttempts > 0 || emailCount > 0 || textCount > 0) {
-        overallStatus = 'In Progress';
-        statusColor = '#3b82f6';
-        statusIcon = 'fas fa-phone';
-    }
-
     modalContent.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
-            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-phone-volume"></i> Call Status - ${lead.name || 'Unknown'}</h2>
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-highlight" style="color: #10b981;"></i> Highlight Duration - ${lead.name || 'Unknown'}</h2>
             <button onclick="this.closest('.call-status-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
         </div>
 
-        <!-- Overall Status -->
-        <div style="text-align: center; margin-bottom: 25px;">
-            <div style="display: inline-flex; align-items: center; background: ${statusColor}; color: white; padding: 12px 20px; border-radius: 25px; font-weight: bold; font-size: 16px;">
-                <i class="${statusIcon}" style="margin-right: 8px;"></i>
-                ${overallStatus}
-            </div>
-            ${isCompleted ? `<div style="font-size: 12px; color: #6b7280; margin-top: 8px;">Completed: ${new Date(isCompleted).toLocaleDateString()} at ${new Date(isCompleted).toLocaleTimeString()}</div>` : ''}
+        <!-- GREEN Highlight Duration -->
+        <div style="text-align: center; padding: 20px; background: ${daysRemaining > 0 ? '#f0fdf4' : '#f9fafb'}; border-radius: 8px; margin-bottom: 20px; border: 2px solid ${daysRemaining > 0 ? '#10b981' : '#e5e7eb'};">
+            <div style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 10px;">Green Highlight Status</div>
+            <div style="font-size: 32px; font-weight: bold; color: ${daysRemaining > 0 ? '#10b981' : '#6b7280'}; margin-bottom: 5px;">${greenHighlightDays}</div>
+            <div style="display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; ${
+                daysRemaining > 0 ? 'background: #dcfce7; color: #166534;' : 'background: #f3f4f6; color: #6b7280;'
+            }">${greenHighlightStatus}</div>
         </div>
 
-        <!-- Call Metrics -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-bottom: 25px;">
-            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
-                <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${callAttempts}</div>
-                <div style="font-size: 12px; color: #6b7280;">Call Attempts</div>
-            </div>
-            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
-                <div style="font-size: 24px; font-weight: bold; color: #10b981;">${callsConnected}</div>
-                <div style="font-size: 12px; color: #6b7280;">Connected</div>
-            </div>
-            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
-                <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${voicemailCount}</div>
-                <div style="font-size: 12px; color: #6b7280;">Voicemails</div>
-            </div>
-            <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
-                <div style="font-size: 24px; font-weight: bold; color: ${successRate >= 50 ? '#10b981' : successRate > 0 ? '#f59e0b' : '#6b7280'};">${successRate}%</div>
-                <div style="font-size: 12px; color: #6b7280;">Success Rate</div>
-            </div>
-        </div>
 
-        <!-- Communication Summary -->
-        <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h4 style="margin: 0 0 10px 0; color: #1f2937;">Communication Summary</h4>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
-                <div>
-                    <div style="font-size: 18px; font-weight: bold; color: #0066cc;">${emailCount}</div>
-                    <div style="font-size: 12px; color: #6b7280;">Emails Sent</div>
-                </div>
-                <div>
-                    <div style="font-size: 18px; font-weight: bold; color: #0066cc;">${textCount}</div>
-                    <div style="font-size: 12px; color: #6b7280;">Texts Sent</div>
-                </div>
-                <div>
-                    <div style="font-size: 18px; font-weight: bold; color: #0066cc;">${callAttempts + emailCount + textCount}</div>
-                    <div style="font-size: 12px; color: #6b7280;">Total Outreach</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div style="display: flex; gap: 10px; justify-content: center;">
-            <button onclick="showCallLogs('${leadId}'); this.closest('.call-status-modal').remove();" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                <i class="fas fa-history"></i> View Call Logs
-            </button>
+        <!-- Close Button -->
+        <div style="text-align: center;">
             <button onclick="this.closest('.call-status-modal').remove()" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
                 Close
             </button>
@@ -2090,10 +2253,535 @@ protectedFunctions.showCallStatus = function(leadId) {
     });
 };
 
+// Function to show email confirmation popup
+window.showEmailConfirmationPopup = function(leadId) {
+    console.log(`📧 Showing email confirmation popup for lead: ${leadId}`);
+
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.log(`❌ Lead ${leadId} not found for email confirmation`);
+        return;
+    }
+
+    // Create modal for email confirmation
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000005;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 450px;
+        width: 90%;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    `;
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-envelope" style="color: #3b82f6;"></i> Email Confirmation</h2>
+            <button onclick="this.closest('.email-confirmation-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">×</button>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 25px;">
+            <div style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 15px;">Did the lead confirm they received your email?</div>
+            <div style="font-size: 14px; color: #6b7280;">This affects how long the lead will be highlighted green</div>
+        </div>
+
+        <!-- Response Options -->
+        <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
+            <button onclick="handleEmailConfirmation('${leadId}', true)" style="
+                background: #10b981;
+                color: white;
+                border: none;
+                padding: 15px 25px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 16px;
+                min-width: 120px;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                <i class="fas fa-check"></i> Yes
+                <div style="font-size: 12px; margin-top: 4px;">7 days green</div>
+            </button>
+            <button onclick="handleEmailConfirmation('${leadId}', false)" style="
+                background: #ef4444;
+                color: white;
+                border: none;
+                padding: 15px 25px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 16px;
+                min-width: 120px;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                <i class="fas fa-times"></i> No
+                <div style="font-size: 12px; margin-top: 4px;">2 days green</div>
+            </button>
+        </div>
+
+        <!-- Skip Button -->
+        <div style="text-align: center;">
+            <button onclick="this.closest('.email-confirmation-modal').remove()" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                Skip
+            </button>
+        </div>
+    `;
+
+    modal.className = 'email-confirmation-modal';
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
+
+// Function to handle email confirmation response
+window.handleEmailConfirmation = function(leadId, confirmed) {
+    console.log(`📧 Email confirmation for lead ${leadId}: ${confirmed ? 'YES' : 'NO'}`);
+
+    const days = confirmed ? 7 : 2;
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + days);
+
+    // Get leads and complete reach-out
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        // Initialize reachOut if needed
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {
+                emailCount: 0,
+                textCount: 0,
+                callAttempts: 0,
+                callsConnected: 0,
+                voicemailCount: 0,
+                callLogs: []
+            };
+        }
+
+        // Initialize callLogs array if it doesn't exist
+        if (!leads[leadIndex].reachOut.callLogs) {
+            leads[leadIndex].reachOut.callLogs = [];
+        }
+
+        // Add 1 connected call (regardless of YES/NO)
+        const currentConnected = leads[leadIndex].reachOut.callsConnected || 0;
+        leads[leadIndex].reachOut.callsConnected = currentConnected + 1;
+
+        // Add call log entry
+        const callLog = {
+            timestamp: new Date().toISOString(),
+            connected: true,
+            duration: '5 min',
+            leftVoicemail: false,
+            notes: `Email confirmation call - ${confirmed ? 'Lead confirmed receiving email' : 'Lead did not confirm email'}`
+        };
+        leads[leadIndex].reachOut.callLogs.push(callLog);
+
+        // Mark reach-out as COMPLETE
+        leads[leadIndex].reachOut.completedAt = new Date().toISOString();
+        leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
+        leads[leadIndex].reachOut.called = true;
+
+        // Set green highlight (using existing format)
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {};
+        }
+        leads[leadIndex].reachOut.greenHighlightUntil = expiryDate.toISOString();
+        leads[leadIndex].reachOut.greenHighlightDays = days;
+
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Save to server
+        const updateData = {
+            reachOut: leads[leadIndex].reachOut
+        };
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Reach-out completion and green highlight saved to server');
+            }
+        }).catch(error => console.error('❌ Error saving completion data:', error));
+
+        // Update the connected display immediately
+        const connectedDisplay = document.getElementById(`call-connected-${leadId}`);
+        if (connectedDisplay) {
+            connectedDisplay.textContent = leads[leadIndex].reachOut.callsConnected;
+        }
+
+        // Update checkbox to checked
+        const checkbox = document.getElementById(`call-made-${leadId}`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+
+        // Mark reach-out as COMPLETE with green styling
+        markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt);
+
+        showNotification(`Email confirmed! Reach-out completed. Lead will stay green for ${days} days.`, 'success');
+    }
+
+    // Close modal
+    document.querySelector('.email-confirmation-modal').remove();
+
+    // Refresh table to show green highlighting and completion
+    setTimeout(() => {
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        refreshLeadsTable();
+    }, 300);
+};
+
+// Function to show green highlight duration popup
+window.showGreenHighlightDurationPopup = function(leadId) {
+    console.log(`🟢 Showing green highlight duration popup for lead: ${leadId}`);
+
+    // Check if this lead has "REACH OUT" todo
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.log(`❌ Lead ${leadId} not found, skipping popup`);
+        return;
+    }
+
+    // Check if lead is in a reachout scenario
+    const todoText = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : '').toLowerCase();
+
+    // Check for reachout scenarios:
+    // 1. Todo text includes "reach out"
+    // 2. Stages like "info requested", "loss runs requested", "quote sent" with called box checked
+    const stage = (lead.stage || '').toLowerCase();
+    const hasCalled = lead.reachOut && lead.reachOut.called;
+
+    const isReachOutScenario = todoText.includes('reach out') ||
+                              (stage.includes('info_requested') && hasCalled) ||
+                              (stage.includes('loss_runs_requested') && hasCalled) ||
+                              (stage.includes('quote_sent') && hasCalled) ||
+                              (stage.includes('contact_attempted') && hasCalled);
+
+    if (!isReachOutScenario) {
+        console.log(`⏭️ Lead ${leadId} not in reachout scenario (stage: "${stage}", called: ${hasCalled}, todo: "${todoText}"), skipping popup`);
+        return;
+    }
+
+    console.log(`✅ Lead ${leadId} is in reachout scenario (stage: "${stage}", called: ${hasCalled}, todo: "${todoText}"), showing popup`);
+
+    // Create modal for green highlight duration selection
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000004;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    `;
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-highlight" style="color: #10b981;"></i> Set Green Highlight Duration</h2>
+            <button onclick="this.closest('.green-highlight-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+        </div>
+
+        <p style="color: #6b7280; margin-bottom: 20px; text-align: center;">How long should this lead stay highlighted in green?</p>
+
+        <!-- Duration Options -->
+        <div style="margin-bottom: 25px;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px;">
+                <button onclick="setGreenHighlightDuration('${leadId}', 2)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
+                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
+                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                    2 Days<br><span style="font-size: 12px; color: #6b7280;">Standard</span>
+                </button>
+                <button onclick="setGreenHighlightDuration('${leadId}', 3)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
+                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
+                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                    3 Days
+                </button>
+                <button onclick="setGreenHighlightDuration('${leadId}', 5)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
+                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
+                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                    5 Days
+                </button>
+                <button onclick="setGreenHighlightDuration('${leadId}', 7)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
+                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
+                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                    7 Days
+                </button>
+                <button onclick="setGreenHighlightDuration('${leadId}', 14)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
+                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
+                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                    14 Days
+                </button>
+                <button onclick="showCustomDurationInput('${leadId}')" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
+                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
+                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                    Custom
+                </button>
+            </div>
+        </div>
+
+        <!-- Custom Duration Input (initially hidden) -->
+        <div id="customDurationDiv" style="display: none; margin-bottom: 20px; padding: 15px; background: #f9fafb; border-radius: 8px;">
+            <label style="font-weight: 600; margin-bottom: 10px; display: block;">Custom Duration (days):</label>
+            <input type="number" id="customDays" min="1" max="365" placeholder="Enter days" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; margin-bottom: 10px;">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="setGreenHighlightDuration('${leadId}', document.getElementById('customDays').value)" style="flex: 1; padding: 8px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Set Custom</button>
+                <button onclick="document.getElementById('customDurationDiv').style.display='none'" style="flex: 1; padding: 8px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Close Button -->
+        <div style="text-align: center;">
+            <button onclick="this.closest('.green-highlight-modal').remove()" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                Skip
+            </button>
+        </div>
+    `;
+
+    modal.className = 'green-highlight-modal';
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
+
+// Function to show custom duration input
+window.showCustomDurationInput = function(leadId) {
+    document.getElementById('customDurationDiv').style.display = 'block';
+};
+
+// Function to set green highlight duration
+window.setGreenHighlightDuration = function(leadId, days) {
+    const daysNum = parseInt(days) || 2;
+    console.log(`🟢 Setting green highlight duration for lead ${leadId}: ${daysNum} days`);
+
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        // Set green highlight expiration
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + daysNum);
+
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {};
+        }
+
+        leads[leadIndex].reachOut.greenHighlightUntil = expirationDate.toISOString();
+        leads[leadIndex].reachOut.greenHighlightDays = daysNum;
+
+        // Save to localStorage
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        console.log(`✅ Green highlight set until: ${expirationDate.toLocaleDateString()}`);
+    }
+
+    // Close the modal
+    const modal = document.querySelector('.green-highlight-modal');
+    if (modal) {
+        modal.remove();
+    }
+
+    // Show notification
+    showNotification(`Lead will stay green for ${daysNum} ${daysNum === 1 ? 'day' : 'days'}`, 'success');
+};
+
+// Custom modal for Contact Attempted confirmation
+function showContactAttemptedModal(leadId, callback) {
+    // Create modal overlay
+    const modalOverlay = document.createElement('div');
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 3000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+    `;
+
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 450px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        position: relative;
+    `;
+
+    modal.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="width: 60px; height: 60px; background: #fef3c7; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-phone" style="font-size: 24px; color: #f59e0b;"></i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Contact Attempt</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 16px; line-height: 1.5;">
+                Did you attempt to call this lead with no pickup?
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="contact-attempted-yes" style="
+                background: #dc2626;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 80px;
+                transition: all 0.2s;
+            ">Yes</button>
+            <button id="contact-attempted-no" style="
+                background: #f3f4f6;
+                color: #374151;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 80px;
+                transition: all 0.2s;
+            ">No</button>
+        </div>
+    `;
+
+    modalOverlay.appendChild(modal);
+    document.body.appendChild(modalOverlay);
+
+    // Add hover effects
+    const noBtn = modal.querySelector('#contact-attempted-no');
+    const yesBtn = modal.querySelector('#contact-attempted-yes');
+
+    noBtn.addEventListener('mouseenter', () => {
+        noBtn.style.background = '#e5e7eb';
+    });
+    noBtn.addEventListener('mouseleave', () => {
+        noBtn.style.background = '#f3f4f6';
+    });
+
+    yesBtn.addEventListener('mouseenter', () => {
+        yesBtn.style.background = '#b91c1c';
+    });
+    yesBtn.addEventListener('mouseleave', () => {
+        yesBtn.style.background = '#dc2626';
+    });
+
+    // Handle button clicks
+    noBtn.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        callback(false);
+    });
+
+    yesBtn.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        callback(true);
+    });
+
+    // Handle escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            document.body.removeChild(modalOverlay);
+            callback(false);
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Handle click outside modal
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) {
+            document.body.removeChild(modalOverlay);
+            callback(false);
+        }
+    });
+}
+
 // Update stage function
 protectedFunctions.updateLeadStage = function(leadId, stage) {
     console.log('Updating lead stage:', leadId, stage);
 
+    // Special handling for Contact Attempted stage
+    let contactAttemptedCompleted = false;
+    if (stage === 'contact_attempted') {
+        showContactAttemptedModal(leadId, (confirmed) => {
+            if (confirmed) {
+                // Auto-complete the reach-out
+                handleContactAttemptedCompletion(leadId);
+                contactAttemptedCompleted = true;
+
+                // Continue with stage update
+                continueStageUpdate(leadId, stage, contactAttemptedCompleted);
+            } else {
+                // Continue with stage update but no auto-completion
+                continueStageUpdate(leadId, stage, false);
+            }
+        });
+        return; // Exit early, continuation handled by callback
+    }
+
+    // For non-contact-attempted stages, continue normally
+    continueStageUpdate(leadId, stage, contactAttemptedCompleted);
+};
+
+// Extracted stage update continuation logic
+function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
     const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
 
@@ -2104,24 +2792,33 @@ protectedFunctions.updateLeadStage = function(leadId, stage) {
         leads[leadIndex].stage = stage;
         leads[leadIndex].stageUpdatedAt = now;
 
-        // Reset reach-out data when stage changes
-        console.log('🔄 Stage changed - resetting reach-out data for lead:', leadId);
-        if (leads[leadIndex].reachOut) {
-            // Reset all reach-out completion data
-            leads[leadIndex].reachOut.completedAt = null;
-            leads[leadIndex].reachOut.reachOutCompletedAt = null;
-            leads[leadIndex].reachOut.callsConnected = 0;
-            leads[leadIndex].reachOut.textCount = 0;
-            leads[leadIndex].reachOut.emailSent = false;
-            leads[leadIndex].reachOut.textSent = false;
-            leads[leadIndex].reachOut.callMade = false;
-            leads[leadIndex].reachOut.emailCount = 0;
-            leads[leadIndex].reachOut.callAttempts = 0;
-            leads[leadIndex].reachOut.voicemailCount = 0;
-            console.log('✅ Reach-out data reset for lead:', leadId);
+        // Reset reach-out data when stage changes (unless Contact Attempted was completed)
+        if (!contactAttemptedCompleted) {
+            console.log('🔄 Stage changed - resetting reach-out data for lead:', leadId);
+            if (leads[leadIndex].reachOut) {
+                // Reset all reach-out completion data
+                leads[leadIndex].reachOut.completedAt = null;
+                leads[leadIndex].reachOut.reachOutCompletedAt = null;
+                leads[leadIndex].reachOut.callsConnected = 0;
+                leads[leadIndex].reachOut.textCount = 0;
+                leads[leadIndex].reachOut.emailSent = false;
+                leads[leadIndex].reachOut.textSent = false;
+                leads[leadIndex].reachOut.callMade = false;
+                leads[leadIndex].reachOut.emailCount = 0;
+                leads[leadIndex].reachOut.callAttempts = 0;
+                leads[leadIndex].reachOut.voicemailCount = 0;
+                console.log('✅ Reach-out data reset for lead:', leadId);
+            }
+        } else {
+            console.log('⏭️ Skipping reach-out reset - Contact Attempted was completed');
         }
 
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Check if email confirmation popup should be shown
+        if (stage === 'info_requested' || stage === 'loss_runs_requested') {
+            showEmailConfirmationPopup(leadId);
+        }
 
         // Save stage change to server (including reset reach-out data)
         const updateData = {
@@ -2161,6 +2858,7 @@ protectedFunctions.updateLeadStage = function(leadId, stage) {
 
         // Update reach-out styling based on new stage requirements
         const stagesRequiringReachOut = [
+            'Contact Attempted', 'contact_attempted',
             'Info Requested', 'info_requested',
             'Loss Runs Requested', 'loss_runs_requested',
             'Quote Sent', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware',
@@ -2171,22 +2869,30 @@ protectedFunctions.updateLeadStage = function(leadId, stage) {
         applyReachOutStyling(leadId, hasReachOutTodo);
         console.log(`🎨 Stage change: ${stage}, hasReachOut: ${hasReachOutTodo}`);
 
-        // Update the table display immediately
+        // Immediately update the stage badge in the leads table
+        updateStageBadgeInTable(leadId, stage);
+
+        // Update the table display immediately with localStorage data
         refreshLeadsTable();
     }
-};
+}
 
 // Override viewLead to use enhanced profile
 protectedFunctions.viewLead = function(leadId) {
     console.log('🔥 viewLead override called for:', leadId);
 
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    console.log(`🔍 SEARCHING: Looking for lead ID ${leadId} in ${leads.length} total leads`);
+    console.log(`🔍 AVAILABLE LEAD IDS:`, leads.map(l => l.id).join(', '));
+
     const lead = leads.find(l => String(l.id) === String(leadId));
 
     if (lead) {
+        console.log(`✅ FOUND LEAD: ID=${lead.id}, Name=${lead.name}`);
         protectedFunctions.createEnhancedProfile(lead);
     } else {
-        console.error('Lead not found:', leadId);
+        console.error('❌ Lead not found:', leadId);
+        console.error('❌ Available leads:', leads.map(l => `${l.id}: ${l.name}`));
     }
 };
 
@@ -3372,6 +4078,15 @@ protectedFunctions.sendEmail = async function(leadId) {
         // Update reach out count
         protectedFunctions.updateReachOut(leadId, 'email', true);
 
+        // Update lead stage to "app sent" after successful email
+        try {
+            console.log('🎯 Auto-updating stage to "app sent" after successful email for lead:', leadId);
+            protectedFunctions.updateLeadStage(leadId, 'app_sent');
+            console.log('✅ Stage updated successfully to app_sent for lead:', leadId);
+        } catch (stageError) {
+            console.error('❌ Error updating stage to app_sent:', stageError);
+        }
+
         // Show success message
         alert(`Email sent successfully!\n\nTo: ${to}\nSubject: ${subject}\nAttachments: ${attachments.length} files\nMessage ID: ${result.messageId}`);
 
@@ -3420,15 +4135,51 @@ console.log('🔥 Available functions:', {
     'sendEmail': typeof window.sendEmail
 });
 
+// Function to immediately update stage badge in the table
+function updateStageBadgeInTable(leadId, newStage) {
+    console.log(`🏷️ Updating stage badge for lead ${leadId} to: ${newStage}`);
+
+    // Find the lead row in the table
+    const leadRow = document.querySelector(`tr[data-lead-id="${leadId}"]`);
+    if (leadRow) {
+        // Find the stage cell (usually column 6, but let's be more specific)
+        const stageBadge = leadRow.querySelector('.stage-badge');
+        if (stageBadge) {
+            // Update the stage class and text
+            stageBadge.className = `stage-badge stage-${newStage.replace(/_/g, '-')}`;
+
+            // Update the stage text using formatStageName if available
+            if (typeof window.formatStageName === 'function') {
+                stageBadge.textContent = window.formatStageName(newStage);
+            } else {
+                // Fallback: capitalize and replace underscores
+                stageBadge.textContent = newStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            }
+
+            console.log(`✅ Stage badge updated immediately for lead ${leadId}: ${newStage}`);
+        } else {
+            console.warn(`⚠️ Stage badge not found for lead ${leadId}`);
+        }
+    } else {
+        console.warn(`⚠️ Lead row not found for lead ${leadId}`);
+    }
+}
+
 // Function to refresh the leads table when modal closes
 function refreshLeadsTable() {
     console.log('🔄 Refreshing leads table after profile changes...');
+
+    // Force use localStorage data to avoid server delay
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    console.log('🔍 Using localStorage data for immediate refresh:', leads.length, 'leads');
 
     // Try multiple methods to refresh the leads display
     if (window.displayLeads && typeof window.displayLeads === 'function') {
         window.displayLeads();
         console.log('✅ Refreshed using displayLeads()');
     } else if (window.loadLeadsView && typeof window.loadLeadsView === 'function') {
+        // Store current leads to ensure localStorage is up to date
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
         window.loadLeadsView();
         console.log('✅ Refreshed using loadLeadsView()');
     } else if (document.querySelector('.data-table tbody')) {
@@ -3539,6 +4290,110 @@ window.updateWinLossStatus = protectedFunctions.updateWinLossStatus;
 window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
 window.sendEmail = protectedFunctions.sendEmail;
+
+// Handle Contact Attempted completion
+window.handleContactAttemptedCompletion = function(leadId) {
+    console.log('🎯 Auto-completing Contact Attempted reach-out for lead:', leadId);
+
+    try {
+        // Get leads from localStorage
+        let insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+        // Find the lead
+        let lead = insurance_leads.find(l => String(l.id) === String(leadId)) ||
+                  regular_leads.find(l => String(l.id) === String(leadId));
+
+        if (!lead) {
+            console.error('Lead not found for ID:', leadId);
+            return;
+        }
+
+        // Initialize reach-out data if it doesn't exist
+        if (!lead.reachOut) {
+            lead.reachOut = {
+                callAttempts: 0,
+                callsConnected: 0,
+                emailCount: 0,
+                textCount: 0,
+                voicemailCount: 0,
+                callLogs: []
+            };
+        }
+
+        // Increment call attempts by 1 (no pickup means connected stays at 0)
+        lead.reachOut.callAttempts += 1;
+
+        // Mark reach-out as FORCE COMPLETED with current timestamp
+        const completedAt = new Date().toISOString();
+        lead.reachOut.reachOutCompletedAt = completedAt;
+        lead.reachOut.completedAt = completedAt;
+
+        // Force complete all reach-out activities to bypass sequential todos
+        lead.reachOut.emailCount = 1;  // Mark email as sent
+        lead.reachOut.textCount = 1;   // Mark text as sent
+        lead.reachOut.emailSent = true;
+        lead.reachOut.textSent = true;
+        lead.reachOut.callMade = true;
+
+        // Ensure callLogs array exists before pushing
+        if (!lead.reachOut.callLogs) {
+            lead.reachOut.callLogs = [];
+        }
+
+        // Add a call log entry
+        lead.reachOut.callLogs.push({
+            timestamp: completedAt,
+            connected: false, // No pickup, so not connected
+            duration: null,
+            leftVoicemail: false,
+            notes: 'Contact attempted - No pickup (auto-generated)'
+        });
+
+        // Set 1-day green highlighting
+        const oneDayFromNow = new Date();
+        oneDayFromNow.setDate(oneDayFromNow.getDate() + 1);
+        lead.greenUntil = oneDayFromNow.toISOString();
+
+        // Update the lead in both storage locations
+        const insuranceIndex = insurance_leads.findIndex(l => String(l.id) === String(leadId));
+        if (insuranceIndex !== -1) {
+            insurance_leads[insuranceIndex] = lead;
+            localStorage.setItem('insurance_leads', JSON.stringify(insurance_leads));
+        }
+
+        const regularIndex = regular_leads.findIndex(l => String(l.id) === String(leadId));
+        if (regularIndex !== -1) {
+            regular_leads[regularIndex] = lead;
+            localStorage.setItem('leads', JSON.stringify(regular_leads));
+        }
+
+        console.log('✅ Contact Attempted reach-out completed:', {
+            leadId: leadId,
+            attempts: lead.reachOut.callAttempts,
+            completedAt: completedAt,
+            greenUntil: lead.greenUntil
+        });
+
+        // Show notification
+        if (window.showNotification) {
+            showNotification('Contact attempt recorded! Lead highlighted green for 1 day.', 'success');
+        }
+
+        // Force refresh the lead profile to show updated data
+        if (window.createEnhancedProfile) {
+            setTimeout(() => {
+                window.createEnhancedProfile(lead);
+            }, 1000);
+        }
+
+    } catch (error) {
+        console.error('Error completing Contact Attempted reach-out:', error);
+        if (window.showNotification) {
+            showNotification('Error recording contact attempt', 'error');
+        }
+    }
+};
 
 // Vehicle, Trailer, Driver management functions
 window.addVehicleToLead = protectedFunctions.addVehicleToLead;
@@ -4448,10 +5303,162 @@ try {
     console.log('💾 Storage usage check failed:', e.message);
 }
 
+// Fix all lead reachOut references to prevent data sharing between leads
+protectedFunctions.fixAllLeadReachOutReferences = function() {
+    console.log('🔧 Fixing all lead reachOut references to prevent data sharing...');
+
+    try {
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        let fixedCount = 0;
+
+        leads.forEach(lead => {
+            // Ensure each lead has its own unique reachOut object
+            if (!lead.reachOut || typeof lead.reachOut !== 'object') {
+                lead.reachOut = {
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    emailCount: 0,
+                    textCount: 0,
+                    voicemailCount: 0
+                };
+                fixedCount++;
+                console.log(`🔧 Created new reachOut for lead ${lead.id} - ${lead.name}`);
+            } else {
+                // Create a completely new object to break any references
+                lead.reachOut = {
+                    callAttempts: lead.reachOut.callAttempts || 0,
+                    callsConnected: lead.reachOut.callsConnected || 0,
+                    emailCount: lead.reachOut.emailCount || 0,
+                    textCount: lead.reachOut.textCount || 0,
+                    voicemailCount: lead.reachOut.voicemailCount || 0,
+                    // Preserve other important properties
+                    ...(lead.reachOut.callLogs && { callLogs: [...(lead.reachOut.callLogs || [])] }),
+                    ...(lead.reachOut.completedAt && { completedAt: lead.reachOut.completedAt }),
+                    ...(lead.reachOut.reachOutCompletedAt && { reachOutCompletedAt: lead.reachOut.reachOutCompletedAt })
+                };
+                fixedCount++;
+            }
+        });
+
+        // Save the fixed data back to localStorage
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log(`✅ Fixed reachOut references for ${fixedCount} leads`);
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error fixing lead reachOut references:', error);
+        return false;
+    }
+};
+
+// Clear any cached hardcoded test lead data
+protectedFunctions.clearTestLeadData = function() {
+    try {
+        const testLeadId = '8126662';
+
+        // Clear all localStorage keys containing the test lead ID
+        const keysToRemove = [];
+        Object.keys(localStorage).forEach(key => {
+            if (key.includes(testLeadId)) {
+                keysToRemove.push(key);
+            }
+        });
+
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+            console.log(`🧹 Cleared cached test data: ${key}`);
+        });
+
+        // Force clear any reach out modal elements that might be lingering
+        const existingModalElements = document.querySelectorAll(`[id*="${testLeadId}"]`);
+        existingModalElements.forEach(el => {
+            console.log(`🧹 Removing lingering test element: ${el.id}`);
+            el.remove();
+        });
+
+        console.log(`✅ Test data cleanup completed - cleared ${keysToRemove.length} localStorage keys and ${existingModalElements.length} DOM elements`);
+        return true;
+    } catch (error) {
+        console.error('Error clearing test lead data:', error);
+        return false;
+    }
+};
+
+// Automatically clear test data on load
+protectedFunctions.clearTestLeadData();
+
+// DISABLED - DOM Protection System was causing infinite loops
+protectedFunctions.protectModalIDs = function(leadId, modalContainer) {
+    console.log(`🛡️ DOM protection disabled to prevent infinite loops for lead ${leadId}`);
+    // This function is now a no-op to prevent the infinite loop issue
+    return null;
+};
+
+// Manual test function to set different reach out stats for testing
+window.setTestReachOutStats = function() {
+    console.log('🧪 Setting test reach out stats for different leads...');
+
+    // Get leads from localStorage
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    // Find the three test leads mentioned by the user
+    const testLeadNames = ['KLASSIC TRANSPORTING', 'CENTEX TRANSPORTATIO', 'DULLANI TRANSPORT'];
+
+    let updatedCount = 0;
+    leads.forEach((lead, index) => {
+        if (testLeadNames.some(name => lead.name && lead.name.includes(name))) {
+            // Initialize reachOut if it doesn't exist
+            if (!lead.reachOut) {
+                lead.reachOut = {
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    emailCount: 0,
+                    textCount: 0,
+                    voicemailCount: 0
+                };
+            }
+
+            // Set different stats for each lead for testing
+            if (lead.name.includes('KLASSIC')) {
+                lead.reachOut.callAttempts = 3;
+                lead.reachOut.callsConnected = 1;
+                lead.reachOut.emailCount = 2;
+                lead.reachOut.textCount = 1;
+                console.log(`🔧 Set KLASSIC stats: calls=${lead.reachOut.callAttempts}, emails=${lead.reachOut.emailCount}`);
+            } else if (lead.name.includes('CENTEX')) {
+                lead.reachOut.callAttempts = 5;
+                lead.reachOut.callsConnected = 2;
+                lead.reachOut.emailCount = 1;
+                lead.reachOut.textCount = 3;
+                console.log(`🔧 Set CENTEX stats: calls=${lead.reachOut.callAttempts}, emails=${lead.reachOut.emailCount}`);
+            } else if (lead.name.includes('DULLANI')) {
+                lead.reachOut.callAttempts = 1;
+                lead.reachOut.callsConnected = 0;
+                lead.reachOut.emailCount = 3;
+                lead.reachOut.textCount = 0;
+                console.log(`🔧 Set DULLANI stats: calls=${lead.reachOut.callAttempts}, emails=${lead.reachOut.emailCount}`);
+            }
+            updatedCount++;
+        }
+    });
+
+    // Save back to localStorage
+    localStorage.setItem('insurance_leads', JSON.stringify(leads));
+    console.log(`✅ Updated reach out stats for ${updatedCount} test leads`);
+    console.log('💡 Now open different lead profiles to verify each has unique data!');
+
+    return updatedCount;
+};
+
+console.log('🧪 Test function available: setTestReachOutStats() - run this to set different stats for test leads');
+
 // Ensure our protected functions override any others - ULTRA AGGRESSIVE OVERRIDE
 window.viewLead = protectedFunctions.viewLead;
 window.createEnhancedProfile = protectedFunctions.createEnhancedProfile;
 window.showLeadProfile = protectedFunctions.showLeadProfile;
+window.updateReachOut = protectedFunctions.updateReachOut;
+window.showCallLogs = protectedFunctions.showCallLogs;
+window.showCallStatus = protectedFunctions.showCallStatus;
 
 // Add getReachOutStatus function for compatibility with test files and external access
 window.getReachOutStatus = function(lead) {
@@ -4481,7 +5488,7 @@ window.getReachOutStatus = function(lead) {
         lead.stage === 'quoted' || lead.stage === 'info_requested' || lead.stage === 'Info Requested' ||
         lead.stage === 'loss_runs_requested' || lead.stage === 'Loss Runs Requested' ||
         lead.stage === 'quote_sent' || lead.stage === 'quote-sent-unaware' || lead.stage === 'quote-sent-aware' ||
-        lead.stage === 'interested' || lead.stage === 'Interested'
+        lead.stage === 'sale' || lead.stage === 'Sale'
     );
 
     if (!stageRequiresReachOut) {
@@ -4553,6 +5560,21 @@ function lockFunctions() {
             writable: false,
             configurable: false
         });
+        Object.defineProperty(window, 'updateReachOut', {
+            value: protectedFunctions.updateReachOut,
+            writable: false,
+            configurable: false
+        });
+        Object.defineProperty(window, 'showCallLogs', {
+            value: protectedFunctions.showCallLogs,
+            writable: false,
+            configurable: false
+        });
+        Object.defineProperty(window, 'showCallStatus', {
+            value: protectedFunctions.showCallStatus,
+            writable: false,
+            configurable: false
+        });
         console.log('🔒 FUNCTIONS LOCKED: Protected functions are now non-configurable and non-writable');
     } catch (error) {
         console.warn('⚠️ Could not lock functions, falling back to aggressive override:', error.message);
@@ -4560,6 +5582,12 @@ function lockFunctions() {
         window.viewLead = protectedFunctions.viewLead;
         window.createEnhancedProfile = protectedFunctions.createEnhancedProfile;
         window.showLeadProfile = protectedFunctions.showLeadProfile;
+        window.updateReachOut = protectedFunctions.updateReachOut;
+        window.showCallLogs = protectedFunctions.showCallLogs;
+        window.showCallStatus = protectedFunctions.showCallStatus;
+window.updateReachOut = protectedFunctions.updateReachOut;
+window.showCallLogs = protectedFunctions.showCallLogs;
+window.showCallStatus = protectedFunctions.showCallStatus;
     }
 }
 
@@ -4659,7 +5687,10 @@ setInterval(() => {
     // Check if functions are still ours
     if (window.showLeadProfile !== protectedFunctions.showLeadProfile ||
         window.viewLead !== protectedFunctions.viewLead ||
-        window.createEnhancedProfile !== protectedFunctions.createEnhancedProfile) {
+        window.createEnhancedProfile !== protectedFunctions.createEnhancedProfile ||
+        window.updateReachOut !== protectedFunctions.updateReachOut ||
+        window.showCallLogs !== protectedFunctions.showCallLogs ||
+        window.showCallStatus !== protectedFunctions.showCallStatus) {
 
         console.warn('🚨 FUNCTION OVERRIDE DETECTED! Re-establishing protection...');
         lockFunctions();

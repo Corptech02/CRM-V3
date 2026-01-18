@@ -16,6 +16,15 @@
         // Ensure leadId is a string
         leadId = String(leadId);
 
+        // Special handling for Contact Attempted stage
+        if (newStage === 'contact_attempted') {
+            const confirmed = confirm('Did you attempt to call the lead with no pickup?');
+            if (confirmed) {
+                // Auto-complete the reach-out
+                await handleContactAttemptedCompletion(leadId);
+            }
+        }
+
         try {
             // Update in ALL localStorage locations
             let insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
@@ -40,7 +49,7 @@
                 insurance_leads[insuranceIndex].stageTimestamps[newStage] = currentTimestamp;
 
                 // CRITICAL: Clear reach-out completion when moving to non-reach-out stages
-                const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+                const reachOutStages = ['quoted', 'info_requested', 'contact_attempted', 'quote_sent', 'interested'];
                 if (!reachOutStages.includes(newStage)) {
                     // Stage doesn't require reach out - clear completion data
                     if (insurance_leads[insuranceIndex].reachOut) {
@@ -73,7 +82,7 @@
                 regular_leads[regularIndex].stageTimestamps[newStage] = currentTimestamp;
 
                 // CRITICAL: Clear reach-out completion when moving to non-reach-out stages
-                const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+                const reachOutStages = ['quoted', 'info_requested', 'contact_attempted', 'quote_sent', 'interested'];
                 if (!reachOutStages.includes(newStage)) {
                     // Stage doesn't require reach out - clear completion data
                     if (regular_leads[regularIndex].reachOut) {
@@ -123,7 +132,7 @@
                 window.leadStore[leadId].stageUpdatedAt = new Date().toISOString();
 
                 // Clear reach-out completion in memory store too
-                const reachOutStages = ['quoted', 'info_requested', 'quote_sent', 'interested'];
+                const reachOutStages = ['quoted', 'info_requested', 'contact_attempted', 'quote_sent', 'interested'];
                 if (!reachOutStages.includes(newStage) && window.leadStore[leadId].reachOut) {
                     console.log('🔄 Clearing reach-out completion data in memory store');
                     window.leadStore[leadId].reachOut.callsConnected = 0;
@@ -494,4 +503,89 @@
     };
 
     console.log('✅ Premium field will now save to server!');
+
+    // Handle Contact Attempted completion
+    window.handleContactAttemptedCompletion = async function(leadId) {
+        console.log('🎯 Auto-completing Contact Attempted reach-out for lead:', leadId);
+
+        try {
+            // Get leads from localStorage
+            let insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            let regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+
+            // Find the lead
+            let lead = insurance_leads.find(l => String(l.id) === String(leadId)) ||
+                      regular_leads.find(l => String(l.id) === String(leadId));
+
+            if (!lead) {
+                console.error('Lead not found for ID:', leadId);
+                return;
+            }
+
+            // Initialize reach-out data if it doesn't exist
+            if (!lead.reachOut) {
+                lead.reachOut = {
+                    callAttempts: 0,
+                    callsConnected: 0,
+                    emailCount: 0,
+                    textCount: 0,
+                    voicemailCount: 0,
+                    callLogs: []
+                };
+            }
+
+            // Increment call attempts by 1
+            lead.reachOut.callAttempts += 1;
+
+            // Mark reach-out as completed with current timestamp
+            const completedAt = new Date().toISOString();
+            lead.reachOut.reachOutCompletedAt = completedAt;
+            lead.reachOut.completedAt = completedAt;
+
+            // Add a call log entry
+            lead.reachOut.callLogs.push({
+                timestamp: completedAt,
+                connected: false,
+                duration: null,
+                leftVoicemail: false,
+                notes: 'Contact attempted - No pickup (auto-generated)'
+            });
+
+            // Set 1-day green highlighting
+            const oneDayFromNow = new Date();
+            oneDayFromNow.setDate(oneDayFromNow.getDate() + 1);
+            lead.greenUntil = oneDayFromNow.toISOString();
+
+            // Update the lead in both storage locations
+            const insuranceIndex = insurance_leads.findIndex(l => String(l.id) === String(leadId));
+            if (insuranceIndex !== -1) {
+                insurance_leads[insuranceIndex] = lead;
+                localStorage.setItem('insurance_leads', JSON.stringify(insurance_leads));
+            }
+
+            const regularIndex = regular_leads.findIndex(l => String(l.id) === String(leadId));
+            if (regularIndex !== -1) {
+                regular_leads[regularIndex] = lead;
+                localStorage.setItem('leads', JSON.stringify(regular_leads));
+            }
+
+            console.log('✅ Contact Attempted reach-out completed:', {
+                leadId: leadId,
+                attempts: lead.reachOut.callAttempts,
+                completedAt: completedAt,
+                greenUntil: lead.greenUntil
+            });
+
+            // Show notification
+            if (window.showNotification) {
+                showNotification('Contact attempt recorded! Lead marked as complete for 1 day.', 'success');
+            }
+
+        } catch (error) {
+            console.error('Error completing Contact Attempted reach-out:', error);
+            if (window.showNotification) {
+                showNotification('Error recording contact attempt', 'error');
+            }
+        }
+    };
 })();

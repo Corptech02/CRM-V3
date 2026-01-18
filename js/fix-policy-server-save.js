@@ -108,6 +108,10 @@ console.log('Policy Server Save Fix: Loading...');
                 showNotification('Policy saved locally (Server database needs fixing)', 'warning');
             }
 
+            // Clear editing state to ensure next policy creation works properly
+            window.editingPolicyId = undefined;
+            console.log('🔧 Cleared editingPolicyId after fallback save');
+
             // Close the policy edit modal
             const policyModal = document.querySelector('#policyModal');
             if (policyModal) {
@@ -169,14 +173,28 @@ console.log('Policy Server Save Fix: Loading...');
         }
 
         try {
-            // If no policyData is provided, we must collect it from the form
+            // If no policyData is provided, try to use the enhanced collection from app.js first
             if (!policyData) {
-                console.log('No policyData provided, collecting from form...');
+                console.log('No policyData provided, trying enhanced collection first...');
 
-                // Try to collect comprehensive policy data from all form tabs
-                console.log('Collecting comprehensive policy data from modal form...');
+                // Try the enhanced collectPolicyData function from app.js
+                if (typeof window.collectPolicyData === 'function') {
+                    console.log('🎯 Using enhanced collectPolicyData function from app.js...');
+                    policyData = window.collectPolicyData();
 
-                // Start with basic overview data
+                    if (policyData && policyData.vehicles) {
+                        console.log('✅ Enhanced collection succeeded, vehicles found:', policyData.vehicles.length);
+                        console.log('🔍 Vehicle data sample:', JSON.stringify(policyData.vehicles[0] || {}, null, 2));
+                    }
+                }
+
+                // If enhanced collection failed or returned no data, fall back to manual collection
+                if (!policyData) {
+                    console.log('Enhanced collection failed, falling back to manual collection...');
+                    // Try to collect comprehensive policy data from all form tabs
+                    console.log('Collecting comprehensive policy data from modal form...');
+
+                    // Start with basic overview data
                 policyData = {
                     policyNumber: document.getElementById('overview-policy-number')?.value || `POL-${Date.now()}`,
                     carrier: document.getElementById('overview-carrier')?.value || '',
@@ -208,10 +226,17 @@ console.log('Policy Server Save Fix: Loading...');
                     policyData.policyType = typeMap[policyTypeField.value] || policyTypeField.value.toLowerCase().replace(/\s+/g, '-');
                 }
 
-                // Check if we're editing an existing policy
-                const isEditing = window.editingPolicyId !== undefined;
+                // Check if we're editing an existing policy (not creating new)
+                const isEditing = window.editingPolicyId !== undefined &&
+                                window.editingPolicyId !== 'new' &&
+                                window.editingPolicyId !== '' &&
+                                window.editingPolicyId !== null;
+
                 if (isEditing) {
+                    console.log('🔧 Editing existing policy with ID:', window.editingPolicyId);
                     policyData.id = window.editingPolicyId;
+                } else {
+                    console.log('🔧 Creating new policy (editingPolicyId:', window.editingPolicyId, ')');
                 }
 
                 // Try to get client association if available
@@ -219,6 +244,81 @@ console.log('Policy Server Save Fix: Loading...');
                     policyData.clientId = window.currentClientId || window.currentViewingClientId;
                     console.log('Added client association:', policyData.clientId);
                 }
+
+                // Collect vehicles data
+                policyData.vehicles = [];
+                const vehicleContainers = document.querySelectorAll('[id^="vehicle-"], .vehicle-entry, .vehicle-container');
+                vehicleContainers.forEach((container, index) => {
+                    const vehicle = {};
+                    const inputs = container.querySelectorAll('input, select, textarea');
+
+                    inputs.forEach(input => {
+                        if (input.value) {
+                            const id = input.id || input.name || '';
+                            const label = input.closest('.form-group')?.querySelector('label')?.textContent?.replace(' *', '').replace(':', '').trim();
+
+                            // Map common vehicle field IDs to standardized names
+                            let fieldName = label || id;
+                            if (id.includes('year')) fieldName = 'year';
+                            else if (id.includes('make')) fieldName = 'make';
+                            else if (id.includes('model')) fieldName = 'model';
+                            else if (id.includes('vin')) fieldName = 'vin';
+                            else if (id.includes('value')) fieldName = 'value';
+                            else if (id.includes('deductible')) fieldName = 'deductible';
+
+                            vehicle[fieldName] = input.value;
+                        }
+                    });
+
+                    // Only add if vehicle has some data
+                    if (Object.keys(vehicle).length > 0) {
+                        vehicle.vehicleNumber = index + 1;
+                        policyData.vehicles.push(vehicle);
+                    }
+                });
+
+                // Collect drivers data
+                policyData.drivers = [];
+                const driverContainers = document.querySelectorAll('[id^="driver-"], .driver-entry, .driver-container');
+                driverContainers.forEach((container, index) => {
+                    const driver = {};
+                    const inputs = container.querySelectorAll('input, select, textarea');
+
+                    inputs.forEach(input => {
+                        if (input.value) {
+                            const id = input.id || input.name || '';
+                            const label = input.closest('.form-group')?.querySelector('label')?.textContent?.replace(' *', '').replace(':', '').trim();
+
+                            // Map common driver field IDs to standardized names
+                            let fieldName = label || id;
+                            if (id.includes('name') || id.includes('Name')) fieldName = 'name';
+                            else if (id.includes('license')) fieldName = 'licenseNumber';
+                            else if (id.includes('birth') || id.includes('dob')) fieldName = 'dateOfBirth';
+                            else if (id.includes('age')) fieldName = 'age';
+                            else if (id.includes('experience')) fieldName = 'experience';
+
+                            driver[fieldName] = input.value;
+                        }
+                    });
+
+                    // Only add if driver has some data
+                    if (Object.keys(driver).length > 0) {
+                        driver.driverNumber = index + 1;
+                        policyData.drivers.push(driver);
+                    }
+                });
+
+                // Collect coverages data from all coverage-related inputs
+                policyData.coverages = {};
+                const coverageInputs = document.querySelectorAll('input[id*="coverage"], input[id*="limit"], input[id*="deductible"], select[id*="coverage"], select[id*="limit"]');
+                coverageInputs.forEach(input => {
+                    if (input.value) {
+                        const id = input.id || input.name || '';
+                        const label = input.closest('.form-group')?.querySelector('label')?.textContent?.replace(' *', '').replace(':', '').trim();
+                        const fieldName = label || id.replace(/^(coverage|limit|deductible)-?/, '');
+                        policyData.coverages[fieldName] = input.value;
+                    }
+                });
 
                 // Collect data from other form tabs if they exist
                 const allTabs = document.querySelectorAll('[id$="-content"]');
@@ -231,7 +331,7 @@ console.log('Policy Server Save Fix: Loading...');
                     }
 
                     inputs.forEach(input => {
-                        const label = input.closest('.form-group')?.querySelector('label')?.textContent.replace(' *', '').replace(':', '').trim();
+                        const label = input.closest('.form-group')?.querySelector('label')?.textContent?.replace(' *', '').replace(':', '').trim();
                         if (label && input.value) {
                             policyData[tabId][label] = input.value;
                         }
@@ -239,6 +339,9 @@ console.log('Policy Server Save Fix: Loading...');
                 });
 
                 console.log('Collected comprehensive policy data:', policyData);
+                console.log('Vehicles found:', policyData.vehicles?.length || 0);
+                console.log('Drivers found:', policyData.drivers?.length || 0);
+                console.log('Coverages found:', Object.keys(policyData.coverages || {}).length);
 
                 // Validate that we actually collected data
                 if (!policyData || Object.keys(policyData).length === 0) {
@@ -249,10 +352,23 @@ console.log('Policy Server Save Fix: Loading...');
             console.log('🔍 SERVER SAVE DEBUG - Final policyData before processing:', policyData);
             console.log('🔍 SERVER SAVE DEBUG - policyData has id:', !!policyData?.id);
 
-            // Ensure policy has an ID
-            if (!policyData.id) {
+            // Ensure policy has an ID and fix any invalid IDs
+            if (!policyData.id || policyData.id === 'new' || policyData.id === '' || policyData.id === 'undefined') {
+                console.log('🔧 Generating new policy ID (current invalid ID:', policyData.id, ')');
                 policyData.id = 'policy_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                console.log('🔧 New policy ID generated:', policyData.id);
             }
+
+            // 🔍 DETAILED DEBUGGING - Check what policies exist before saving
+            console.log('🔍 DEBUG: Policy ID being saved:', policyData.id);
+            console.log('🔍 DEBUG: Is editing mode:', isEditing);
+            console.log('🔍 DEBUG: editingPolicyId value:', window.editingPolicyId);
+
+            const existingPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            console.log('🔍 DEBUG: Existing policies count before save:', existingPolicies.length);
+            console.log('🔍 DEBUG: Existing policy IDs:', existingPolicies.map(p => p.id));
+            console.log('🔍 DEBUG: Will this be an update or new addition?',
+                       existingPolicies.findIndex(p => p.id === policyData.id) >= 0 ? 'UPDATE' : 'NEW ADDITION');
 
             // IMPORTANT: Remove client_id and clientName from server payload since database doesn't support it
             const serverPolicyData = { ...policyData };
@@ -277,10 +393,16 @@ console.log('Policy Server Save Fix: Loading...');
             }
             serverPolicyData.updatedAt = new Date().toISOString();
 
-            // Determine if this is an existing policy (has an ID that's not auto-generated)
-            const isExistingPolicy = serverPolicyData.id && !serverPolicyData.id.startsWith('POL-');
+            // Determine if this is an existing policy (has a real ID, not "new" or auto-generated)
+            const isExistingPolicy = serverPolicyData.id &&
+                                    serverPolicyData.id !== 'new' &&
+                                    !serverPolicyData.id.startsWith('POL-') &&
+                                    !serverPolicyData.id.startsWith('policy_') &&
+                                    !serverPolicyData.id.startsWith('policy-');
             const method = isExistingPolicy ? 'PUT' : 'POST';
             const endpoint = isExistingPolicy ? `${API_URL}/api/policies/${serverPolicyData.id}` : `${API_URL}/api/policies`;
+
+            console.log('🔍 Policy ID check:', serverPolicyData.id, 'isExisting:', isExistingPolicy);
 
             // Save to server
             console.log('🌐 Sending policy data to server:', endpoint);
@@ -340,18 +462,33 @@ console.log('Policy Server Save Fix: Loading...');
             let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
             const existingIndex = policies.findIndex(p => p.id === policyData.id);
 
+            console.log('📊 SAVE DEBUG: Policies before save:', policies.length);
+            console.log('📊 SAVE DEBUG: Looking for policy ID:', policyData.id);
+            console.log('📊 SAVE DEBUG: Existing index found:', existingIndex);
+
             if (existingIndex >= 0) {
                 policies[existingIndex] = policyData;
+                console.log('📊 SAVE DEBUG: Updated existing policy at index', existingIndex);
             } else {
                 policies.push(policyData);
+                console.log('📊 SAVE DEBUG: Added new policy, total count now:', policies.length);
             }
 
             localStorage.setItem('insurance_policies', JSON.stringify(policies));
+
+            // Verify the save worked
+            const savedPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            console.log('✅ SAVE DEBUG: Verified save - total policies now:', savedPolicies.length);
+            console.log('✅ SAVE DEBUG: Verified policy IDs:', savedPolicies.map(p => p.id));
 
             // Show success notification
             if (window.showNotification) {
                 showNotification('Policy saved to server successfully', 'success');
             }
+
+            // Clear editing state to ensure next policy creation works properly
+            window.editingPolicyId = undefined;
+            console.log('🔧 Cleared editingPolicyId after successful save');
 
             // Close the policy edit modal
             const policyModal = document.querySelector('#policyModal');
@@ -705,15 +842,38 @@ console.log('Policy Server Save Fix: Loading...');
 
             if (response.ok) {
                 const serverPolicies = await response.json();
+                const localPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
 
-                // Update localStorage with server data
-                localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
-                console.log(`Loaded ${serverPolicies.length} policies from server`);
+                console.log(`🔄 Server has ${serverPolicies.length} policies, local has ${localPolicies.length} policies`);
 
-                return serverPolicies;
+                // Merge server and local policies, avoiding duplicates
+                const mergedPolicies = [...localPolicies];
+                let addedCount = 0;
+
+                serverPolicies.forEach(serverPolicy => {
+                    const existingIndex = mergedPolicies.findIndex(p => p.id === serverPolicy.id);
+                    if (existingIndex >= 0) {
+                        // Update existing policy with server version (server is authoritative)
+                        mergedPolicies[existingIndex] = serverPolicy;
+                    } else {
+                        // Add new policy from server
+                        mergedPolicies.push(serverPolicy);
+                        addedCount++;
+                    }
+                });
+
+                // Update localStorage with merged data
+                localStorage.setItem('insurance_policies', JSON.stringify(mergedPolicies));
+                console.log(`✅ Merged policies: ${mergedPolicies.length} total (${addedCount} new from server)`);
+
+                return mergedPolicies;
             }
         } catch (error) {
             console.error('Error loading policies from server:', error);
+            // Return local policies if server fails
+            const localPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            console.log(`⚠️ Using local policies only: ${localPolicies.length} policies`);
+            return localPolicies;
         }
         return [];
     }

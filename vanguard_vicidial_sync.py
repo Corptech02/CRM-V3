@@ -368,10 +368,17 @@ class VanguardViciDialSync:
         # Primary pattern: "Insurance Expires: xxxx-xx-xx | Fleet Size: x"
         fleet_patterns = [
             r'Insurance Expires:.*?\|\s*Fleet Size:?\s*(\d+)',  # Original pattern
+            r'Size:\s*(\d+)',  # NEW: "Size: 10" pattern for new ViciDial format
             r'Fleet Size:?\s*(\d+)',  # Simple "Fleet Size: x" pattern
             r'Fleet\s*Size\s*:\s*(\d+)',  # "Fleet Size : x" with spaces
             r'(\d+)\s*vehicles?',  # "9 vehicles" pattern
             r'fleet\s*of\s*(\d+)',  # "fleet of 9" pattern
+            r'(\d+)\s*units?',  # "5 units" pattern
+            r'(\d+)\s*trucks?',  # "3 trucks" pattern
+            r'(\d+)\s*power\s*units?',  # "4 power units" pattern
+            r'units?\s*:\s*(\d+)',  # "Units: 5" pattern
+            r'truck\s*count\s*:\s*(\d+)',  # "Truck count: 3" pattern
+            r'total\s*vehicles?\s*:\s*(\d+)',  # "Total vehicles: 7" pattern
         ]
 
         fleet_size = 0
@@ -380,8 +387,8 @@ class VanguardViciDialSync:
             if fleet_match:
                 fleet_size = int(fleet_match.group(1))
                 policy_info['fleet_size'] = fleet_size
-                # Calculate premium at $15,600 per vehicle
-                calculated_premium = fleet_size * 15600
+                # Calculate premium at $14,400 per vehicle
+                calculated_premium = fleet_size * 14400
                 policy_info['calculated_premium'] = calculated_premium
                 logger.info(f"✓ Fleet size extracted with pattern '{pattern}': {fleet_size} vehicles, calculated premium: ${calculated_premium:,}")
                 break
@@ -449,17 +456,42 @@ class VanguardViciDialSync:
         # Format phone
         phone = self.format_phone(vicidial_lead.get('phone', ''))
 
-        # Simple approach - skip complex premium calculation for now
-        # Just use basic default values to ensure leads save properly
-        policy_info = {
-            'current_carrier': '',
-            'current_premium': '',
-            'quoted_premium': 0,
-            'liability': '$1,000,000',
-            'cargo': '$100,000',
-            'fleet_size': 0,
-            'calculated_premium': 0
-        }
+        # Extract fleet size and insurance info from comments
+        comments = lead_details.get('comments', '') if lead_details else ''
+        policy_info = self.extract_policy_from_comments(comments)
+
+        # Extract insurance company from address fields
+        insurance_company = ""
+        if lead_details:
+            # Check address1 and address2 for insurance company
+            address1 = lead_details.get('address1', '').strip()
+            address2 = lead_details.get('address2', '').strip()
+
+            # Common insurance company patterns
+            insurance_patterns = [
+                r'(State Farm|Progressive|Nationwide|Geico|Allstate|Liberty|USAA|Farmers|Travelers)',
+                r'([A-Z\s]+CASUALTY\s+CO\.?)',  # "GREAT WEST CASUALTY CO."
+                r'([A-Z\s]+Insurance)',
+                r'([A-Z\s]+Mutual)',
+                r'([A-Z\s]+General)',
+                r'([A-Z\s]+Casualty)',  # General casualty pattern
+                r'(\w+.*INSURANCE.*)',  # Any text with INSURANCE
+            ]
+
+            # Check address1 first, then address2
+            for address_field in [address1, address2]:
+                if address_field:
+                    for pattern in insurance_patterns:
+                        match = re.search(pattern, address_field, re.I)
+                        if match:
+                            insurance_company = match.group(1).title()
+                            field_name = "address1" if address_field == address1 else "address2"
+                            logger.info(f"✓ Insurance company extracted: '{insurance_company}' from {field_name}: '{address_field}'")
+                            break
+                    if insurance_company:
+                        break
+
+        logger.info(f"✓ Policy info extracted - Fleet: {policy_info['fleet_size']} units, Premium: ${policy_info['calculated_premium']:,}, Insurance: {insurance_company}")
 
         # Extract renewal date from address3 field (where ViciDial stores renewal date)
         renewal_date = ""
@@ -492,11 +524,12 @@ class VanguardViciDialSync:
             "assigned_to": assigned_representative,  # Also save underscore format for frontend compatibility
             "created": datetime.now().strftime("%-m/%-d/%Y"),
             "renewalDate": renewal_date,
-            "premium": 0,  # Simplified - no premium calculation to avoid issues
+            "premium": policy_info['calculated_premium'],  # Use calculated premium from fleet size
             "dotNumber": vicidial_lead.get('vendor_code', ''),
             "mcNumber": "",
             "yearsInBusiness": "Unknown",
-            "fleetSize": "Unknown",  # Simplified
+            "fleetSize": str(policy_info['fleet_size']) if policy_info['fleet_size'] > 0 else "Unknown",
+            "insuranceCompany": insurance_company,  # New field for current insurance company
             "address": "",
             "city": vicidial_lead.get('city', '').upper(),
             "state": vicidial_lead.get('state', 'OH'),
@@ -506,8 +539,8 @@ class VanguardViciDialSync:
             "operatingStates": [vicidial_lead.get('state', 'OH')],
             "annualRevenue": "",
             "safetyRating": "Satisfactory",
-            "currentCarrier": "",  # Simplified
-            "currentPremium": "",  # Simplified
+            "currentCarrier": insurance_company,  # Use extracted insurance company
+            "currentPremium": policy_info['current_premium'],  # Use extracted premium info
             "needsCOI": False,
             "insuranceLimits": {
                 "liability": "$1,000,000",

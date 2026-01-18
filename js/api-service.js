@@ -56,7 +56,7 @@ const apiService = {
             
             console.log('Sending search request:', searchBody);
             
-            const response = await fetch(`${API_BASE_URL}/api/search`, {
+            const response = await fetch(`${API_BASE_URL}/search`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -80,7 +80,7 @@ const apiService = {
     // Get carrier by USDOT number
     getCarrierByDOT: async function(dotNumber) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/carriers/${dotNumber}`);
+            const response = await fetch(`${API_BASE_URL}/carriers/${dotNumber}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -97,7 +97,7 @@ const apiService = {
     // Get summary statistics
     getStats: async function() {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/stats/summary`);
+            const response = await fetch(`${API_BASE_URL}/stats/summary`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -136,7 +136,7 @@ const apiService = {
             }
             
             // Always use the backend server API endpoint
-            const response = await fetch(`${API_BASE_URL}/api/leads/expiring-insurance?${params}`, {
+            const response = await fetch(`${API_BASE_URL}/leads/expiring-insurance?${params}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -271,7 +271,7 @@ const apiService = {
     // Lead Management Functions
     async getLeads() {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/leads`, {
+            const response = await fetch(`${API_BASE_URL}/leads`, {
                 method: 'GET',
                 headers: getAuthHeaders()
             });
@@ -291,7 +291,7 @@ const apiService = {
 
     async createLead(leadData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/leads`, {
+            const response = await fetch(`${API_BASE_URL}/leads`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(leadData)
@@ -327,7 +327,7 @@ const apiService = {
 
     async updateLead(leadId, leadData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/leads/${leadId}`, {
+            const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
                 method: 'PUT',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(leadData)
@@ -364,7 +364,7 @@ const apiService = {
 
     async deleteLead(leadId) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/leads/${leadId}`, {
+            const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
                 method: 'DELETE',
                 headers: getAuthHeaders()
             });
@@ -392,7 +392,7 @@ const apiService = {
     // Policy Management Functions
     async getPolicies() {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/policies`, {
+            const response = await fetch(`${API_BASE_URL}/policies`, {
                 method: 'GET',
                 headers: getAuthHeaders()
             });
@@ -412,7 +412,7 @@ const apiService = {
 
     async createPolicy(policyData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/policies`, {
+            const response = await fetch(`${API_BASE_URL}/policies`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(policyData)
@@ -448,7 +448,7 @@ const apiService = {
 
     async updatePolicy(policyId, policyData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/policies/${policyId}`, {
+            const response = await fetch(`${API_BASE_URL}/policies/${policyId}`, {
                 method: 'PUT',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(policyData)
@@ -478,7 +478,7 @@ const apiService = {
     // Reminders/Tasks Functions
     async getReminders() {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/reminders`, {
+            const response = await fetch(`${API_BASE_URL}/reminders`, {
                 method: 'GET',
                 headers: getAuthHeaders()
             });
@@ -500,7 +500,7 @@ const apiService = {
 
     async createReminder(reminderData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/reminders`, {
+            const response = await fetch(`${API_BASE_URL}/reminders`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(reminderData)
@@ -521,7 +521,7 @@ const apiService = {
     // Authentication Functions
     async login(username, password) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/login`, {
+            const response = await fetch(`${API_BASE_URL}/users/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -550,7 +550,7 @@ const apiService = {
 
     async register(userData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/register`, {
+            const response = await fetch(`${API_BASE_URL}/users/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -574,7 +574,7 @@ const apiService = {
     // Dashboard Statistics
     async getDashboardStats() {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/stats/dashboard`, {
+            const response = await fetch(`${API_BASE_URL}/stats/dashboard`, {
                 method: 'GET',
                 headers: getAuthHeaders()
             });
@@ -599,7 +599,7 @@ const apiService = {
     async getCarrierProfile(dotNumber) {
         try {
             const API_BASE_URL = this.getAPIBaseURL();
-            const response = await fetch(`${API_BASE_URL}/api/carrier/profile/${dotNumber}`, {
+            const response = await fetch(`${API_BASE_URL}/carrier/profile/${dotNumber}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

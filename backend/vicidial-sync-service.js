@@ -10,8 +10,8 @@ const path = require('path');
 console.log('🔄 ViciDial Sync Service Started');
 
 const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
-// Use the web extractor that actually works
-const PYTHON_SCRIPT = '/var/www/vanguard/vicidial-web-extractor.py';
+// Use the main ViciDial sync script for automatic lead discovery
+const PYTHON_SCRIPT = '/var/www/vanguard/vanguard_vicidial_sync.py';
 
 function runSync() {
     console.log(`[${new Date().toISOString()}] Running ViciDial sync...`);

@@ -5,7 +5,7 @@
     // Define the official agent list
     window.VANGUARD_AGENTS = [
         'Grant',
-        'Maureen',
+        'Carson',
         'Hunter'
     ];
 

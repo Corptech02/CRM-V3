@@ -52,10 +52,17 @@ window.generateLeadsFromForm = async function() {
         console.log('🔍 Current location:', window.location.origin);
         console.log('🔍 window.VANGUARD_API_URL:', window.VANGUARD_API_URL);
 
-        // Force using current location with port 3001 to match the current page
+        // Use same protocol as current page - HTTPS proxies to backend
         const currentHost = window.location.hostname;
         const currentProtocol = window.location.protocol;
-        const baseUrl = `${currentProtocol}//${currentHost}:3001/api`;
+        const isHTTPS = currentProtocol === 'https:';
+
+        // If HTTPS, use main domain (proxied), if HTTP use direct backend
+        const baseUrl = isHTTPS
+            ? `${currentProtocol}//${currentHost}/api`  // HTTPS: use proxy
+            : `${currentProtocol}//${currentHost}:3001/api`;  // HTTP: direct to backend
+
+        console.log('🔍 Protocol:', currentProtocol, '| Using proxy:', isHTTPS);
         console.log('🔍 Constructed baseUrl:', baseUrl);
 
         const apiUrl = `${baseUrl}/matched-carriers-leads?${params}`;

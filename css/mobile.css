@@ -129,8 +129,8 @@
     }
 }
 
-/* Mobile Styles (max-width: 768px) */
-@media (max-width: 768px) {
+/* Mobile Styles (max-width: 390px ONLY - does not affect desktop) */
+@media (max-width: 390px) {
     /* Prevent horizontal scroll */
     body {
         overflow-x: hidden !important;
@@ -291,6 +291,201 @@
         font-size: 14px;
     }
 
+    /* Mobile navigation section headers - CENTERED, BOLD, LARGER, BLUE */
+    .mobile-nav-section-header {
+        text-align: center !important;
+        padding: 12px 16px !important;
+        background: rgba(59, 130, 246, 0.1) !important; /* Light blue background */
+        border-bottom: 1px solid rgba(59, 130, 246, 0.2) !important;
+        margin: 0 !important;
+    }
+
+    .mobile-nav-section-header span {
+        font-size: 16px !important; /* Larger text */
+        font-weight: 700 !important; /* Bold */
+        color: #3b82f6 !important; /* Blue text */
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        display: block !important;
+    }
+
+    /* Make content-header stack vertically for mobile */
+    .content-header {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0 !important;
+    }
+
+    /* Header title first - bigger text and lower position */
+    .content-header h1 {
+        order: 1 !important;
+        margin: 15px 0 20px 0 !important;
+        width: 100% !important;
+        font-size: 28px !important;
+        font-weight: bold !important;
+    }
+
+    /* Lead tabs second */
+    .lead-tabs {
+        order: 2 !important;
+        width: 100% !important;
+        margin: 0 0 15px 0 !important;
+    }
+
+    /* Header actions third - below everything */
+    .header-actions {
+        order: 3 !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        margin: 0 !important;
+        width: 100% !important;
+        justify-content: space-between !important;
+    }
+
+    /* Style action buttons for mobile - wider and shorter */
+    .header-actions .btn-primary,
+    .header-actions .btn-secondary,
+    .header-actions .toggle-button {
+        flex: 1 !important;
+        min-width: calc(50% - 3px) !important; /* Two buttons per row */
+        max-width: calc(50% - 3px) !important;
+        padding: 8px 4px !important; /* Shorter height, minimal side padding */
+        font-size: 11px !important;
+        border-radius: 4px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Specific adjustments for button text on mobile */
+    .header-actions .toggle-text {
+        font-size: 10px !important;
+    }
+
+    .header-actions i {
+        font-size: 9px !important;
+        margin-right: 3px !important;
+    }
+
+    /* Lead pipeline - make much smaller by 3x for mobile */
+    .lead-pipeline {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important; /* 2 columns instead of 5 */
+        gap: 4px !important;
+        margin: -15px 0 8px 0 !important; /* Bring it up higher with negative top margin */
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .pipeline-stage {
+        padding: 8px !important; /* Much smaller padding */
+        margin: 0 !important;
+        min-height: auto !important;
+        border-radius: 4px !important;
+    }
+
+    .stage-header {
+        margin-bottom: 4px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .stage-header h3 {
+        font-size: 11px !important; /* Much smaller text */
+        margin: 0 !important;
+        font-weight: 600 !important;
+    }
+
+    .stage-count {
+        font-size: 10px !important; /* Smaller count */
+        padding: 1px 4px !important;
+        border-radius: 2px !important;
+    }
+
+    .stage-value {
+        font-size: 9px !important; /* Much smaller value text */
+        margin: 2px 0 4px 0 !important;
+        font-weight: 500 !important;
+    }
+
+    .stage-bar {
+        height: 3px !important; /* Much thinner bar */
+        border-radius: 1px !important;
+        margin-top: 2px !important;
+    }
+
+    /* Make space for lead-stats above the table */
+    .data-table {
+        margin-top: 20px !important; /* Bring table up higher */
+    }
+
+    #leadsTable,
+    .leads-table,
+    .table-responsive {
+        margin-top: 20px !important; /* Bring leads table up higher */
+    }
+
+    .lead-stats {
+        margin-bottom: 15px !important; /* Space between stats and table */
+    }
+
+    /* Mobile optimizations for lead-stats cards - HIGHER POSITIONING */
+    .lead-stats,
+    div.lead-stats,
+    .dashboard-content .lead-stats,
+    .main-content .lead-stats {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important; /* 2 columns on mobile */
+        gap: 8px !important;
+        padding: 0 4px !important;
+        margin: 15px 0 15px 0 !important; /* Bring up much higher */
+        margin-top: 15px !important; /* Small top margin */
+        padding-top: 10px !important; /* Minimal top spacing */
+        position: relative !important;
+        top: 10px !important; /* Minimal position adjustment */
+    }
+
+    .stat-card {
+        padding: 8px !important; /* Smaller padding for mobile */
+        border-radius: 6px !important;
+        margin: 0 !important;
+    }
+
+    .stat-card .stat-content h4 {
+        font-size: 11px !important; /* Smaller title */
+        margin-bottom: 4px !important;
+    }
+
+    .stat-card .stat-number {
+        font-size: 16px !important; /* Smaller numbers */
+        margin: 2px 0 !important;
+    }
+
+    .stat-card .stat-trend {
+        font-size: 9px !important; /* Much smaller trend text */
+    }
+
+    .stat-icon {
+        width: 24px !important; /* Smaller icons */
+        height: 24px !important;
+        font-size: 12px !important;
+    }
+
+    /* Ensure lead tabs and header are properly ordered */
+    h1 {
+        order: 1 !important;
+    }
+
+    .lead-tabs {
+        order: 2 !important;
+        margin: 8px 0 4px 0 !important; /* Reduced bottom margin */
+    }
+
     /* Sidebar Adjustments */
     .sidebar {
         position: fixed;
@@ -310,7 +505,7 @@
         margin-left: 0 !important;
         margin-right: 0 !important;
         padding: 6px !important;
-        padding-top: 56px !important; /* 50px header + 6px padding */
+        padding-top: 56px !important; /* Original value restored */
         padding-bottom: 66px !important; /* Space for bottom nav */
         width: 100% !important;
         max-width: 100vw !important;
@@ -361,10 +556,12 @@
         box-sizing: border-box !important;
     }
 
+    /* .table-container - DISABLED for natural page scroll
     .table-container {
         width: 100% !important;
         overflow: hidden !important;
     }
+    */
 
     /* Lead Table - Keep visible but compressed */
     #leadsTable,
@@ -432,49 +629,396 @@
     #leadsTable td {
         display: block !important;
         width: 100% !important;
+        padding: 8px 4px !important; /* More padding for each cell */
+        line-height: 1.5 !important; /* Better line spacing */
     }
 
-    /* Each row becomes a card */
-    #leadsTable tr,
-    .leads-table tr {
+    /* WORKING LEAD CARD LAYOUT - 1/3 THICKER */
+    #leadsTable tr:not(.lead-divider),
+    .leads-table tr:not(.lead-divider) {
         margin-bottom: 8px !important;
         background: var(--white) !important;
-        border-radius: 4px !important;
-        padding: 6px !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        border-radius: 8px !important;
+        padding: 14px !important;
+        height: 133px !important; /* 1/3 thicker than 100px */
+        min-height: 133px !important;
+        max-height: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        display: block !important;
+        position: relative !important;
+        overflow: hidden !important;
     }
 
-    /* Hide checkbox column */
-    #leadsTable td:nth-child(1) {
+    /* Subtle category accent */
+    #leadsTable tr:not(.lead-divider)[style*="background-color"] {
+        border-left: 3px solid rgba(251, 146, 60, 0.6) !important;
+    }
+
+    /* Reset all cells for absolute positioning */
+    #leadsTable tr:not(.lead-divider) td {
+        position: absolute !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        line-height: 1.2 !important;
+    }
+
+    /* ROW 1: Name (top left) */
+    #leadsTable td:nth-child(2) {
+        top: 14px !important;
+        left: 14px !important;
+        right: 60px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* ROW 1: Contact icons (top right) */
+    #leadsTable td:nth-child(3) {
+        top: 14px !important;
+        right: 14px !important;
+        width: 45px !important;
+    }
+
+    #leadsTable .contact-info {
+        display: flex !important;
+        gap: 6px !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+    }
+
+    #leadsTable .contact-info a {
+        width: 18px !important;
+        height: 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 4px !important;
+        font-size: 10px !important;
+        color: #64748b !important;
+        text-decoration: none !important;
+    }
+
+    #leadsTable .contact-info a:hover {
+        background: #3b82f6 !important;
+        color: white !important;
+    }
+
+    /* ROW 2: Interest Bar (progress bar) - full width again since buttons moved */
+    #leadsTable td:nth-child(4) {
+        display: block !important; /* Show interest bar again */
+        top: 38px !important;
+        left: 14px !important;
+        right: 14px !important; /* Full width since buttons moved down */
+        height: 20px !important;
+    }
+
+    /* ROW 3: Premium (below progress bar, left) + Stage (right) */
+    #leadsTable td:nth-child(5) {
+        top: 65px !important;
+        left: 14px !important;
+        width: 55% !important; /* Increased width so premium doesn't get cut off */
+        font-size: 14px !important; /* Increased text size for premium */
+        font-weight: 700 !important; /* Made bolder */
+        color: #059669 !important;
+        display: block !important;
+        overflow: visible !important; /* Prevent cutoff */
+        white-space: nowrap !important; /* Prevent wrapping */
+    }
+
+    #leadsTable td:nth-child(5):before {
+        content: "Premium: " !important;
+        font-size: 14px !important; /* Same size as the number */
+        color: #059669 !important; /* Same color as the number */
+        font-weight: 700 !important; /* Same weight as the number */
+        margin-right: 4px !important;
+    }
+
+    /* Stage (right side, same row as premium) - FORCE VISIBLE */
+    #leadsTable td:nth-child(6) {
+        top: 65px !important;
+        right: 14px !important;
+        width: 30% !important; /* Reduced width to give premium more space */
+        text-align: right !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: absolute !important;
+        z-index: 9999 !important;
+    }
+
+
+    /* MOBILE STAGE BADGE FOR LEAD CARDS */
+    #leadsTable .stage-badge {
+        background: #e5e7eb !important;
+        color: #374151 !important;
+        padding: 4px 8px !important;
+        border-radius: 12px !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        display: inline-block !important;
+        border: 1px solid #d1d5db !important;
+        white-space: nowrap !important;
+    }
+
+    #leadsTable .stage-badge.stage-new {
+        background: #dbeafe !important;
+        color: #1e40af !important;
+        border-color: #93c5fd !important;
+    }
+
+    #leadsTable .stage-badge.stage-quoted {
+        background: #d1fae5 !important;
+        color: #065f46 !important;
+        border-color: #86efac !important;
+    }
+
+    #leadsTable .stage-badge.stage-qualified {
+        background: #fef3c7 !important;
+        color: #92400e !important;
+        border-color: #fcd34d !important;
+    }
+
+    /* REMOVE TD STYLING TO ELIMINATE OUTSIDE BUBBLE */
+    #leadsTable tr:not(.lead-divider) td:nth-child(6) {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    /* LEAD STAGE COLORS - ONLY TARGET LEADSTABLE */
+    #leadsTable span.stage-badge.stage-new {
+        background: #dbeafe !important;
+        color: #1e40af !important;
+        border-color: #3b82f6 !important;
+    }
+
+    #leadsTable span.stage-badge.stage-qualified {
+        background: #fef3c7 !important;
+        color: #92400e !important;
+        border-color: #f59e0b !important;
+    }
+
+    #leadsTable span.stage-badge.stage-quoted {
+        background: #d1fae5 !important;
+        color: #065f46 !important;
+        border-color: #10b981 !important;
+    }
+
+    /* FORCE STAGE BADGE TO SHOW - EXACT TARGETING */
+    #leadsTable span.stage-badge.stage-new,
+    #leadsTable .stage-badge.stage-new,
+    #leadsTable span.stage-badge,
+    #leadsTable .stage-badge,
+    span.stage-badge.stage-new,
+    span.stage-badge {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background: #dbeafe !important;
+        color: #1e40af !important;
+        padding: 4px 8px !important;
+        border-radius: 12px !important;
+        font-size: 10px !important;
+        font-weight: 500 !important;
+        text-transform: uppercase !important;
+        border: 1px solid #3b82f6 !important;
+        white-space: nowrap !important;
+        position: relative !important;
+        z-index: 9999 !important;
+        max-width: none !important;
+        width: auto !important;
+    }
+
+    /* ROW 4: Renewal Date (under premium) */
+    #leadsTable td:nth-child(8) {
+        top: 90px !important;
+        left: 14px !important;
+        width: 55% !important;
+        font-size: 11px !important;
+        color: #6b7280 !important;
+        overflow: visible !important;
+        white-space: nowrap !important;
+    }
+
+    #leadsTable td:nth-child(8):before {
+        content: "Expires: " !important;
+        font-size: 11px !important;
+        color: #000000 !important;
+        font-weight: 500 !important;
+        margin-right: 4px !important;
+    }
+
+    /* FORCE RENEWAL DATE TO SHOW - VERY HIGH PRIORITY */
+    #leadsTable tr:not(.lead-divider) td:nth-child(8) {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: absolute !important;
+        top: 90px !important;
+        left: 14px !important;
+        width: 55% !important;
+        font-size: 11px !important;
+        color: #000000 !important;
+        overflow: visible !important;
+        white-space: nowrap !important;
+        z-index: 999 !important;
+    }
+
+    /* ROW 4: Todo (moved to row 5) */
+    #leadsTable td:nth-child(7) {
+        top: 115px !important;
+        left: 14px !important;
+        width: 25% !important;
+        font-size: 9px !important;
+        color: #6b7280 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* Show Agent column (moved to row 5) */
+    #leadsTable td:nth-child(9) {
+        display: block !important;
+        top: 115px !important;
+        left: 27% !important;
+        width: 15% !important;
+        font-size: 9px !important;
+        color: #6b7280 !important;
+        text-align: center !important;
+    }
+
+    /* Insurance Company - under expiration date - FORCE VISIBLE */
+    #leadsTable td:nth-child(10) {
+        display: block !important;
+        top: 108px !important;
+        left: 14px !important;
+        width: 55% !important;
+        font-size: 10px !important;
+        color: #000000 !important;
+        text-align: left !important;
+        overflow: visible !important;
+        white-space: nowrap !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: absolute !important;
+        z-index: 9999 !important;
+    }
+
+    #leadsTable td:nth-child(10):before {
+        content: "Company: " !important;
+        font-size: 10px !important;
+        color: #000000 !important;
+        font-weight: 500 !important;
+        margin-right: 4px !important;
+    }
+
+    /* FORCE INSURANCE COMPANY SPAN TO SHOW */
+    #leadsTable td:nth-child(10) span,
+    #leadsTable span[style*="background: #6b7280"],
+    #leadsTable span[style*="color: white"] {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background: #6b7280 !important;
+        color: white !important;
+        padding: 4px 8px !important;
+        border-radius: 12px !important;
+        font-size: 10px !important;
+        font-weight: 500 !important;
+        white-space: nowrap !important;
+        position: relative !important;
+        z-index: 9999 !important;
+        max-width: none !important;
+        width: auto !important;
+    }
+
+    /* Action buttons - positioned higher */
+    #leadsTable td:last-child {
+        top: 65px !important;
+        right: 14px !important;
+        width: 120px !important;
+        text-align: center !important;
+        display: block !important;
+    }
+
+    /* Remove the hide rule - we want to show the interest bar */
+
+    #leadsTable .action-buttons {
+        display: flex !important;
+        gap: 3px !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important; /* Allow wrapping for compact layout */
+    }
+
+    #leadsTable .action-buttons .btn-icon {
+        width: 20px !important;
+        height: 20px !important;
+        padding: 0 !important;
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 4px !important;
+        font-size: 10px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #64748b !important;
+        margin: 1px !important; /* Small margin for spacing */
+    }
+
+    #leadsTable .action-buttons .btn-icon:hover {
+        background: #e2e8f0 !important;
+    }
+
+    /* Hide unused columns - only hide checkbox and last unused column */
+    #leadsTable td:nth-child(1),
+    #leadsTable td:nth-child(11) {
         display: none !important;
     }
 
-    /* Name as header */
-    #leadsTable td:nth-child(2) {
-        font-weight: 600 !important;
-        font-size: 11px !important;
-        margin-bottom: 4px !important;
-        padding-bottom: 4px !important;
-        border-bottom: 1px solid #e5e7eb !important;
-    }
-
-    /* Contact and Status inline */
-    #leadsTable td:nth-child(3),
-    #leadsTable td:nth-child(4) {
-        display: inline-block !important;
-        width: 50% !important;
-        font-size: 9px !important;
-        padding: 2px 0 !important;
-    }
-
-    /* Actions - show as buttons below */
-    #leadsTable td:nth-child(5),
-    #leadsTable td:last-child {
-        display: block !important;
+    /* Lead Divider Row - Mobile Fix - NORMAL HEIGHT */
+    #leadsTable tr.lead-divider[style],
+    .leads-table tr.lead-divider[style],
+    tbody tr.lead-divider[style] {
+        display: block !important; /* Override table display */
         width: 100% !important;
-        margin-top: 4px !important;
-        padding-top: 4px !important;
-        border-top: 1px solid #e5e7eb !important;
+        background: #e5e7eb !important; /* Light grey background - override inline */
+        border: none !important;
+        margin: 8px 0 !important;
+        border-radius: 4px !important;
+        padding: 0 !important; /* No extra padding for divider */
+        min-height: auto !important; /* Override thick row styling */
+    }
+
+    #leadsTable tr.lead-divider[style] td[style],
+    .leads-table tr.lead-divider[style] td[style],
+    tbody tr.lead-divider[style] td[style] {
+        display: block !important; /* Override table cell display */
+        width: calc(100% + 16px) !important; /* Slightly wider than container */
+        max-width: none !important;
+        padding: 12px 8px !important; /* Normal padding for divider */
+        font-weight: bold !important;
+        color: #374151 !important; /* Dark text on light background - override inline */
+        font-size: 16px !important; /* Keep original size but ensure visibility */
+        text-align: center !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        background: #e5e7eb !important; /* Light grey background - override inline */
+        border-radius: 4px !important;
+        margin: 0 -12px !important; /* Larger negative margin to extend width */
+        box-sizing: border-box !important;
+        position: relative !important;
+        left: -4px !important; /* Slight left shift to center */
     }
 
     /* Action buttons in lead rows */
@@ -848,8 +1392,23 @@
         display: grid !important;
         grid-template-columns: repeat(4, 1fr) !important; /* 4 columns to fit all */
         gap: 3px !important;
+        margin: 0 !important; /* Remove all margin including top margin */
         margin-bottom: 6px !important;
         padding: 0 !important;
+    }
+
+    /* Mobile Dashboard - Bring content much higher for VERY SMALL screens */
+    @media (max-width: 390px) {
+        .dashboard-content {
+            padding-top: 25px !important; /* Much higher placement for mobile */
+            margin-top: 0 !important;
+        }
+
+        .stats-grid {
+            margin-top: 0 !important; /* Remove top margin on small mobile only */
+            margin-bottom: 4px !important; /* Reduce bottom spacing */
+            padding: 2px !important; /* Extra compact padding */
+        }
     }
 
     .stat-card,
@@ -1390,8 +1949,8 @@
     }
 }
 
-/* Small Mobile Styles (max-width: 480px) */
-@media (max-width: 480px) {
+/* Small Mobile Styles (max-width: 390px for iPhone and similar small devices) */
+@media (max-width: 390px) {
     /* Even more compact spacing */
     :root {
         --mobile-spacing: 6px;
@@ -1430,7 +1989,7 @@
     /* Adjust content for smaller header */
     .dashboard-content,
     .main-content {
-        padding-top: 51px !important; /* 45px header + 6px padding */
+        padding-top: 51px !important; /* Original value restored */
         padding-left: 6px !important;
         padding-right: 6px !important;
     }
@@ -1728,8 +2287,164 @@
     }
 }
 
+/* Ultra-Compact Mobile Optimizations (390px and smaller ONLY) */
+@media (max-width: 390px) {
+    /* Dashboard sections stacked VERTICALLY for mobile - Reminders first, then To-Do */
+    .dashboard-sections {
+        display: grid !important;
+        grid-template-columns: 1fr !important; /* Single column - stacked vertically */
+        gap: 8px !important;
+        margin: 4px 0 !important;
+        padding: 0 2px !important; /* Minimal side padding */
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Reorder sections: Reminders first, To-Do second */
+    .section-card:not(.todo-container) {
+        order: 1 !important; /* Reminders section goes first */
+    }
+
+    .todo-container {
+        order: 2 !important; /* To-Do section goes second */
+    }
+
+    /* To-Do section ultra compact - FULL WIDTH to properly fit page */
+    .todo-container {
+        padding: 4px !important;
+        min-height: 180px !important;
+        width: calc(100vw - 12px) !important; /* Full viewport width minus minimal margin */
+        max-width: 100% !important;
+        margin: 0 2px !important;
+        box-sizing: border-box !important;
+    }
+
+    .todo-container .section-header {
+        padding: 4px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .todo-container .section-header h2 {
+        font-size: 12px !important;
+        margin: 0 !important;
+    }
+
+    /* Todo buttons ultra small */
+    #todoViewButtons button {
+        padding: 2px 4px !important;
+        font-size: 8px !important;
+        margin: 0 1px !important;
+    }
+
+    /* Todo input ultra compact */
+    #todoInput {
+        padding: 6px !important;
+        font-size: 11px !important;
+        margin-bottom: 6px !important;
+    }
+
+    /* Reminders section ultra compact - FULL WIDTH to properly fit page */
+    .section-card:not(.todo-container) {
+        padding: 4px !important;
+        min-height: 180px !important;
+        width: calc(100vw - 12px) !important; /* Full viewport width minus minimal margin */
+        max-width: 100% !important;
+        margin: 0 2px !important;
+        box-sizing: border-box !important;
+    }
+
+    .section-card:not(.todo-container) h2 {
+        font-size: 12px !important;
+        margin: 0 0 6px 0 !important;
+    }
+
+    /* Reminder cards optimized for full width mobile */
+    .reminder-stats {
+        padding: 4px !important;
+        width: 100% !important;
+    }
+
+    .reminder-stats > div {
+        grid-template-columns: 1fr 1fr !important; /* 2x2 grid for reminder cards */
+        gap: 4px !important;
+        width: 100% !important;
+    }
+
+    .reminder-stats div[style*="padding: 15px"] {
+        padding: 6px !important; /* Compact padding for reminder cards */
+        font-size: 10px !important;
+        border-radius: 4px !important;
+    }
+
+    /* Make reminder card text smaller for mobile */
+    .reminder-stats p {
+        font-size: 9px !important;
+        margin: 2px 0 !important;
+    }
+
+    .reminder-stats p:last-child {
+        font-size: 14px !important; /* Keep numbers readable */
+        font-weight: bold !important;
+    }
+
+    /* Stats grid ultra compact - 2x2 instead of 4 across */
+    .stats-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 3px !important;
+        margin-bottom: 8px !important;
+    }
+
+    .stat-card {
+        padding: 6px 4px !important;
+        min-height: 60px !important;
+    }
+
+    .stat-card .stat-details h3 {
+        font-size: 9px !important;
+        line-height: 1.1 !important;
+        margin-bottom: 2px !important;
+    }
+
+    .stat-card .stat-number {
+        font-size: 16px !important;
+        font-weight: bold !important;
+    }
+
+    /* Ultra compact header for tiny screens */
+    .header {
+        height: 45px !important;
+        padding: 0 4px !important;
+    }
+
+    .nav-brand h1 {
+        font-size: 11px !important;
+    }
+
+    .nav-brand .logo {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Adjust content for smaller header - bring much higher */
+    .dashboard-content,
+    .main-content {
+        padding-top: 20px !important; /* Much higher for ultra-compact mobile */
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+        margin-top: 0 !important;
+    }
+
+    /* Remove any extra spacing from sections */
+    .dashboard-sections {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+}
+
 /* Accessibility Improvements for Mobile */
-@media (max-width: 768px) {
+@media (max-width: 390px) {
     /* Focus styles for mobile */
     *:focus {
         outline: 2px solid var(--primary);

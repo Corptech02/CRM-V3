@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
         const call = await client.calls.create({
             to: to,
             from: from,
-            url: 'http://demo.twilio.com/docs/voice.xml', // Simple TwiML for testing
+            url: `${req.protocol}://${req.get('host')}/api/twilio/voice-bridge`, // Connect to agent
             statusCallback: `${req.protocol}://${req.get('host')}/api/twilio/call-status`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST'

@@ -1,53 +1,77 @@
-
-# API keys and credentials
-backend/add-gmail-token.js
-backend/add-gmail-token-web.js
-backend/setup-gmail-auth.js
-*.backup
-*backup*
-# Backup files
-backup_gmail_20251024_020633/add-gmail-token.js
-backup_gmail_20251024_020633/add-gmail-token-web.js
-backup_gmail_20251024_020633/setup-gmail-auth.js
-*.bak
-check-whisper-alternative.py
-*credentials*.json
-credentials.json
-# Database files
-*.db
-*.db.*
-.DS_Store
-*.env
-.env
-# Environment files
-.env.local
-*.key
-# Large files
-lead-transfer-integration/
-*.log
-# Log files
-matched_carriers_*.csv
+# Dependencies
 node_modules/
-# Node modules
 npm-debug.log*
-openai-processor.py
-# OS files
-*.pem
-save-gmail-token.js
-# Sensitive files
-# Session files
-sessions/
-*.sqlite
-*.sqlite3
-# Submodules and embedded repos
-*.tar.gz
-temp/
-test-api-org.py
-test-github-push.sh
-test-whisper-api.py
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Production builds
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-*token*.json
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Cache files
+.cache/
+*.cache
+
+# Backup files
+*.backup
+*.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# API keys and secrets
+*.key
+*.pem
+.env*
+config.json
+secrets.json
 token.json
+
 # Upload directories
 uploads/
 *.zip
@@ -62,3 +86,73 @@ logs/
 *.db-shm
 
 .idea
+
+# Large files and downloads
+*.tar.gz
+*.AppImage
+downloaded-*
+*-downloaded*
+vanguard-crm-*
+vanguard-vps-*
+
+# Lead files
+leads_*
+*leads*
+Leads/
+LLCinfo/
+
+# FCSMA data
+fcsma_*
+FCSMA_*
+
+# Analysis and processing files
+*.csv
+*analysis*
+*matcher*
+*_list.py
+*search*
+*dedup*
+
+# Test files
+test_*
+test-*
+debug*
+sample_*
+reproduce_*
+
+# Generated files
+hyper_detailed_*
+matched_carriers_*
+unmatched_*
+*carriers*.json
+
+# Script outputs
+# *.txt
+
+# Personal files
+.bash_history
+.bash_logout
+.bashrc
+.cache/
+.claude.json*
+.claude/
+.cloudflared/
+.config/
+.electron-gyp/
+.git-credentials
+.gitconfig
+.lesshst
+.local/
+.npm-global/
+.npm/
+.npmrc
+.nvm/
+.pki/
+.pm2/
+.profile
+.ssh/
+.sudo_as_admin_successful
+.wget-hsts
+
+# Website builds
+vig-website/

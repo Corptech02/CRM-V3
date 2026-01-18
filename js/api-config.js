@@ -1,3 +1,3 @@
-// API Configuration - Updated to use correct backend port and API prefix
-// This URL is what the working page uses for all API calls
-window.VANGUARD_API_URL = "http://162-220-14-239.nip.io:3001/api";
+// API Configuration - Updated to use nginx proxy with HTTPS
+// This URL routes through nginx proxy to the backend on port 3001
+window.VANGUARD_API_URL = "https://162-220-14-239.nip.io/api";

@@ -296,10 +296,14 @@ document.addEventListener('click', function(e) {
             return; // Let the document system handle its own download
         }
 
-        // Check for download buttons
-        if (element.textContent.includes('Download') ||
+        // Check for download buttons (but exclude agent report downloads)
+        if ((element.textContent.includes('Download') ||
             element.innerHTML.includes('fa-download') ||
-            (element.onclick && element.onclick.toString().includes('download'))) {
+            (element.onclick && element.onclick.toString().includes('download'))) &&
+            // Exclude agent report downloads
+            !element.onclick.toString().includes('downloadAgentReport') &&
+            !element.classList.contains('agent-report-download') &&
+            !element.closest('[data-download-type="agent-report"]')) {
 
             console.log('🛑 Intercepted download click');
             e.preventDefault();

@@ -59,7 +59,7 @@
             });
 
             if (response.ok) {
-                console.log(`✅ Lead ${leadData.name || leadData.id} saved to server database`);
+                // Reduced logging - batch messages are shown instead
                 return true;
             } else {
                 console.warn(`⚠️ Failed to save lead ${leadData.name || leadData.id} to database`);
@@ -154,26 +154,53 @@
                     // Get list of deleted lead IDs to avoid re-saving them
                     const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
 
-                    // TEMPORARILY DISABLED - Check if any leads are from ViciDial and save them to database
+                    // Check if any leads are from ViciDial and save them to database
                     // BUT do not save deleted leads
-                    console.log('🚫 ViciDial lead auto-saving temporarily disabled for cleanup');
+                    const permanentArchiveIds = JSON.parse(localStorage.getItem('PERMANENT_ARCHIVED_IDS') || '[]');
 
-                    // CRITICAL: After processing leads, wait a moment for any deletion operations to complete,
-                    // then check for leads that should be deleted from the server
-                    setTimeout(() => {
-                        const updatedDeletedIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
-                        updatedDeletedIds.forEach(deletedId => {
-                            // Check if this deleted ID somehow got re-saved to server and remove it
-                            fetch('/api/leads/' + deletedId)
-                                .then(response => {
-                                    if (response.ok) {
-                                        console.log(`🚫 CLEANUP: Removing re-saved deleted lead ${deletedId} from server`);
-                                        return fetch('/api/leads/' + deletedId, { method: 'DELETE' });
-                                    }
-                                })
-                                .catch(error => console.log(`Cleanup check for ${deletedId}:`, error));
-                        });
-                    }, 2000);
+                    // Count and filter ViciDial leads that need saving
+                    const viciDialLeads = leads.filter(lead => {
+                        // Skip invalid IDs
+                        if (!lead.id || String(lead.id).trim() === '' || String(lead.id) === 'undefined') return false;
+
+                        // Skip archived/deleted leads
+                        if (lead.archived === true ||
+                            permanentArchiveIds.includes(String(lead.id)) ||
+                            deletedLeadIds.includes(String(lead.id))) return false;
+
+                        // Only ViciDial leads
+                        return (lead.source === 'ViciDial' || lead.listId);
+                    });
+
+                    if (viciDialLeads.length > 0) {
+                        console.log(`💾 Auto-saving ${viciDialLeads.length} ViciDial leads to database...`);
+
+                        // Save leads with consolidated logging
+                        let savedCount = 0;
+                        for (const lead of viciDialLeads) {
+                            const saved = await saveLeadToDatabase(lead);
+                            if (saved) savedCount++;
+                        }
+
+                        console.log(`✅ Successfully saved ${savedCount}/${viciDialLeads.length} ViciDial leads to database`);
+                    }
+
+                    // DISABLED: This cleanup logic was causing hundreds of 404s when editing leads
+                    // The massive deleted lead IDs list was overwhelming the system
+                    // setTimeout(() => {
+                    //     const updatedDeletedIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
+                    //     updatedDeletedIds.forEach(deletedId => {
+                    //         // Check if this deleted ID somehow got re-saved to server and remove it
+                    //         fetch('/api/leads/' + deletedId)
+                    //             .then(response => {
+                    //                 if (response.ok) {
+                    //                     console.log(`🚫 CLEANUP: Removing re-saved deleted lead ${deletedId} from server`);
+                    //                     return fetch('/api/leads/' + deletedId, { method: 'DELETE' });
+                    //                 }
+                    //             })
+                    //             .catch(error => console.log(`Cleanup check for ${deletedId}:`, error));
+                    //     });
+                    // }, 2000);
                 }
             } catch (e) {
                 // Ignore parsing errors
@@ -212,6 +239,12 @@
         const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
 
         for (const lead of leads) {
+            // Validate lead ID before saving
+            if (!lead.id || String(lead.id).trim() === '' || String(lead.id) === 'undefined') {
+                console.log(`🚫 Skipping sync save for lead with invalid ID: ${lead.id} (name: ${lead.name})`);
+                continue;
+            }
+
             if ((lead.source === 'ViciDial' || lead.listId) &&
                 !deletedLeadIds.includes(String(lead.id))) {
                 await saveLeadToDatabase(lead);

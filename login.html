@@ -267,7 +267,7 @@
         }
 
         // Valid users (username and password are the same)
-        const validUsers = ['Maureen', 'Grant', 'Hunter'];
+        const validUsers = ['Maureen', 'Grant', 'Hunter', 'Carson'];
 
         function togglePasswordVisibility() {
             const passwordInput = document.getElementById('password');
@@ -307,8 +307,9 @@
             // Simulate network delay
             await new Promise(resolve => setTimeout(resolve, 800));
 
-            // Check credentials (username and password must be the same)
-            if (validUsers.includes(username) && password === username) {
+            // Check credentials (username and password must be the same, case-insensitive)
+            const matchingUser = validUsers.find(user => user.toLowerCase() === username.toLowerCase());
+            if (matchingUser && password.toLowerCase() === username.toLowerCase()) {
                 // Store user session
                 sessionStorage.setItem('vanguard_user', JSON.stringify({
                     username: username,
