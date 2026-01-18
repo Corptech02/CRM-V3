@@ -42,10 +42,10 @@ window.syncVicidialLeads = async function() {
         if (window.location.hostname === 'localhost') {
             API_URLS = ['http://localhost:3001', '/'];
         } else {
-            // For production, use HTTPS to match the page protocol
-            const protocol = window.location.protocol; // Gets 'https:' or 'http:'
+            // For production, always use HTTP for direct port access and nginx proxy as fallback
+            // Avoid HTTPS on port 3001 to prevent SSL protocol errors
             API_URLS = [
-                `${protocol}//${window.location.hostname}:3001`,
+                `http://${window.location.hostname}:3001`, // Direct HTTP to backend
                 '/' // Relative URL (goes through nginx proxy)
             ];
         }
@@ -219,8 +219,21 @@ function showLeadSelectionPopup(leads, data) {
     const allListsSummary = data.allListsSummary || [];
     const leadsByListId = {};
 
-    // Group actual leads by list ID
+    // Group actual leads by list ID with deduplication
+    const seenLeads = new Set(); // Track leads we've already seen
+
     leads.forEach((lead, index) => {
+        // Create a unique identifier for this lead (phone + email + name)
+        const leadKey = `${lead.phone || ''}|${lead.email || ''}|${lead.name || ''}`;
+
+        // Skip if we've already seen this exact lead
+        if (seenLeads.has(leadKey)) {
+            console.log(`🔄 DEDUP: Skipping duplicate lead: ${lead.name || lead.contact} (${lead.phone})`);
+            return;
+        }
+
+        seenLeads.add(leadKey);
+
         if (!leadsByListId[lead.listId]) {
             leadsByListId[lead.listId] = [];
         }
@@ -232,6 +245,9 @@ function showLeadSelectionPopup(leads, data) {
     const leadsList = allListsSummary.map(listSummary => {
         const listId = listSummary.listId;
         const listLeads = leadsByListId[listId] || [];
+
+        // FIX: Calculate actual lead count for this list (fixes "undefined SALE leads")
+        const actualLeadCount = listLeads.length;
 
         // Color coding: Green for active (Y), Orange/Red for inactive
         const isActive = listSummary.active === true;
@@ -273,7 +289,7 @@ function showLeadSelectionPopup(leads, data) {
                 align-items: center;
                 justify-content: space-between;
             ">
-                <span>${statusIcon} ${listSummary.listName} (${listSummary.saleCount} SALE leads)</span>
+                <span>${statusIcon} ${listSummary.listName} (${actualLeadCount} SALE leads)</span>
                 ${tagHtml}
             </div>
         `;
@@ -667,6 +683,19 @@ async function importSelectedLeads(quickMode = false) {
         // Handle Quick Import differently - it completes immediately
         if (quickMode && result.success) {
             console.log('✅ Quick Import completed immediately');
+
+            // IMMEDIATELY clear imported ViciDial leads from deleted list
+            try {
+                const deletedLeads = JSON.parse(localStorage.getItem('deletedLeadIds') || '[]');
+                const importedLeadIds = selectedLeads.map(lead => lead.id);
+                const updatedDeletedLeads = deletedLeads.filter(id => !importedLeadIds.includes(id));
+                localStorage.setItem('deletedLeadIds', JSON.stringify(updatedDeletedLeads));
+                console.log(`🧹 IMMEDIATE: Cleared ${deletedLeads.length - updatedDeletedLeads.length} imported leads from deleted list`);
+                console.log(`🧹 IMMEDIATE: Removed IDs: ${importedLeadIds.join(', ')}`);
+            } catch (error) {
+                console.error('❌ Error clearing deleted leads immediately:', error);
+            }
+
             if (window.updateTranscriptionProgress) {
                 window.updateTranscriptionProgress(100, 'Quick Import complete!');
             }
@@ -689,7 +718,18 @@ async function importSelectedLeads(quickMode = false) {
                         if (response.ok) {
                             const freshLeads = await response.json();
                             localStorage.setItem('insurance_leads', JSON.stringify(freshLeads));
+
+                            // Clear deleted leads list for newly imported ViciDial leads
+                            const deletedLeads = JSON.parse(localStorage.getItem('deletedLeadIds') || '[]');
+                            const importedLeadIds = freshLeads
+                                .filter(lead => lead.source === 'ViciDial')
+                                .map(lead => lead.id);
+
+                            const updatedDeletedLeads = deletedLeads.filter(id => !importedLeadIds.includes(id));
+                            localStorage.setItem('deletedLeadIds', JSON.stringify(updatedDeletedLeads));
+
                             console.log('✅ Leads reloaded after Quick Import');
+                            console.log(`🧹 Cleared ${deletedLeads.length - updatedDeletedLeads.length} ViciDial leads from deleted list`);
                         }
                     } catch (error) {
                         console.warn('Failed to reload leads:', error);
