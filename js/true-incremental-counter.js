@@ -22,40 +22,45 @@
         return {
             agents: {
                 'Grant': {
-                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                    // Overall/lifetime counters (for backward compatibility)
+                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
-                    periodResets: {
-                        day: null,
-                        week: null,
-                        month: null,
-                        ytd: null,
-                        custom: null
+
+                    // Separate counters for each time period - these get incremented independently
+                    periodCounters: {
+                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
                     }
                 },
                 'Hunter': {
-                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
-                    periodResets: {
-                        day: null,
-                        week: null,
-                        month: null,
-                        ytd: null,
-                        custom: null
+
+                    periodCounters: {
+                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
                     }
                 },
                 'Carson': {
-                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                     resetTimestamp: null,
-                    periodResets: {
-                        day: null,
-                        week: null,
-                        month: null,
-                        ytd: null,
-                        custom: null
+
+                    periodCounters: {
+                        day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                        custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
                     }
                 }
             },
-            version: '1.1'
+            version: '2.0'
         };
     }
 
@@ -91,31 +96,46 @@
         return true;
     }
 
-    // Reset agent counter for specific time period
+    // Reset agent counter for specific time period - GENUINELY reset the actual counter
     function resetAgentCounterForPeriod(agentName, period) {
         const counterData = getCounterData();
         const resetTimestamp = new Date().toISOString();
 
         if (!counterData.agents[agentName]) {
             counterData.agents[agentName] = {
-                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
                 resetTimestamp: null,
-                periodResets: { day: null, week: null, month: null, ytd: null, custom: null }
+                periodCounters: {
+                    day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+                }
             };
         }
 
-        // Initialize periodResets if not present
-        if (!counterData.agents[agentName].periodResets) {
-            counterData.agents[agentName].periodResets = {
-                day: null, week: null, month: null, ytd: null, custom: null
+        // Initialize periodCounters if not present (migration)
+        if (!counterData.agents[agentName].periodCounters) {
+            counterData.agents[agentName].periodCounters = {
+                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
             };
         }
 
-        // Set the reset timestamp for this period
-        counterData.agents[agentName].periodResets[period] = resetTimestamp;
+        // ACTUALLY RESET the specific period counter to 0
+        const oldValues = { ...counterData.agents[agentName].periodCounters[period] };
+        counterData.agents[agentName].periodCounters[period] = {
+            leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0
+        };
 
         saveCounterData(counterData);
-        console.log(`🔢 Reset ${period} counter for ${agentName} - period reset recorded`);
+        console.log(`🔢 GENUINE RESET: ${period} counter for ${agentName} - ALL VALUES RESET TO 0`);
+        console.log(`🔢 OLD VALUES: Leads: ${oldValues.leadCount}, Calls: ${oldValues.callCount}, Sales: ${oldValues.saleCount}`);
+        console.log(`🔢 NEW VALUES: Leads: 0, Calls: 0, Sales: 0`);
         return true;
     }
 
@@ -124,14 +144,42 @@
         const counterData = getCounterData();
 
         if (!counterData.agents[agentName]) {
-            counterData.agents[agentName] = { leadCount: 0, callCount: 0, saleCount: 0, resetTimestamp: null };
+            counterData.agents[agentName] = {
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
+                resetTimestamp: null,
+                periodCounters: {
+                    day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+                }
+            };
         }
 
-        // Increment by exactly 1
+        // Initialize periodCounters if not present (migration)
+        if (!counterData.agents[agentName].periodCounters) {
+            counterData.agents[agentName].periodCounters = {
+                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+            };
+        }
+
+        // Increment by exactly 1 in overall counter
         counterData.agents[agentName].leadCount += 1;
 
+        // ALSO increment ALL period counters (leads should count towards all periods)
+        counterData.agents[agentName].periodCounters.day.leadCount += 1;
+        counterData.agents[agentName].periodCounters.week.leadCount += 1;
+        counterData.agents[agentName].periodCounters.month.leadCount += 1;
+        counterData.agents[agentName].periodCounters.ytd.leadCount += 1;
+        counterData.agents[agentName].periodCounters.custom.leadCount += 1;
+
         saveCounterData(counterData);
-        console.log(`🔢 +1 Lead for ${agentName}: Now at ${counterData.agents[agentName].leadCount} leads`);
+        console.log(`🔢 +1 Lead for ${agentName}: Overall: ${counterData.agents[agentName].leadCount}, Day: ${counterData.agents[agentName].periodCounters.day.leadCount}`);
 
         return counterData.agents[agentName].leadCount;
     }
@@ -141,12 +189,42 @@
         const counterData = getCounterData();
 
         if (!counterData.agents[agentName]) {
-            counterData.agents[agentName] = { leadCount: 0, callCount: 0, saleCount: 0, resetTimestamp: null };
+            counterData.agents[agentName] = {
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
+                resetTimestamp: null,
+                periodCounters: {
+                    day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+                }
+            };
         }
 
+        // Initialize periodCounters if not present (migration)
+        if (!counterData.agents[agentName].periodCounters) {
+            counterData.agents[agentName].periodCounters = {
+                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+            };
+        }
+
+        // Increment overall counter
         counterData.agents[agentName].callCount += 1;
+
+        // ALSO increment ALL period counters
+        counterData.agents[agentName].periodCounters.day.callCount += 1;
+        counterData.agents[agentName].periodCounters.week.callCount += 1;
+        counterData.agents[agentName].periodCounters.month.callCount += 1;
+        counterData.agents[agentName].periodCounters.ytd.callCount += 1;
+        counterData.agents[agentName].periodCounters.custom.callCount += 1;
+
         saveCounterData(counterData);
-        console.log(`🔢 +1 Call for ${agentName}: Now at ${counterData.agents[agentName].callCount} calls`);
+        console.log(`🔢 +1 Call for ${agentName}: Overall: ${counterData.agents[agentName].callCount}, Day: ${counterData.agents[agentName].periodCounters.day.callCount}`);
 
         return counterData.agents[agentName].callCount;
     }
@@ -156,12 +234,42 @@
         const counterData = getCounterData();
 
         if (!counterData.agents[agentName]) {
-            counterData.agents[agentName] = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, resetTimestamp: null };
+            counterData.agents[agentName] = {
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0,
+                resetTimestamp: null,
+                periodCounters: {
+                    day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                    custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+                }
+            };
         }
 
+        // Initialize periodCounters if not present (migration)
+        if (!counterData.agents[agentName].periodCounters) {
+            counterData.agents[agentName].periodCounters = {
+                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
+            };
+        }
+
+        // Increment overall counter
         counterData.agents[agentName].saleCount += 1;
+
+        // ALSO increment ALL period counters
+        counterData.agents[agentName].periodCounters.day.saleCount += 1;
+        counterData.agents[agentName].periodCounters.week.saleCount += 1;
+        counterData.agents[agentName].periodCounters.month.saleCount += 1;
+        counterData.agents[agentName].periodCounters.ytd.saleCount += 1;
+        counterData.agents[agentName].periodCounters.custom.saleCount += 1;
+
         saveCounterData(counterData);
-        console.log(`🔢 +1 Sale for ${agentName}: Now at ${counterData.agents[agentName].saleCount} sales`);
+        console.log(`🔢 +1 Sale for ${agentName}: Overall: ${counterData.agents[agentName].saleCount}, Day: ${counterData.agents[agentName].periodCounters.day.saleCount}`);
 
         return counterData.agents[agentName].saleCount;
     }
@@ -213,54 +321,52 @@
         };
     }
 
-    // Get counter values filtered by period reset
+    // Get counter values for specific time period - RETURNS ACTUAL PERIOD COUNTERS
     function getAgentCountersForPeriod(agentName, period) {
         const counterData = getCounterData();
         const agent = counterData.agents[agentName];
 
         if (!agent) {
             return {
-                leadCount: 0,
-                callCount: 0,
-                saleCount: 0,
-                leadsToBrokers: 0,
-                resetTimestamp: null,
-                periodReset: null
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                totalCallDuration: 0, resetTimestamp: null
             };
         }
 
-        // Check if this period has been reset
-        const periodResetTime = agent.periodResets && agent.periodResets[period];
-
-        if (periodResetTime) {
-            // Period has been reset - show 0 for all counters
-            console.log(`📊 PERIOD FILTERED: ${period} was reset at ${periodResetTime}, showing 0 values`);
-            return {
-                leadCount: 0,
-                callCount: 0,
-                saleCount: 0,
-                leadsToBrokers: 0,
-                totalCallDuration: 0,
-                resetTimestamp: periodResetTime,
-                periodReset: periodResetTime,
-                contactRate: 0,
-                conversionRate: 0
+        // Initialize periodCounters if not present (migration)
+        if (!agent.periodCounters) {
+            agent.periodCounters = {
+                day: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                week: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                month: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                ytd: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 },
+                custom: { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 }
             };
-        } else {
-            // Period not reset - show current values
-            console.log(`📊 PERIOD UNFILTERED: ${period} not reset, showing current values`);
+            saveCounterData(counterData);
+        }
+
+        // Get the specific period counter - REAL COUNTER VALUES
+        const periodCounter = agent.periodCounters[period];
+        if (!periodCounter) {
+            console.log(`📊 PERIOD NOT FOUND: ${period} counter doesn't exist for ${agentName}`);
             return {
-                leadCount: agent.leadCount,
-                callCount: agent.callCount,
-                saleCount: agent.saleCount,
-                leadsToBrokers: agent.leadsToBrokers || 0,
-                totalCallDuration: agent.totalCallDuration || 0,
-                resetTimestamp: agent.resetTimestamp,
-                periodReset: null,
-                contactRate: agent.callCount > 0 ? ((agent.callCount * 0.8) / agent.callCount * 100).toFixed(1) : 0,
-                conversionRate: agent.leadCount > 0 ? (agent.saleCount / agent.leadCount * 100).toFixed(1) : 0
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                totalCallDuration: 0, resetTimestamp: null
             };
         }
+
+        console.log(`📊 GENUINE PERIOD COUNTERS: ${agentName} ${period} - Leads: ${periodCounter.leadCount}, Calls: ${periodCounter.callCount}, Sales: ${periodCounter.saleCount}`);
+
+        return {
+            leadCount: periodCounter.leadCount || 0,
+            callCount: periodCounter.callCount || 0,
+            saleCount: periodCounter.saleCount || 0,
+            leadsToBrokers: periodCounter.leadsToBrokers || 0,
+            totalCallDuration: periodCounter.totalCallDuration || 0,
+            resetTimestamp: null, // Period counters don't have individual timestamps
+            contactRate: periodCounter.callCount > 0 ? ((periodCounter.callCount * 0.8) / periodCounter.callCount * 100).toFixed(1) : 0,
+            conversionRate: periodCounter.leadCount > 0 ? (periodCounter.saleCount / periodCounter.leadCount * 100).toFixed(1) : 0
+        };
     }
 
     // Monitor for new lead assignments using a different approach
