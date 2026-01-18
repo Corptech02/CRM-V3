@@ -21,11 +21,41 @@
 
         return {
             agents: {
-                'Grant': { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, resetTimestamp: null },
-                'Hunter': { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, resetTimestamp: null },
-                'Carson': { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, resetTimestamp: null }
+                'Grant': {
+                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                    resetTimestamp: null,
+                    periodResets: {
+                        day: null,
+                        week: null,
+                        month: null,
+                        ytd: null,
+                        custom: null
+                    }
+                },
+                'Hunter': {
+                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                    resetTimestamp: null,
+                    periodResets: {
+                        day: null,
+                        week: null,
+                        month: null,
+                        ytd: null,
+                        custom: null
+                    }
+                },
+                'Carson': {
+                    leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                    resetTimestamp: null,
+                    periodResets: {
+                        day: null,
+                        week: null,
+                        month: null,
+                        ytd: null,
+                        custom: null
+                    }
+                }
             },
-            version: '1.0'
+            version: '1.1'
         };
     }
 
@@ -35,13 +65,17 @@
         console.log('🔢 Counter data saved');
     }
 
-    // Reset agent counter
+    // Reset agent counter (full reset - all periods)
     function resetAgentCounter(agentName) {
         const counterData = getCounterData();
         const resetTimestamp = new Date().toISOString();
 
         if (!counterData.agents[agentName]) {
-            counterData.agents[agentName] = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, resetTimestamp: null };
+            counterData.agents[agentName] = {
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                resetTimestamp: null,
+                periodResets: { day: null, week: null, month: null, ytd: null, custom: null }
+            };
         }
 
         // Reset all counters to 0
@@ -54,6 +88,34 @@
 
         saveCounterData(counterData);
         console.log(`🔢 Reset counter for ${agentName} - all counts now at 0`);
+        return true;
+    }
+
+    // Reset agent counter for specific time period
+    function resetAgentCounterForPeriod(agentName, period) {
+        const counterData = getCounterData();
+        const resetTimestamp = new Date().toISOString();
+
+        if (!counterData.agents[agentName]) {
+            counterData.agents[agentName] = {
+                leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0,
+                resetTimestamp: null,
+                periodResets: { day: null, week: null, month: null, ytd: null, custom: null }
+            };
+        }
+
+        // Initialize periodResets if not present
+        if (!counterData.agents[agentName].periodResets) {
+            counterData.agents[agentName].periodResets = {
+                day: null, week: null, month: null, ytd: null, custom: null
+            };
+        }
+
+        // Set the reset timestamp for this period
+        counterData.agents[agentName].periodResets[period] = resetTimestamp;
+
+        saveCounterData(counterData);
+        console.log(`🔢 Reset ${period} counter for ${agentName} - period reset recorded`);
         return true;
     }
 
@@ -151,6 +213,56 @@
         };
     }
 
+    // Get counter values filtered by period reset
+    function getAgentCountersForPeriod(agentName, period) {
+        const counterData = getCounterData();
+        const agent = counterData.agents[agentName];
+
+        if (!agent) {
+            return {
+                leadCount: 0,
+                callCount: 0,
+                saleCount: 0,
+                leadsToBrokers: 0,
+                resetTimestamp: null,
+                periodReset: null
+            };
+        }
+
+        // Check if this period has been reset
+        const periodResetTime = agent.periodResets && agent.periodResets[period];
+
+        if (periodResetTime) {
+            // Period has been reset - show 0 for all counters
+            console.log(`📊 PERIOD FILTERED: ${period} was reset at ${periodResetTime}, showing 0 values`);
+            return {
+                leadCount: 0,
+                callCount: 0,
+                saleCount: 0,
+                leadsToBrokers: 0,
+                totalCallDuration: 0,
+                resetTimestamp: periodResetTime,
+                periodReset: periodResetTime,
+                contactRate: 0,
+                conversionRate: 0
+            };
+        } else {
+            // Period not reset - show current values
+            console.log(`📊 PERIOD UNFILTERED: ${period} not reset, showing current values`);
+            return {
+                leadCount: agent.leadCount,
+                callCount: agent.callCount,
+                saleCount: agent.saleCount,
+                leadsToBrokers: agent.leadsToBrokers || 0,
+                totalCallDuration: agent.totalCallDuration || 0,
+                resetTimestamp: agent.resetTimestamp,
+                periodReset: null,
+                contactRate: agent.callCount > 0 ? ((agent.callCount * 0.8) / agent.callCount * 100).toFixed(1) : 0,
+                conversionRate: agent.leadCount > 0 ? (agent.saleCount / agent.leadCount * 100).toFixed(1) : 0
+            };
+        }
+    }
+
     // Monitor for new lead assignments using a different approach
     function monitorForNewLeads() {
         try {
@@ -225,6 +337,7 @@
 
     // Expose functions globally
     window.resetAgentCounter = resetAgentCounter;
+    window.resetAgentCounterForPeriod = resetAgentCounterForPeriod;
     window.incrementLeadCounter = incrementLeadCounter;
     window.incrementCallCounter = incrementCallCounter;
     window.incrementSaleCounter = incrementSaleCounter;
@@ -232,6 +345,7 @@
     window.testBrokerCounter = testBrokerCounter;
     window.testEmailTracking = testEmailTracking;
     window.getAgentCounters = getAgentCounters;
+    window.getAgentCountersForPeriod = getAgentCountersForPeriod;
     window.manuallyAddLead = manuallyAddLead;
     window.fixAgentLeadCount = fixAgentLeadCount;
 

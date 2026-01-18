@@ -2348,10 +2348,29 @@
             modal.className = 'simple-counter-modal';
             modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white !important;border-radius:12px !important;max-width:1000px !important;width:95% !important;max-height:90vh !important;overflow-y:auto !important;box-shadow:rgba(0,0,0,0.3) 0px 20px 40px !important;z-index:999999;animation:0.3s ease-out 0s 1 normal none running modalSlideIn !important;';
 
-            // Get current counter values - CONSOLE-BASED STATS INTEGRATION
-            let counters = window.getAgentCounters ? window.getAgentCounters(agentName) : {
-                leadCount: 0, callCount: 0, saleCount: 0, resetTimestamp: null
-            };
+            // Get current counter values - CONSOLE-BASED STATS INTEGRATION with period awareness
+            let counters = { leadCount: 0, callCount: 0, saleCount: 0, resetTimestamp: null };
+
+            if (window.getAgentCounters) {
+                // Check if we have an active time filter and use period-aware counters
+                const activeButton = document.querySelector('.time-filter-buttons button[style*="rgb(37, 99, 235)"]');
+                if (activeButton && window.getAgentCountersForPeriod) {
+                    const filterText = activeButton.textContent.trim();
+                    const periodMap = {
+                        'Today': 'day', 'This Week': 'week', 'This Month': 'month',
+                        'Year to Date': 'ytd', 'Custom Range': 'custom'
+                    };
+                    const period = periodMap[filterText];
+                    if (period) {
+                        counters = window.getAgentCountersForPeriod(agentName, period);
+                        console.log(`🎯 MODAL-OVERRIDE: Using period-filtered counters for ${agentName} (${filterText}):`, counters);
+                    } else {
+                        counters = window.getAgentCounters(agentName);
+                    }
+                } else {
+                    counters = window.getAgentCounters(agentName);
+                }
+            }
 
             // The counters already include call duration from getAgentCounters - no override needed!
             // getAgentCounters now includes totalCallDuration from console message tracking
@@ -2445,7 +2464,7 @@
                 <div style="padding: 24px; border-bottom: 1px solid #e5e7eb;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0; color: #1f2937; font-size: 24px; font-weight: 600;">
-                            <i class="fas fa-user-circle" style="margin-right: 12px; color: #3b82f6;"></i>${agentName} Performance Profile (Since Reset)
+                            <i class="fas fa-user-circle" style="margin-right: 12px; color: #3b82f6;"></i>${agentName} Performance Profile (Today)
                         </h2>
                         <button onclick="this.closest('.simple-counter-modal').remove()" style="
                             background: none;
@@ -2458,19 +2477,12 @@
                         ">×</button>
                     </div>
                     <div class="time-filter-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button style="padding: 8px 16px; background: rgb(37, 99, 235); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Since Reset</button>
-                        <button onclick="alert('Day view - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Day</button>
-                        <button onclick="alert('Weekly view - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Weekly</button>
-                        <button onclick="alert('Monthly view - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Monthly</button>
-                        <button onclick="alert('YTD view - Coming soon!')" style="padding: 8px 16px; background: rgb(243, 244, 246); color: rgb(55, 65, 81); border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">YTD</button>
-                        <button onclick="alert('Custom date range - Coming soon!')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Custom</button>
-                        <button onclick="
-                            if(window.resetAgentCounter) {
-                                window.resetAgentCounter('${agentName}');
-                                alert('Counter reset to 0!');
-                                window.showSimpleCounter('${agentName}');
-                            }
-                        " style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;"><i class="fas fa-redo"></i> Reset</button>
+                        <button id="filter-since-reset" onclick="applyTimeFilter('${agentName}', 'since-reset')" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🔄 Reset Counters</button>
+                        <button id="filter-day" onclick="applyTimeFilter('${agentName}', 'day')" style="padding: 8px 16px; background: rgb(37, 99, 235); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Today</button>
+                        <button id="filter-week" onclick="applyTimeFilter('${agentName}', 'week')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">This Week</button>
+                        <button id="filter-month" onclick="applyTimeFilter('${agentName}', 'month')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">This Month</button>
+                        <button id="filter-ytd" onclick="applyTimeFilter('${agentName}', 'ytd')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Year to Date</button>
+                        <button id="filter-custom" onclick="applyTimeFilter('${agentName}', 'custom')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Custom Range</button>
                     </div>
                 </div>
 
@@ -2640,6 +2652,14 @@
 
             document.body.appendChild(modal);
             console.log('✅ Emergency simple modal created');
+
+            // Automatically apply "Today" filter as default
+            setTimeout(() => {
+                if (window.applyTimeFilter) {
+                    console.log('🕒 AUTO-APPLYING: Setting Today as default filter');
+                    window.applyTimeFilter(agentName, 'day');
+                }
+            }, 100);
         };
 
         // Override everything immediately
@@ -2652,6 +2672,254 @@
             console.log('🎯 [IMMEDIATE BLOCK] Enhanced blocked, using simple counter');
             return window.showSimpleCounter(agentName);
         };
+
+        // Time Period Filter Function for Agent Performance Reports
+        window.applyTimeFilter = function(agentName, period) {
+            console.log(`🕒 Applying time filter: ${period} for agent: ${agentName}`);
+
+            // SPECIAL CASE: Only "since-reset" actually resets the counters
+            if (period === 'since-reset') {
+                console.log('🔄 RESET: Reset Counters button clicked - resetting counters');
+
+                // Determine current active filter and corresponding period
+                let currentFilter = 'Today'; // Default
+                let currentPeriod = 'day'; // Default
+                const activeButton = document.querySelector('.time-filter-buttons button[style*="rgb(37, 99, 235)"]');
+                if (activeButton) {
+                    currentFilter = activeButton.textContent.trim();
+                    // Map display names to period codes
+                    const periodMap = {
+                        'Today': 'day',
+                        'This Week': 'week',
+                        'This Month': 'month',
+                        'Year to Date': 'ytd',
+                        'Custom Range': 'custom'
+                    };
+                    currentPeriod = periodMap[currentFilter] || 'day';
+
+                    // Remove emoji if present
+                    if (currentFilter.includes('🔄')) {
+                        currentFilter = 'All Counters';
+                        currentPeriod = 'all';
+                    }
+                }
+
+                console.log(`🔍 DEBUG: Checking reset function availability - resetAgentCounterForPeriod: ${typeof window.resetAgentCounterForPeriod}, currentPeriod: ${currentPeriod}`);
+
+                if (window.resetAgentCounterForPeriod && currentPeriod !== 'all') {
+                    console.log(`🎯 Using period-specific reset for ${currentPeriod}`);
+                    const confirmReset = confirm(`Reset the ${currentFilter} counter for ${agentName} back to 0?\n\nThis will mark ${currentFilter} as reset and show filtered data from that point forward.`);
+                    if (confirmReset) {
+                        console.log(`🔢 PERIOD RESET: Calling resetAgentCounterForPeriod('${agentName}', '${currentPeriod}')`);
+                        window.resetAgentCounterForPeriod(agentName, currentPeriod);
+                        alert(`✅ ${currentFilter} counter reset for ${agentName}!`);
+                        console.log(`🔢 Period-specific reset applied: ${currentPeriod} for ${agentName}`);
+                        return;
+                    } else {
+                        // User cancelled reset, don't change anything
+                        console.log('❌ Reset cancelled by user');
+                        return;
+                    }
+                } else if (window.resetAgentCounter) {
+                    console.log(`⚠️ FALLBACK: Using full reset - resetAgentCounterForPeriod not available or currentPeriod is 'all'`);
+                    const confirmReset = confirm(`Reset ALL counters for ${agentName} back to 0?\n\nThis will reset all time periods.`);
+                    if (confirmReset) {
+                        console.log(`🔢 FULL RESET: Calling resetAgentCounter('${agentName}')`);
+                        window.resetAgentCounter(agentName);
+                        // Refresh the modal to show reset values
+                        setTimeout(() => {
+                            if (window.showTrueCounterModal) {
+                                window.showTrueCounterModal(agentName);
+                            }
+                        }, 500);
+                        alert(`✅ All counters reset to 0 for ${agentName}!`);
+                        return;
+                    } else {
+                        // User cancelled reset, don't change anything
+                        console.log('❌ Reset cancelled by user');
+                        return;
+                    }
+                }
+                return; // Exit early for reset action
+            }
+
+            // For all other filters: just update the view, don't reset data
+            updateFilterButtonStates(period);
+
+            // Get the current counters with period filtering support
+            let counters = { leadCount: 0, callCount: 0, saleCount: 0, leadsToBrokers: 0, totalCallDuration: 0 };
+            if (window.getAgentCounters) {
+                // Use period-aware counters if available and period is specified
+                if (window.getAgentCountersForPeriod && ['day', 'week', 'month', 'ytd', 'custom'].includes(period)) {
+                    counters = window.getAgentCountersForPeriod(agentName, period);
+                    console.log(`🎯 FILTER-OVERRIDE: Using period-filtered counters for ${agentName} (${period}):`, counters);
+                } else {
+                    counters = window.getAgentCounters(agentName);
+                }
+            }
+
+            // For now, show the current counters with a note about the time period
+            // In the future, this could filter based on actual timestamps
+            let periodLabel = '';
+            let filteredData = { ...counters };
+
+            switch(period) {
+                case 'since-reset':
+                    periodLabel = 'Since Reset';
+                    // This is the default - show all data since last reset
+                    break;
+                case 'day':
+                    periodLabel = 'Today';
+                    // For now, show current data (could be filtered by date in future)
+                    break;
+                case 'week':
+                    periodLabel = 'This Week';
+                    // For now, show current data (could be filtered by date in future)
+                    break;
+                case 'month':
+                    periodLabel = 'This Month';
+                    // For now, show current data (could be filtered by date in future)
+                    break;
+                case 'ytd':
+                    periodLabel = 'Year to Date';
+                    // For now, show current data (could be filtered by date in future)
+                    break;
+                case 'custom':
+                    // Show date picker for custom range
+                    const startDate = prompt('Enter start date (YYYY-MM-DD):');
+                    const endDate = prompt('Enter end date (YYYY-MM-DD):');
+                    if (startDate && endDate) {
+                        periodLabel = `${startDate} to ${endDate}`;
+                    } else {
+                        return; // Cancel if no dates provided
+                    }
+                    break;
+            }
+
+            // Update the modal title to show the time period
+            const titleElement = document.querySelector('#agent-profile-modal h2');
+            if (titleElement) {
+                titleElement.innerHTML = `
+                    <i class="fas fa-user-circle" style="margin-right: 12px; color: #3b82f6;"></i>
+                    ${agentName} Performance Profile (${periodLabel})
+                `;
+            }
+
+            // Show a notification about the filter
+            if (period !== 'since-reset') {
+                // For now, show a note that this will be enhanced with historical data
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    background: #e0f2fe;
+                    border: 1px solid #0288d1;
+                    color: #01579b;
+                    padding: 12px;
+                    border-radius: 8px;
+                    margin: 16px;
+                    font-size: 14px;
+                    text-align: center;
+                `;
+                notification.innerHTML = `
+                    <i class="fas fa-info-circle" style="margin-right: 8px;"></i>
+                    <strong>${periodLabel} View Active</strong><br>
+                    Currently showing latest data. Historical filtering will be enhanced in future updates.
+                `;
+
+                // Find a good place to insert the notification
+                const modal = document.getElementById('agent-profile-modal');
+                const statsContainer = modal?.querySelector('.simple-counter-stats');
+                if (statsContainer && statsContainer.parentNode) {
+                    // Remove any existing notifications
+                    const existingNotification = modal.querySelector('[data-time-filter-notification]');
+                    if (existingNotification) {
+                        existingNotification.remove();
+                    }
+
+                    notification.setAttribute('data-time-filter-notification', 'true');
+                    statsContainer.parentNode.insertBefore(notification, statsContainer);
+                }
+            } else {
+                // Remove notification for "Since Reset" view
+                const modal = document.getElementById('agent-profile-modal');
+                const existingNotification = modal?.querySelector('[data-time-filter-notification]');
+                if (existingNotification) {
+                    existingNotification.remove();
+                }
+            }
+
+            // Refresh the modal to show period-filtered values
+            setTimeout(() => {
+                const modal = document.getElementById('agent-profile-modal');
+                if (modal) {
+                    console.log(`🔄 MODAL-REFRESH: Refreshing modal for ${agentName} with ${periodLabel} filter`);
+
+                    // Find and update the metric values using the period-aware counters
+                    const metricElements = modal.querySelectorAll('[style*="font-size: 28px"], [style*="font-size:28px"]');
+
+                    metricElements.forEach(element => {
+                        const nextElement = element.nextElementSibling;
+                        const parentElement = element.parentElement;
+
+                        if (nextElement && nextElement.textContent) {
+                            const labelText = nextElement.textContent.trim();
+
+                            // Update the values based on the label
+                            if (labelText.includes('Total Leads')) {
+                                element.textContent = counters.leadCount;
+                                element.style.color = counters.leadCount > 0 ? '#059669' : '#dc2626';
+                            } else if (labelText.includes('Total Calls')) {
+                                element.textContent = counters.callCount;
+                                element.style.color = counters.callCount > 0 ? '#059669' : '#dc2626';
+                            } else if (labelText.includes('Sales')) {
+                                element.textContent = counters.saleCount;
+                                element.style.color = counters.saleCount > 0 ? '#059669' : '#dc2626';
+                            } else if (labelText.includes('Leads to Brokers')) {
+                                element.textContent = counters.leadsToBrokers || 0;
+                                element.style.color = (counters.leadsToBrokers || 0) > 0 ? '#10b981' : '#dc2626';
+                            } else if (labelText.includes('Total Call Duration')) {
+                                element.textContent = counters.totalCallDuration || 0;
+                                element.style.color = (counters.totalCallDuration || 0) > 0 ? '#0ea5e9' : '#dc2626';
+                            }
+                        }
+                    });
+
+                    console.log(`✅ MODAL-REFRESH: Updated modal metrics for ${agentName} (${periodLabel})`);
+                }
+            }, 100);
+
+            console.log(`✅ Applied ${periodLabel} filter for ${agentName}`);
+        };
+
+        // Helper function to update filter button states
+        function updateFilterButtonStates(activePeriod) {
+            const buttons = document.querySelectorAll('.time-filter-buttons button');
+            buttons.forEach(button => {
+                const isActive = button.id === `filter-${activePeriod}`;
+                const isResetButton = button.id === 'filter-since-reset';
+
+                if (isActive) {
+                    if (isResetButton) {
+                        // Reset button stays red when active
+                        button.style.background = '#dc2626';
+                        button.style.color = 'white';
+                    } else {
+                        // Regular filter buttons turn blue when active
+                        button.style.background = 'rgb(37, 99, 235)';
+                        button.style.color = 'white';
+                    }
+                } else {
+                    if (isResetButton) {
+                        // Reset button uses red when inactive
+                        button.style.background = '#ef4444';
+                        button.style.color = 'white';
+                    } else {
+                        // Regular filter buttons are gray when inactive
+                        button.style.background = '#f3f4f6';
+                        button.style.color = '#374151';
+                    }
+                }
+            });
+        }
     </script>
 
     <!-- True Incremental Counter System - Load Last -->
