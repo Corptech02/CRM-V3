@@ -2975,6 +2975,11 @@
                                 element.textContent = counters.totalCallDuration || 0;
                                 // Keep red color for stats that are below average
                                 element.style.color = '#dc2626';
+                            } else if (labelText.includes('High Value Leads')) {
+                                console.log(`🔧 MODAL-UPDATE: Updating High Value Leads from ${element.textContent} to ${counters.highValueLeads || 0}`);
+                                element.textContent = counters.highValueLeads || 0;
+                                // Keep red color for stats that are below average
+                                element.style.color = '#dc2626';
                             }
                         }
                     });

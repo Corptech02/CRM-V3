@@ -1288,23 +1288,43 @@ protectedFunctions.updateLeadRecording = function(leadId, recordingPath) {
 protectedFunctions.updateReachOut = function(leadId, type, checked) {
     console.log(`🐛 DEBUG updateReachOut called: leadId=${leadId}, type=${type}, checked=${checked}`);
 
-    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    // Get leads from ALL possible storage locations
+    const insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    const clients_data = JSON.parse(localStorage.getItem('clients') || '[]');
+    const archived_leads = JSON.parse(localStorage.getItem('archived_leads') || '[]');
+    const leads = [...insurance_leads, ...regular_leads, ...clients_data, ...archived_leads];
 
     // Enhanced debugging for lead lookup
     console.log(`🔍 DEBUG: Looking for lead ID "${leadId}" (type: ${typeof leadId})`);
     console.log(`🔍 DEBUG: Total leads in storage: ${leads.length}`);
+    console.log(`🔍 STORAGE BREAKDOWN: insurance: ${insurance_leads.length}, regular: ${regular_leads.length}, clients: ${clients_data.length}, archived: ${archived_leads.length}`);
 
-    // Try multiple lookup methods
-    let leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+    // Enhanced ID matching - remove ALL quotes and normalize
+    const normalizeId = (id) => {
+        let normalized = String(id);
+        // Remove all types of quotes (single, double, escaped)
+        normalized = normalized.replace(/['"\\]/g, '');
+        // Remove extra whitespace
+        normalized = normalized.trim();
+        return normalized;
+    };
+    const targetId = normalizeId(leadId);
+
+    console.log(`🔍 DEBUG: Normalized target ID: "${targetId}"`);
+    console.log(`🔍 DEBUG: Sample stored IDs:`, leads.slice(0, 5).map(l => `"${normalizeId(l.id)}" (original: ${l.id})`));
+
+    // Use normalized ID matching
+    let leadIndex = leads.findIndex(l => normalizeId(l.id) === targetId);
 
     if (leadIndex === -1) {
-        // Try looking up by number/integer
+        // Try looking up by number/integer as fallback
         leadIndex = leads.findIndex(l => l.id == leadId);
         console.log(`🔍 DEBUG: Loose comparison result: index=${leadIndex}`);
     }
 
     if (leadIndex === -1) {
-        // Try parsing leadId as number
+        // Try parsing leadId as number as final fallback
         const numLeadId = parseInt(leadId);
         if (!isNaN(numLeadId)) {
             leadIndex = leads.findIndex(l => l.id === numLeadId);
@@ -1397,7 +1417,26 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
         }
     }
 
-    localStorage.setItem('insurance_leads', JSON.stringify(leads));
+    // Save back to the correct storage location
+    const foundLead = leads[leadIndex];
+    const foundInInsurance = insurance_leads.findIndex(l => String(l.id) === String(leadId));
+    const foundInRegular = regular_leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (foundInInsurance !== -1) {
+        // Update the insurance leads array and save
+        insurance_leads[foundInInsurance] = foundLead;
+        localStorage.setItem('insurance_leads', JSON.stringify(insurance_leads));
+        console.log('💾 Saved lead data to insurance_leads storage');
+    } else if (foundInRegular !== -1) {
+        // Update the regular leads array and save
+        regular_leads[foundInRegular] = foundLead;
+        localStorage.setItem('leads', JSON.stringify(regular_leads));
+        console.log('💾 Saved lead data to regular leads storage');
+    } else {
+        // Fallback - save to insurance leads
+        localStorage.setItem('insurance_leads', JSON.stringify(insurance_leads.concat([foundLead])));
+        console.log('💾 Fallback: Added lead to insurance_leads storage');
+    }
 
     // Save reach-out data to server
     const updateData = {
@@ -1764,6 +1803,23 @@ window.handleCallDuration = function(leadId, duration) {
         // Increment connected counter
         leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
 
+        // CALCULATE TOTAL MINUTES BEFORE ADDING NEW CALL (for high value upgrade detection)
+        let totalMinutesBefore = 0;
+        if (leads[leadIndex].reachOut.callLogs && Array.isArray(leads[leadIndex].reachOut.callLogs)) {
+            leads[leadIndex].reachOut.callLogs.forEach(log => {
+                if (log.duration) {
+                    if (log.duration === '< 1 min') {
+                        totalMinutesBefore += 0.5;
+                    } else if (log.duration.includes('min')) {
+                        const match = log.duration.match(/(\d+(?:\.\d+)?)\s*min/);
+                        if (match) {
+                            totalMinutesBefore += parseFloat(match[1]);
+                        }
+                    }
+                }
+            });
+        }
+
         // Add call log entry
         const callLog = {
             timestamp: new Date().toISOString(),
@@ -1773,6 +1829,36 @@ window.handleCallDuration = function(leadId, duration) {
             notes: `Call connected - Duration: ${durationNum > 0 ? durationNum + ' minutes' : 'less than 1 minute'}`
         };
         leads[leadIndex].reachOut.callLogs.push(callLog);
+
+        // CALCULATE TOTAL MINUTES AFTER ADDING NEW CALL (for high value upgrade detection)
+        const totalMinutesAfter = totalMinutesBefore + durationNum;
+
+        // CHECK FOR HIGH VALUE LEAD UPGRADE (60+ minutes threshold)
+        if (totalMinutesBefore < 60 && totalMinutesAfter >= 60) {
+            console.log(`🏆 HIGH VALUE LEAD UPGRADE: ${leads[leadIndex].name} just became a high value lead!`);
+            console.log(`📊 Total talk time: ${totalMinutesBefore.toFixed(1)} min → ${totalMinutesAfter.toFixed(1)} min (crossed 60+ threshold)`);
+
+            // Show popup notification for the upgrade
+            setTimeout(() => {
+                alert(`🏆 HIGH VALUE LEAD UPGRADE!\n\n${leads[leadIndex].name} just became a high value lead with ${totalMinutesAfter.toFixed(1)} minutes of total talk time!`);
+            }, 1000);
+
+            // Add to counter system as high value lead
+            if (window.incrementHighValueLeadCounter && leads[leadIndex].assignedTo) {
+                window.incrementHighValueLeadCounter(leads[leadIndex].assignedTo);
+
+                // Force immediate UI refresh for high value lead upgrade
+                setTimeout(() => {
+                    if (window.showSimpleCounter) {
+                        const modal = document.querySelector('.simple-counter-modal');
+                        if (modal && modal.style.display !== 'none') {
+                            console.log('🔄 FORCE-REFRESH: Updating modal after high value lead upgrade');
+                            window.showSimpleCounter(leads[leadIndex].assignedTo);
+                        }
+                    }
+                }, 500);
+            }
+        }
 
         // Track connected call in live stats
         if (window.liveStatsTracker && leads[leadIndex].assignedTo) {
@@ -2105,13 +2191,61 @@ function markReachOutComplete(leadId, completedAt) {
 protectedFunctions.showCallLogs = function(leadId) {
     console.log(`📞 Showing call logs for lead: ${leadId}`);
 
-    // Get the lead data
-    const leads = JSON.parse(localStorage.getItem('insurance_leads') || localStorage.getItem('leads') || '[]');
-    const lead = leads.find(l => String(l.id) === String(leadId));
+    // DEBUG: Check what's actually in localStorage
+    console.log(`🔍 LOCALSTORAGE KEYS:`, Object.keys(localStorage).filter(k => k.toLowerCase().includes('lead')));
+    console.log(`🔍 ALL LOCALSTORAGE KEYS:`, Object.keys(localStorage).slice(0, 10));
 
+    // Get the lead data from ALL possible storage locations
+    const insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    const clients_data = JSON.parse(localStorage.getItem('clients') || '[]');
+    const archived_leads = JSON.parse(localStorage.getItem('archived_leads') || '[]');
+
+    console.log(`🔍 STORAGE DEBUG: insurance_leads: ${insurance_leads.length}, regular_leads: ${regular_leads.length}, clients: ${clients_data.length}, archived: ${archived_leads.length}`);
+
+    const allLeads = [...insurance_leads, ...regular_leads, ...clients_data, ...archived_leads];
+    console.log(`🔍 COMBINED STORAGE: Total ${allLeads.length} leads`);
+    console.log(`🔍 LEAD IDS in combined storage:`, allLeads.slice(0, 10).map(l => `"${l.id}"`));
+
+    // Enhanced ID matching - remove ALL quotes and normalize
+    const normalizeId = (id) => {
+        let normalized = String(id);
+        // Remove all types of quotes (single, double, escaped)
+        normalized = normalized.replace(/['"\\]/g, '');
+        // Remove extra whitespace
+        normalized = normalized.trim();
+        return normalized;
+    };
+    const targetId = normalizeId(leadId);
+
+    console.log(`🔍 NORMALIZED TARGET ID: "${targetId}"`);
+    console.log(`🔍 SAMPLE STORED IDS:`, allLeads.slice(0, 5).map(l => `"${normalizeId(l.id)}" (original: ${l.id})`));
+
+    let lead = allLeads.find(l => normalizeId(l.id) === targetId);
+    console.log(`🔍 LOOKUP RESULT: Looking for "${targetId}", found:`, lead ? `${lead.name} (${lead.id})` : 'NOT FOUND');
+
+    // If not found in localStorage, try to fetch from server
     if (!lead) {
-        alert('Lead not found!');
-        return;
+        console.log(`🌐 Lead not found in localStorage, attempting server fetch for ${leadId}...`);
+
+        // Try to fetch from the API
+        fetch(`/api/leads/${leadId}`)
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error(`HTTP ${response.status}`);
+            })
+            .then(data => {
+                console.log(`✅ Server fetch successful for lead ${leadId}:`, data.name);
+                // Recreate the modal with server data
+                protectedFunctions.showCallLogsWithData(data);
+            })
+            .catch(error => {
+                console.log(`❌ Server fetch failed for lead ${leadId}:`, error.message);
+                alert(`Lead not found in local storage or server! ID: ${leadId}`);
+            });
+        return; // Exit early, server fetch will handle the modal
     }
 
     // Create modal for call logs
@@ -2247,22 +2381,132 @@ protectedFunctions.showCallLogs = function(leadId) {
     });
 };
 
+// Helper function to show call logs with lead data (used by server fetch)
+protectedFunctions.showCallLogsWithData = function(lead) {
+    console.log(`📞 Showing call logs with server data for: ${lead.name || 'Unknown'}`);
+
+    // Create modal for call logs (simplified version for server data)
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    `;
+
+    const callLogs = lead.reachOut?.callLogs || [];
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80%; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);">
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-phone-alt"></i> Call Logs - ${lead.name || 'Unknown'} (Server Data)</h2>
+                    <button onclick="this.closest('.call-logs-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                </div>
+            </div>
+            <div style="padding: 20px;">
+                ${callLogs.length > 0 ? `
+                    <div style="space-y: 12px;">
+                        ${callLogs.map(log => `
+                            <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="font-weight: 600; color: ${log.connected ? '#10b981' : '#f59e0b'};">
+                                        ${log.connected ? '✅ Connected' : '📞 Attempted'}
+                                    </span>
+                                    <span style="color: #6b7280; font-size: 14px;">
+                                        ${log.timestamp ? new Date(log.timestamp).toLocaleString() : 'No timestamp'}
+                                    </span>
+                                </div>
+                                <div style="color: #374151; margin-bottom: 4px;">
+                                    <strong>Duration:</strong> ${log.duration || 'Not recorded'}
+                                </div>
+                                ${log.leftVoicemail ? '<div style="color: #f59e0b; font-size: 14px;">📧 Left Voicemail</div>' : ''}
+                                ${log.notes ? `<div style="color: #6b7280; font-size: 14px; font-style: italic;">${log.notes}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : `
+                    <div style="text-align: center; color: #6b7280; padding: 40px;">
+                        <i class="fas fa-phone-alt" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                        <p style="margin: 0; font-size: 18px;">No call logs available for this lead</p>
+                    </div>
+                `}
+                <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="this.closest('.call-logs-modal').remove()" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.className = 'call-logs-modal';
+    document.body.appendChild(modal);
+};
+
 // Function to show call status modal
 protectedFunctions.showCallStatus = function(leadId) {
     console.log(`🟢 Showing highlight duration for lead: ${leadId}`);
 
-    // Get the lead data from both storage locations
+    // Get the lead data from ALL possible storage locations
     const insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
     const regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
-    const allLeads = [...insurance_leads, ...regular_leads];
+    const clients_data = JSON.parse(localStorage.getItem('clients') || '[]');
+    const archived_leads = JSON.parse(localStorage.getItem('archived_leads') || '[]');
 
-    const lead = allLeads.find(l => String(l.id) === String(leadId));
+    console.log(`🔍 STORAGE DEBUG: insurance_leads: ${insurance_leads.length}, regular_leads: ${regular_leads.length}, clients: ${clients_data.length}, archived: ${archived_leads.length}`);
+
+    const allLeads = [...insurance_leads, ...regular_leads, ...clients_data, ...archived_leads];
+    console.log(`🔍 COMBINED STORAGE: Total ${allLeads.length} leads`);
+    console.log(`🔍 LEAD IDS in combined storage:`, allLeads.slice(0, 10).map(l => `"${l.id}"`));
+
+    // Enhanced ID matching - remove ALL quotes and normalize
+    const normalizeId = (id) => {
+        let normalized = String(id);
+        // Remove all types of quotes (single, double, escaped)
+        normalized = normalized.replace(/['"\\]/g, '');
+        // Remove extra whitespace
+        normalized = normalized.trim();
+        return normalized;
+    };
+    const targetId = normalizeId(leadId);
+
+    console.log(`🔍 NORMALIZED TARGET ID: "${targetId}"`);
+    console.log(`🔍 SAMPLE STORED IDS:`, allLeads.slice(0, 5).map(l => `"${normalizeId(l.id)}" (original: ${l.id})`));
+
+    let lead = allLeads.find(l => normalizeId(l.id) === targetId);
+    console.log(`🔍 LOOKUP RESULT: Looking for "${targetId}", found:`, lead ? `${lead.name} (${lead.id})` : 'NOT FOUND');
 
     console.log(`🔍 DEBUG: Found lead:`, lead?.name, 'greenUntil:', lead?.greenUntil);
 
+    // If not found in localStorage, try to fetch from server
     if (!lead) {
-        alert('Lead not found!');
-        return;
+        console.log(`🌐 Lead not found in localStorage, attempting server fetch for ${leadId}...`);
+
+        // Try to fetch from the API
+        fetch(`/api/leads/${leadId}`)
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error(`HTTP ${response.status}`);
+            })
+            .then(data => {
+                console.log(`✅ Server fetch successful for lead ${leadId}:`, data.name);
+                // Recreate the modal with server data
+                protectedFunctions.showCallStatusWithData(data);
+            })
+            .catch(error => {
+                console.log(`❌ Server fetch failed for lead ${leadId}:`, error.message);
+                alert(`Lead not found in local storage or server! ID: ${leadId}`);
+            });
+        return; // Exit early, server fetch will handle the modal
     }
 
     // Check for GREEN highlight duration (from green highlight system)
@@ -2408,6 +2652,86 @@ protectedFunctions.showCallStatus = function(leadId) {
         }
     });
 };
+
+// Add the function to protectedFunctions for global access
+protectedFunctions.showCallStatusWithData = showCallStatusWithData;
+
+// Helper function to show highlight duration modal with server-fetched lead data
+function showCallStatusWithData(leadData) {
+    console.log('📊 Creating highlight duration modal for server-fetched lead:', leadData);
+
+    // Create modal HTML
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); display: flex; align-items: center;
+        justify-content: center; z-index: 10000;
+    `;
+
+    // Calculate highlight duration from lead data
+    let highlightMinutes = 0;
+    if (leadData.callLogs && Array.isArray(leadData.callLogs)) {
+        highlightMinutes = leadData.callLogs
+            .filter(log => log.disposition === 'Interested' || log.disposition === 'Very Interested' || log.disposition === 'Hot Lead')
+            .reduce((total, log) => total + (parseFloat(log.duration) || 0), 0);
+    }
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                <h2 style="margin: 0; color: #333; font-size: 24px;">📊 Highlight Duration</h2>
+                <button onclick="this.closest('.modal').remove()" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 16px;">✕</button>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #2563eb; margin: 0 0 10px 0;">Lead Information</h3>
+                <p style="margin: 5px 0;"><strong>Name:</strong> ${leadData.name || 'Unknown'}</p>
+                <p style="margin: 5px 0;"><strong>Phone:</strong> ${leadData.phone || 'N/A'}</p>
+                <p style="margin: 5px 0;"><strong>Email:</strong> ${leadData.email || 'N/A'}</p>
+            </div>
+
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center;">
+                <h3 style="color: #dc2626; margin: 0 0 10px 0; font-size: 20px;">🎯 Total Highlight Duration</h3>
+                <p style="font-size: 32px; font-weight: bold; color: #dc2626; margin: 10px 0;">${highlightMinutes.toFixed(1)} minutes</p>
+                <p style="color: #6b7280; margin: 10px 0; font-style: italic;">Based on calls marked as Interested, Very Interested, or Hot Lead</p>
+            </div>
+
+            ${leadData.callLogs && leadData.callLogs.length > 0 ? `
+                <div style="margin-top: 20px;">
+                    <h3 style="color: #2563eb; margin: 0 0 15px 0;">📞 Highlighted Calls</h3>
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        ${leadData.callLogs
+                            .filter(log => log.disposition === 'Interested' || log.disposition === 'Very Interested' || log.disposition === 'Hot Lead')
+                            .map(log => `
+                                <div style="border: 1px solid #e5e7eb; padding: 12px; margin-bottom: 8px; border-radius: 6px; background: #fef2f2;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-weight: bold; color: #dc2626;">${log.disposition}</span>
+                                        <span style="color: #6b7280;">${log.date || 'Unknown date'}</span>
+                                    </div>
+                                    <div style="margin-top: 5px;">
+                                        <span style="background: #dc2626; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">
+                                            ${parseFloat(log.duration || 0).toFixed(1)} min
+                                        </span>
+                                    </div>
+                                    ${log.notes ? `<p style="margin: 8px 0 0 0; color: #374151; font-size: 14px;">${log.notes}</p>` : ''}
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+            ` : '<p style="text-align: center; color: #6b7280; margin-top: 20px;">No highlighted calls found</p>'}
+        </div>
+    `;
+
+    modal.classList.add('modal');
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
 
 // Function to show email confirmation popup
 window.showEmailConfirmationPopup = function(leadId) {

@@ -4762,13 +4762,13 @@ async function loadLeadsView() {
                         return false; // Always filter out leads with invalid IDs
                     }
 
-                    // DISABLED: ViciDial protection was preventing legitimate deletions
-                    // const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('88') && String(lead.id).length === 9);
-                    // if (isViciDialLead) {
-                    //     console.log(`🔓 VICIDIAL PROTECTION ACTIVE: Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name} (source: ${lead.source})`);
-                    //     return true; // Don't filter out ViciDial leads
-                    // }
-                    console.log(`🔓 ViciDial deletion protection DISABLED - allowing normal deletion for: ${lead.id} - ${lead.name}`);
+                    // RE-ENABLED: ViciDial protection to prevent filtering valid ViciDial leads
+                    const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('88') && String(lead.id).length === 9);
+                    if (isViciDialLead) {
+                        console.log(`🔓 VICIDIAL PROTECTION ACTIVE: Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name} (source: ${lead.source})`);
+                        return true; // Don't filter out ViciDial leads
+                    }
+                    console.log(`🔓 ViciDial deletion protection ENABLED - checking lead source: ${lead.source}`);
 
                     console.log(`🚫 Filtering out deleted lead: ${lead.id} - ${lead.name}`);
                     return false;
