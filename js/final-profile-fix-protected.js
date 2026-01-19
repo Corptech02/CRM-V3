@@ -1780,6 +1780,37 @@ window.handleCallDuration = function(leadId, duration) {
             window.liveStatsTracker.addConnectedCall(leads[leadIndex].assignedTo, duration);
         }
 
+        // INTEGRATE WITH COUNTER SYSTEM - Add call count and duration to all containers
+        if (leads[leadIndex].assignedTo && window.incrementCallCounter) {
+            console.log(`🔢 VICIDIAL INTEGRATION: Adding call for ${leads[leadIndex].assignedTo} with ${durationNum} min duration`);
+
+            // Increment call counter (this adds to all containers simultaneously)
+            window.incrementCallCounter(leads[leadIndex].assignedTo);
+
+            // Add duration to all separate containers
+            if (window.addCallDurationToAllContainers) {
+                window.addCallDurationToAllContainers(leads[leadIndex].assignedTo, durationNum);
+            } else {
+                console.log(`📞 Adding ${durationNum} min duration to counter system for ${leads[leadIndex].assignedTo}`);
+                // Manually add duration if function doesn't exist yet
+                const counterData = JSON.parse(localStorage.getItem('trueIncrementalCounters') || '{}');
+                if (counterData.agents && counterData.agents[leads[leadIndex].assignedTo]) {
+                    const agent = counterData.agents[leads[leadIndex].assignedTo];
+                    // Add to all containers simultaneously
+                    agent.totalCallDuration = (agent.totalCallDuration || 0) + durationNum;
+                    if (agent.todayCounters) {
+                        agent.todayCounters.totalCallDuration = (agent.todayCounters.totalCallDuration || 0) + durationNum;
+                        agent.weekCounters.totalCallDuration = (agent.weekCounters.totalCallDuration || 0) + durationNum;
+                        agent.monthCounters.totalCallDuration = (agent.monthCounters.totalCallDuration || 0) + durationNum;
+                        agent.ytdCounters.totalCallDuration = (agent.ytdCounters.totalCallDuration || 0) + durationNum;
+                        agent.customCounters.totalCallDuration = (agent.customCounters.totalCallDuration || 0) + durationNum;
+                    }
+                    localStorage.setItem('trueIncrementalCounters', JSON.stringify(counterData));
+                    console.log(`✅ Added ${durationNum} min duration to all containers for ${leads[leadIndex].assignedTo}`);
+                }
+            }
+        }
+
         // Mark reach-out as COMPLETE
         leads[leadIndex].reachOut.completedAt = new Date().toISOString();
         leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();

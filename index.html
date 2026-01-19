@@ -2368,7 +2368,14 @@
                         counters = window.getAgentCounters(agentName);
                     }
                 } else {
-                    counters = window.getAgentCounters(agentName);
+                    // DEFAULT: Use Today filter when no active button (modal creation before filters load)
+                    if (window.getAgentCountersForPeriod) {
+                        counters = window.getAgentCountersForPeriod(agentName, 'day');
+                        console.log(`🎯 MODAL-OVERRIDE: Using default TODAY counters for ${agentName} (no active button yet):`, counters);
+                    } else {
+                        counters = window.getAgentCounters(agentName);
+                        console.log(`🎯 MODAL-OVERRIDE: Using fallback overall counters for ${agentName}:`, counters);
+                    }
                 }
             }
 
@@ -2478,64 +2485,14 @@
                     </div>
                     <div class="time-filter-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <!-- Time period filters -->
-                        <button id="filter-day" onclick="applyTimeFilter('${agentName}', 'day')" style="padding: 8px 16px; background: rgb(37, 99, 235); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Today</button>
+                        <button id="filter-day" onclick="applyTimeFilter('${agentName}', 'day')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Today</button>
                         <button id="filter-week" onclick="applyTimeFilter('${agentName}', 'week')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">This Week</button>
                         <button id="filter-month" onclick="applyTimeFilter('${agentName}', 'month')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">This Month</button>
                         <button id="filter-ytd" onclick="applyTimeFilter('${agentName}', 'ytd')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Year to Date</button>
                         <button id="filter-custom" onclick="applyTimeFilter('${agentName}', 'custom')" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Custom Range</button>
 
-                        <!-- Full reset (old working version) -->
-                        <button onclick="
-                            console.log('🔍 RESET TRACKING: Reset button clicked');
-
-                            // DETECT which filter is currently active
-                            const activeButton = document.querySelector('.time-filter-buttons button[style*=\"rgb(37, 99, 235)\"]');
-                            let activeFilter = 'All';
-                            let activePeriod = 'all';
-
-                            if (activeButton) {
-                                activeFilter = activeButton.textContent.trim();
-                                console.log('🎯 ACTIVE FILTER DETECTED:', activeFilter);
-
-                                // Map display names to period codes
-                                const filterToPeriod = {
-                                    'Today': 'day',
-                                    'This Week': 'week',
-                                    'This Month': 'month',
-                                    'Year to Date': 'ytd',
-                                    'Custom Range': 'custom'
-                                };
-                                activePeriod = filterToPeriod[activeFilter] || 'all';
-                                console.log('🎯 MAPPED PERIOD:', activePeriod);
-                            } else {
-                                console.log('⚠️ NO ACTIVE FILTER: Using full reset');
-                            }
-
-                            // Show confirmation with active filter info
-                            const resetMessage = activeFilter !== 'All' ?
-                                \`Reset only the \${activeFilter} counter for \${agentName} to 0?\\n\\nThis will reset only \${activeFilter}, leaving other time periods unchanged.\` :
-                                \`Reset ALL counters for \${agentName} to 0?\\n\\nThis will reset all time periods.\`;
-
-                            const confirmReset = confirm(resetMessage);
-                            if (confirmReset) {
-                                if (activePeriod !== 'all' && window.resetAgentCounterForPeriod) {
-                                    console.log(\`🔄 PERIOD RESET: Resetting only \${activeFilter} (period: \${activePeriod})\`);
-                                    window.resetAgentCounterForPeriod('${agentName}', activePeriod);
-                                    alert(\`✅ \${activeFilter} counter reset to 0 for \${agentName}!\`);
-                                } else if (window.resetAgentCounter) {
-                                    console.log('🔄 FULL RESET: Using original resetAgentCounter');
-                                    window.resetAgentCounter('${agentName}');
-                                    alert('✅ All counters reset to 0 for \${agentName}!');
-                                } else {
-                                    alert('Reset function not available');
-                                }
-
-                                // Refresh modal
-                                setTimeout(() => {
-                                    window.showSimpleCounter('${agentName}');
-                                }, 500);
-                            }
-                        " style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;"><i class="fas fa-redo"></i> Reset</button>
+                        <!-- Smart Reset Button -->
+                        <button onclick="handleSmartReset('${agentName}')" style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;"><i class="fas fa-redo"></i> Reset</button>
                     </div>
                 </div>
 
@@ -2923,12 +2880,15 @@
             }
 
             // Update the modal title to show the time period
-            const titleElement = document.querySelector('#agent-profile-modal h2');
+            const titleElement = document.querySelector('.simple-counter-modal h2');
             if (titleElement) {
                 titleElement.innerHTML = `
                     <i class="fas fa-user-circle" style="margin-right: 12px; color: #3b82f6;"></i>
                     ${agentName} Performance Profile (${periodLabel})
                 `;
+                console.log(`🔄 TITLE-UPDATE: Updated header to show ${periodLabel}`);
+            } else {
+                console.log(`🔄 TITLE-UPDATE: Header element not found`);
             }
 
             // Show a notification about the filter
@@ -2975,27 +2935,35 @@
 
             // Refresh the modal to show period-filtered values
             setTimeout(() => {
-                const modal = document.getElementById('agent-profile-modal');
+                const modal = document.querySelector('.simple-counter-modal');
                 if (modal) {
                     console.log(`🔄 MODAL-REFRESH: Refreshing modal for ${agentName} with ${periodLabel} filter`);
+                    console.log(`🔄 MODAL-REFRESH: Should update to show ${counters.callCount} calls`);
 
                     // Find and update the metric values using the period-aware counters
                     const metricElements = modal.querySelectorAll('[style*="font-size: 28px"], [style*="font-size:28px"]');
+                    console.log(`🔄 MODAL-REFRESH: Found ${metricElements.length} metric elements`);
 
                     metricElements.forEach(element => {
                         const nextElement = element.nextElementSibling;
                         const parentElement = element.parentElement;
 
+                        // The label comes AFTER the number in this HTML structure
                         if (nextElement && nextElement.textContent) {
                             const labelText = nextElement.textContent.trim();
+                            console.log(`🔧 MODAL-UPDATE: Checking element with label "${labelText}" and current value "${element.textContent}"`);
 
                             // Update the values based on the label
                             if (labelText.includes('Total Leads')) {
+                                console.log(`🔧 MODAL-UPDATE: Updating Total Leads from ${element.textContent} to ${counters.leadCount}`);
                                 element.textContent = counters.leadCount;
-                                element.style.color = counters.leadCount > 0 ? '#059669' : '#dc2626';
+                                // Keep red color for stats that are below average
+                                element.style.color = '#dc2626';
                             } else if (labelText.includes('Total Calls')) {
+                                console.log(`🔧 MODAL-UPDATE: Updating Total Calls from ${element.textContent} to ${counters.callCount}`);
                                 element.textContent = counters.callCount;
-                                element.style.color = counters.callCount > 0 ? '#059669' : '#dc2626';
+                                // Keep red color for stats that are below average
+                                element.style.color = '#dc2626';
                             } else if (labelText.includes('Sales')) {
                                 element.textContent = counters.saleCount;
                                 element.style.color = counters.saleCount > 0 ? '#059669' : '#dc2626';
@@ -3003,8 +2971,10 @@
                                 element.textContent = counters.leadsToBrokers || 0;
                                 element.style.color = (counters.leadsToBrokers || 0) > 0 ? '#10b981' : '#dc2626';
                             } else if (labelText.includes('Total Call Duration')) {
+                                console.log(`🔧 MODAL-UPDATE: Updating Total Call Duration from ${element.textContent} to ${counters.totalCallDuration || 0}`);
                                 element.textContent = counters.totalCallDuration || 0;
-                                element.style.color = (counters.totalCallDuration || 0) > 0 ? '#0ea5e9' : '#dc2626';
+                                // Keep red color for stats that are below average
+                                element.style.color = '#dc2626';
                             }
                         }
                     });
@@ -3014,6 +2984,72 @@
             }, 100);
 
             console.log(`✅ Applied ${periodLabel} filter for ${agentName}`);
+        };
+
+        // Smart Reset Handler - Detects current filter and resets accordingly
+        window.handleSmartReset = function(agentName) {
+            console.log(`🎯 SMART RESET: Handling reset for ${agentName}`);
+
+            // Detect which filter is currently active
+            const activeButton = document.querySelector('.time-filter-buttons button[style*="rgb(37, 99, 235)"]');
+            let activeFilter = 'All';
+            let activePeriod = 'all';
+
+            if (activeButton) {
+                activeFilter = activeButton.textContent.trim();
+                console.log('🎯 ACTIVE FILTER DETECTED:', activeFilter);
+
+                // Map display names to period codes
+                const filterToPeriod = {
+                    'Today': 'day',
+                    'This Week': 'week',
+                    'This Month': 'month',
+                    'Year to Date': 'ytd',
+                    'Custom Range': 'custom'
+                };
+                activePeriod = filterToPeriod[activeFilter] || 'all';
+                console.log('🎯 MAPPED PERIOD:', activePeriod);
+            } else {
+                console.log('⚠️ NO ACTIVE FILTER: Using full reset');
+            }
+
+            // Create appropriate confirmation message
+            const resetMessage = activeFilter !== 'All' ?
+                `Reset only the ${activeFilter} counter to 0? This will reset only ${activeFilter}, leaving other time periods unchanged.` :
+                `Reset ALL counters to 0? This will reset all time periods.`;
+
+            console.log('💬 RESET MESSAGE:', resetMessage);
+
+            // Show confirmation dialog
+            const confirmReset = confirm(resetMessage);
+            if (!confirmReset) {
+                console.log('❌ Reset cancelled by user');
+                return;
+            }
+
+            // Execute the appropriate reset
+            if (activePeriod !== 'all' && window.resetAgentCounterForPeriod) {
+                console.log(`🔄 ACTION: Calling resetAgentCounterForPeriod('${agentName}', '${activePeriod}')`);
+                window.resetAgentCounterForPeriod(agentName, activePeriod);
+                alert(`✅ ${activeFilter} counter reset for ${agentName}!`);
+
+                // Refresh modal after short delay
+                setTimeout(() => {
+                    window.showSimpleCounter(agentName);
+                }, 300);
+            } else if (window.resetAgentCounter) {
+                console.log(`🔄 ACTION: Calling resetAgentCounter('${agentName}') - Full reset`);
+                window.resetAgentCounter(agentName);
+                alert(`✅ All counters reset for ${agentName}!`);
+
+                // Refresh modal after short delay
+                setTimeout(() => {
+                    window.showSimpleCounter(agentName);
+                }, 300);
+            } else {
+                console.error('❌ No reset function available!');
+                alert('Error: Reset functionality not available');
+            }
         };
 
         // Helper function to update filter button states
