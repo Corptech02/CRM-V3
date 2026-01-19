@@ -6,7 +6,7 @@
 
     // Function to clear ViciDial leads from deleted list
     function clearViciDialFromDeletedList() {
-        const deletedLeads = JSON.parse(localStorage.getItem('deletedLeadIds') || '[]');
+        const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
         const originalCount = deletedLeads.length;
 
         // ViciDial leads typically have IDs in the 131000-135000 range
@@ -15,7 +15,7 @@
             return num < 131000 || num > 135000;
         });
 
-        localStorage.setItem('deletedLeadIds', JSON.stringify(filteredDeleted));
+        localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(filteredDeleted));
 
         const cleared = originalCount - filteredDeleted.length;
         if (cleared > 0) {

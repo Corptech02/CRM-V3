@@ -686,10 +686,10 @@ async function importSelectedLeads(quickMode = false) {
 
             // IMMEDIATELY clear imported ViciDial leads from deleted list
             try {
-                const deletedLeads = JSON.parse(localStorage.getItem('deletedLeadIds') || '[]');
+                const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
                 const importedLeadIds = selectedLeads.map(lead => lead.id);
                 const updatedDeletedLeads = deletedLeads.filter(id => !importedLeadIds.includes(id));
-                localStorage.setItem('deletedLeadIds', JSON.stringify(updatedDeletedLeads));
+                localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(updatedDeletedLeads));
                 console.log(`🧹 IMMEDIATE: Cleared ${deletedLeads.length - updatedDeletedLeads.length} imported leads from deleted list`);
                 console.log(`🧹 IMMEDIATE: Removed IDs: ${importedLeadIds.join(', ')}`);
             } catch (error) {
@@ -720,13 +720,13 @@ async function importSelectedLeads(quickMode = false) {
                             localStorage.setItem('insurance_leads', JSON.stringify(freshLeads));
 
                             // Clear deleted leads list for newly imported ViciDial leads
-                            const deletedLeads = JSON.parse(localStorage.getItem('deletedLeadIds') || '[]');
+                            const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
                             const importedLeadIds = freshLeads
                                 .filter(lead => lead.source === 'ViciDial')
                                 .map(lead => lead.id);
 
                             const updatedDeletedLeads = deletedLeads.filter(id => !importedLeadIds.includes(id));
-                            localStorage.setItem('deletedLeadIds', JSON.stringify(updatedDeletedLeads));
+                            localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(updatedDeletedLeads));
 
                             console.log('✅ Leads reloaded after Quick Import');
                             console.log(`🧹 Cleared ${deletedLeads.length - updatedDeletedLeads.length} ViciDial leads from deleted list`);
