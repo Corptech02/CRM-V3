@@ -357,14 +357,32 @@ window.closeQuoteApplicationModal = function() {
 };
 
 // Override createQuoteApplicationSimple with enhanced version
-window.createQuoteApplicationSimple = function(leadId) {
+window.createQuoteApplicationSimple = async function(leadId) {
     console.log('Enhanced quote application for lead:', leadId);
 
     // Get the lead data from both possible sources
-    const leads = JSON.parse(localStorage.getItem('leads') || '[]');
-    const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const allLeads = [...leads, ...insuranceLeads];
-    const lead = allLeads.find(l => l.id == leadId);
+    let leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    let allLeads = [...leads, ...insuranceLeads];
+    let lead = allLeads.find(l => l.id == leadId);
+
+    if (!lead) {
+        console.log('⚡ Lead not found locally, refreshing from server...');
+        try {
+            // Refresh leads from server if lead not found locally
+            if (typeof loadLeadsFromServerAndRefresh === 'function') {
+                await loadLeadsFromServerAndRefresh();
+            }
+
+            // Try again after refresh
+            leads = JSON.parse(localStorage.getItem('leads') || '[]');
+            insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            allLeads = [...leads, ...insuranceLeads];
+            lead = allLeads.find(l => l.id == leadId);
+        } catch (error) {
+            console.error('❌ Error refreshing leads from server:', error);
+        }
+    }
 
     if (!lead) {
         console.error('Lead not found with ID:', leadId);
@@ -1596,16 +1614,34 @@ async function saveToServer(applicationData) {
 }
 
 // Function to show enhanced quote modal with saved application data
-window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
+window.showEnhancedQuoteApplicationWithData = async function(leadId, application) {
     console.log('👁️ Showing enhanced quote modal with saved data for lead:', leadId, 'application:', application);
 
     try {
 
     // Get the lead data from both possible sources
-    const leads = JSON.parse(localStorage.getItem('leads') || '[]');
-    const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const allLeads = [...leads, ...insuranceLeads];
-    const lead = allLeads.find(l => l.id == leadId);
+    let leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    let allLeads = [...leads, ...insuranceLeads];
+    let lead = allLeads.find(l => l.id == leadId);
+
+    if (!lead) {
+        console.log('⚡ Lead not found locally, refreshing from server...');
+        try {
+            // Refresh leads from server if lead not found locally
+            if (typeof loadLeadsFromServerAndRefresh === 'function') {
+                await loadLeadsFromServerAndRefresh();
+            }
+
+            // Try again after refresh
+            leads = JSON.parse(localStorage.getItem('leads') || '[]');
+            insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            allLeads = [...leads, ...insuranceLeads];
+            lead = allLeads.find(l => l.id == leadId);
+        } catch (error) {
+            console.error('❌ Error refreshing leads from server:', error);
+        }
+    }
 
     if (!lead) {
         console.error('Lead not found with ID:', leadId);

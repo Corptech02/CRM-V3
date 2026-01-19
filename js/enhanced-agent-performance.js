@@ -451,7 +451,7 @@
                             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                                 ${generatePerformanceCard(agentLeads.length, avgStats.totalLeads, 'Total Leads', '', '#374151')}
                                 ${generatePerformanceCard(highValueLeads, avgStats.highValueLeads, 'High Value Leads', `${highValuePercentage}% of total`, '#059669')}
-                                ${generatePerformanceCard(parseFloat(lowValuePercentage), parseFloat(avgStats.lowValuePercentage), 'Low Value Leads', `${lowValueLeads} total leads`, '#dc2626', true)}
+                                ${generatePerformanceCard(lowValueLeads, avgStats.lowValueLeads, 'Low Value Leads', `${lowValuePercentage}% of total`, '#dc2626', true)}
                             </div>
                         </div>
 

@@ -43,6 +43,20 @@
             localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeadIds));
         }
 
+        // Mark as user-deleted to bypass ViciDial protection
+        const userDeletedLeads = JSON.parse(localStorage.getItem('USER_DELETED_LEADS') || '[]');
+        if (!userDeletedLeads.includes(String(leadId))) {
+            userDeletedLeads.push(String(leadId));
+            localStorage.setItem('USER_DELETED_LEADS', JSON.stringify(userDeletedLeads));
+            console.log('🏷️ Marked as user-deleted to bypass ViciDial protection:', leadId);
+        }
+
+        // Record deletion timestamp for smart ViciDial protection
+        const deletedLeadTimestamps = JSON.parse(localStorage.getItem('DELETED_LEAD_TIMESTAMPS') || '{}');
+        deletedLeadTimestamps[String(leadId)] = Date.now();
+        localStorage.setItem('DELETED_LEAD_TIMESTAMPS', JSON.stringify(deletedLeadTimestamps));
+        console.log('⏰ Recorded deletion timestamp for:', leadId);
+
         // Delete from server permanently
         fetch(`/api/leads/${leadId}`, {
             method: 'DELETE',
@@ -123,6 +137,25 @@
         // Save updated localStorage immediately
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
         localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(deletedLeadIds));
+
+        // Mark all as user-deleted to bypass ViciDial protection
+        const userDeletedLeads = JSON.parse(localStorage.getItem('USER_DELETED_LEADS') || '[]');
+        selectedLeadIds.forEach(leadId => {
+            if (!userDeletedLeads.includes(String(leadId))) {
+                userDeletedLeads.push(String(leadId));
+            }
+        });
+        localStorage.setItem('USER_DELETED_LEADS', JSON.stringify(userDeletedLeads));
+        console.log('🏷️ Marked as user-deleted to bypass ViciDial protection:', selectedLeadIds);
+
+        // Record deletion timestamps for smart ViciDial protection
+        const deletedLeadTimestamps = JSON.parse(localStorage.getItem('DELETED_LEAD_TIMESTAMPS') || '{}');
+        const now = Date.now();
+        selectedLeadIds.forEach(leadId => {
+            deletedLeadTimestamps[String(leadId)] = now;
+        });
+        localStorage.setItem('DELETED_LEAD_TIMESTAMPS', JSON.stringify(deletedLeadTimestamps));
+        console.log('⏰ Recorded deletion timestamps for:', selectedLeadIds);
 
         console.log(`✅ Locally deleted ${successfulLocalDeletes}/${totalToDelete} leads`);
 

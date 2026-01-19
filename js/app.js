@@ -4762,11 +4762,30 @@ async function loadLeadsView() {
                         return false; // Always filter out leads with invalid IDs
                     }
 
-                    // RE-ENABLED: ViciDial protection to prevent filtering valid ViciDial leads
+                    // SIMPLIFIED VICIDIAL PROTECTION: Only protect from accidental bulk cleanup, not user deletion
+                    const userDeletedLeads = JSON.parse(localStorage.getItem('USER_DELETED_LEADS') || '[]');
+                    const isUserDeleted = userDeletedLeads.includes(String(lead.id));
+
+                    if (isUserDeleted) {
+                        console.log(`🗑️ USER DELETION: Allowing user-deleted lead to be filtered: ${lead.id} - ${lead.name}`);
+                        return false; // Allow user-deleted leads to be filtered out
+                    }
+
+                    // Check if this deletion happened in the last 10 minutes (recent user activity)
+                    const recentDeletionThreshold = Date.now() - (10 * 60 * 1000); // 10 minutes ago
+                    const deletedLeadTimestamps = JSON.parse(localStorage.getItem('DELETED_LEAD_TIMESTAMPS') || '{}');
+                    const deletionTime = deletedLeadTimestamps[String(lead.id)];
+
+                    if (deletionTime && deletionTime > recentDeletionThreshold) {
+                        console.log(`🕒 RECENT DELETION: Allowing recently deleted lead to be filtered: ${lead.id} - ${lead.name}`);
+                        return false; // Allow recently deleted leads to be filtered out
+                    }
+
+                    // Only protect ViciDial leads from old/automatic cleanup (not recent user actions)
                     const isViciDialLead = lead.source === 'ViciDial' || (String(lead.id).startsWith('88') && String(lead.id).length === 9);
-                    if (isViciDialLead) {
-                        console.log(`🔓 VICIDIAL PROTECTION ACTIVE: Protecting ViciDial lead from deletion filter: ${lead.id} - ${lead.name} (source: ${lead.source})`);
-                        return true; // Don't filter out ViciDial leads
+                    if (isViciDialLead && (!deletionTime || deletionTime < recentDeletionThreshold)) {
+                        console.log(`🔓 VICIDIAL PROTECTION: Protecting old ViciDial lead from cleanup: ${lead.id} - ${lead.name} (source: ${lead.source})`);
+                        return true; // Only protect ViciDial leads from old deletions
                     }
                     console.log(`🔓 ViciDial deletion protection ENABLED - checking lead source: ${lead.source}`);
 
@@ -4866,8 +4885,8 @@ async function loadLeadsView() {
         // Save back the cleaned list with archived flags
         // localStorage.setItem('insurance_leads', JSON.stringify(allLeads));
 
-        console.log(`🔧 USING ALL LEADS WITHOUT ARCHIVED FILTERING FOR DEBUG`);
-        leads = allLeads; // Use all leads directly
+        console.log(`✅ USING PROPERLY FILTERED LEADS (debug disabled)`);
+        // leads = allLeads; // DISABLED: Debug override that was preventing deletion filtering
         console.log(`🔧 Total leads being used: ${leads.length}`);
 
         // Filter out archived leads - they should not appear in the active leads view
@@ -15866,10 +15885,9 @@ function generatePerformanceCard(agentValue, avgValue, label, subtitle, defaultC
         ? `${avgValue}%`
         : avgValue;
 
-    // Format the agent value - add % for Low Value Leads and other percentage metrics
+    // Format the agent value - add % for rate and percentage metrics only
     const agentValueDisplay = (label.toLowerCase().includes('rate') ||
-                              label.toLowerCase().includes('percentage') ||
-                              label.toLowerCase().includes('low value leads'))
+                              label.toLowerCase().includes('percentage'))
         ? `${agentValue}%`
         : agentValue;
 
@@ -16123,7 +16141,7 @@ function viewAgentStats(agentName) {
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                         ${generatePerformanceCard(agentLeads.length, avgStats.totalLeads, 'Total Leads', '', '#374151')}
                         ${generatePerformanceCard(highValueLeads, avgStats.highValueLeads, 'High Value Leads', `${highValuePercentage}% of total`, '#059669')}
-                        ${generatePerformanceCard(parseFloat(lowValuePercentage), parseFloat(avgStats.lowValuePercentage), 'Low Value Leads', `${lowValueLeads} total leads`, '#dc2626', true)}
+                        ${generatePerformanceCard(lowValueLeads, avgStats.lowValueLeads, 'Low Value Leads', `${lowValuePercentage}% of total`, '#dc2626', true)}
                     </div>
                 </div>
 
@@ -16735,7 +16753,7 @@ function viewAgentStatsWithDateRange(agentName, dateRange, periodLabel) {
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                             ${generatePerformanceCard(agentLeads.length, avgStats.totalLeads, 'Total Leads', '', '#374151')}
                             ${generatePerformanceCard(highValueLeads, avgStats.highValueLeads, 'High Value Leads', `${highValuePercentage}% of total`, '#059669')}
-                            ${generatePerformanceCard(parseFloat(lowValuePercentage), parseFloat(avgStats.lowValuePercentage), 'Low Value Leads', `${lowValueLeads} total leads`, '#dc2626', true)}
+                            ${generatePerformanceCard(lowValueLeads, avgStats.lowValueLeads, 'Low Value Leads', `${lowValuePercentage}% of total`, '#dc2626', true)}
                         </div>
                     </div>
 

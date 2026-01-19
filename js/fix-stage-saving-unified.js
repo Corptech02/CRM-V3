@@ -518,6 +518,24 @@
                       regular_leads.find(l => String(l.id) === String(leadId));
 
             if (!lead) {
+                console.log('⚡ Lead not found locally, refreshing from server...');
+                try {
+                    // Refresh leads from server if lead not found locally
+                    if (typeof loadLeadsFromServerAndRefresh === 'function') {
+                        await loadLeadsFromServerAndRefresh();
+                    }
+
+                    // Try again after refresh
+                    insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                    regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+                    lead = insurance_leads.find(l => String(l.id) === String(leadId)) ||
+                          regular_leads.find(l => String(l.id) === String(leadId));
+                } catch (error) {
+                    console.error('❌ Error refreshing leads from server:', error);
+                }
+            }
+
+            if (!lead) {
                 console.error('Lead not found for ID:', leadId);
                 return;
             }

@@ -42,7 +42,7 @@ class VanguardViciDialSync:
         self.db = sqlite3.connect(DB_PATH)
         self.processed_leads = self.load_processed_leads()
         # Auto-assignment configuration
-        self.representatives = ["Hunter", "Grant", "Maureen"]
+        self.representatives = ["Hunter", "Grant", "Maureen", "Carson"]
         self.assignment_index = self.get_current_assignment_index()
 
     def load_processed_leads(self):
@@ -98,12 +98,16 @@ class VanguardViciDialSync:
         """Determine assigned agent based on list ID"""
         # Mapping based on Vicidial list assignment
         list_agent_mapping = {
-            '998': 'Hunter',    # Hunter's list
-            '999': 'Grant',     # Grant's list
-            '1000': 'Hunter',   # Default Hunter list
-            '1001': 'Grant',    # Grant's secondary list
-            '1002': 'Maureen',  # Maureen's list
-            '1005': 'Grant'     # Grant's additional list
+            '998': 'Hunter',    # OH Hunter's list
+            '999': 'Grant',     # TX Hunter's list
+            '1000': 'Hunter',   # IN Hunter's list
+            '1001': 'Grant',    # OH Grant's list
+            '1002': 'Maureen',  # TEST list - Maureen
+            '1005': 'Grant',    # TX Grant's list
+            '1006': 'Grant',    # IN Grant's list
+            '1007': 'Carson',   # OH Carson's list
+            '1008': 'Carson',   # TX Carson's list
+            '1009': 'Carson'    # IN Carson's list
         }
 
         assigned_agent = list_agent_mapping.get(list_id, 'Hunter')  # Default to Hunter
@@ -590,7 +594,7 @@ class VanguardViciDialSync:
         total_imported = 0
 
         # Check multiple lists if needed - each assigned to different agents
-        lists_to_check = ["998", "999", "1000", "1001", "1002", "1005"]  # Hunter, Grant, Hunter, Grant, Maureen, Grant
+        lists_to_check = ["998", "999", "1000", "1001", "1002", "1005", "1006", "1007", "1008", "1009"]  # All active lists including Carson's lists
 
         for list_id in lists_to_check:
             logger.info(f"Checking list {list_id}...")

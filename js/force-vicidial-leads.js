@@ -1,11 +1,12 @@
 /**
- * FORCE VICIDIAL LEADS - Emergency Fix for ViciDial Lead Persistence
+ * FORCE VICIDIAL LEADS - DISABLED
  *
- * This script ensures ViciDial leads are ALWAYS present in localStorage
- * and never filtered out, regardless of other caching logic.
+ * This script was preventing legitimate ViciDial lead deletions by users.
+ * The protection was too aggressive and interfered with normal operations.
+ * SCRIPT DISABLED TO ALLOW PROPER LEAD MANAGEMENT.
  */
 
-console.log('🚀 Force ViciDial Leads - Loading emergency persistence fix');
+console.log('🔇 Force ViciDial Leads - DISABLED (was preventing legitimate deletions)');
 
 // Emergency function to ensure ViciDial leads are in localStorage
 async function forceViciDialLeadsIntoLocalStorage() {
@@ -60,73 +61,28 @@ async function forceViciDialLeadsIntoLocalStorage() {
     }
 }
 
-// Override localStorage.setItem to prevent ViciDial leads from being removed
-const originalSetItem = localStorage.setItem;
-localStorage.setItem = function(key, value) {
-    if (key === 'insurance_leads') {
-        try {
-            const leads = JSON.parse(value);
-            const vicidialCount = leads.filter(l => l.source === 'ViciDial').length;
-            console.log(`🔍 INTERCEPTED localStorage.setItem: ${leads.length} leads (${vicidialCount} ViciDial)`);
+// DISABLED: localStorage override was preventing legitimate deletions
+// const originalSetItem = localStorage.setItem;
+// localStorage.setItem = function(key, value) {
+//     // DISABLED - was blocking user deletions
+// };
+console.log('🔓 localStorage override DISABLED - users can now delete leads normally');
 
-            if (vicidialCount === 0) {
-                console.warn('⚠️ PROTECTION: Attempt to save localStorage without ViciDial leads - forcing re-fetch');
-                // Force re-fetch ViciDial leads before saving
-                forceViciDialLeadsIntoLocalStorage().then(() => {
-                    console.log('✅ PROTECTION: ViciDial leads restored after intercept');
-                });
-            }
-        } catch (e) {
-            console.warn('⚠️ Error parsing leads in setItem intercept:', e);
-        }
-    }
-    return originalSetItem.call(this, key, value);
-};
+// DISABLED: Auto-forcing leads on page load
+// if (document.readyState === 'loading') {
+//     // DISABLED - was preventing deletions
+// } else {
+//     // DISABLED - was preventing deletions
+// }
+console.log('🔓 Auto-force on page load DISABLED - allowing normal lead management');
 
-// Force ViciDial leads on page load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', async () => {
-        console.log('📅 DOM loaded - forcing ViciDial leads');
-        const count = await forceViciDialLeadsIntoLocalStorage();
-        if (count > 0) {
-            console.log('🎉 ViciDial leads forced successfully on page load');
-        }
-    });
-} else {
-    // DOM already loaded, run immediately
-    forceViciDialLeadsIntoLocalStorage().then(count => {
-        if (count > 0) {
-            console.log('🎉 ViciDial leads forced successfully immediately');
-        }
-    });
-}
+// DISABLED: Interval check was constantly restoring deleted leads
+// setInterval(async () => {
+//     // DISABLED - was preventing legitimate deletions by constantly restoring leads
+// }, 5000);
+console.log('🔓 Interval failsafe DISABLED - leads will stay deleted when users delete them');
 
-// Also force leads every few seconds as a failsafe
-setInterval(async () => {
-    const currentLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const vicidialInStorage = currentLeads.filter(l => l.source === 'ViciDial').length;
-
-    if (vicidialInStorage === 0) {
-        console.log('🔄 FAILSAFE: No ViciDial leads in localStorage - forcing refresh');
-        const count = await forceViciDialLeadsIntoLocalStorage();
-        if (count > 0) {
-            console.log('🔄 FAILSAFE: ViciDial leads restored');
-
-            // Trigger any available display refresh functions
-            if (typeof displayLeads === 'function') {
-                displayLeads();
-            }
-            if (typeof refreshLeadsDisplay === 'function') {
-                refreshLeadsDisplay();
-            }
-            if (typeof loadContent === 'function' && window.location.hash === '#leads') {
-                loadContent('#leads');
-            }
-        }
-    }
-}, 5000); // Check every 5 seconds
-
-// Make the force function available globally for manual calling
+// Function still available for manual emergency use if needed
 window.forceViciDialLeads = forceViciDialLeadsIntoLocalStorage;
 
-console.log('✅ Force ViciDial Leads script loaded - ViciDial leads are now protected');
+console.log('✅ Force ViciDial Leads script loaded - PROTECTION DISABLED, normal deletions now allowed');

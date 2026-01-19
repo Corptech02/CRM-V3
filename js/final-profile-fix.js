@@ -950,14 +950,36 @@ window.updateReachOut = function(leadId, type, checked) {
     console.log(`🐛 DEBUG updateReachOut called: leadId=${leadId}, type=${type}, checked=${checked}`);
 
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    // Enhanced debugging for lead lookup
+    console.log(`🔍 DEBUG: Looking for lead ID "${leadId}" (type: ${typeof leadId})`);
+    console.log(`🔍 DEBUG: Total leads in storage: ${leads.length}`);
+
+    // Try multiple lookup methods
+    let leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
 
     if (leadIndex === -1) {
-        console.log('🐛 DEBUG updateReachOut - lead not found');
-        return;
+        // Try looking up by number/integer
+        leadIndex = leads.findIndex(l => l.id == leadId);
+        console.log(`🔍 DEBUG: Loose comparison result: index=${leadIndex}`);
     }
 
-    console.log(`🐛 DEBUG found lead at index: ${leadIndex}`);
+    if (leadIndex === -1) {
+        // Try parsing leadId as number
+        const numLeadId = parseInt(leadId);
+        if (!isNaN(numLeadId)) {
+            leadIndex = leads.findIndex(l => l.id === numLeadId);
+            console.log(`🔍 DEBUG: Number lookup result: index=${leadIndex}`);
+        }
+    }
+
+    if (leadIndex === -1) {
+        console.log(`🐛 DEBUG updateReachOut - lead not found after all lookup methods`);
+        console.log(`🔍 DEBUG: Available lead IDs:`, leads.slice(0, 5).map(l => `"${l.id}" (${typeof l.id})`));
+        return;
+    } else {
+        console.log(`✅ DEBUG: Found lead at index ${leadIndex} with ID ${leads[leadIndex].id}`);
+    }
 
     if (!leads[leadIndex].reachOut) {
         leads[leadIndex].reachOut = {
