@@ -5,16 +5,16 @@
 (function() {
     'use strict';
 
-    console.log('🔧 Eye icon lead ID fix loaded');
+    console.log('🔧 Action button lead ID fix loaded');
 
-    function fixEyeIconLeadIds() {
-        console.log('🔧 Fixing eye icon lead IDs...');
+    function fixActionButtonLeadIds() {
+        console.log('🔧 Fixing ALL action button lead IDs...');
 
-        // Find all eye icon buttons
-        const eyeButtons = document.querySelectorAll('button.btn-icon[onclick*="viewLead"]');
-        console.log(`👁️ Found ${eyeButtons.length} eye icon buttons to fix`);
+        // Find all action buttons - not just eye icons, but ALL buttons in action-buttons divs
+        const actionButtons = document.querySelectorAll('.action-buttons button[onclick*="Lead"], button.btn-icon[onclick*="viewLead"], button.btn-icon[onclick*="archiveLead"], button.btn-icon[onclick*="convertLead"], button.btn-icon[onclick*="permanentlyDeleteActiveLead"]');
+        console.log(`👁️ Found ${actionButtons.length} action buttons to fix`);
 
-        eyeButtons.forEach((button, index) => {
+        actionButtons.forEach((button, index) => {
             // Find the parent row
             const row = button.closest('tr');
             if (!row) {
@@ -40,7 +40,18 @@
 
             const correctLeadId = leadIdMatch[1];
             const currentOnclick = button.getAttribute('onclick');
-            const currentLeadIdMatch = currentOnclick.match(/viewLead\(['"]([^'"]+)['"]\)/);
+
+            // Extract current lead ID from various button types
+            let currentLeadIdMatch = currentOnclick.match(/viewLead\(['"]([^'"]+)['"]\)/);
+            if (!currentLeadIdMatch) {
+                currentLeadIdMatch = currentOnclick.match(/archiveLead\(['"]([^'"]+)['"]\)/);
+            }
+            if (!currentLeadIdMatch) {
+                currentLeadIdMatch = currentOnclick.match(/convertLead\(['"]([^'"]+)['"]\)/);
+            }
+            if (!currentLeadIdMatch) {
+                currentLeadIdMatch = currentOnclick.match(/permanentlyDeleteActiveLead\(['"]([^'"]+)['"]\)/);
+            }
 
             if (!currentLeadIdMatch) {
                 console.log(`⚠️ Button ${index}: Could not extract current lead ID from button onclick:`, currentOnclick);
@@ -51,8 +62,13 @@
 
             // Check if the lead IDs match
             if (currentLeadId !== correctLeadId) {
-                // Fix the button onclick
-                const newOnclick = `viewLead('${correctLeadId}')`;
+                // Fix ALL button types with the correct lead ID
+                let newOnclick = currentOnclick;
+                newOnclick = newOnclick.replace(/viewLead\(['"]([^'"]+)['"]\)/g, `viewLead('${correctLeadId}')`);
+                newOnclick = newOnclick.replace(/archiveLead\(['"]([^'"]+)['"]\)/g, `archiveLead('${correctLeadId}')`);
+                newOnclick = newOnclick.replace(/convertLead\(['"]([^'"]+)['"]\)/g, `convertLead('${correctLeadId}')`);
+                newOnclick = newOnclick.replace(/permanentlyDeleteActiveLead\(['"]([^'"]+)['"]\)/g, `permanentlyDeleteActiveLead('${correctLeadId}')`);
+
                 button.setAttribute('onclick', newOnclick);
                 console.log(`✅ Fixed button ${index}: ${currentLeadId} → ${correctLeadId}`);
 
@@ -64,15 +80,15 @@
             }
         });
 
-        console.log('🔧 Eye icon lead ID fix complete');
+        console.log('🔧 Action button lead ID fix complete');
     }
 
     // Run the fix when page loads
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fixEyeIconLeadIds);
+        document.addEventListener('DOMContentLoaded', fixActionButtonLeadIds);
     } else {
         // DOM already loaded
-        setTimeout(fixEyeIconLeadIds, 100);
+        setTimeout(fixActionButtonLeadIds, 100);
     }
 
     // Also run when new content is added (for dynamic table updates)
@@ -81,14 +97,26 @@
 
         mutations.forEach((mutation) => {
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                // Check if new buttons were added
+                // Check if new action buttons were added
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === 1) { // Element node
-                        if (node.matches && node.matches('button.btn-icon[onclick*="viewLead"]')) {
+                        if (node.matches && (
+                            node.matches('button.btn-icon[onclick*="viewLead"]') ||
+                            node.matches('button.btn-icon[onclick*="archiveLead"]') ||
+                            node.matches('button.btn-icon[onclick*="convertLead"]') ||
+                            node.matches('button.btn-icon[onclick*="permanentlyDeleteActiveLead"]') ||
+                            node.matches('.action-buttons')
+                        )) {
                             shouldFix = true;
                             break;
                         }
-                        if (node.querySelector && node.querySelector('button.btn-icon[onclick*="viewLead"]')) {
+                        if (node.querySelector && (
+                            node.querySelector('button.btn-icon[onclick*="viewLead"]') ||
+                            node.querySelector('button.btn-icon[onclick*="archiveLead"]') ||
+                            node.querySelector('button.btn-icon[onclick*="convertLead"]') ||
+                            node.querySelector('button.btn-icon[onclick*="permanentlyDeleteActiveLead"]') ||
+                            node.querySelector('.action-buttons')
+                        )) {
                             shouldFix = true;
                             break;
                         }
@@ -98,8 +126,8 @@
         });
 
         if (shouldFix) {
-            console.log('🔧 New eye icon buttons detected, applying fix...');
-            setTimeout(fixEyeIconLeadIds, 100);
+            console.log('🔧 New action buttons detected, applying fix...');
+            setTimeout(fixActionButtonLeadIds, 100);
         }
     });
 
@@ -109,6 +137,6 @@
         subtree: true
     });
 
-    console.log('🔧 Eye icon lead ID fix system installed');
+    console.log('🔧 Action button lead ID fix system installed');
 
 })();

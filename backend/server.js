@@ -240,6 +240,30 @@ function initializeDatabase() {
     console.log('Database tables initialized');
 }
 
+// Helper function to get existing lead data
+async function getExistingLead(leadId) {
+    return new Promise((resolve, reject) => {
+        db.get('SELECT data FROM leads WHERE id = ?', [leadId], (err, row) => {
+            if (err) {
+                console.error(`Error fetching existing lead ${leadId}:`, err);
+                resolve(null);
+            } else if (row) {
+                try {
+                    const existingLead = JSON.parse(row.data);
+                    console.log(`📋 Found existing lead ${leadId} with stage: ${existingLead.stage || 'new'}`);
+                    resolve(existingLead);
+                } catch (parseErr) {
+                    console.error(`Error parsing existing lead ${leadId}:`, parseErr);
+                    resolve(null);
+                }
+            } else {
+                console.log(`📋 No existing lead found for ${leadId} - will create new`);
+                resolve(null);
+            }
+        });
+    });
+}
+
 // Helper functions for ViciDial lead processing
 function formatRenewalDate(rawDate) {
     if (!rawDate) return '';
@@ -2026,29 +2050,41 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
 
             console.log(`📊 Enhanced data - Fleet: ${lead.fleetSize}, Premium: $${calculatedPremium.toLocaleString()}, Insurance: "${insuranceCompany}"`);
 
+            // Get existing lead data to preserve important fields like stage, call duration, etc.
+            const existingLead = await getExistingLead(leadId);
+
+            console.log(`🔄 ${existingLead ? 'UPDATING' : 'CREATING'} lead ${leadId} (preserving existing data)`);
+
             // Ensure lead has required fields in proper Vanguard format
+            // PRESERVE existing lead data, only update specific fields from ViciDial
             const leadToSave = {
+                // Start with existing data if available
+                ...(existingLead || {}),
+                // Update with ViciDial-sourced data (but preserve critical existing fields)
                 id: leadId,
                 name: companyName,
                 contact: contactName,
                 phone: formattedPhone,
-                email: lead.email || '',
+                email: lead.email || (existingLead ? existingLead.email : ''),
                 product: "Commercial Auto",
-                stage: "new",
-                status: "hot_lead",
+                // PRESERVE EXISTING STAGE - don't reset to "new" if lead already has a stage
+                stage: existingLead ? (existingLead.stage || "new") : "new",
+                status: existingLead ? (existingLead.status || "hot_lead") : "hot_lead",
                 assignedTo: assignedAgent, // Use list-based assignment
-                created: new Date().toLocaleDateString("en-US", {
+                // PRESERVE creation date for existing leads
+                created: existingLead ? (existingLead.created || existingLead.createdAt) : new Date().toLocaleDateString("en-US", {
                     month: "numeric",
                     day: "numeric",
                     year: "numeric"
                 }),
-                renewalDate: renewalDate,
-                premium: lead.calculatedPremium || 0,
-                dotNumber: lead.dotNumber || '',
-                mcNumber: lead.mcNumber || '',
-                yearsInBusiness: "Unknown",
-                fleetSize: lead.fleetSize || "Unknown",
-                insuranceCompany: lead.insuranceCompany || "",
+                // Update renewal date and premium from ViciDial, but preserve if not available
+                renewalDate: renewalDate || (existingLead ? existingLead.renewalDate : ''),
+                premium: lead.calculatedPremium || (existingLead ? existingLead.premium : 0),
+                dotNumber: lead.dotNumber || (existingLead ? existingLead.dotNumber : ''),
+                mcNumber: lead.mcNumber || (existingLead ? existingLead.mcNumber : ''),
+                yearsInBusiness: existingLead ? (existingLead.yearsInBusiness || "Unknown") : "Unknown",
+                fleetSize: lead.fleetSize || (existingLead ? existingLead.fleetSize : "Unknown"),
+                insuranceCompany: lead.insuranceCompany || (existingLead ? existingLead.insuranceCompany : ""),
                 address: "",
                 city: (lead.city || '').toUpperCase(),
                 state: lead.state || 'OH',
@@ -2066,30 +2102,57 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
                     cargo: "$100,000"
                 },
                 source: 'ViciDial',
-                leadScore: 85,
-                lastContactDate: new Date().toLocaleDateString("en-US", {
+                leadScore: existingLead ? (existingLead.leadScore || 85) : 85,
+                // PRESERVE existing lastContactDate if available, otherwise update it
+                lastContactDate: existingLead ? (existingLead.lastContactDate || new Date().toLocaleDateString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "numeric"
+                })) : new Date().toLocaleDateString("en-US", {
                     month: "numeric",
                     day: "numeric",
                     year: "numeric"
                 }),
-                followUpDate: "",
-                notes: `SALE from ViciDial list ${lead.listId || '999'}. ${lead.notes || ''}`,
-                tags: ["ViciDial", "Sale", `List-${lead.listId || '999'}`],
-                transcriptText: transcriptionData.transcriptText || lead.transcriptText || '',
-                hasTranscription: !!transcriptionData.transcriptText,
-                structuredData: transcriptionData.structured_data || {},
-                createdAt: new Date().toISOString(),
+                followUpDate: existingLead ? (existingLead.followUpDate || "") : "",
+                // PRESERVE existing notes and append ViciDial sync info if not already there
+                notes: existingLead ? (existingLead.notes && !existingLead.notes.includes(`ViciDial list ${lead.listId}`) ?
+                    `${existingLead.notes}\n\nViciDial sync update from list ${lead.listId || '999'}.` :
+                    existingLead.notes || `SALE from ViciDial list ${lead.listId || '999'}. ${lead.notes || ''}`)
+                    : `SALE from ViciDial list ${lead.listId || '999'}. ${lead.notes || ''}`,
+                // PRESERVE existing tags and ensure ViciDial tags are included
+                tags: existingLead ? [...new Set([...(existingLead.tags || []), "ViciDial", "Sale", `List-${lead.listId || '999'}`])] : ["ViciDial", "Sale", `List-${lead.listId || '999'}`],
+                // PRESERVE existing transcription data but update if new data available
+                transcriptText: transcriptionData.transcriptText || (existingLead ? existingLead.transcriptText : '') || lead.transcriptText || '',
+                hasTranscription: !!transcriptionData.transcriptText || (existingLead ? existingLead.hasTranscription : false),
+                structuredData: transcriptionData.structured_data || (existingLead ? existingLead.structuredData : {}) || {},
+                // PRESERVE original creation timestamp
+                createdAt: existingLead ? (existingLead.createdAt || new Date().toISOString()) : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
             // Save to database (using await for sequential processing)
             const data = JSON.stringify(leadToSave);
             console.log(`💾 Saving lead to database: ${leadId} (${leadToSave.name})`);
+
+            // Log what data is being preserved vs updated
+            if (existingLead) {
+                console.log(`🔄 PRESERVING existing data:`, {
+                    stage: `${existingLead.stage || 'new'} → ${leadToSave.stage}`,
+                    status: `${existingLead.status || 'hot_lead'} → ${leadToSave.status}`,
+                    premium: `$${existingLead.premium || 0} → $${leadToSave.premium}`,
+                    notes_length: `${(existingLead.notes || '').length} → ${leadToSave.notes.length} chars`,
+                    hasExistingCallData: !!(existingLead.callDuration || existingLead.lastCall),
+                    preservedTags: existingLead.tags?.length || 0
+                });
+            }
+
             console.log(`💾 Lead data preview:`, {
                 id: leadToSave.id,
                 name: leadToSave.name,
                 phone: leadToSave.phone,
-                state: leadToSave.state
+                stage: leadToSave.stage,
+                premium: leadToSave.premium,
+                preservedExistingData: !!existingLead
             });
 
             await new Promise((resolve, reject) => {
