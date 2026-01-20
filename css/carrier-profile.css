@@ -356,6 +356,31 @@
     font-family: 'Courier New', monospace;
 }
 
+/* Carrier Section Styles */
+.carrier-section {
+    margin-bottom: 3rem;
+}
+
+.section-header {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #3498db;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.carriers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .modal-container {
@@ -364,25 +389,35 @@
         max-height: 100vh;
         border-radius: 0;
     }
-    
+
     .carrier-profile {
         padding: 1rem;
     }
-    
+
     .profile-tabs {
         flex-wrap: nowrap;
         overflow-x: auto;
     }
-    
+
     .info-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .action-buttons {
         flex-direction: column;
     }
-    
+
     .action-buttons button {
         width: 100%;
+    }
+
+    .section-header {
+        font-size: 1.3rem;
+        padding: 0.8rem 1rem;
+    }
+
+    .carriers-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
     }
 }

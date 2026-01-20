@@ -12308,10 +12308,14 @@ function loadCarriersView() {
 
     // Force update carriers to new list (removing State Farm and Liberty Mutual)
     let carriers = [
-        { id: 1, name: 'Progressive', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.progressive.com/agent' },
-        { id: 2, name: 'Geico', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.geico.com/agent' },
-        { id: 3, name: 'Northland', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.northlandinsurance.com' },
-        { id: 4, name: 'Canal', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.canalinsurance.com' }
+        { id: 1, name: 'Progressive', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.progressive.com/agent', type: 'direct' },
+        { id: 2, name: 'Geico', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.geico.com/agent', type: 'direct' },
+        { id: 3, name: 'Northland', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.northlandinsurance.com', type: 'rps' },
+        { id: 4, name: 'Canal', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.canalinsurance.com', type: 'rps' },
+        { id: 5, name: 'Cumb', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.cumbinsurance.com', type: 'rps' },
+        { id: 6, name: 'Nico', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.nicoinsurance.com', type: 'rps' },
+        { id: 7, name: 'Coverwheal', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.coverwhealinsurance.com', type: 'rps' },
+        { id: 8, name: 'Hathway', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.hathwayinsurance.com', type: 'rps' }
     ];
     localStorage.setItem('carriers', JSON.stringify(carriers));
 
@@ -12324,42 +12328,97 @@ function loadCarriersView() {
             premium: stats.premium
         };
     });
-    
+
+    // Separate carriers by type
+    const directCarriers = carriers.filter(c => c.type === 'direct');
+    const rpsCarriers = carriers.filter(c => c.type === 'rps');
+
+    // Calculate totals for each section
+    const directTotal = directCarriers.reduce((total, carrier) => {
+        const premiumNum = parseFloat(carrier.premium.replace(/[$,]/g, '')) || 0;
+        return total + premiumNum;
+    }, 0);
+
+    const rpsTotal = rpsCarriers.reduce((total, carrier) => {
+        const premiumNum = parseFloat(carrier.premium.replace(/[$,]/g, '')) || 0;
+        return total + premiumNum;
+    }, 0);
+
+    // Format totals as currency
+    const formatCurrency = (amount) => `$${amount.toLocaleString()}`;
+
     dashboardContent.innerHTML = `
         <div class="carriers-view">
             <header class="content-header">
                 <h1>Carrier Management</h1>
                 <div class="header-actions">
+                    <button class="btn-secondary" onclick="showRPSInfoSheet()" style="margin-right: 10px;">
+                        <i class="fas fa-info-circle"></i> Info Sheet
+                    </button>
                     <button class="btn-primary" onclick="addCarrier()">
                         <i class="fas fa-plus"></i> Add Carrier
                     </button>
                 </div>
             </header>
-            
-            <div class="carriers-grid">
-                ${carriers.map(carrier => `
-                <div class="carrier-card" data-carrier-id="${carrier.id}">
-                    <div class="carrier-logo">
-                        <img src="${carrier.logo}" alt="${carrier.name}">
-                    </div>
-                    <h3>${carrier.name}</h3>
-                    <div class="carrier-info">
-                        <div class="info-row">
-                            <span>Active Policies:</span>
-                            <strong>${carrier.policies}</strong>
+
+            <!-- Direct Carriers Section -->
+            <div class="carrier-section">
+                <h2 class="section-header">Direct - ${formatCurrency(directTotal)}</h2>
+                <div class="carriers-grid">
+                    ${directCarriers.map(carrier => `
+                    <div class="carrier-card" data-carrier-id="${carrier.id}">
+                        <div class="carrier-logo">
+                            <img src="${carrier.logo}" alt="${carrier.name}">
                         </div>
-                        <div class="info-row">
-                            <span>Total Premium:</span>
-                            <strong>${carrier.premium}</strong>
+                        <h3>${carrier.name}</h3>
+                        <div class="carrier-info">
+                            <div class="info-row">
+                                <span>Active Policies:</span>
+                                <strong>${carrier.policies}</strong>
+                            </div>
+                            <div class="info-row">
+                                <span>Total Premium:</span>
+                                <strong>${carrier.premium}</strong>
+                            </div>
+                        </div>
+                        <div class="carrier-actions">
+                            <button class="btn-secondary" onclick="openCarrierPortal(${carrier.id})">Portal Login</button>
+                            <button class="btn-secondary" onclick="viewCarrierDetails(${carrier.id})">Requirements</button>
+                            <button class="btn-icon" onclick="deleteCarrier(${carrier.id})" title="Delete Carrier" style="color: #ff4444; margin-left: 10px;"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
-                    <div class="carrier-actions">
-                        <button class="btn-secondary" onclick="openCarrierPortal(${carrier.id})">Portal Login</button>
-                        <button class="btn-secondary" onclick="viewCarrierDetails(${carrier.id})">View Details</button>
-                        <button class="btn-icon" onclick="deleteCarrier(${carrier.id})" title="Delete Carrier" style="color: #ff4444; margin-left: 10px;"><i class="fas fa-trash"></i></button>
-                    </div>
+                    `).join('')}
                 </div>
-                `).join('')}
+            </div>
+
+            <!-- RPS Carriers Section -->
+            <div class="carrier-section">
+                <h2 class="section-header">RPS - ${formatCurrency(rpsTotal)}</h2>
+                <div class="carriers-grid">
+                    ${rpsCarriers.map(carrier => `
+                    <div class="carrier-card" data-carrier-id="${carrier.id}">
+                        <div class="carrier-logo">
+                            <img src="${carrier.logo}" alt="${carrier.name}">
+                        </div>
+                        <h3>${carrier.name}</h3>
+                        <div class="carrier-info">
+                            <div class="info-row">
+                                <span>Active Policies:</span>
+                                <strong>${carrier.policies}</strong>
+                            </div>
+                            <div class="info-row">
+                                <span>Total Premium:</span>
+                                <strong>${carrier.premium}</strong>
+                            </div>
+                        </div>
+                        <div class="carrier-actions">
+                            <button class="btn-secondary" onclick="openCarrierPortal(${carrier.id})">Portal Login</button>
+                            <button class="btn-secondary" onclick="viewCarrierDetails(${carrier.id})">Requirements</button>
+                            <button class="btn-icon" onclick="deleteCarrier(${carrier.id})" title="Delete Carrier" style="color: #ff4444; margin-left: 10px;"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    `).join('')}
+                </div>
             </div>
         </div>
     `;
@@ -18150,6 +18209,12 @@ function viewCarrierDetails(carrierId) {
                 <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">×</button>
             </div>
             <div class="modal-body">
+                <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #007bff;">
+                    <h3 style="margin: 0 0 1rem 0; color: #007bff;">Clear Requirements:</h3>
+                    <div style="font-weight: 500; line-height: 1.6;">
+                        Requirements information will be displayed here based on carrier type and fleet size.
+                    </div>
+                </div>
                 <div class="carrier-detail-grid">
                     <div class="detail-row">
                         <label>Carrier Name:</label>
@@ -18178,6 +18243,42 @@ function viewCarrierDetails(carrierId) {
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" onclick="editCarrier(${carrier.id})">Edit</button>
+                    <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function showRPSInfoSheet() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+        <div class="modal-container" style="max-width: 800px; width: 90%;">
+            <div class="modal-header">
+                <h2>——— RPS INFO SHEET ———</h2>
+                <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="padding: 2rem; font-family: monospace; white-space: pre-line; line-height: 1.6;">
+<strong>2 Units or Less</strong>
+
+No loss runs required for Canal and Northland.
+
+Additional markets (e.g., Cumberland, Berkshire Hathaway) available if loss runs are provided.
+
+<strong>Less Than 3 Years in Business (Any Fleet Size)</strong>
+
+No loss runs required at all.
+
+<strong>3+ Units</strong>
+
+Loss runs required.
+
+IFTA reports recommended.
+                </div>
+                <div class="modal-footer">
                     <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()">Close</button>
                 </div>
             </div>
