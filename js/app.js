@@ -12312,10 +12312,10 @@ function loadCarriersView() {
         { id: 2, name: 'Geico', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.geico.com/agent', type: 'direct' },
         { id: 3, name: 'Northland', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.northlandinsurance.com', type: 'rps' },
         { id: 4, name: 'Canal', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.canalinsurance.com', type: 'rps' },
-        { id: 5, name: 'Cumb', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.cumbinsurance.com', type: 'rps' },
+        { id: 5, name: 'Crum & Forster', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.cumbinsurance.com', type: 'rps' },
         { id: 6, name: 'Nico', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.nicoinsurance.com', type: 'rps' },
-        { id: 7, name: 'Coverwheal', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.coverwhealinsurance.com', type: 'rps' },
-        { id: 8, name: 'Hathway', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.hathwayinsurance.com', type: 'rps' }
+        { id: 7, name: 'Occidental', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.coverwhealinsurance.com', type: 'rps' },
+        { id: 8, name: 'Berkley Prime', logo: 'https://via.placeholder.com/120x60', portalUrl: 'https://www.hathwayinsurance.com', type: 'rps' }
     ];
     localStorage.setItem('carriers', JSON.stringify(carriers));
 
@@ -18195,6 +18195,24 @@ function openCarrierPortal(carrierId) {
     }
 }
 
+// Helper function to get carrier-specific requirements
+function getCarrierRequirements(carrierName) {
+    const requirements = {
+        'Crum & Forster': 'APP, SAA',
+        'Northland': `<strong>0-2 years:</strong> APP and below<br>
+                      <strong>3+ years:</strong> APP, 3-Year loss runs`,
+        'Canal': `<strong>0-2 years:</strong> APP and below<br>
+                  <strong>3+ years:</strong> APP, 3-Year loss runs`,
+        'Berkley Prime': 'APP, Loss Runs, IFTAS',
+        'Progressive': 'Standard underwriting requirements',
+        'Geico': 'Standard underwriting requirements',
+        'Nico': 'Standard underwriting requirements',
+        'Occidental': 'Standard underwriting requirements'
+    };
+
+    return requirements[carrierName] || 'Requirements information will be displayed here based on carrier type and fleet size.';
+}
+
 function viewCarrierDetails(carrierId) {
     const carriers = JSON.parse(localStorage.getItem('carriers') || '[]');
     const carrier = carriers.find(c => c.id === carrierId);
@@ -18212,7 +18230,7 @@ function viewCarrierDetails(carrierId) {
                 <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #007bff;">
                     <h3 style="margin: 0 0 1rem 0; color: #007bff;">Clear Requirements:</h3>
                     <div style="font-weight: 500; line-height: 1.6;">
-                        Requirements information will be displayed here based on carrier type and fleet size.
+                        ${getCarrierRequirements(carrier.name)}
                     </div>
                 </div>
                 <div class="carrier-detail-grid">

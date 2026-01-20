@@ -651,6 +651,76 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
+                <!-- APP Stage -->
+                <div class="profile-section" style="background: #fff8e1; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3><i class="fas fa-clipboard-check"></i> APP Stage</h3>
+                    </div>
+
+                    <!-- Checkboxes Section -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" ${lead.appStage?.app ? 'checked' : ''} onchange="updateAppStageField('${lead.id}', 'app', this.checked)" style="margin-right: 8px; transform: scale(1.2);">
+                            <span style="font-weight: 500;">APP</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" ${lead.appStage?.lossRuns ? 'checked' : ''} onchange="updateAppStageField('${lead.id}', 'lossRuns', this.checked)" style="margin-right: 8px; transform: scale(1.2);">
+                            <span style="font-weight: 500;">LOSS RUNS</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" ${lead.appStage?.iftas ? 'checked' : ''} onchange="updateAppStageField('${lead.id}', 'iftas', this.checked)" style="margin-right: 8px; transform: scale(1.2);">
+                            <span style="font-weight: 500;">IFTAS</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" ${lead.appStage?.saa ? 'checked' : ''} onchange="updateAppStageField('${lead.id}', 'saa', this.checked)" style="margin-right: 8px; transform: scale(1.2);">
+                            <span style="font-weight: 500;">SAA</span>
+                        </label>
+                    </div>
+
+                    <!-- Requirements Information -->
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 6px; font-size: 18px; line-height: 1.8;">
+                        <div style="margin-bottom: 16px;">
+                            <strong>0-2 <i class="fas fa-truck" style="color: #374151;"></i></strong>
+                            <span id="northland-02-${lead.id}" style="background: ${lead.appStage?.app ? '#10b981' : '#9ca3af'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 16px; margin: 0 6px;">Northland</span>
+                            <span id="canal-02-${lead.id}" style="background: ${lead.appStage?.app ? '#10b981' : '#9ca3af'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 16px; margin: 0 6px;">Canal</span>
+                            <span id="req-app-${lead.id}" style="color: ${lead.appStage?.app ? '#10b981' : 'black'}; font-weight: bold; margin-left: 10px;">APP</span>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <strong>3+ <i class="fas fa-truck" style="color: #374151;"></i></strong>
+                            <span id="northland-3plus-${lead.id}" style="background: ${(lead.appStage?.app && lead.appStage?.lossRuns) ? '#10b981' : '#9ca3af'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 16px; margin: 0 6px;">Northland</span>
+                            <span id="canal-3plus-${lead.id}" style="background: ${(lead.appStage?.app && lead.appStage?.lossRuns) ? '#10b981' : '#9ca3af'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 16px; margin: 0 6px;">Canal</span>
+                            <span style="margin-left: 10px;">
+                                <span id="req-app2-${lead.id}" style="color: ${lead.appStage?.app ? '#10b981' : 'black'}; font-weight: bold;">APP</span> -
+                                <span id="req-lossruns-${lead.id}" style="color: ${lead.appStage?.lossRuns ? '#10b981' : 'black'}; font-weight: bold;">LOSS RUNS</span>
+                            </span>
+                        </div>
+
+                        <!-- Divider -->
+                        <div style="border-top: 2px solid #d1d5db; margin: 20px 0;">
+                            <div style="text-align: center; font-weight: bold; font-size: 20px; color: #374151; padding: 12px 0; border-bottom: 2px solid #d1d5db; background: white; margin: 0;">3+ Years</div>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <span id="berkley-3plus-${lead.id}" style="background: ${(lead.appStage?.app && lead.appStage?.lossRuns) ? '#10b981' : '#9ca3af'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 16px; margin: 0 6px;">Berkley</span>
+                            <span id="occidental-3plus-${lead.id}" style="background: ${(lead.appStage?.app && lead.appStage?.lossRuns) ? '#10b981' : '#9ca3af'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 16px; margin: 0 6px;">Occidental</span>
+                            <span style="margin-left: 10px;">
+                                <span id="req-app3-${lead.id}" style="color: ${lead.appStage?.app ? '#10b981' : 'black'}; font-weight: bold;">APP</span> -
+                                <span id="req-lossruns2-${lead.id}" style="color: ${lead.appStage?.lossRuns ? '#10b981' : 'black'}; font-weight: bold;">LOSS RUNS</span>
+                            </span>
+                        </div>
+                        <div>
+                            <span id="crum-3plus-${lead.id}" style="background: ${(lead.appStage?.app && lead.appStage?.lossRuns && lead.appStage?.iftas && lead.appStage?.saa) ? '#10b981' : '#9ca3af'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 16px; margin: 0 6px;">Crum</span>
+                            <span style="margin-left: 10px;">
+                                <span id="req-app4-${lead.id}" style="color: ${lead.appStage?.app ? '#10b981' : 'black'}; font-weight: bold;">APP</span> -
+                                <span id="req-lossruns3-${lead.id}" style="color: ${lead.appStage?.lossRuns ? '#10b981' : 'black'}; font-weight: bold;">LOSS RUNS</span> -
+                                <span id="req-iftas-${lead.id}" style="color: ${lead.appStage?.iftas ? '#10b981' : 'black'}; font-weight: bold;">IFTAS</span> -
+                                <span id="req-saa-${lead.id}" style="color: ${lead.appStage?.saa ? '#10b981' : 'black'}; font-weight: bold;">SAA</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Application Submissions -->
                 <div class="profile-section" style="background: #f0f9f0; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -793,6 +863,121 @@ protectedFunctions.updateLeadField = function(leadId, field, value) {
         refreshLeadsTable();
     }
 };
+
+// Function to handle APP Stage checkbox updates
+protectedFunctions.updateAppStageField = function(leadId, field, value) {
+    console.log('Updating APP Stage field:', leadId, field, value);
+
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        // Initialize appStage object if it doesn't exist
+        if (!leads[leadIndex].appStage) {
+            leads[leadIndex].appStage = {
+                app: false,
+                lossRuns: false,
+                iftas: false,
+                saa: false
+            };
+        }
+
+        // Update the specific field
+        leads[leadIndex].appStage[field] = value;
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log('APP Stage field updated:', field, value);
+
+        // Update visual highlighting in requirements section
+        updateRequirementsHighlighting(leadId, field, value);
+
+        // Save to server database
+        const updateData = {
+            appStage: leads[leadIndex].appStage
+        };
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ APP Stage updated on server:', field, value);
+            } else {
+                console.error('❌ APP Stage server update failed:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ APP Stage server update error:', error);
+        });
+    }
+};
+
+// Helper function to update requirements section highlighting
+function updateRequirementsHighlighting(leadId, field, value) {
+    // Get current app stage from localStorage
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    const appStage = lead?.appStage || {};
+
+    const color = value ? '#10b981' : 'black'; // Green if checked, black if unchecked
+
+    if (field === 'app') {
+        // Update all APP references
+        const appElements = [
+            document.getElementById(`req-app-${leadId}`),
+            document.getElementById(`req-app2-${leadId}`),
+            document.getElementById(`req-app3-${leadId}`),
+            document.getElementById(`req-app4-${leadId}`)
+        ];
+        appElements.forEach(el => {
+            if (el) el.style.color = color;
+        });
+
+        // Update 0-2 year company bubbles (only need APP)
+        updateCompanyBubble(`northland-02-${leadId}`, appStage.app);
+        updateCompanyBubble(`canal-02-${leadId}`, appStage.app);
+
+    } else if (field === 'lossRuns') {
+        // Update all LOSS RUNS references
+        const lossRunsElements = [
+            document.getElementById(`req-lossruns-${leadId}`),
+            document.getElementById(`req-lossruns2-${leadId}`),
+            document.getElementById(`req-lossruns3-${leadId}`)
+        ];
+        lossRunsElements.forEach(el => {
+            if (el) el.style.color = color;
+        });
+
+    } else if (field === 'iftas') {
+        // Update IFTAS reference
+        const iftasElement = document.getElementById(`req-iftas-${leadId}`);
+        if (iftasElement) iftasElement.style.color = color;
+
+    } else if (field === 'saa') {
+        // Update SAA reference
+        const saaElement = document.getElementById(`req-saa-${leadId}`);
+        if (saaElement) saaElement.style.color = color;
+    }
+
+    // Update 3+ year company bubbles based on their specific requirements
+    updateCompanyBubble(`northland-3plus-${leadId}`, appStage.app && appStage.lossRuns);
+    updateCompanyBubble(`canal-3plus-${leadId}`, appStage.app && appStage.lossRuns);
+    updateCompanyBubble(`berkley-3plus-${leadId}`, appStage.app && appStage.lossRuns);
+    updateCompanyBubble(`occidental-3plus-${leadId}`, appStage.app && appStage.lossRuns);
+    updateCompanyBubble(`crum-3plus-${leadId}`, appStage.app && appStage.lossRuns && appStage.iftas && appStage.saa);
+}
+
+// Helper function to update company bubble color
+function updateCompanyBubble(elementId, isComplete) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.style.background = isComplete ? '#10b981' : '#9ca3af';
+    }
+}
 
 // NEW: Dedicated Email Composer for Lead Documentation
 protectedFunctions.openEmailDocumentation = async function(leadId) {
@@ -6089,6 +6274,11 @@ function lockFunctions() {
             writable: false,
             configurable: false
         });
+        Object.defineProperty(window, 'updateAppStageField', {
+            value: protectedFunctions.updateAppStageField,
+            writable: false,
+            configurable: false
+        });
         console.log('🔒 FUNCTIONS LOCKED: Protected functions are now non-configurable and non-writable');
     } catch (error) {
         console.warn('⚠️ Could not lock functions, falling back to aggressive override:', error.message);
@@ -6099,9 +6289,11 @@ function lockFunctions() {
         window.updateReachOut = protectedFunctions.updateReachOut;
         window.showCallLogs = protectedFunctions.showCallLogs;
         window.showCallStatus = protectedFunctions.showCallStatus;
+        window.updateAppStageField = protectedFunctions.updateAppStageField;
 window.updateReachOut = protectedFunctions.updateReachOut;
 window.showCallLogs = protectedFunctions.showCallLogs;
 window.showCallStatus = protectedFunctions.showCallStatus;
+window.updateAppStageField = protectedFunctions.updateAppStageField;
     }
 }
 

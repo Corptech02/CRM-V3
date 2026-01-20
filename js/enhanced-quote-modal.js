@@ -464,7 +464,7 @@ window.createQuoteApplicationSimple = async function(leadId) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Effective Date:</label>
-                        <input type="date" value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <input type="date" value="${calculateEffectiveDate(lead)}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Insured's Name (including DBA):</label>
@@ -737,9 +737,13 @@ window.createQuoteApplicationSimple = async function(leadId) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured/Underinsured Bodily Injury:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="$100,000" selected>$100,000</option>
+                            <option value="$150,000">$150,000</option>
+                            <option value="$200,000">$200,000</option>
+                            <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
                             <option value="$750,000">$750,000</option>
-                            <option value="$1,000,000" selected>$1,000,000</option>
+                            <option value="$1,000,000">$1,000,000</option>
                             <option value="$1,500,000">$1,500,000</option>
                             <option value="$2,000,000">$2,000,000</option>
                         </select>
@@ -754,6 +758,20 @@ window.createQuoteApplicationSimple = async function(leadId) {
                             <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
                             <option value="$1,000,000">$1,000,000</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Hired Auto Liability:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="Not Included" selected>Not Included</option>
+                            <option value="Matching Bodily and Property Limits">Matching Bodily and Property Limits</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Employer Non-Owned Auto Liability:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="Not Included" selected>Not Included</option>
+                            <option value="Matching Bodily and Property Limits">Matching Bodily and Property Limits</option>
                         </select>
                     </div>
                     <div>
@@ -783,23 +801,35 @@ window.createQuoteApplicationSimple = async function(leadId) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Non-Owned Trailer Phys Dam:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="$25,000">$25,000</option>
-                            <option value="$50,000" selected>$50,000</option>
-                            <option value="$75,000">$75,000</option>
-                            <option value="$100,000">$100,000</option>
-                            <option value="$150,000">$150,000</option>
-                            <option value="Not Included">Not Included</option>
+                            <option value="$25,000/$1,000">$25,000/$1,000</option>
+                            <option value="$25,000/$2,000">$25,000/$2,000</option>
+                            <option value="$50,000/$1,000">$50,000/$1,000</option>
+                            <option value="$50,000/$2,000">$50,000/$2,000</option>
+                            <option value="$75,000/$1,000">$75,000/$1,000</option>
+                            <option value="$75,000/$2,000">$75,000/$2,000</option>
+                            <option value="$100,000/$1,000">$100,000/$1,000</option>
+                            <option value="$100,000/$2,000">$100,000/$2,000</option>
+                            <option value="$150,000/$1,000">$150,000/$1,000</option>
+                            <option value="$150,000/$2,000">$150,000/$2,000</option>
+                            <option value="$250,000/$1,000">$250,000/$1,000</option>
+                            <option value="$250,000/$2,000">$250,000/$2,000</option>
+                            <option value="Not Included" selected>Not Included</option>
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="$25,000">$25,000</option>
-                            <option value="$50,000" selected>$50,000</option>
-                            <option value="$75,000">$75,000</option>
-                            <option value="$100,000">$100,000</option>
-                            <option value="$150,000">$150,000</option>
-                            <option value="Not Included">Not Included</option>
+                            <option value="$25,000/$1,000">$25,000/$1,000</option>
+                            <option value="$25,000/$2,000">$25,000/$2,000</option>
+                            <option value="$50,000/$1,000">$50,000/$1,000</option>
+                            <option value="$50,000/$2,000">$50,000/$2,000</option>
+                            <option value="$75,000/$1,000">$75,000/$1,000</option>
+                            <option value="$75,000/$2,000">$75,000/$2,000</option>
+                            <option value="$100,000/$1,000">$100,000/$1,000</option>
+                            <option value="$100,000/$2,000">$100,000/$2,000</option>
+                            <option value="$150,000/$1,000">$150,000/$1,000</option>
+                            <option value="$150,000/$2,000">$150,000/$2,000</option>
+                            <option value="Not Included" selected>Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -848,11 +878,18 @@ window.createQuoteApplicationSimple = async function(leadId) {
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="$5,000">$5,000</option>
                             <option value="$10,000">$10,000</option>
-                            <option value="$15,000" selected>$15,000</option>
+                            <option value="$15,000">$15,000</option>
                             <option value="$25,000">$25,000</option>
                             <option value="$50,000">$50,000</option>
                             <option value="Included DED. $2500">Included DED. $2500</option>
-                            <option value="Not Included">Not Included</option>
+                            <option value="Not Included" selected>Not Included</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Aggregate:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="$1,000,000" selected>$1,000,000</option>
+                            <option value="$2,000,000">$2,000,000</option>
                         </select>
                     </div>
                 </div>
@@ -1613,6 +1650,30 @@ async function saveToServer(applicationData) {
     }
 }
 
+// Helper function to calculate effective date from renewal date
+function calculateEffectiveDate(lead) {
+    try {
+        if (lead && lead.renewalDate) {
+            // Parse the renewal date (format: MM/DD/YYYY or similar)
+            const renewalDate = lead.renewalDate;
+            const dateParts = renewalDate.split('/');
+
+            if (dateParts.length === 3) {
+                const month = dateParts[0].padStart(2, '0');
+                const day = dateParts[1].padStart(2, '0');
+                const year = '2026'; // Always use 2026 as requested
+
+                return `${year}-${month}-${day}`;
+            }
+        }
+    } catch (error) {
+        console.warn('Error parsing renewal date:', error);
+    }
+
+    // Fallback to current date if renewal date is not available or invalid
+    return new Date().toISOString().split('T')[0];
+}
+
 // Function to show enhanced quote modal with saved application data
 window.showEnhancedQuoteApplicationWithData = async function(leadId, application) {
     console.log('👁️ Showing enhanced quote modal with saved data for lead:', leadId, 'application:', application);
@@ -1736,7 +1797,7 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Effective Date:</label>
-                        <input type="date" value="${getSavedValue('Effective Date', new Date().toISOString().split('T')[0])}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <input type="date" value="${getSavedValue('Effective Date', calculateEffectiveDate(lead))}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Insured's Name (including DBA):</label>
@@ -1996,13 +2057,25 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured/Underinsured Bodily Injury:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$500,000', '$750,000', '$1,000,000', '$1,500,000', '$2,000,000'], getSavedValue('Uninsured/Underinsured Bodily Injury', '$1,000,000'))}
+                            ${generateDropdownOptions(['$100,000', '$150,000', '$200,000', '$250,000', '$500,000', '$750,000', '$1,000,000', '$1,500,000', '$2,000,000'], getSavedValue('Uninsured/Underinsured Bodily Injury', '$100,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured Motorist Property Damage:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             ${generateDropdownOptions(['$50,000', '$100,000', '$150,000', '$200,000', '$250,000', '$500,000', '$1,000,000'], getSavedValue('Uninsured Motorist Property Damage', '$100,000'))}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Hired Auto Liability:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            ${generateDropdownOptions(['Not Included', 'Matching Bodily and Property Limits'], getSavedValue('Hired Auto Liability', 'Not Included'))}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Employer Non-Owned Auto Liability:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            ${generateDropdownOptions(['Not Included', 'Matching Bodily and Property Limits'], getSavedValue('Employer Non-Owned Auto Liability', 'Not Included'))}
                         </select>
                     </div>
                     <div>
@@ -2020,13 +2093,13 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Non-Owned Trailer Phys Dam:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Non-Owned Trailer Phys Dam', '$50,000'))}
+                            ${generateDropdownOptions(['$25,000/$1,000', '$25,000/$2,000', '$50,000/$1,000', '$50,000/$2,000', '$75,000/$1,000', '$75,000/$2,000', '$100,000/$1,000', '$100,000/$2,000', '$150,000/$1,000', '$150,000/$2,000', '$250,000/$1,000', '$250,000/$2,000', 'Not Included'], getSavedValue('Non-Owned Trailer Phys Dam', 'Not Included'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Trailer Interchange', '$50,000'))}
+                            ${generateDropdownOptions(['$25,000/$1,000', '$25,000/$2,000', '$50,000/$1,000', '$50,000/$2,000', '$75,000/$1,000', '$75,000/$2,000', '$100,000/$1,000', '$100,000/$2,000', '$150,000/$1,000', '$150,000/$2,000', 'Not Included'], getSavedValue('Trailer Interchange', 'Not Included'))}
                         </select>
                     </div>
                     <div>
@@ -2056,7 +2129,13 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Reefer Breakdown:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$5,000', '$10,000', '$15,000', '$25,000', '$50,000', 'Included DED. $2500', 'Not Included'], getSavedValue('Reefer Breakdown', '$15,000'))}
+                            ${generateDropdownOptions(['$5,000', '$10,000', '$15,000', '$25,000', '$50,000', 'Included DED. $2500', 'Not Included'], getSavedValue('Reefer Breakdown', 'Not Included'))}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Aggregate:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            ${generateDropdownOptions(['$1,000,000', '$2,000,000'], getSavedValue('Aggregate', '$1,000,000'))}
                         </select>
                     </div>
                 </div>
