@@ -1097,12 +1097,65 @@ try:
                     for row in rows:
                         cells = row.find_all('td')
                         if len(cells) > 10:  # SALE leads table format
+                            # Debug: Log all available columns for the first few leads
+                            if len(all_leads) < 3:
+                                import sys
+                                print("🔍 DEBUG: Lead row has " + str(len(cells)) + " columns:", file=sys.stderr)
+                                for i, cell in enumerate(cells[:15]):  # Check first 15 columns
+                                    cell_text = cell.text.strip()
+                                    email_marker = " (EMAIL?)" if '@' in cell_text else ""
+                                    print("  Cell " + str(i) + ": '" + cell_text + "'" + email_marker, file=sys.stderr)
+
                             # Based on debug: Cell 1=LEAD_ID, Cell 3=VENDOR_ID, Cell 6=PHONE, Cell 7=NAME, Cell 8=CITY
                             lead_id = cells[1].text.strip() if len(cells) > 1 else ""
                             vendor_id = cells[3].text.strip() if len(cells) > 3 else ""
                             phone = cells[6].text.strip() if len(cells) > 6 else ""
                             company_name = cells[7].text.strip() if len(cells) > 7 else ""
                             city = cells[8].text.strip() if len(cells) > 8 else ""
+
+                            # Try to find email in other columns
+                            real_email = ""
+                            for i, cell in enumerate(cells):
+                                cell_text = cell.text.strip()
+                                if '@' in cell_text and '.' in cell_text and not cell_text.endswith('@company.com'):
+                                    real_email = cell_text
+                                    import sys
+                                    print("🎯 Found real email in cell " + str(i) + ": " + real_email, file=sys.stderr)
+                                    break
+
+                            # If no email found in table, fetch lead details page
+                            if not real_email and lead_id and lead_id.isdigit():
+                                try:
+                                    import sys
+                                    print("🔍 Fetching lead details for ID " + lead_id + " to get real email...", file=sys.stderr)
+
+                                    # Fetch individual lead details page
+                                    detail_url = "https://" + VICIDIAL_HOST + "/vicidial/admin_modify_lead.php"
+                                    detail_response = session.get(detail_url, auth=(USERNAME, PASSWORD), params={
+                                        'lead_id': lead_id,
+                                        'DB': ''
+                                    })
+
+                                    if detail_response.status_code == 200:
+                                        detail_soup = BeautifulSoup(detail_response.text, 'html.parser')
+
+                                        # Look for email input field in the form
+                                        email_input = detail_soup.find('input', {'name': 'email'})
+                                        if email_input and email_input.get('value'):
+                                            email_value = email_input.get('value').strip()
+                                            if email_value and '@' in email_value and not email_value.endswith('@company.com'):
+                                                real_email = email_value
+                                                print("✅ Found real email from detail page: " + real_email, file=sys.stderr)
+                                            else:
+                                                print("⚠️ Email field found but empty/invalid: '" + str(email_value) + "'", file=sys.stderr)
+                                        else:
+                                            print("⚠️ No email input field found on detail page", file=sys.stderr)
+                                    else:
+                                        print("❌ Failed to fetch lead detail page: " + str(detail_response.status_code), file=sys.stderr)
+
+                                except Exception as e:
+                                    import sys
+                                    print("❌ Error fetching lead details: " + str(e), file=sys.stderr)
 
                             if lead_id and lead_id.isdigit():
                                 # Clean up company name - remove " Unknown Rep" suffix
@@ -1115,10 +1168,17 @@ try:
                                 if len(contact_name.split()) > 3:
                                     contact_name = ' '.join(contact_name.split()[:3])  # Limit to first 3 words
 
-                                # Generate email based on company name
-                                email_base = clean_name.replace(' ', '').replace('-', '').replace('&', 'and')
-                                email_base = ''.join(c for c in email_base if c.isalnum())[:20].lower()
-                                generated_email = f"{email_base}@company.com" if email_base else f"lead{lead_id}@company.com"
+                                # Use real email if found, otherwise generate one based on company name
+                                if real_email:
+                                    final_email = real_email
+                                    import sys
+                                    print("✅ Using real email for " + clean_name + ": " + real_email, file=sys.stderr)
+                                else:
+                                    email_base = clean_name.replace(' ', '').replace('-', '').replace('&', 'and')
+                                    email_base = ''.join(c for c in email_base if c.isalnum())[:20].lower()
+                                    final_email = email_base + "@company.com" if email_base else "lead" + lead_id + "@company.com"
+                                    import sys
+                                    print("⚠️ No real email found for " + clean_name + ", using generated: " + final_email, file=sys.stderr)
 
                                 all_leads.append({
                                     "id": lead_id,
@@ -1126,7 +1186,7 @@ try:
                                     "name": clean_name,
                                     "phone": phone,
                                     "company": clean_name,
-                                    "email": generated_email,
+                                    "email": final_email,
                                     "contact": contact_name,
                                     "city": city,
                                     "vendorId": vendor_id,
