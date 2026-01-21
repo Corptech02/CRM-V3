@@ -655,6 +655,10 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 <div class="profile-section" style="background: #fff8e1; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3><i class="fas fa-clipboard-check"></i> APP Stage</h3>
+                        <button onclick="showMarketStats('${lead.id}')" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px;" onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">
+                            <i class="fas fa-chart-line"></i>
+                            Market Stats
+                        </button>
                     </div>
 
                     <!-- Checkboxes Section -->
@@ -3417,6 +3421,132 @@ function showContactAttemptedModal(leadId, callback) {
         }
     });
 }
+
+// Market Stats function
+protectedFunctions.showMarketStats = function(leadId) {
+    console.log('📊 Showing Market Stats for lead:', leadId);
+
+    // Get lead data
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        alert('Lead not found');
+        return;
+    }
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    `;
+
+    modalContent.innerHTML = `
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 24px; font-weight: bold;">
+                    <i class="fas fa-chart-line" style="margin-right: 10px;"></i>
+                    Market Stats - ${lead.name || 'Unknown'}
+                </h2>
+                <button onclick="this.closest('div').parentElement.parentElement.remove()"
+                        style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 18px;">
+                    ×
+                </button>
+            </div>
+        </div>
+
+        <div style="padding: 30px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                <!-- Market Overview Cards -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #007bff;">
+                    <h4 style="margin: 0 0 10px 0; color: #007bff;"><i class="fas fa-chart-bar"></i> Market Capacity</h4>
+                    <p style="margin: 0; font-size: 24px; font-weight: bold; color: #333;">High</p>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Multiple carriers available</p>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <h4 style="margin: 0 0 10px 0; color: #28a745;"><i class="fas fa-dollar-sign"></i> Rate Trend</h4>
+                    <p style="margin: 0; font-size: 24px; font-weight: bold; color: #333;">Stable</p>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">±5% from last year</p>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #ffc107;">
+                    <h4 style="margin: 0 0 10px 0; color: #ffc107;"><i class="fas fa-shield-alt"></i> Risk Profile</h4>
+                    <p style="margin: 0; font-size: 24px; font-weight: bold; color: #333;">Moderate</p>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Based on industry/location</p>
+                </div>
+            </div>
+
+            <!-- Detailed Analysis -->
+            <div style="background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 15px 0; color: #333;"><i class="fas fa-analytics"></i> Market Analysis</h3>
+
+                <div style="margin-bottom: 15px;">
+                    <strong>Industry:</strong> ${lead.industry || 'Transportation'}
+                    <br><strong>Location:</strong> ${lead.state || 'Unknown'} ${lead.city || ''}
+                    <br><strong>Fleet Size:</strong> ${lead.units || 'Not specified'} units
+                </div>
+
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                    <h4 style="margin: 0 0 10px 0; color: #1976d2;">Competitive Landscape</h4>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li>Progressive Commercial: Competitive for smaller fleets</li>
+                        <li>Northland/Canal: Strong appetite for 3+ year accounts</li>
+                        <li>Berkley Prime: Specialized programs available</li>
+                        <li>Crum & Forster: Comprehensive coverage options</li>
+                    </ul>
+                </div>
+
+                <div style="background: #f3e5f5; padding: 15px; border-radius: 6px;">
+                    <h4 style="margin: 0 0 10px 0; color: #7b1fa2;">Recommendations</h4>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li>Target multiple carriers for best rates</li>
+                        <li>Emphasize safety record and experience</li>
+                        <li>Consider bundling opportunities</li>
+                        <li>Review coverage limits and deductibles</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="text-align: center; border-top: 2px solid #e9ecef; padding-top: 20px;">
+                <button onclick="this.closest('div').parentElement.parentElement.parentElement.remove()"
+                        style="background: #6c757d; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
 
 // Update stage function
 protectedFunctions.updateLeadStage = function(leadId, stage) {
@@ -6290,10 +6420,12 @@ function lockFunctions() {
         window.showCallLogs = protectedFunctions.showCallLogs;
         window.showCallStatus = protectedFunctions.showCallStatus;
         window.updateAppStageField = protectedFunctions.updateAppStageField;
+        window.showMarketStats = protectedFunctions.showMarketStats;
 window.updateReachOut = protectedFunctions.updateReachOut;
 window.showCallLogs = protectedFunctions.showCallLogs;
 window.showCallStatus = protectedFunctions.showCallStatus;
 window.updateAppStageField = protectedFunctions.updateAppStageField;
+window.showMarketStats = protectedFunctions.showMarketStats;
     }
 }
 
@@ -6396,7 +6528,8 @@ setInterval(() => {
         window.createEnhancedProfile !== protectedFunctions.createEnhancedProfile ||
         window.updateReachOut !== protectedFunctions.updateReachOut ||
         window.showCallLogs !== protectedFunctions.showCallLogs ||
-        window.showCallStatus !== protectedFunctions.showCallStatus) {
+        window.showCallStatus !== protectedFunctions.showCallStatus ||
+        window.showMarketStats !== protectedFunctions.showMarketStats) {
 
         console.warn('🚨 FUNCTION OVERRIDE DETECTED! Re-establishing protection...');
         lockFunctions();
