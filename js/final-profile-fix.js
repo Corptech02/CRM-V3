@@ -162,12 +162,12 @@ window.createEnhancedProfile = function(lead) {
                     <h3><i class="fas fa-info-circle"></i> Lead Details</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                         <div>
-                            <label style="font-weight: 600; font-size: 12px;">Lead Status:</label>
-                            <select onchange="updateLeadStatus('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-                                <option value="Active" ${(lead.status === 'Active' || !lead.status) ? 'selected' : ''}>Active</option>
-                                <option value="Inactive" ${lead.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                                <option value="Pending" ${lead.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Converted" ${lead.status === 'Converted' ? 'selected' : ''}>Converted</option>
+                            <label style="font-weight: 600; font-size: 12px;">Response Rate:</label>
+                            <select onchange="updateLeadPriority('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                                <option value="High" ${lead.priority === 'High' ? 'selected' : ''}>High</option>
+                                <option value="Mid" ${(lead.priority === 'Mid' || !lead.priority) ? 'selected' : ''}>Mid</option>
+                                <option value="Lower" ${lead.priority === 'Lower' ? 'selected' : ''}>Lower</option>
+                                <option value="Low" ${lead.priority === 'Low' ? 'selected' : ''}>Low</option>
                             </select>
                         </div>
                         <div>
@@ -1250,6 +1250,18 @@ window.updateWinLossStatus = function(leadId, winLoss) {
 
 window.updateLeadAssignedTo = function(leadId, assignedTo) {
     updateLeadField(leadId, 'assignedTo', assignedTo);
+};
+
+window.updateLeadPriority = function(leadId, priority) {
+    console.log('Updating lead priority:', leadId, 'to', priority);
+    updateLeadField(leadId, 'priority', priority);
+
+    // Update the lead name color in the table immediately
+    if (window.displayLeads) {
+        setTimeout(() => {
+            window.displayLeads();
+        }, 100);
+    }
 };
 
 window.addVehicleToLead = function(leadId) {

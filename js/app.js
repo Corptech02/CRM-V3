@@ -4061,72 +4061,25 @@ function getStageHtml(stage, lead) {
 // Make getStageHtml globally accessible
 window.getStageHtml = getStageHtml;
 
-// Function to determine lead name styling based on call criteria
+// Function to determine lead name styling based on priority
 function getLeadNameStyling(lead) {
-    // Check if lead has reachOut data
-    if (!lead.reachOut || !lead.reachOut.callLogs) {
-        console.log(`🔍 NO REACHOUT: ${lead.name} - Default blue`);
-        return 'color: #3b82f6'; // Default blue
+    // Get lead priority, default to 'Mid' if not set
+    const priority = lead.priority || 'Mid';
+
+    console.log(`🎨 PRIORITY STYLING: ${lead.name} - Priority: ${priority}`);
+
+    // Return color based on priority
+    switch (priority) {
+        case 'High':
+            return 'color: #16a34a'; // Green
+        case 'Lower':
+            return 'color: #f59e0b'; // Orange
+        case 'Low':
+            return 'color: #dc2626'; // Red
+        case 'Mid':
+        default:
+            return 'color: #3b82f6'; // Blue (default)
     }
-
-    // Calculate total calls (attempts + connected)
-    const callLogs = lead.reachOut.callLogs || [];
-    const totalCalls = callLogs.length;
-
-    // Also check the reachOut summary stats for verification
-    const callAttempts = lead.reachOut.callAttempts || 0;
-    const callsConnected = lead.reachOut.callsConnected || 0;
-    const summaryTotal = callAttempts + callsConnected;
-
-    // Calculate total talk time in minutes
-    let totalTalkTimeMinutes = 0;
-    callLogs.forEach(log => {
-        if (log.connected && log.duration) {
-            // Parse duration - handle formats like "67 min", "20 sec", "5:00", etc.
-            let durationStr = log.duration.toString().toLowerCase();
-            let minutes = 0;
-
-            if (durationStr.includes('min')) {
-                // Extract minutes from "67 min"
-                const minMatch = durationStr.match(/(\d+)\s*min/);
-                if (minMatch) minutes = parseInt(minMatch[1]);
-            } else if (durationStr.includes('sec')) {
-                // Convert seconds to minutes "20 sec" -> 0.33 min
-                const secMatch = durationStr.match(/(\d+)\s*sec/);
-                if (secMatch) minutes = parseInt(secMatch[1]) / 60;
-            } else if (durationStr.includes(':')) {
-                // Handle "5:00" format
-                const timeMatch = durationStr.match(/(\d+):(\d+)/);
-                if (timeMatch) {
-                    minutes = parseInt(timeMatch[1]) + (parseInt(timeMatch[2]) / 60);
-                }
-            } else if (!isNaN(parseInt(durationStr))) {
-                // Handle raw numbers as minutes
-                minutes = parseInt(durationStr);
-            }
-
-            totalTalkTimeMinutes += minutes;
-        }
-    });
-
-    // Debug: Show the call counting for this lead
-    console.log(`🔍 CALL CHECK: ${lead.name}`);
-    console.log(`  📞 CallLogs length: ${totalCalls}`);
-    console.log(`  📊 Summary stats - Attempts: ${callAttempts}, Connected: ${callsConnected}, Total: ${summaryTotal}`);
-    console.log(`  ⏱️ Talk time: ${totalTalkTimeMinutes.toFixed(1)} min`);
-    console.log(`  🔍 Raw callLogs:`, callLogs);
-
-    // Use the more reliable summary total
-    const actualTotalCalls = summaryTotal;
-
-    // Check criteria: 4+ calls AND <15 min talk time
-    if (actualTotalCalls >= 4 && totalTalkTimeMinutes < 15) {
-        console.log(`🚨 RED LEAD: ${lead.name} - ${actualTotalCalls} total calls, ${totalTalkTimeMinutes.toFixed(1)} min talk time`);
-        return 'color: #dc2626';
-    }
-
-    console.log(`✅ BLUE LEAD: ${lead.name} - ${actualTotalCalls} total calls (need 4+)`);
-    return 'color: #3b82f6'; // Default blue
 }
 
 // Helper function to generate lead rows
@@ -4482,18 +4435,35 @@ function generateSimpleLeadRowsWithDividers(leads) {
         }
     });
 
-    // Sort each user's group to put high value leads at the top
+    // Sort each user's group with priority: Gold High Value (60+ min) > Priority (High/Mid/Lower/Low)
     Object.keys(groups).forEach(groupKey => {
         if (groupKey !== 'closed') { // Don't sort closed leads
             groups[groupKey].sort((a, b) => {
                 const aIsHighValue = isHighValueLead(a);
                 const bIsHighValue = isHighValueLead(b);
 
-                // High value leads go to top
+                // 1. Gold High Value leads (60+ call time) ALWAYS go to top, regardless of priority
                 if (aIsHighValue && !bIsHighValue) return -1;
                 if (!aIsHighValue && bIsHighValue) return 1;
 
-                // If both or neither are high value, maintain original order
+                // 2. If both are gold high-value OR both are not, sort by priority
+                if (aIsHighValue === bIsHighValue) {
+                    const aPriority = a.priority || 'Mid';
+                    const bPriority = b.priority || 'Mid';
+
+                    // Define priority order: High = 1, Mid = 2, Lower = 3, Low = 4
+                    const priorityOrder = { 'High': 1, 'Mid': 2, 'Lower': 3, 'Low': 4 };
+
+                    const aOrder = priorityOrder[aPriority] || 2; // Default to Mid
+                    const bOrder = priorityOrder[bPriority] || 2; // Default to Mid
+
+                    // Lower numbers (higher priority) come first
+                    if (aOrder !== bOrder) {
+                        return aOrder - bOrder;
+                    }
+                }
+
+                // If same priority, maintain original order
                 return 0;
             });
         }
@@ -4905,7 +4875,7 @@ async function loadLeadsView() {
             }
         }
 
-        // Sort leads with logged-in user's leads at the top, then by assignedTo, with closed leads at the bottom
+        // Sort leads with priority: Closed (bottom) > User (top) > Gold High Value > Priority > AssignedTo
         leads.sort((a, b) => {
 
             // First, check if either lead is closed - closed leads go to the bottom
@@ -4915,7 +4885,16 @@ async function loadLeadsView() {
             if (aIsClosed && !bIsClosed) return 1;
             if (bIsClosed && !aIsClosed) return -1;
 
-            // If both are closed or both are not closed, prioritize current user's leads
+            // If both are closed, skip priority sorting and just sort by assignedTo
+            if (aIsClosed && bIsClosed) {
+                const aVal = a.assignedTo || 'zzz';
+                const bVal = b.assignedTo || 'zzz';
+                if (aVal < bVal) return -1;
+                if (aVal > bVal) return 1;
+                return 0;
+            }
+
+            // For non-closed leads: prioritize current user's leads
             const aVal = a.assignedTo || 'zzz'; // Put unassigned at the end
             const bVal = b.assignedTo || 'zzz';
 
@@ -4927,12 +4906,41 @@ async function loadLeadsView() {
             if (aIsCurrentUser && !bIsCurrentUser) return -1;
             if (bIsCurrentUser && !aIsCurrentUser) return 1;
 
-            // If both belong to current user or both don't, sort by assignedTo (A-Z)
-            if (aVal < bVal) return -1;
-            if (aVal > bVal) return 1;
+            // If both belong to current user or both don't, apply Gold High Value + Priority sorting
+            if (aIsCurrentUser === bIsCurrentUser) {
+                // Check for Gold High Value leads (60+ call time)
+                const aIsHighValue = isHighValueLead(a);
+                const bIsHighValue = isHighValueLead(b);
+
+                // Gold High Value leads ALWAYS go to top, regardless of priority
+                if (aIsHighValue && !bIsHighValue) return -1;
+                if (!aIsHighValue && bIsHighValue) return 1;
+
+                // If both are gold high-value OR both are not, sort by priority
+                if (aIsHighValue === bIsHighValue) {
+                    const aPriority = a.priority || 'Mid';
+                    const bPriority = b.priority || 'Mid';
+
+                    // Define priority order: High = 1, Mid = 2, Lower = 3, Low = 4
+                    const priorityOrder = { 'High': 1, 'Mid': 2, 'Lower': 3, 'Low': 4 };
+
+                    const aOrder = priorityOrder[aPriority] || 2; // Default to Mid
+                    const bOrder = priorityOrder[bPriority] || 2; // Default to Mid
+
+                    // Lower numbers (higher priority) come first
+                    if (aOrder !== bOrder) {
+                        return aOrder - bOrder;
+                    }
+
+                    // If same priority, sort by assignedTo (A-Z)
+                    if (aVal < bVal) return -1;
+                    if (aVal > bVal) return 1;
+                }
+            }
+
             return 0;
         });
-        console.log('Applied user-prioritized sort by assignedTo field', currentUser ? `- ${currentUser}'s leads at top` : '');
+        console.log('🎯 Applied enhanced sort: Gold High Value (60+ min) → Priority (High/Mid/Lower/Low) → AssignedTo', currentUser ? `- ${currentUser}'s leads at top` : '');
 
         // Store leads globally for filtering
         window.allLeads = leads;

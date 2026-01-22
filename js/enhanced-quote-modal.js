@@ -558,6 +558,13 @@ window.createQuoteApplicationSimple = async function(leadId) {
                             <span style="margin-left: 3px;">%</span>
                         </div>
                     </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Intermodal:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -823,6 +830,8 @@ window.createQuoteApplicationSimple = async function(leadId) {
                             <option value="$25,000/$2,000">$25,000/$2,000</option>
                             <option value="$50,000/$1,000">$50,000/$1,000</option>
                             <option value="$50,000/$2,000">$50,000/$2,000</option>
+                            <option value="$60,000/$1,000">$60,000/$1,000</option>
+                            <option value="$60,000/$2,000">$60,000/$2,000</option>
                             <option value="$75,000/$1,000">$75,000/$1,000</option>
                             <option value="$75,000/$2,000">$75,000/$2,000</option>
                             <option value="$100,000/$1,000">$100,000/$1,000</option>
@@ -836,6 +845,7 @@ window.createQuoteApplicationSimple = async function(leadId) {
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="Included">Included</option>
+                            <option value="Selected w/ 250" selected>Selected w/ 250</option>
                             <option value="Not Included">Not Included</option>
                         </select>
                     </div>
@@ -891,6 +901,19 @@ window.createQuoteApplicationSimple = async function(leadId) {
                             <option value="$1,000,000" selected>$1,000,000</option>
                             <option value="$2,000,000">$2,000,000</option>
                         </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental Reimbursement:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="Not Included">Not Included</option>
+                            <option value="$40 per day/$1200 max">$40 per day/$1200 max</option>
+                            <option value="$70 per day/$2100 max">$70 per day/$2100 max</option>
+                            <option value="$80 per day/$2400 max">$80 per day/$2400 max</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental with Downtime:</label>
+                        <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter downtime details">
                     </div>
                 </div>
             </div>
@@ -1009,6 +1032,7 @@ function prefillApplicationForm(applicationData) {
             'Box Truck': formData['Box Truck'],
             'Reefer': formData['Reefer'],
             'Dumptruck': formData['Dumptruck'],
+            'Intermodal': formData['Intermodal'],
 
             // Coverage fields
             'Auto Liability': formData['Auto Liability'],
@@ -1392,6 +1416,9 @@ window.saveQuoteApplication = async function() {
             } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
                 formData['Dumptruck'] = value;
                 console.log(`🎯 Explicitly captured Dumptruck: "${value}"`);
+            } else if (parentText.includes('Intermodal') || grandparentText.includes('Intermodal')) {
+                formData['Intermodal'] = value;
+                console.log(`🎯 Explicitly captured Intermodal: "${value}"`);
             }
         });
 
@@ -1891,6 +1918,13 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                             <span style="margin-left: 3px;">%</span>
                         </div>
                     </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Intermodal:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="${getSavedValue('Intermodal', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2099,13 +2133,13 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000/$1,000', '$25,000/$2,000', '$50,000/$1,000', '$50,000/$2,000', '$75,000/$1,000', '$75,000/$2,000', '$100,000/$1,000', '$100,000/$2,000', '$150,000/$1,000', '$150,000/$2,000', 'Not Included'], getSavedValue('Trailer Interchange', 'Not Included'))}
+                            ${generateDropdownOptions(['$25,000/$1,000', '$25,000/$2,000', '$50,000/$1,000', '$50,000/$2,000', '$60,000/$1,000', '$60,000/$2,000', '$75,000/$1,000', '$75,000/$2,000', '$100,000/$1,000', '$100,000/$2,000', '$150,000/$1,000', '$150,000/$2,000', 'Not Included'], getSavedValue('Trailer Interchange', 'Not Included'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['Included', 'Not Included'], getSavedValue('Roadside Assistance', 'Included'))}
+                            ${generateDropdownOptions(['Included', 'Selected w/ 250', 'Not Included'], getSavedValue('Roadside Assistance', 'Selected w/ 250'))}
                         </select>
                     </div>
                     <div>
@@ -2137,6 +2171,16 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             ${generateDropdownOptions(['$1,000,000', '$2,000,000'], getSavedValue('Aggregate', '$1,000,000'))}
                         </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental Reimbursement:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            ${generateDropdownOptions(['Not Included', '$40 per day/$1200 max', '$70 per day/$2100 max', '$80 per day/$2400 max'], getSavedValue('Rental Reimbursement', 'Not Included'))}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental with Downtime:</label>
+                        <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter downtime details" value="${getSavedValue('Rental with Downtime', '')}">
                     </div>
                 </div>
             </div>
@@ -2467,6 +2511,9 @@ window.downloadQuoteApplicationPDF = function() {
             } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
                 formData['Dumptruck'] = value;
                 console.log(`🎯 Download: Captured Dumptruck: "${value}"`);
+            } else if (parentText.includes('Intermodal') || grandparentText.includes('Intermodal')) {
+                formData['Intermodal'] = value;
+                console.log(`🎯 Download: Captured Intermodal: "${value}"`);
             }
         });
 
@@ -2922,6 +2969,10 @@ function generateApplicationPDF(lead, formData) {
                 <div class="field-label">Dumptruck:</div>
                 <div class="field-value">${formData['Dumptruck'] || ''}${formData['Dumptruck'] ? '%' : ''}</div>
             </div>
+            <div class="field">
+                <div class="field-label">Intermodal:</div>
+                <div class="field-value">${formData['Intermodal'] || ''}${formData['Intermodal'] ? '%' : ''}</div>
+            </div>
         </div>
     </div>
 
@@ -2979,6 +3030,18 @@ function generateApplicationPDF(lead, formData) {
             <div class="field">
                 <div class="field-label">Reefer Breakdown:</div>
                 <div class="field-value">${formData['Reefer Breakdown'] || '$15,000'}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Aggregate:</div>
+                <div class="field-value">${formData['Aggregate'] || '$1,000,000'}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Rental Reimbursement:</div>
+                <div class="field-value">${formData['Rental Reimbursement'] || 'Not Included'}</div>
+            </div>
+            <div class="field">
+                <div class="field-label">Rental with Downtime:</div>
+                <div class="field-value">${formData['Rental with Downtime'] || ''}</div>
             </div>
         </div>
     </div>

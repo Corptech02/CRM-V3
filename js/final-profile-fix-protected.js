@@ -270,12 +270,12 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <h3><i class="fas fa-info-circle"></i> Lead Details</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                         <div>
-                            <label style="font-weight: 600; font-size: 12px;">Lead Status:</label>
-                            <select onchange="updateLeadStatus('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-                                <option value="Active" ${(lead.status === 'Active' || !lead.status) ? 'selected' : ''}>Active</option>
-                                <option value="Inactive" ${lead.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                                <option value="Pending" ${lead.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Converted" ${lead.status === 'Converted' ? 'selected' : ''}>Converted</option>
+                            <label style="font-weight: 600; font-size: 12px;">Response Rate:</label>
+                            <select onchange="updateLeadPriority('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                                <option value="High" ${lead.priority === 'High' ? 'selected' : ''}>High</option>
+                                <option value="Mid" ${(lead.priority === 'Mid' || !lead.priority) ? 'selected' : ''}>Mid</option>
+                                <option value="Lower" ${lead.priority === 'Lower' ? 'selected' : ''}>Lower</option>
+                                <option value="Low" ${lead.priority === 'Low' ? 'selected' : ''}>Low</option>
                             </select>
                         </div>
                         <div>
@@ -2752,31 +2752,40 @@ protectedFunctions.showCallStatus = function(leadId) {
                     } else {
                         greenHighlightDays = `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} remaining`;
                     }
-                    greenHighlightStatus = 'Green Highlight Active';
+                    greenHighlightStatus = 'Active Green Highlighting';
                 } else {
                     greenHighlightDays = 'Expired';
-                    greenHighlightStatus = 'Green Highlight Expired';
+                    greenHighlightStatus = 'Green Highlighting Expired';
                     daysRemaining = 0;
                 }
                 console.log(`🔍 Green highlight expires: ${lead.reachOut.greenHighlightUntil}, remaining: ${daysRemaining} days`);
             } else {
-                // No specific duration set, just show reach-out complete
-                const completedAt = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
-                const completedDate = new Date(completedAt);
-                const now = new Date();
-                const diffMs = now - completedDate;
-                const hoursAgo = Math.floor(diffMs / (1000 * 60 * 60));
-                const daysAgo = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-                if (daysAgo === 0) {
-                    greenHighlightDays = `Completed ${hoursAgo} hours ago`;
-                    greenHighlightStatus = 'Reach-Out Complete (No Duration Set)';
+                // No specific duration set, but check if lead has contact attempted green highlight
+                if (lead.stage === 'contact_attempted') {
+                    // For contact attempted, show as active with 1 day duration
+                    greenHighlightDays = '1 day remaining';
+                    greenHighlightStatus = 'Active Green Highlighting';
+                    daysRemaining = 1;
+                    console.log(`🔍 Contact attempted lead with active highlighting`);
                 } else {
-                    greenHighlightDays = `Completed ${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago`;
-                    greenHighlightStatus = 'Reach-Out Complete (No Duration Set)';
+                    // No specific duration set, just show reach-out complete
+                    const completedAt = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
+                    const completedDate = new Date(completedAt);
+                    const now = new Date();
+                    const diffMs = now - completedDate;
+                    const hoursAgo = Math.floor(diffMs / (1000 * 60 * 60));
+                    const daysAgo = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                    if (daysAgo === 0) {
+                        greenHighlightDays = `Completed ${hoursAgo} hours ago`;
+                        greenHighlightStatus = 'Reach-Out Complete (No Duration Set)';
+                    } else {
+                        greenHighlightDays = `Completed ${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago`;
+                        greenHighlightStatus = 'Reach-Out Complete (No Duration Set)';
+                    }
+                    daysRemaining = 1; // Show green styling
+                    console.log(`🔍 No highlight duration set, completed: ${completedAt}`);
                 }
-                daysRemaining = 1; // Show green styling
-                console.log(`🔍 No highlight duration set, completed: ${completedAt}`);
             }
         }
     }
@@ -3734,6 +3743,18 @@ protectedFunctions.updateLeadAssignedTo = function(leadId, assignedTo) {
     protectedFunctions.updateLeadField(leadId, 'assigned_to', assignedTo);
 
     console.log('✅ Both assignedTo formats updated:', assignedTo);
+};
+
+protectedFunctions.updateLeadPriority = function(leadId, priority) {
+    console.log('🎨 updateLeadPriority called:', leadId, priority);
+    protectedFunctions.updateLeadField(leadId, 'priority', priority);
+
+    // Update the lead name color in the table immediately
+    if (window.displayLeads) {
+        setTimeout(() => {
+            window.displayLeads();
+        }, 100);
+    }
 };
 
 // Vehicle, Trailer, Driver management functions - Use existing card functions
@@ -5096,6 +5117,7 @@ window.updateLeadField = protectedFunctions.updateLeadField;
 window.updateLeadStage = protectedFunctions.updateLeadStage;
 window.updateLeadAssignedTo = protectedFunctions.updateLeadAssignedTo;
 window.updateLeadStatus = protectedFunctions.updateLeadStatus;
+window.updateLeadPriority = protectedFunctions.updateLeadPriority;
 window.updateWinLossStatus = protectedFunctions.updateWinLossStatus;
 window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
@@ -5183,6 +5205,10 @@ window.handleContactAttemptedCompletion = async function(leadId) {
         const oneDayFromNow = new Date();
         oneDayFromNow.setDate(oneDayFromNow.getDate() + 1);
         lead.greenUntil = oneDayFromNow.toISOString();
+
+        // Also set in reachOut for consistency
+        if (!lead.reachOut) lead.reachOut = {};
+        lead.reachOut.greenHighlightUntil = oneDayFromNow.toISOString();
 
         // Update the lead in both storage locations
         const insuranceIndex = insurance_leads.findIndex(l => String(l.id) === String(leadId));

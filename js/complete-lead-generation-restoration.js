@@ -1,8 +1,12 @@
 // COMPLETE Lead Generation Interface Restoration - EXACT as it was before
 console.log('🔄 RESTORING COMPLETE Lead Generation Interface...');
 
+// Set flag to prevent other scripts from overriding
+window.completeLeadGenerationLoaded = true;
+
 // Override the simplified loadLeadGenerationView with COMPLETE implementation
 window.loadLeadGenerationView = function loadLeadGenerationView(activeTab = 'lookup') {
+    console.log('🚀 USING COMPLETE Lead Generation with Skip Days & Lead Split features!');
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 

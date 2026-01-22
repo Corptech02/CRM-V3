@@ -1,8 +1,8 @@
 // Fix for loadLeadGenerationView function not being defined
 console.log('Loading lead generation fix...');
 
-// Ensure loadLeadGenerationView is available globally
-if (typeof window.loadLeadGenerationView !== 'function') {
+// Ensure loadLeadGenerationView is available globally - DO NOT OVERRIDE if complete version is loaded
+if (typeof window.loadLeadGenerationView !== 'function' && !window.completeLeadGenerationLoaded) {
     window.loadLeadGenerationView = function(activeTab = 'lookup') {
         console.log('Loading Lead Generation view with tab:', activeTab);
 
