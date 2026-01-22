@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vanguard Accounting System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.9);
+            padding: 12px 20px;
+            margin: 2px 0;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        .main-content {
+            background-color: #f8f9fa;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <div class="text-center mb-4">
+                        <h4 class="text-white">Vanguard Accounting</h4>
+                    </div>
+                    <ul class="nav nav-pills flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#" data-section="dashboard">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="customers">
+                                <i class="bi bi-people"></i> Customers
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="vendors">
+                                <i class="bi bi-building"></i> Vendors
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="invoices">
+                                <i class="bi bi-receipt"></i> Invoices
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="bills">
+                                <i class="bi bi-file-earmark-text"></i> Bills
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="transactions">
+                                <i class="bi bi-arrow-left-right"></i> Transactions
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="reports">
+                                <i class="bi bi-graph-up"></i> Reports
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="settings">
+                                <i class="bi bi-gear"></i> Settings
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2" id="page-title">Dashboard</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary">Export</button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary" id="new-item-btn">
+                            <i class="bi bi-plus"></i> New
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dashboard Section -->
+                <div id="dashboard-section" class="section">
+                    <div class="dashboard-stats">
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Total Revenue</h6>
+                                        <h3 id="total-revenue">$0.00</h3>
+                                    </div>
+                                    <i class="bi bi-currency-dollar fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Outstanding</h6>
+                                        <h3 id="total-outstanding">$0.00</h3>
+                                    </div>
+                                    <i class="bi bi-exclamation-triangle fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Expenses</h6>
+                                        <h3 id="total-expenses">$0.00</h3>
+                                    </div>
+                                    <i class="bi bi-arrow-down-circle fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Profit</h6>
+                                        <h3 id="total-profit">$0.00</h3>
+                                    </div>
+                                    <i class="bi bi-graph-up fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Recent Invoices</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="recent-invoices" class="table-container">
+                                        <div class="text-muted text-center py-4">No invoices found</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Recent Transactions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="recent-transactions" class="table-container">
+                                        <div class="text-muted text-center py-4">No transactions found</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customers Section -->
+                <div id="customers-section" class="section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Customers</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th>Balance</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="customers-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vendors Section -->
+                <div id="vendors-section" class="section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Vendors</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th>Balance</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vendors-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invoices Section -->
+                <div id="invoices-section" class="section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Invoices</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice #</th>
+                                            <th>Customer</th>
+                                            <th>Date</th>
+                                            <th>Due Date</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="invoices-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bills Section -->
+                <div id="bills-section" class="section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Bills</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Bill #</th>
+                                            <th>Vendor</th>
+                                            <th>Date</th>
+                                            <th>Due Date</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bills-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transactions Section -->
+                <div id="transactions-section" class="section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Transactions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>Account</th>
+                                            <th>Description</th>
+                                            <th>Amount</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transactions-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reports Section -->
+                <div id="reports-section" class="section" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-graph-up display-4 text-primary"></i>
+                                    <h5 class="card-title mt-3">Profit & Loss</h5>
+                                    <button class="btn btn-primary">Generate Report</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-clipboard-data display-4 text-success"></i>
+                                    <h5 class="card-title mt-3">Balance Sheet</h5>
+                                    <button class="btn btn-success">Generate Report</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-arrow-left-right display-4 text-info"></i>
+                                    <h5 class="card-title mt-3">Cash Flow</h5>
+                                    <button class="btn btn-info">Generate Report</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Section -->
+                <div id="settings-section" class="section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Company Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="settings-form">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="company-name" class="form-label">Company Name</label>
+                                            <input type="text" class="form-control" id="company-name" value="Vanguard Insurance Group">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="company-email" class="form-label">Email</label>
+                                            <input type="email" class="form-control" id="company-email" value="info@vanguardinsgroup.com">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="company-phone" class="form-label">Phone</label>
+                                            <input type="tel" class="form-control" id="company-phone" value="+1 (330) 636-9079">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="company-address" class="form-label">Address</label>
+                                            <textarea class="form-control" id="company-address" rows="3">123 Business Street
+Cleveland, OH 44101
+United States</textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="tax-number" class="form-label">Tax ID Number</label>
+                                            <input type="text" class="form-control" id="tax-number" value="">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal fade" id="itemModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Add Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="itemForm">
+                        <div id="modalContent"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveItem">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        class AccountingSystem {
+            constructor() {
+                this.data = {
+                    customers: JSON.parse(localStorage.getItem('accounting_customers') || '[]'),
+                    vendors: JSON.parse(localStorage.getItem('accounting_vendors') || '[]'),
+                    invoices: JSON.parse(localStorage.getItem('accounting_invoices') || '[]'),
+                    bills: JSON.parse(localStorage.getItem('accounting_bills') || '[]'),
+                    transactions: JSON.parse(localStorage.getItem('accounting_transactions') || '[]')
+                };
+                this.currentSection = 'dashboard';
+                this.init();
+            }
+
+            init() {
+                this.loadSampleData();
+                this.bindEvents();
+                this.updateDashboard();
+                this.renderCurrentSection();
+            }
+
+            loadSampleData() {
+                if (this.data.customers.length === 0) {
+                    this.data.customers = [
+                        { id: 1, name: 'John Smith', email: 'john@email.com', phone: '(555) 123-4567', balance: 2500.00 },
+                        { id: 2, name: 'ABC Corporation', email: 'billing@abccorp.com', phone: '(555) 987-6543', balance: -750.00 },
+                        { id: 3, name: 'Sarah Johnson', email: 'sarah@email.com', phone: '(555) 456-7890', balance: 1200.00 }
+                    ];
+                }
+
+                if (this.data.vendors.length === 0) {
+                    this.data.vendors = [
+                        { id: 1, name: 'Office Supplies Inc', email: 'orders@officesupplies.com', phone: '(555) 111-2222', balance: 500.00 },
+                        { id: 2, name: 'Tech Solutions LLC', email: 'billing@techsolutions.com', phone: '(555) 333-4444', balance: 1200.00 }
+                    ];
+                }
+
+                if (this.data.invoices.length === 0) {
+                    this.data.invoices = [
+                        { id: 'INV-001', customer: 'John Smith', date: '2024-01-15', dueDate: '2024-02-15', amount: 2500.00, status: 'Paid' },
+                        { id: 'INV-002', customer: 'ABC Corporation', date: '2024-01-20', dueDate: '2024-02-20', amount: 1800.00, status: 'Outstanding' },
+                        { id: 'INV-003', customer: 'Sarah Johnson', date: '2024-01-25', dueDate: '2024-02-25', amount: 1200.00, status: 'Partial' }
+                    ];
+                }
+
+                if (this.data.transactions.length === 0) {
+                    this.data.transactions = [
+                        { id: 1, date: '2024-01-15', type: 'Income', account: 'Sales', description: 'Invoice Payment - John Smith', amount: 2500.00 },
+                        { id: 2, date: '2024-01-16', type: 'Expense', account: 'Office Supplies', description: 'Office Equipment', amount: -500.00 },
+                        { id: 3, date: '2024-01-18', type: 'Income', account: 'Sales', description: 'Partial Payment - Sarah Johnson', amount: 600.00 }
+                    ];
+                }
+
+                this.saveData();
+            }
+
+            bindEvents() {
+                // Navigation
+                document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const section = e.target.closest('.nav-link').dataset.section;
+                        this.showSection(section);
+                    });
+                });
+
+                // New item button
+                document.getElementById('new-item-btn').addEventListener('click', () => {
+                    this.showModal('add');
+                });
+
+                // Save item
+                document.getElementById('saveItem').addEventListener('click', () => {
+                    this.saveItem();
+                });
+
+                // Settings form
+                document.getElementById('settings-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.saveSettings();
+                });
+            }
+
+            showSection(section) {
+                // Update navigation
+                document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+                    link.classList.remove('active');
+                });
+                document.querySelector(`[data-section="${section}"]`).classList.add('active');
+
+                // Update content
+                document.querySelectorAll('.section').forEach(el => {
+                    el.style.display = 'none';
+                });
+                document.getElementById(`${section}-section`).style.display = 'block';
+
+                // Update page title
+                const titles = {
+                    dashboard: 'Dashboard',
+                    customers: 'Customers',
+                    vendors: 'Vendors',
+                    invoices: 'Invoices',
+                    bills: 'Bills',
+                    transactions: 'Transactions',
+                    reports: 'Reports',
+                    settings: 'Settings'
+                };
+                document.getElementById('page-title').textContent = titles[section];
+
+                this.currentSection = section;
+                this.renderCurrentSection();
+            }
+
+            renderCurrentSection() {
+                switch(this.currentSection) {
+                    case 'dashboard':
+                        this.updateDashboard();
+                        break;
+                    case 'customers':
+                        this.renderCustomers();
+                        break;
+                    case 'vendors':
+                        this.renderVendors();
+                        break;
+                    case 'invoices':
+                        this.renderInvoices();
+                        break;
+                    case 'transactions':
+                        this.renderTransactions();
+                        break;
+                }
+            }
+
+            updateDashboard() {
+                const totalRevenue = this.data.transactions
+                    .filter(t => t.type === 'Income')
+                    .reduce((sum, t) => sum + t.amount, 0);
+
+                const totalExpenses = Math.abs(this.data.transactions
+                    .filter(t => t.type === 'Expense')
+                    .reduce((sum, t) => sum + t.amount, 0));
+
+                const totalOutstanding = this.data.invoices
+                    .filter(i => i.status === 'Outstanding')
+                    .reduce((sum, i) => sum + i.amount, 0);
+
+                const profit = totalRevenue - totalExpenses;
+
+                document.getElementById('total-revenue').textContent = `$${totalRevenue.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('total-expenses').textContent = `$${totalExpenses.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('total-outstanding').textContent = `$${totalOutstanding.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('total-profit').textContent = `$${profit.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+                // Render recent invoices
+                const recentInvoices = this.data.invoices.slice(-5).reverse();
+                const invoicesHtml = recentInvoices.length ?
+                    `<table class="table table-sm">
+                        <thead><tr><th>Invoice #</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+                        <tbody>
+                            ${recentInvoices.map(inv => `
+                                <tr>
+                                    <td>${inv.id}</td>
+                                    <td>${inv.customer}</td>
+                                    <td>$${inv.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                    <td><span class="badge ${inv.status === 'Paid' ? 'bg-success' : inv.status === 'Outstanding' ? 'bg-danger' : 'bg-warning'}">${inv.status}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>` : '<div class="text-muted text-center py-4">No invoices found</div>';
+                document.getElementById('recent-invoices').innerHTML = invoicesHtml;
+
+                // Render recent transactions
+                const recentTransactions = this.data.transactions.slice(-5).reverse();
+                const transactionsHtml = recentTransactions.length ?
+                    `<table class="table table-sm">
+                        <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+                        <tbody>
+                            ${recentTransactions.map(txn => `
+                                <tr>
+                                    <td>${txn.date}</td>
+                                    <td>${txn.description}</td>
+                                    <td class="${txn.amount >= 0 ? 'text-success' : 'text-danger'}">$${Math.abs(txn.amount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>` : '<div class="text-muted text-center py-4">No transactions found</div>';
+                document.getElementById('recent-transactions').innerHTML = transactionsHtml;
+            }
+
+            renderCustomers() {
+                const tbody = document.getElementById('customers-table');
+                tbody.innerHTML = this.data.customers.map(customer => `
+                    <tr>
+                        <td>${customer.name}</td>
+                        <td>${customer.email}</td>
+                        <td>${customer.phone}</td>
+                        <td class="${customer.balance >= 0 ? 'text-success' : 'text-danger'}">$${customer.balance.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="app.editItem('customers', ${customer.id})">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="app.deleteItem('customers', ${customer.id})">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            renderVendors() {
+                const tbody = document.getElementById('vendors-table');
+                tbody.innerHTML = this.data.vendors.map(vendor => `
+                    <tr>
+                        <td>${vendor.name}</td>
+                        <td>${vendor.email}</td>
+                        <td>${vendor.phone}</td>
+                        <td class="text-danger">$${vendor.balance.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="app.editItem('vendors', ${vendor.id})">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="app.deleteItem('vendors', ${vendor.id})">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            renderInvoices() {
+                const tbody = document.getElementById('invoices-table');
+                tbody.innerHTML = this.data.invoices.map(invoice => `
+                    <tr>
+                        <td>${invoice.id}</td>
+                        <td>${invoice.customer}</td>
+                        <td>${invoice.date}</td>
+                        <td>${invoice.dueDate}</td>
+                        <td>$${invoice.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td><span class="badge ${invoice.status === 'Paid' ? 'bg-success' : invoice.status === 'Outstanding' ? 'bg-danger' : 'bg-warning'}">${invoice.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="app.editItem('invoices', '${invoice.id}')">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="app.deleteItem('invoices', '${invoice.id}')">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            renderTransactions() {
+                const tbody = document.getElementById('transactions-table');
+                tbody.innerHTML = this.data.transactions.map(txn => `
+                    <tr>
+                        <td>${txn.date}</td>
+                        <td><span class="badge ${txn.type === 'Income' ? 'bg-success' : 'bg-danger'}">${txn.type}</span></td>
+                        <td>${txn.account}</td>
+                        <td>${txn.description}</td>
+                        <td class="${txn.amount >= 0 ? 'text-success' : 'text-danger'}">$${Math.abs(txn.amount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="app.editItem('transactions', ${txn.id})">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="app.deleteItem('transactions', ${txn.id})">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            showModal(action, type = null, id = null) {
+                const modal = new bootstrap.Modal(document.getElementById('itemModal'));
+                const modalTitle = document.getElementById('modalTitle');
+                const modalContent = document.getElementById('modalContent');
+
+                const currentType = type || this.currentSection;
+                modalTitle.textContent = `${action === 'add' ? 'Add' : 'Edit'} ${currentType.charAt(0).toUpperCase() + currentType.slice(0, -1)}`;
+
+                let formHtml = '';
+
+                if (currentType === 'customers' || currentType === 'vendors') {
+                    formHtml = `
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" name="phone" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Balance</label>
+                            <input type="number" step="0.01" class="form-control" name="balance" value="0">
+                        </div>
+                    `;
+                } else if (currentType === 'invoices') {
+                    formHtml = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Customer</label>
+                                    <select class="form-control" name="customer" required>
+                                        <option value="">Select Customer</option>
+                                        ${this.data.customers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Amount</label>
+                                    <input type="number" step="0.01" class="form-control" name="amount" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Date</label>
+                                    <input type="date" class="form-control" name="date" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Due Date</label>
+                                    <input type="date" class="form-control" name="dueDate" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-control" name="status" required>
+                                <option value="Outstanding">Outstanding</option>
+                                <option value="Partial">Partial</option>
+                                <option value="Paid">Paid</option>
+                            </select>
+                        </div>
+                    `;
+                } else if (currentType === 'transactions') {
+                    formHtml = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Date</label>
+                                    <input type="date" class="form-control" name="date" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-control" name="type" required>
+                                        <option value="Income">Income</option>
+                                        <option value="Expense">Expense</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Account</label>
+                                    <input type="text" class="form-control" name="account" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Amount</label>
+                                    <input type="number" step="0.01" class="form-control" name="amount" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" rows="3" required></textarea>
+                        </div>
+                    `;
+                }
+
+                modalContent.innerHTML = formHtml;
+                document.getElementById('saveItem').setAttribute('data-action', action);
+                document.getElementById('saveItem').setAttribute('data-type', currentType);
+                if (id) document.getElementById('saveItem').setAttribute('data-id', id);
+
+                modal.show();
+            }
+
+            saveItem() {
+                const form = document.getElementById('itemForm');
+                const formData = new FormData(form);
+                const action = document.getElementById('saveItem').getAttribute('data-action');
+                const type = document.getElementById('saveItem').getAttribute('data-type');
+
+                const item = {};
+                for (let [key, value] of formData.entries()) {
+                    item[key] = ['amount', 'balance'].includes(key) ? parseFloat(value) : value;
+                }
+
+                if (action === 'add') {
+                    if (type === 'invoices') {
+                        item.id = `INV-${String(this.data.invoices.length + 1).padStart(3, '0')}`;
+                    } else if (type === 'transactions') {
+                        item.id = Math.max(0, ...this.data.transactions.map(t => t.id)) + 1;
+                        if (item.type === 'Expense' && item.amount > 0) {
+                            item.amount = -item.amount;
+                        }
+                    } else {
+                        item.id = Math.max(0, ...this.data[type].map(i => i.id)) + 1;
+                    }
+                    this.data[type].push(item);
+                }
+
+                this.saveData();
+                this.renderCurrentSection();
+                this.updateDashboard();
+
+                const modal = bootstrap.Modal.getInstance(document.getElementById('itemModal'));
+                modal.hide();
+            }
+
+            deleteItem(type, id) {
+                if (confirm('Are you sure you want to delete this item?')) {
+                    const index = this.data[type].findIndex(item => item.id == id);
+                    if (index > -1) {
+                        this.data[type].splice(index, 1);
+                        this.saveData();
+                        this.renderCurrentSection();
+                        this.updateDashboard();
+                    }
+                }
+            }
+
+            editItem(type, id) {
+                this.showModal('edit', type, id);
+            }
+
+            saveSettings() {
+                const settings = {
+                    companyName: document.getElementById('company-name').value,
+                    companyEmail: document.getElementById('company-email').value,
+                    companyPhone: document.getElementById('company-phone').value,
+                    companyAddress: document.getElementById('company-address').value,
+                    taxNumber: document.getElementById('tax-number').value
+                };
+                localStorage.setItem('accounting_settings', JSON.stringify(settings));
+                alert('Settings saved successfully!');
+            }
+
+            saveData() {
+                localStorage.setItem('accounting_customers', JSON.stringify(this.data.customers));
+                localStorage.setItem('accounting_vendors', JSON.stringify(this.data.vendors));
+                localStorage.setItem('accounting_invoices', JSON.stringify(this.data.invoices));
+                localStorage.setItem('accounting_bills', JSON.stringify(this.data.bills));
+                localStorage.setItem('accounting_transactions', JSON.stringify(this.data.transactions));
+            }
+        }
+
+        // Initialize the application
+        const app = new AccountingSystem();
+    </script>
+</body>
+</html>

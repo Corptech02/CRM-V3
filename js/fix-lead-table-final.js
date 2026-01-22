@@ -27,8 +27,102 @@ function formatPremiumDisplay(premium) {
                 stage === 'interested') {
 
                 // If connected call was made or text sent (final step), reach out is complete
-                if (reachOut.callsConnected > 0 || reachOut.textCount > 0) {
-                    return ''; // Empty TO DO when reach out is complete
+                // OR if we have completion timestamps (even if counts were reset due to expiration)
+                if (reachOut.callsConnected > 0 || reachOut.textCount > 0 ||
+                    reachOut.completedAt || reachOut.reachOutCompletedAt) {
+
+                    // CRITICAL FIX: If highlight was already marked as expired, show red TO DO immediately
+                    if (reachOut.highlightExpired) {
+                        console.log(`🔴 EXPIRED LEAD: ${lead.id} - showing red TO DO text`);
+                        return 'Reach out';
+                    }
+
+                    // CRITICAL FIX: Check if green highlight duration has expired
+                    if (reachOut.completedAt || reachOut.reachOutCompletedAt) {
+                        const completedTime = new Date(reachOut.completedAt || reachOut.reachOutCompletedAt);
+                        const currentTime = new Date();
+
+                        // Check for green highlight expiration based on duration
+                        let isExpired = false;
+
+                        // Method 1: Check if greenHighlightUntil exists and has expired
+                        if (reachOut.greenHighlightUntil) {
+                            const highlightExpiry = new Date(reachOut.greenHighlightUntil);
+                            if (currentTime > highlightExpiry) {
+                                isExpired = true;
+                                console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - highlight expired at ${reachOut.greenHighlightUntil}`);
+                            }
+                        }
+                        // Method 2: Calculate expiration based on duration
+                        else if (reachOut.highlightDuration) {
+                            const durationMs = reachOut.highlightDuration * 60 * 60 * 1000; // Convert hours to milliseconds
+                            const highlightExpiry = new Date(completedTime.getTime() + durationMs);
+                            if (currentTime > highlightExpiry) {
+                                isExpired = true;
+                                console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - ${reachOut.highlightDuration}h duration expired`);
+                            }
+                        }
+                        // Method 3: Check if highlightDurationDays exists
+                        else if (reachOut.highlightDurationDays) {
+                            const durationMs = reachOut.highlightDurationDays * 24 * 60 * 60 * 1000; // Convert days to milliseconds
+                            const highlightExpiry = new Date(completedTime.getTime() + durationMs);
+                            if (currentTime > highlightExpiry) {
+                                isExpired = true;
+                                console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - ${reachOut.highlightDurationDays}d duration expired`);
+                            }
+                        }
+                        // Method 4: Check for lead-level duration
+                        else if (lead.highlightDuration) {
+                            const durationMs = lead.highlightDuration * 60 * 60 * 1000; // Convert hours to milliseconds
+                            const highlightExpiry = new Date(completedTime.getTime() + durationMs);
+                            if (currentTime > highlightExpiry) {
+                                isExpired = true;
+                                console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - lead-level ${lead.highlightDuration}h duration expired`);
+                            }
+                        }
+                        // Method 5: Default 24-hour check if no specific duration is found
+                        else {
+                            const defaultDurationMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+                            const highlightExpiry = new Date(completedTime.getTime() + defaultDurationMs);
+                            if (currentTime > highlightExpiry) {
+                                isExpired = true;
+                                console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - default 24h duration expired`);
+                            }
+                        }
+
+                        // If highlight has expired, reset completion status and add TO DO text
+                        if (isExpired) {
+                            console.log(`🔄 RESETTING EXPIRED HIGHLIGHT: Lead ${lead.id} - adding TO DO text and resetting completion`);
+
+                            // Reset reach out completion to trigger new reach out
+                            reachOut.callsConnected = 0;
+                            reachOut.textCount = 0;
+                            reachOut.emailSent = false;
+                            reachOut.textSent = false;
+                            reachOut.callMade = false;
+                            delete reachOut.completedAt;
+                            delete reachOut.reachOutCompletedAt;
+                            delete reachOut.greenHighlightUntil;
+
+                            // Save updated lead data to localStorage
+                            try {
+                                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                                const leadIndex = leads.findIndex(l => String(l.id) === String(lead.id));
+                                if (leadIndex !== -1) {
+                                    leads[leadIndex] = lead;
+                                    localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                                    console.log(`✅ Updated expired lead ${lead.id} in localStorage`);
+                                }
+                            } catch (error) {
+                                console.error(`❌ Error updating expired lead ${lead.id}:`, error);
+                            }
+
+                            // Return red "Reach out" text instead of empty string
+                            return '<span style="color: #dc2626; font-weight: bold;">Reach out</span>';
+                        }
+                    }
+
+                    return ''; // Empty TO DO when reach out is complete and not expired
                 }
             }
         }
@@ -54,6 +148,108 @@ function formatPremiumDisplay(premium) {
 
     // Make the getNextAction function globally available to fix TO DO text
     window.getNextAction = getNextActionFixed;
+
+    // Function to clean up expired highlight durations across all leads
+    function cleanupExpiredHighlights() {
+        console.log('🧹 Cleaning up expired highlight durations...');
+
+        try {
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            let updatedCount = 0;
+
+            leads.forEach(lead => {
+                if (lead.reachOut &&
+                    (lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) &&
+                    lead.reachOut.greenHighlightUntil) {
+
+                    const highlightExpiry = new Date(lead.reachOut.greenHighlightUntil);
+                    const now = new Date();
+
+                    if (now > highlightExpiry) {
+                        console.log(`🔴 EXPIRED CLEANUP: Lead ${lead.id} (${lead.name}) - highlight expired at ${lead.reachOut.greenHighlightUntil}`);
+                        console.log(`   Before reset: callsConnected=${lead.reachOut.callsConnected}, textCount=${lead.reachOut.textCount}`);
+
+                        // Mark as expired but keep completion timestamps for proper TO DO logic
+                        lead.reachOut.callsConnected = 0;
+                        lead.reachOut.textCount = 0;
+                        lead.reachOut.emailSent = false;
+                        lead.reachOut.textSent = false;
+                        lead.reachOut.callMade = false;
+
+                        // CRITICAL: Keep completion timestamps but mark as expired
+                        lead.reachOut.highlightExpired = true;
+                        lead.reachOut.expiredAt = new Date().toISOString();
+
+                        delete lead.reachOut.greenHighlightUntil;
+                        delete lead.reachOut.greenHighlightDays;
+
+                        console.log(`   After reset: callsConnected=${lead.reachOut.callsConnected}, textCount=${lead.reachOut.textCount}`);
+                        updatedCount++;
+                    } else {
+                        // Debug: Log leads that aren't expired yet
+                        if (lead.name && lead.name.includes('SKUR TRANSPORT')) {
+                            console.log(`🟡 SKUR TRANSPORT not expired: expires ${highlightExpiry.toLocaleString()}, now is ${now.toLocaleString()}`);
+                        }
+                    }
+                }
+            });
+
+            if (updatedCount > 0) {
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                console.log(`✅ Cleaned up ${updatedCount} expired highlight durations`);
+
+                // Save expired leads to server
+                leads.forEach(async lead => {
+                    if (lead.reachOut && lead.reachOut.highlightExpired) {
+
+                        try {
+                            await fetch(`/api/leads/${lead.id}`, {
+                                method: 'PUT',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({reachOut: lead.reachOut})
+                            });
+                            console.log(`✅ Saved expired lead ${lead.id} to server`);
+                        } catch (error) {
+                            console.error(`❌ Failed to save expired lead ${lead.id}:`, error);
+                        }
+                    }
+                });
+
+                // Force table refresh to show updated TO DO text
+                if (window.displayLeads) {
+                    window.displayLeads();
+                } else if (window.loadLeadsView) {
+                    window.loadLeadsView();
+                }
+            } else {
+                console.log('✅ No expired highlights found to clean up');
+            }
+        } catch (error) {
+            console.error('❌ Error cleaning up expired highlights:', error);
+        }
+    }
+
+    // Run cleanup immediately on page load and every 5 minutes
+    console.log('🚀 Running immediate highlight expiration cleanup...');
+    cleanupExpiredHighlights();
+    setInterval(cleanupExpiredHighlights, 5 * 60 * 1000); // Every 5 minutes
+
+    // Also run cleanup whenever the table is refreshed
+    const originalDisplayLeads = window.displayLeads;
+    if (originalDisplayLeads) {
+        window.displayLeads = function(...args) {
+            cleanupExpiredHighlights();
+            return originalDisplayLeads.apply(this, args);
+        };
+    }
+
+    const originalLoadLeadsView = window.loadLeadsView;
+    if (originalLoadLeadsView) {
+        window.loadLeadsView = function(...args) {
+            cleanupExpiredHighlights();
+            return originalLoadLeadsView.apply(this, args);
+        };
+    }
 
     // Store original if it exists
     const originalGenerateSimpleLeadRows = window.generateSimpleLeadRows;
@@ -194,6 +390,20 @@ function formatPremiumDisplay(premium) {
                         ${(() => {
                             const todoText = getNextActionFixed(lead.stage || 'new', lead);
                             const color = todoText && todoText.toLowerCase().includes('reach out') ? '#dc2626' : 'black';
+
+                            // Debug log for SKUR TRANSPORT
+                            if (lead.name && lead.name.includes('SKUR TRANSPORT')) {
+                                console.log(`🔍 SKUR TRANSPORT DEBUG:`, {
+                                    id: lead.id,
+                                    stage: lead.stage,
+                                    todoText: todoText,
+                                    completedAt: lead.reachOut?.completedAt,
+                                    greenHighlightUntil: lead.reachOut?.greenHighlightUntil,
+                                    callsConnected: lead.reachOut?.callsConnected,
+                                    textCount: lead.reachOut?.textCount
+                                });
+                            }
+
                             return `<div style="font-weight: bold; color: ${color};">${todoText}</div>`;
                         })()}
                     </td>

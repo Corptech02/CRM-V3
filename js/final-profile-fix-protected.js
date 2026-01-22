@@ -1560,8 +1560,67 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
 
             // Mark reach-out as COMPLETE when text is sent (final step in sequence)
             if (leads[leadIndex].reachOut.textCount > 0) {
-                leads[leadIndex].reachOut.completedAt = new Date().toISOString();
-                leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
+                const completionTime = new Date().toISOString();
+                leads[leadIndex].reachOut.completedAt = completionTime;
+                leads[leadIndex].reachOut.reachOutCompletedAt = completionTime;
+
+                // CRITICAL FIX: Preserve green highlight duration when reach-out completes
+                if (!leads[leadIndex].reachOut.greenHighlightUntil) {
+                    // Check if there was a previously set duration to preserve
+                    let durationHours = null;
+
+                    // Try to find previously set duration
+                    if (leads[leadIndex].reachOut.greenHighlightDays) {
+                        durationHours = leads[leadIndex].reachOut.greenHighlightDays * 24;
+                        console.log(`🔍 COMPLETION: Found greenHighlightDays = ${leads[leadIndex].reachOut.greenHighlightDays} days`);
+                    } else if (leads[leadIndex].reachOut.highlightDuration) {
+                        durationHours = leads[leadIndex].reachOut.highlightDuration;
+                        console.log(`🔍 COMPLETION: Found highlightDuration = ${leads[leadIndex].reachOut.highlightDuration} hours`);
+                    } else if (leads[leadIndex].reachOut.highlightDurationDays) {
+                        durationHours = leads[leadIndex].reachOut.highlightDurationDays * 24;
+                        console.log(`🔍 COMPLETION: Found highlightDurationDays = ${leads[leadIndex].reachOut.highlightDurationDays} days`);
+                    } else if (leads[leadIndex].highlightDuration) {
+                        durationHours = leads[leadIndex].highlightDuration;
+                        console.log(`🔍 COMPLETION: Found lead-level highlightDuration = ${leads[leadIndex].highlightDuration} hours`);
+                    } else {
+                        // Default to 24 hours if no specific duration was set
+                        durationHours = 24;
+                        console.log(`🔍 COMPLETION: No duration found, defaulting to 24 hours`);
+                    }
+
+                    // Calculate greenHighlightUntil based on completion time + duration
+                    const completionDate = new Date(completionTime);
+                    const expirationDate = new Date(completionDate.getTime() + (durationHours * 60 * 60 * 1000));
+                    leads[leadIndex].reachOut.greenHighlightUntil = expirationDate.toISOString();
+
+                    console.log(`✅ COMPLETION: Set greenHighlightUntil = ${leads[leadIndex].reachOut.greenHighlightUntil} (${durationHours}h from completion)`);
+                } else {
+                    console.log(`✅ COMPLETION: Preserved existing greenHighlightUntil = ${leads[leadIndex].reachOut.greenHighlightUntil}`);
+                }
+
+                // CRITICAL FIX: Save to server immediately after setting greenHighlightUntil
+                const updateData = {
+                    reachOut: leads[leadIndex].reachOut
+                };
+
+                fetch(`/api/leads/${leadId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updateData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('✅ Text completion data with greenHighlightUntil saved to server');
+                    } else {
+                        console.error('❌ Server save failed for text completion:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Server save error for text completion:', error);
+                });
 
                 // Mark as complete with green styling
                 markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt);
@@ -2087,8 +2146,43 @@ window.handleCallDuration = function(leadId, duration) {
         }
 
         // Mark reach-out as COMPLETE
-        leads[leadIndex].reachOut.completedAt = new Date().toISOString();
-        leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
+        const completionTime = new Date().toISOString();
+        leads[leadIndex].reachOut.completedAt = completionTime;
+        leads[leadIndex].reachOut.reachOutCompletedAt = completionTime;
+
+        // CRITICAL FIX: Preserve green highlight duration when connected call completes reach-out
+        if (!leads[leadIndex].reachOut.greenHighlightUntil) {
+            // Check if there was a previously set duration to preserve
+            let durationHours = null;
+
+            // Try to find previously set duration
+            if (leads[leadIndex].reachOut.greenHighlightDays) {
+                durationHours = leads[leadIndex].reachOut.greenHighlightDays * 24;
+                console.log(`🔍 CALL COMPLETION: Found greenHighlightDays = ${leads[leadIndex].reachOut.greenHighlightDays} days`);
+            } else if (leads[leadIndex].reachOut.highlightDuration) {
+                durationHours = leads[leadIndex].reachOut.highlightDuration;
+                console.log(`🔍 CALL COMPLETION: Found highlightDuration = ${leads[leadIndex].reachOut.highlightDuration} hours`);
+            } else if (leads[leadIndex].reachOut.highlightDurationDays) {
+                durationHours = leads[leadIndex].reachOut.highlightDurationDays * 24;
+                console.log(`🔍 CALL COMPLETION: Found highlightDurationDays = ${leads[leadIndex].reachOut.highlightDurationDays} days`);
+            } else if (leads[leadIndex].highlightDuration) {
+                durationHours = leads[leadIndex].highlightDuration;
+                console.log(`🔍 CALL COMPLETION: Found lead-level highlightDuration = ${leads[leadIndex].highlightDuration} hours`);
+            } else {
+                // Default to 24 hours if no specific duration was set
+                durationHours = 24;
+                console.log(`🔍 CALL COMPLETION: No duration found, defaulting to 24 hours`);
+            }
+
+            // Calculate greenHighlightUntil based on completion time + duration
+            const completionDate = new Date(completionTime);
+            const expirationDate = new Date(completionDate.getTime() + (durationHours * 60 * 60 * 1000));
+            leads[leadIndex].reachOut.greenHighlightUntil = expirationDate.toISOString();
+
+            console.log(`✅ CALL COMPLETION: Set greenHighlightUntil = ${leads[leadIndex].reachOut.greenHighlightUntil} (${durationHours}h from completion)`);
+        } else {
+            console.log(`✅ CALL COMPLETION: Preserved existing greenHighlightUntil = ${leads[leadIndex].reachOut.greenHighlightUntil}`);
+        }
 
         // Update connected display
         const connectedDisplay = document.getElementById(`call-connected-${leadId}`);
@@ -2312,6 +2406,10 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
                 if (completionDiv) {
                     completionDiv.style.display = 'none';
                 }
+
+                // CRITICAL FIX: Remove green highlight from main table row when TO DO text is added
+                console.log(`🔴 REMOVING GREEN HIGHLIGHT: Lead ${leadId} now has TO DO text - removing green highlight from table row`);
+                removeGreenHighlightFromTableRow(leadId);
                 }
             } else {
                 // STAGE DOESN'T REQUIRE REACH-OUT AND NOT COMPLETED - Show neutral black styling
@@ -2334,6 +2432,45 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
             }
             console.log(`✅ Applied reach-out styling for lead ${leadId}, hasReachOutTodo: ${hasReachOutTodo}, completed: ${!!(lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt)}`);
         }
+    }
+}
+
+// Function to remove green highlight from table row when TO DO text is added
+function removeGreenHighlightFromTableRow(leadId) {
+    console.log(`🔍 Searching for table row with lead ID: ${leadId}`);
+
+    // Find the table row by data-lead-id attribute
+    const tableRow = document.querySelector(`tr[data-lead-id="${leadId}"]`);
+
+    if (!tableRow) {
+        console.log(`❌ No table row found for lead ID: ${leadId}`);
+        return;
+    }
+
+    console.log(`✅ Found table row for lead ${leadId}, removing green highlight...`);
+
+    // Remove all green highlighting classes
+    tableRow.classList.remove('reach-out-complete', 'force-green-highlight');
+
+    // Remove inline green background styles
+    if (tableRow.style.backgroundColor.includes('16, 185, 129') ||
+        tableRow.style.backgroundColor.includes('rgb(16, 185, 129)') ||
+        tableRow.style.backgroundColor.includes('rgba(16, 185, 129')) {
+
+        tableRow.style.removeProperty('background-color');
+        tableRow.style.removeProperty('background');
+        tableRow.style.removeProperty('border-left');
+        tableRow.style.removeProperty('border-right');
+
+        // Also clear the entire style attribute if it only contained green highlighting
+        const remainingStyle = tableRow.getAttribute('style');
+        if (!remainingStyle || remainingStyle.trim() === '') {
+            tableRow.removeAttribute('style');
+        }
+
+        console.log(`🔴 Removed green highlighting from lead ${leadId} table row`);
+    } else {
+        console.log(`ℹ️ Lead ${leadId} table row had no green highlighting to remove`);
     }
 }
 
@@ -2643,9 +2780,79 @@ protectedFunctions.showCallLogsWithData = function(lead) {
 protectedFunctions.showCallStatus = function(leadId) {
     console.log(`🟢 Showing highlight duration for lead: ${leadId}`);
 
-    // Get the lead data from ALL possible storage locations
-    const insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    // CRITICAL FIX: Always fetch fresh data from server first to ensure we have the latest greenHighlightUntil
+    console.log(`🌐 Fetching fresh lead data from server for ${leadId}...`);
+
+    fetch(`/api/leads/${leadId}`)
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            throw new Error(`HTTP ${response.status}`);
+        })
+        .then(serverLead => {
+            console.log(`✅ Server fetch successful for lead ${leadId}:`, serverLead.name);
+            console.log(`🔍 Server greenHighlightUntil:`, serverLead.reachOut?.greenHighlightUntil);
+            console.log(`🔍 Server greenHighlightDays:`, serverLead.reachOut?.greenHighlightDays);
+
+            // CRITICAL: Check current localStorage state first to see if lead still qualifies for green highlighting
+            const currentLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const currentLead = currentLeads.find(l => String(l.id) === String(leadId));
+
+            if (currentLead) {
+                console.log(`🔍 Checking current lead state for green highlight eligibility...`);
+
+                // Use the getNextAction function to check if lead should have green highlighting
+                let shouldShowGreenHighlight = false;
+                if (typeof window.getNextAction === 'function') {
+                    const todoText = window.getNextAction(currentLead.stage, currentLead);
+                    shouldShowGreenHighlight = !todoText || todoText.trim() === '';
+                    console.log(`🔍 Current stage: ${currentLead.stage}, TO DO: "${todoText}", Should show green: ${shouldShowGreenHighlight}`);
+                }
+
+                // If lead no longer qualifies for green highlighting, show "no highlight" message
+                if (!shouldShowGreenHighlight) {
+                    console.log(`❌ Lead ${leadId} no longer qualifies for green highlighting - showing no highlight status`);
+                    protectedFunctions.showNoHighlightStatus(currentLead);
+                    return;
+                }
+            }
+
+            // Update localStorage with fresh server data
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+            if (leadIndex !== -1) {
+                leads[leadIndex] = serverLead;
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                console.log(`✅ Updated localStorage with fresh server data for lead ${leadId}`);
+            }
+
+            // Use the fresh server data and continue with the original logic
+            protectedFunctions.showCallStatusWithFreshData(serverLead);
+        })
+        .catch(error => {
+            console.log(`❌ Server fetch failed for lead ${leadId}:`, error.message);
+            console.log(`🔄 Falling back to localStorage data...`);
+
+            // Fallback to original localStorage logic
+            protectedFunctions.showCallStatusOriginal(leadId);
+        });
+};
+
+// Renamed original function for fallback
+protectedFunctions.showCallStatusOriginal = function(leadId) {
+    console.log(`📂 Using original localStorage logic for lead: ${leadId}`);
+
+    // Force multiple localStorage reads to ensure we get the most recent data
+    let insurance_leads, regular_leads;
+    let retryCount = 0;
+    do {
+        insurance_leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
+        retryCount++;
+    } while (retryCount < 3); // Try up to 3 times to ensure data consistency
+
+    console.log(`🔄 FORCED REFRESH: Read localStorage ${retryCount} times to ensure consistency`);
     const clients_data = JSON.parse(localStorage.getItem('clients') || '[]');
     const archived_leads = JSON.parse(localStorage.getItem('archived_leads') || '[]');
 
@@ -2673,6 +2880,8 @@ protectedFunctions.showCallStatus = function(leadId) {
     console.log(`🔍 LOOKUP RESULT: Looking for "${targetId}", found:`, lead ? `${lead.name} (${lead.id})` : 'NOT FOUND');
 
     console.log(`🔍 DEBUG: Found lead:`, lead?.name, 'greenUntil:', lead?.greenUntil);
+    console.log(`🔍 DEBUG: greenHighlightUntil check:`, lead?.reachOut?.greenHighlightUntil);
+    console.log(`🔍 DEBUG: Full reachOut data:`, lead?.reachOut);
 
     // If not found in localStorage, try to fetch from server
     if (!lead) {
@@ -2760,17 +2969,74 @@ protectedFunctions.showCallStatus = function(leadId) {
                 }
                 console.log(`🔍 Green highlight expires: ${lead.reachOut.greenHighlightUntil}, remaining: ${daysRemaining} days`);
             } else {
-                // No specific duration set, but check if lead has contact attempted green highlight
-                if (lead.stage === 'contact_attempted') {
-                    // For contact attempted, show as active with 1 day duration
-                    greenHighlightDays = '1 day remaining';
-                    greenHighlightStatus = 'Active Green Highlighting';
-                    daysRemaining = 1;
-                    console.log(`🔍 Contact attempted lead with active highlighting`);
+                // No specific expiration date found, but lead is highlighted - check if we can calculate duration
+                const completedAt = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
+                const completedDate = new Date(completedAt);
+
+                // Check if a highlight duration was specified (look for common duration fields)
+                let highlightDurationHours = null;
+
+                // Check various ways duration might be stored
+                if (lead.reachOut.highlightDuration) {
+                    highlightDurationHours = lead.reachOut.highlightDuration;
+                } else if (lead.reachOut.highlightDurationDays) {
+                    highlightDurationHours = lead.reachOut.highlightDurationDays * 24;
+                } else if (lead.reachOut.greenHighlightDays) {
+                    // CRITICAL FIX: Check for greenHighlightDays which stores the original duration
+                    highlightDurationHours = lead.reachOut.greenHighlightDays * 24;
+                    console.log(`🔍 PERSISTENCE FIX: Found greenHighlightDays = ${lead.reachOut.greenHighlightDays} days`);
+                } else if (lead.highlightDuration) {
+                    highlightDurationHours = lead.highlightDuration;
+                } else if (lead.stage === 'contact_attempted') {
+                    // Default to 24 hours for contact attempted
+                    highlightDurationHours = 24;
                 } else {
-                    // No specific duration set, just show reach-out complete
-                    const completedAt = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
-                    const completedDate = new Date(completedAt);
+                    // Default highlight duration of 24 hours for reach-out complete
+                    highlightDurationHours = 24;
+                    console.log(`🔍 FALLBACK: No duration found, using default 24 hours`);
+                }
+
+                if (highlightDurationHours) {
+                    // Calculate expiration based on completion time + duration
+                    const highlightExpiry = new Date(completedDate.getTime() + (highlightDurationHours * 60 * 60 * 1000));
+                    const now = new Date();
+                    const diffMs = highlightExpiry - now;
+
+                    if (diffMs > 0) {
+                        // Still active - show remaining time
+                        const hoursRemaining = Math.ceil(diffMs / (1000 * 60 * 60));
+                        const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+                        if (hoursRemaining <= 24) {
+                            greenHighlightDays = `${hoursRemaining} hours remaining`;
+                        } else {
+                            greenHighlightDays = `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} remaining`;
+                        }
+                        greenHighlightStatus = 'Active Green Highlighting';
+
+                        // Store the calculated expiration for future reference
+                        if (!lead.reachOut.greenHighlightUntil) {
+                            lead.reachOut.greenHighlightUntil = highlightExpiry.toISOString();
+                            // Update storage
+                            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                            const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+                            if (leadIndex !== -1) {
+                                leads[leadIndex] = lead;
+                                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                                console.log(`✅ Updated lead ${leadId} with calculated highlight expiration: ${highlightExpiry.toISOString()}`);
+                            }
+                        }
+
+                        console.log(`🔍 Calculated highlight duration: ${highlightDurationHours}h, expires: ${highlightExpiry}, remaining: ${hoursRemaining}h`);
+                    } else {
+                        // Expired
+                        greenHighlightDays = 'Expired';
+                        greenHighlightStatus = 'Green Highlighting Expired';
+                        daysRemaining = 0;
+                        console.log(`🔍 Highlight expired: ${highlightExpiry}`);
+                    }
+                } else {
+                    // Fallback to showing completion time
                     const now = new Date();
                     const diffMs = now - completedDate;
                     const hoursAgo = Math.floor(diffMs / (1000 * 60 * 60));
@@ -2784,7 +3050,7 @@ protectedFunctions.showCallStatus = function(leadId) {
                         greenHighlightStatus = 'Reach-Out Complete (No Duration Set)';
                     }
                     daysRemaining = 1; // Show green styling
-                    console.log(`🔍 No highlight duration set, completed: ${completedAt}`);
+                    console.log(`🔍 No highlight duration found, completed: ${completedAt}`);
                 }
             }
         }
@@ -2824,7 +3090,7 @@ protectedFunctions.showCallStatus = function(leadId) {
         <!-- GREEN Highlight Duration -->
         <div style="text-align: center; padding: 20px; background: ${daysRemaining > 0 ? '#f0fdf4' : '#f9fafb'}; border-radius: 8px; margin-bottom: 20px; border: 2px solid ${daysRemaining > 0 ? '#10b981' : '#e5e7eb'};">
             <div style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 10px;">Green Highlight Status</div>
-            <div style="font-size: 32px; font-weight: bold; color: ${daysRemaining > 0 ? '#10b981' : '#6b7280'}; margin-bottom: 5px;">${greenHighlightDays}</div>
+            <div id="countdown-timer" style="font-size: 32px; font-weight: bold; color: ${daysRemaining > 0 ? '#10b981' : '#6b7280'}; margin-bottom: 5px;">${greenHighlightDays}</div>
             <div style="display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; ${
                 daysRemaining > 0 ? 'background: #dcfce7; color: #166534;' : 'background: #f3f4f6; color: #6b7280;'
             }">${greenHighlightStatus}</div>
@@ -2843,7 +3109,296 @@ protectedFunctions.showCallStatus = function(leadId) {
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
 
+    // Start real-time countdown timer for active highlights
+    let countdownInterval = null;
+    if (daysRemaining > 0) {
+        // Calculate target expiration time
+        let expirationTime = null;
+
+        if (lead.reachOut && lead.reachOut.greenHighlightUntil) {
+            expirationTime = new Date(lead.reachOut.greenHighlightUntil);
+        } else if (lead.reachOut && (lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt)) {
+            // Recalculate expiration time based on completion + duration
+            const completedAt = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
+            const completedDate = new Date(completedAt);
+
+            let highlightDurationHours = null;
+            if (lead.reachOut.highlightDuration) {
+                highlightDurationHours = lead.reachOut.highlightDuration;
+            } else if (lead.reachOut.highlightDurationDays) {
+                highlightDurationHours = lead.reachOut.highlightDurationDays * 24;
+            } else if (lead.reachOut.greenHighlightDays) {
+                // CRITICAL FIX: Check for greenHighlightDays which stores the original duration
+                highlightDurationHours = lead.reachOut.greenHighlightDays * 24;
+                console.log(`🔍 COUNTDOWN FIX: Found greenHighlightDays = ${lead.reachOut.greenHighlightDays} days`);
+            } else if (lead.highlightDuration) {
+                highlightDurationHours = lead.highlightDuration;
+            } else {
+                highlightDurationHours = 24; // Default
+                console.log(`🔍 COUNTDOWN FALLBACK: No duration found, using default 24 hours`);
+            }
+
+            expirationTime = new Date(completedDate.getTime() + (highlightDurationHours * 60 * 60 * 1000));
+        }
+
+        if (expirationTime) {
+            const countdownElement = document.getElementById('countdown-timer');
+
+            function updateCountdown() {
+                const now = new Date();
+                const diffMs = expirationTime - now;
+
+                if (diffMs <= 0) {
+                    countdownElement.textContent = 'Expired';
+                    countdownElement.style.color = '#6b7280';
+                    clearInterval(countdownInterval);
+                    return;
+                }
+
+                const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const totalMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                const totalSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+                if (totalHours >= 24) {
+                    const days = Math.floor(totalHours / 24);
+                    const remainingHours = totalHours % 24;
+                    countdownElement.textContent = `${days}d ${remainingHours}h remaining`;
+                } else if (totalHours > 0) {
+                    countdownElement.textContent = `${totalHours}h ${totalMinutes}m remaining`;
+                } else if (totalMinutes > 0) {
+                    countdownElement.textContent = `${totalMinutes}m ${totalSeconds}s remaining`;
+                } else {
+                    countdownElement.textContent = `${totalSeconds}s remaining`;
+                }
+            }
+
+            // Update immediately and then every second
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
+        }
+    }
+
     // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            if (countdownInterval) clearInterval(countdownInterval);
+            modal.remove();
+        }
+    });
+
+    // Clear interval when modal is closed via close button
+    const closeButtons = modal.querySelectorAll('button');
+    closeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            if (countdownInterval) clearInterval(countdownInterval);
+        });
+    });
+};
+
+// New function to show call status with fresh server data
+protectedFunctions.showCallStatusWithFreshData = function(lead) {
+    console.log(`✅ Showing highlight duration modal with fresh server data for: ${lead.name}`);
+
+    // Check for GREEN highlight duration (from green highlight system)
+    let greenHighlightDays = 'Not Set';
+    let greenHighlightStatus = 'No Green Highlighting';
+    let daysRemaining = 0;
+
+    // Check all storage formats for green highlighting
+    let highlightExpiry = null;
+    console.log(`🔍 DEBUG: Checking highlight formats...`);
+    console.log(`🔍 lead.greenHighlight:`, lead.greenHighlight);
+    console.log(`🔍 lead.reachOut?.greenHighlightUntil:`, lead.reachOut?.greenHighlightUntil);
+    console.log(`🔍 lead.greenUntil:`, lead.greenUntil);
+
+    if (lead.greenHighlight && lead.greenHighlight.expiresAt) {
+        highlightExpiry = new Date(lead.greenHighlight.expiresAt);
+        console.log(`🔍 Using greenHighlight.expiresAt:`, lead.greenHighlight.expiresAt);
+    } else if (lead.reachOut && lead.reachOut.greenHighlightUntil) {
+        highlightExpiry = new Date(lead.reachOut.greenHighlightUntil);
+        console.log(`🔍 Using reachOut.greenHighlightUntil:`, lead.reachOut.greenHighlightUntil);
+    } else if (lead.greenUntil) {
+        highlightExpiry = new Date(lead.greenUntil);
+        console.log(`🔍 Using greenUntil:`, lead.greenUntil);
+    }
+
+    if (highlightExpiry) {
+        const now = new Date();
+        const diffMs = highlightExpiry - now;
+
+        if (diffMs > 0) {
+            // Calculate more precise display format
+            const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const days = Math.floor(totalHours / 24);
+            const hours = totalHours % 24;
+
+            if (days > 0) {
+                greenHighlightDays = `${days}d ${hours}h remaining`;
+            } else if (totalHours > 0) {
+                const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                greenHighlightDays = `${totalHours}h ${minutes}m remaining`;
+            } else {
+                const minutes = Math.floor(diffMs / (1000 * 60));
+                greenHighlightDays = `${minutes}m remaining`;
+            }
+
+            greenHighlightStatus = 'Active Green Highlighting';
+            daysRemaining = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+            console.log(`✅ FRESH DATA: Calculated "${greenHighlightDays}" from server timestamp`);
+        } else {
+            greenHighlightDays = 'Expired';
+            greenHighlightStatus = 'Green Highlighting Expired';
+            daysRemaining = 0;
+        }
+    } else {
+        console.log('❌ No highlight expiry found in fresh server data - using fallback');
+        greenHighlightDays = 'No Duration Set';
+        greenHighlightStatus = 'No Green Highlighting';
+    }
+
+    // Create and show the modal with calculated values
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); display: flex; align-items: center;
+        justify-content: center; z-index: 9999999;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white; border-radius: 12px; padding: 30px;
+        max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    `;
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-highlight" style="color: #10b981;"></i> Highlight Duration Status</h2>
+            <button id="close-highlight-modal" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+        </div>
+
+
+        <!-- GREEN Highlight Duration -->
+        <div style="text-align: center; padding: 20px; background: ${daysRemaining > 0 ? '#f0fdf4' : '#f9fafb'}; border-radius: 8px; margin-bottom: 20px; border: 2px solid ${daysRemaining > 0 ? '#10b981' : '#e5e7eb'};">
+            <div style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 10px;">Green Highlight Status</div>
+            <div id="countdown-timer" style="font-size: 32px; font-weight: bold; color: ${daysRemaining > 0 ? '#10b981' : '#6b7280'}; margin-bottom: 5px;">${greenHighlightDays}</div>
+            <div style="display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; ${
+                daysRemaining > 0 ? 'background: #dcfce7; color: #166534;' : 'background: #f3f4f6; color: #6b7280;'
+            }">${greenHighlightStatus}</div>
+        </div>
+
+        <div style="text-align: center;">
+            <button id="close-highlight-modal-btn" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                Close
+            </button>
+        </div>
+    `;
+
+    modal.className = 'call-status-modal';
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Add event listeners for close buttons
+    const closeButton = modal.querySelector('#close-highlight-modal');
+    const closeBtn = modal.querySelector('#close-highlight-modal-btn');
+    if (closeButton) closeButton.addEventListener('click', () => modal.remove());
+    if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
+
+    // Setup real-time countdown if active
+    if (highlightExpiry && daysRemaining > 0) {
+        const countdownElement = document.getElementById('countdown-timer');
+        const countdownInterval = setInterval(() => {
+            const now = new Date();
+            const diffMs = highlightExpiry - now;
+
+            if (diffMs <= 0) {
+                countdownElement.textContent = 'Expired';
+                countdownElement.style.color = '#6b7280';
+                clearInterval(countdownInterval);
+                return;
+            }
+
+            const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const days = Math.floor(totalHours / 24);
+            const hours = totalHours % 24;
+            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+            if (days > 0) {
+                countdownElement.textContent = `${days}d ${hours}h remaining`;
+            } else if (totalHours > 0) {
+                countdownElement.textContent = `${totalHours}h ${minutes}m remaining`;
+            } else {
+                countdownElement.textContent = `${minutes}m remaining`;
+            }
+        }, 1000);
+
+        // Clear interval when modal is closed
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                clearInterval(countdownInterval);
+                modal.remove();
+            }
+        });
+    }
+};
+
+// Function to show "no highlight" status when lead doesn't qualify for green highlighting
+protectedFunctions.showNoHighlightStatus = function(lead) {
+    console.log(`📋 Showing no highlight status for: ${lead.name}`);
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); display: flex; align-items: center;
+        justify-content: center; z-index: 9999999;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white; border-radius: 12px; padding: 30px;
+        max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    `;
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-highlight" style="color: #6b7280;"></i> Highlight Duration Status</h2>
+            <button id="close-no-highlight-modal" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+        </div>
+
+        <!-- No Green Highlight Status -->
+        <div style="text-align: center; padding: 20px; background: #f9fafb; border-radius: 8px; margin-bottom: 20px; border: 2px solid #e5e7eb;">
+            <div style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 10px;">Green Highlight Status</div>
+            <div style="font-size: 32px; font-weight: bold; color: #6b7280; margin-bottom: 5px;">No Active Highlight</div>
+            <div style="display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #f3f4f6; color: #6b7280;">
+                Lead has TO DO actions - Green highlight not applicable
+            </div>
+        </div>
+
+        <div style="text-align: center; color: #6b7280; margin-bottom: 20px; font-size: 14px;">
+            Green highlighting only applies to completed leads with no pending actions.
+        </div>
+
+        <div style="text-align: center;">
+            <button id="close-no-highlight-btn" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                Close
+            </button>
+        </div>
+    `;
+
+    modal.className = 'call-status-modal';
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Add event listeners for close buttons
+    const closeButton = modal.querySelector('#close-no-highlight-modal');
+    const closeBtn = modal.querySelector('#close-no-highlight-btn');
+    if (closeButton) closeButton.addEventListener('click', () => modal.remove());
+    if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
+
+    // Close on outside click
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             modal.remove();
@@ -3298,6 +3853,30 @@ window.setGreenHighlightDuration = function(leadId, days) {
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
 
         console.log(`✅ Green highlight set until: ${expirationDate.toLocaleDateString()}`);
+
+        // CRITICAL FIX: Save green highlight duration to server
+        const updateData = {
+            reachOut: leads[leadIndex].reachOut
+        };
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log(`✅ Green highlight duration saved to server: ${daysNum} days until ${expirationDate.toLocaleDateString()}`);
+            } else {
+                console.error('❌ Server save failed for green highlight duration:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Server save error for green highlight duration:', error);
+        });
     }
 
     // Close the modal
@@ -5020,6 +5599,100 @@ function refreshLeadsTable() {
     } else {
         console.log('❌ No refresh method available');
     }
+
+    // CRITICAL: After table refresh, enforce green highlight removal rule
+    // GREEN HIGHLIGHT ONLY APPLIES WHEN NO TO DO TEXT IS PRESENT
+    setTimeout(() => {
+        console.log('🧹 CLEANUP: Enforcing TO DO text vs green highlight rule...');
+        enforceGreenHighlightRule();
+    }, 500);
+}
+
+// Function to enforce the rule: GREEN HIGHLIGHT ONLY WHEN NO TO DO TEXT
+function enforceGreenHighlightRule() {
+    console.log('🔍 Starting comprehensive green highlight rule enforcement...');
+
+    // Find all table rows with data-lead-id
+    const tableRows = document.querySelectorAll('tr[data-lead-id]');
+    let cleanupCount = 0;
+    let totalChecked = 0;
+
+    tableRows.forEach((row, index) => {
+        const leadId = row.getAttribute('data-lead-id');
+        totalChecked++;
+
+        // Find the TO DO cell (usually column 6 or 7)
+        const cells = row.querySelectorAll('td');
+        let todoText = '';
+        let todoCell = null;
+
+        // Try to find TO DO cell by checking multiple columns
+        for (let i = 5; i < cells.length; i++) {
+            const cellText = (cells[i]?.textContent || '').trim().toLowerCase();
+            if (cellText.includes('to do') || cellText.includes('todo') ||
+                cellText.includes('call') || cellText.includes('email') || cellText.includes('text') ||
+                cells[i]?.innerHTML?.includes('TO DO')) {
+                todoCell = cells[i];
+                todoText = (cells[i]?.textContent || '').trim();
+                break;
+            }
+        }
+
+        // If no specific TO DO cell found, check around column 6 (common TO DO column)
+        if (!todoCell && cells[6]) {
+            todoCell = cells[6];
+            todoText = (cells[6]?.textContent || '').trim();
+        }
+
+        console.log(`Row ${index}: Lead ${leadId}, TO DO: "${todoText}" (length: ${todoText.length})`);
+
+        // Check if row has green highlighting
+        const hasGreenHighlight =
+            row.classList.contains('reach-out-complete') ||
+            row.classList.contains('force-green-highlight') ||
+            (row.style.backgroundColor && (
+                row.style.backgroundColor.includes('16, 185, 129') ||
+                row.style.backgroundColor.includes('rgb(16, 185, 129)') ||
+                row.style.backgroundColor.includes('rgba(16, 185, 129')
+            )) ||
+            (row.getAttribute('style') && row.getAttribute('style').includes('16, 185, 129'));
+
+        // If row has TO DO text AND green highlighting, remove the green highlight
+        if (todoText && todoText.length > 0 &&
+            !todoText.toLowerCase().includes('completed') &&
+            !todoText.toLowerCase().includes('process complete') &&
+            hasGreenHighlight) {
+
+            console.log(`🔴 RULE VIOLATION: Lead ${leadId} has TO DO text "${todoText}" but green highlight - REMOVING GREEN`);
+
+            // Remove green highlighting
+            row.classList.remove('reach-out-complete', 'force-green-highlight');
+
+            if (row.style.backgroundColor.includes('16, 185, 129') ||
+                row.style.backgroundColor.includes('rgb(16, 185, 129)') ||
+                row.style.backgroundColor.includes('rgba(16, 185, 129')) {
+
+                row.style.removeProperty('background-color');
+                row.style.removeProperty('background');
+                row.style.removeProperty('border-left');
+                row.style.removeProperty('border-right');
+            }
+
+            // Check if style attribute is now empty
+            const remainingStyle = row.getAttribute('style');
+            if (!remainingStyle || remainingStyle.trim() === '') {
+                row.removeAttribute('style');
+            }
+
+            cleanupCount++;
+        } else if (hasGreenHighlight) {
+            console.log(`✅ Lead ${leadId} has green highlight and ${todoText ? 'completion' : 'empty TO DO'} - OK`);
+        } else if (todoText && todoText.length > 0) {
+            console.log(`ℹ️ Lead ${leadId} has TO DO text "${todoText}" and no green highlight - OK`);
+        }
+    });
+
+    console.log(`🧹 CLEANUP COMPLETE: Checked ${totalChecked} rows, fixed ${cleanupCount} green highlight violations`);
 }
 
 // Function to load leads from server and refresh display
@@ -6357,16 +7030,61 @@ window.getReachOutStatus = function(lead) {
     const hasActuallyCompleted = (reachOut.callsConnected > 0) || (reachOut.textCount > 0);
 
     if ((reachOut.completedAt || reachOut.reachOutCompletedAt) && hasActuallyCompleted) {
-        // Check if reach out has EXPIRED (older than 2 days) - SAME LOGIC AS getNextAction
-        if (reachOut.reachOutCompletedAt) {
-            const completedTime = new Date(reachOut.reachOutCompletedAt);
+        // Check if reach out has EXPIRED based on green highlight duration - UPDATED LOGIC
+        if (reachOut.reachOutCompletedAt || reachOut.completedAt) {
+            const completedTime = new Date(reachOut.reachOutCompletedAt || reachOut.completedAt);
             const currentTime = new Date();
-            const timeDifferenceMs = currentTime.getTime() - completedTime.getTime();
-            const timeDifferenceDays = timeDifferenceMs / (1000 * 60 * 60 * 24);
 
-            // If more than 2 days have passed, reach out has expired
-            if (timeDifferenceDays > 2) {
-                console.log(`🔄 getReachOutStatus - REACH OUT EXPIRED: Lead ${lead.id}, completed ${timeDifferenceDays.toFixed(1)} days ago`);
+            // Check for green highlight expiration based on duration (same as getNextAction)
+            let isExpired = false;
+
+            // Method 1: Check if greenHighlightUntil exists and has expired
+            if (reachOut.greenHighlightUntil) {
+                const highlightExpiry = new Date(reachOut.greenHighlightUntil);
+                if (currentTime > highlightExpiry) {
+                    isExpired = true;
+                    console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - highlight expired at ${reachOut.greenHighlightUntil}`);
+                }
+            }
+            // Method 2: Calculate expiration based on duration
+            else if (reachOut.highlightDuration) {
+                const durationMs = reachOut.highlightDuration * 60 * 60 * 1000; // Convert hours to milliseconds
+                const highlightExpiry = new Date(completedTime.getTime() + durationMs);
+                if (currentTime > highlightExpiry) {
+                    isExpired = true;
+                    console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - ${reachOut.highlightDuration}h duration expired`);
+                }
+            }
+            // Method 3: Check if highlightDurationDays exists
+            else if (reachOut.highlightDurationDays) {
+                const durationMs = reachOut.highlightDurationDays * 24 * 60 * 60 * 1000; // Convert days to milliseconds
+                const highlightExpiry = new Date(completedTime.getTime() + durationMs);
+                if (currentTime > highlightExpiry) {
+                    isExpired = true;
+                    console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - ${reachOut.highlightDurationDays}d duration expired`);
+                }
+            }
+            // Method 4: Check for lead-level duration
+            else if (lead.highlightDuration) {
+                const durationMs = lead.highlightDuration * 60 * 60 * 1000; // Convert hours to milliseconds
+                const highlightExpiry = new Date(completedTime.getTime() + durationMs);
+                if (currentTime > highlightExpiry) {
+                    isExpired = true;
+                    console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - lead-level ${lead.highlightDuration}h duration expired`);
+                }
+            }
+            // Method 5: Default 24-hour check if no specific duration is found
+            else {
+                const defaultDurationMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+                const highlightExpiry = new Date(completedTime.getTime() + defaultDurationMs);
+                if (currentTime > highlightExpiry) {
+                    isExpired = true;
+                    console.log(`🔴 GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - default 24h duration expired`);
+                }
+            }
+
+            if (isExpired) {
+                console.log(`🔄 getReachOutStatus - GREEN HIGHLIGHT EXPIRED: Lead ${lead.id} - resetting completion status`);
                 return '<span style="color: #dc2626;">EXPIRED - Reach Out Required</span>';
             }
         }
