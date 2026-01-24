@@ -202,3 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Export for use in other modules
 window.PolicySyncManager = PolicySyncManager;
+
+// Map to expected function name for policies view
+window.loadPoliciesFromServer = PolicySyncManager.loadPolicies;

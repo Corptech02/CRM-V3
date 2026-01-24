@@ -307,67 +307,25 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <h3><i class="fas fa-user-circle"></i> Owner Details</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                         <div>
-                            <label style="font-weight: 600; font-size: 12px;">Sex:</label>
-                            <select onchange="updateLeadField('${lead.id}', 'ownerSex', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                                <option value="">Select Sex</option>
-                                <option value="Male" ${(lead.ownerSex === 'Male') ? 'selected' : ''}>Male</option>
-                                <option value="Female" ${(lead.ownerSex === 'Female') ? 'selected' : ''}>Female</option>
-                            </select>
+                            <label style="font-weight: 600; font-size: 12px;">Name:</label>
+                            <input type="text"
+                                value="${lead.ownerName || ''}"
+                                onchange="updateLeadField('${lead.id}', 'ownerName', this.value); updateNameFieldColor(this);"
+                                oninput="updateNameFieldColor(this);"
+                                placeholder="Enter owner name"
+                                style="width: 100%; padding: 8px; border: 1px solid ${(lead.ownerName && lead.ownerName.trim()) ? '#d1d5db' : '#ef4444'}; border-radius: 6px; background-color: ${(lead.ownerName && lead.ownerName.trim()) ? 'white' : '#fef2f2'};">
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 12px;">Race:</label>
-                            <select onchange="updateLeadField('${lead.id}', 'ownerRace', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                                <option value="">Select Race</option>
-                                <option value="White" ${(lead.ownerRace === 'White') ? 'selected' : ''}>White</option>
-                                <option value="Black" ${(lead.ownerRace === 'Black') ? 'selected' : ''}>Black</option>
-                                <option value="Hispanic" ${(lead.ownerRace === 'Hispanic') ? 'selected' : ''}>Hispanic</option>
-                                <option value="Asian" ${(lead.ownerRace === 'Asian') ? 'selected' : ''}>Asian</option>
-                                <option value="Native American" ${(lead.ownerRace === 'Native American') ? 'selected' : ''}>Native American</option>
-                                <option value="Other" ${(lead.ownerRace === 'Other') ? 'selected' : ''}>Other</option>
-                            </select>
+                            <label style="font-weight: 600; font-size: 12px;">Interest:</label>
+                            <input type="text" value="${lead.ownerInterest || ''}" onchange="updateLeadField('${lead.id}', 'ownerInterest', this.value)" placeholder="Enter interests" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 12px;">Preferred Pickup Time:</label>
-                            <select onchange="updateLeadField('${lead.id}', 'preferredPickupTime', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                                <option value="">Select Time</option>
-                                <option value="Morning" ${(lead.preferredPickupTime === 'Morning') ? 'selected' : ''}>Morning</option>
-                                <option value="Mid-day" ${(lead.preferredPickupTime === 'Mid-day') ? 'selected' : ''}>Mid-day</option>
-                                <option value="Afternoon" ${(lead.preferredPickupTime === 'Afternoon') ? 'selected' : ''}>Afternoon</option>
-                            </select>
+                            <label style="font-weight: 600; font-size: 12px;">Dislikes:</label>
+                            <input type="text" value="${lead.ownerDislikes || ''}" onchange="updateLeadField('${lead.id}', 'ownerDislikes', this.value)" placeholder="Enter dislikes" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Personality:</label>
-                            <select onchange="updateLeadField('${lead.id}', 'ownerPersonality', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                                <option value="">Select Personality</option>
-                                <option value="Talkative" ${(lead.ownerPersonality === 'Talkative') ? 'selected' : ''}>Talkative</option>
-                                <option value="Quiet" ${(lead.ownerPersonality === 'Quiet') ? 'selected' : ''}>Quiet</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Temper:</label>
-                            <select onchange="updateLeadField('${lead.id}', 'ownerTemper', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                                <option value="">Select Temper</option>
-                                <option value="Calm" ${(lead.ownerTemper === 'Calm') ? 'selected' : ''}>Calm</option>
-                                <option value="Average" ${(lead.ownerTemper === 'Average') ? 'selected' : ''}>Average</option>
-                                <option value="Cheerful" ${(lead.ownerTemper === 'Cheerful') ? 'selected' : ''}>Cheerful</option>
-                                <option value="Easy to Irritate" ${(lead.ownerTemper === 'Easy to Irritate') ? 'selected' : ''}>Easy to Irritate</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Tone:</label>
-                            <select onchange="updateLeadField('${lead.id}', 'ownerTone', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                                <option value="">Select Tone</option>
-                                <option value="Formal" ${(lead.ownerTone === 'Formal') ? 'selected' : ''}>Formal</option>
-                                <option value="Friendly" ${(lead.ownerTone === 'Friendly') ? 'selected' : ''}>Friendly</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Availability:</label>
-                            <select onchange="updateLeadField('${lead.id}', 'ownerAvailability', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                                <option value="">Select Availability</option>
-                                <option value="Often Free" ${(lead.ownerAvailability === 'Often Free') ? 'selected' : ''}>Often Free</option>
-                                <option value="Often Busy" ${(lead.ownerAvailability === 'Often Busy') ? 'selected' : ''}>Often Busy</option>
-                            </select>
+                            <input type="text" value="${lead.ownerPersonality || ''}" onchange="updateLeadField('${lead.id}', 'ownerPersonality', this.value)" placeholder="Enter personality traits" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         </div>
                     </div>
                 </div>
@@ -1482,7 +1440,14 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
     const regular_leads = JSON.parse(localStorage.getItem('leads') || '[]');
     const clients_data = JSON.parse(localStorage.getItem('clients') || '[]');
     const archived_leads = JSON.parse(localStorage.getItem('archived_leads') || '[]');
-    const leads = [...insurance_leads, ...regular_leads, ...clients_data, ...archived_leads];
+
+    // Ensure all data arrays are valid before spreading
+    const safeInsuranceLeads = Array.isArray(insurance_leads) ? insurance_leads : [];
+    const safeRegularLeads = Array.isArray(regular_leads) ? regular_leads : [];
+    const safeClientsData = Array.isArray(clients_data) ? clients_data : [];
+    const safeArchivedLeads = Array.isArray(archived_leads) ? archived_leads : [];
+
+    const leads = [...safeInsuranceLeads, ...safeRegularLeads, ...safeClientsData, ...safeArchivedLeads];
 
     // Enhanced debugging for lead lookup
     console.log(`🔍 DEBUG: Looking for lead ID "${leadId}" (type: ${typeof leadId})`);
@@ -1849,9 +1814,17 @@ window.handleCallOutcome = function(leadId, answered) {
             showCallDurationPopup(leadId);
             return; // Exit here - duration popup will handle completion
         } else {
-            // Lead didn't pick up - save and show voicemail question
+            // Lead didn't pick up - save call attempt but DON'T mark as completed yet
+            console.log(`📞 Call attempt recorded (no answer) - completion will happen only after call scheduling confirmation`);
+
             localStorage.setItem('insurance_leads', JSON.stringify(leads));
             saveReachOutToServer(leadId, leads[leadIndex].reachOut);
+
+            // Calculate and update response rate based on new call data (unanswered call)
+            console.log(`🎯 DEBUG handleCallOutcome - calculating response rate after unanswered call`);
+            if (protectedFunctions.calculateAndUpdateResponseRate) {
+                protectedFunctions.calculateAndUpdateResponseRate(leadId);
+            }
 
             // Update checkbox to checked
             const checkbox = document.getElementById(`call-made-${leadId}`);
@@ -2050,6 +2023,13 @@ window.handleCallDuration = function(leadId, duration) {
 
         // Increment connected counter
         leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
+        leads[leadIndex].reachOut.callAttempts = (leads[leadIndex].reachOut.callAttempts || 0) + 1;
+
+        // Calculate and update response rate based on new call data
+        console.log(`🎯 DEBUG showCallDurationPopup - calculating response rate after connected call`);
+        if (protectedFunctions.calculateAndUpdateResponseRate) {
+            protectedFunctions.calculateAndUpdateResponseRate(leadId);
+        }
 
         // CALCULATE TOTAL MINUTES BEFORE ADDING NEW CALL (for high value upgrade detection)
         let totalMinutesBefore = 0;
@@ -2314,7 +2294,8 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
             if (hasReachOutTodo) {
                 // First check if reach-out is already completed - MUST verify actual completion actions
                 let isCompleted = false;
-                const hasActuallyCompleted = (lead.reachOut.callsConnected > 0) || (lead.reachOut.textCount > 0);
+                // NEW LOGIC: Consider any call attempt as completion (not just connected calls)
+                const hasActuallyCompleted = (lead.reachOut.callAttempts > 0);
 
                 // Clean up orphaned completion timestamps (timestamps without actual completion)
                 if ((lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) && !hasActuallyCompleted) {
@@ -2377,16 +2358,12 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
                 // STAGE REQUIRES REACH-OUT AND NOT COMPLETED - Show red styling
                 todoDiv.style.display = 'block'; // Show TO DO text
 
-                // Show sequential to-do system: call → email → text
+                // Show TO DO or COMPLETE based on call attempts only
                 let nextAction = '';
                 if (!lead.reachOut.callAttempts || lead.reachOut.callAttempts === 0) {
                     nextAction = 'TO DO: Call';
-                } else if (!lead.reachOut.emailCount || lead.reachOut.emailCount === 0) {
-                    nextAction = 'TO DO: Email';
-                } else if (!lead.reachOut.textCount || lead.reachOut.textCount === 0) {
-                    nextAction = 'TO DO: Text';
                 } else {
-                    nextAction = 'All methods completed';
+                    nextAction = 'REACH OUT COMPLETE';
                 }
 
                 // Show red to-do message for active reach-out requirements
@@ -2527,9 +2504,15 @@ protectedFunctions.showCallLogs = function(leadId) {
     const clients_data = JSON.parse(localStorage.getItem('clients') || '[]');
     const archived_leads = JSON.parse(localStorage.getItem('archived_leads') || '[]');
 
-    console.log(`🔍 STORAGE DEBUG: insurance_leads: ${insurance_leads.length}, regular_leads: ${regular_leads.length}, clients: ${clients_data.length}, archived: ${archived_leads.length}`);
+    // Ensure all data arrays are valid before accessing length or spreading
+    const safeInsuranceLeads = Array.isArray(insurance_leads) ? insurance_leads : [];
+    const safeRegularLeads = Array.isArray(regular_leads) ? regular_leads : [];
+    const safeClientsData = Array.isArray(clients_data) ? clients_data : [];
+    const safeArchivedLeads = Array.isArray(archived_leads) ? archived_leads : [];
 
-    const allLeads = [...insurance_leads, ...regular_leads, ...clients_data, ...archived_leads];
+    console.log(`🔍 STORAGE DEBUG: insurance_leads: ${safeInsuranceLeads.length}, regular_leads: ${safeRegularLeads.length}, clients: ${safeClientsData.length}, archived: ${safeArchivedLeads.length}`);
+
+    const allLeads = [...safeInsuranceLeads, ...safeRegularLeads, ...safeClientsData, ...safeArchivedLeads];
     console.log(`🔍 COMBINED STORAGE: Total ${allLeads.length} leads`);
     console.log(`🔍 LEAD IDS in combined storage:`, allLeads.slice(0, 10).map(l => `"${l.id}"`));
 
@@ -3096,6 +3079,20 @@ protectedFunctions.showCallStatusOriginal = function(leadId) {
             }">${greenHighlightStatus}</div>
         </div>
 
+        <!-- Scheduled Call Information -->
+        ${lead.reachOut && lead.reachOut.scheduledCallDate && lead.reachOut.scheduledCallTime ? `
+        <div style="text-align: center; padding: 15px; background: #eff6ff; border-radius: 8px; margin-bottom: 20px; border: 1px solid #3b82f6;">
+            <div style="font-size: 16px; font-weight: bold; color: #1e40af; margin-bottom: 5px;">
+                <i class="fas fa-calendar-alt" style="color: #3b82f6;"></i> Scheduled Call
+            </div>
+            <div style="font-size: 14px; color: #1e40af;">
+                ${lead.reachOut.scheduledCallDate} at ${lead.reachOut.scheduledCallTime} EST
+            </div>
+            <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
+                Highlight expires when call is due
+            </div>
+        </div>
+        ` : ''}
 
         <!-- Close Button -->
         <div style="text-align: center;">
@@ -3486,6 +3483,355 @@ function showCallStatusWithData(leadData) {
     });
 }
 
+// Function to show call scheduled popup (appears before email confirmation)
+window.showCallScheduledPopup = function(leadId) {
+    console.log(`📞 Showing call scheduled popup for lead: ${leadId}`);
+
+    // Create modal backdrop
+    const modal = document.createElement('div');
+    modal.className = 'call-scheduled-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000003;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    `;
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-calendar-check" style="color: #3b82f6;"></i> Call Scheduled?</h2>
+            <button onclick="this.closest('.call-scheduled-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">×</button>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 25px;">
+            <div style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 15px;">Was a call scheduled with this lead?</div>
+        </div>
+
+        <!-- Initial Response Options -->
+        <div id="initial-options" style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
+            <button onclick="handleCallScheduled('${leadId}', true)" style="
+                background: #10b981;
+                color: white;
+                border: none;
+                padding: 15px 25px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 16px;
+                min-width: 120px;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                <i class="fas fa-check"></i> Yes
+            </button>
+            <button onclick="handleCallScheduled('${leadId}', false)" style="
+                background: #ef4444;
+                color: white;
+                border: none;
+                padding: 15px 25px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 16px;
+                min-width: 120px;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                <i class="fas fa-times"></i> No
+            </button>
+        </div>
+
+        <!-- Date Selector (Initially Hidden) -->
+        <div id="date-selector" style="display: none; text-align: center; margin-top: 20px;">
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; font-size: 16px; display: block; margin-bottom: 10px;">Select Call Date & Time:</label>
+                <div style="display: flex; gap: 15px; justify-content: center; align-items: center;">
+                    <div>
+                        <label style="font-weight: 500; font-size: 14px; display: block; margin-bottom: 5px;">Date:</label>
+                        <input type="date" id="call-date-${leadId}" min="${new Date().toISOString().split('T')[0]}" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div>
+                        <label style="font-weight: 500; font-size: 14px; display: block; margin-bottom: 5px;">Time:</label>
+                        <input type="time" id="call-time-${leadId}" value="10:00" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+            </div>
+            <button onclick="confirmCallScheduled('${leadId}')" style="
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 14px;
+            ">
+                <i class="fas fa-calendar-check"></i> Confirm
+            </button>
+        </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Close on backdrop click
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+};
+
+// Handle call scheduled response
+window.handleCallScheduled = function(leadId, isScheduled) {
+    console.log(`📞 Call scheduled response: ${isScheduled} for lead ${leadId}`);
+
+    if (isScheduled) {
+        // Show date selector
+        const initialOptions = document.getElementById('initial-options');
+        const dateSelector = document.getElementById('date-selector');
+
+        if (initialOptions && dateSelector) {
+            initialOptions.style.display = 'none';
+            dateSelector.style.display = 'block';
+
+            // Set default date to tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const dateInput = document.getElementById(`call-date-${leadId}`);
+            if (dateInput) {
+                dateInput.value = tomorrow.toISOString().split('T')[0];
+            }
+
+            // Set default time to 10:00 AM
+            const timeInput = document.getElementById(`call-time-${leadId}`);
+            if (timeInput) {
+                timeInput.value = '10:00';
+            }
+        }
+    } else {
+        // No call scheduled - reset reach-out to uncompleted state and uncheck the call checkbox
+        console.log('❌ User said NO to call scheduling - resetting reach-out state...');
+
+        // Reset reach-out completion
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+        if (leadIndex !== -1 && leads[leadIndex].reachOut) {
+            // Reset completion timestamps
+            delete leads[leadIndex].reachOut.completedAt;
+            delete leads[leadIndex].reachOut.reachOutCompletedAt;
+
+            // Reset call data
+            leads[leadIndex].reachOut.callsConnected = Math.max(0, (leads[leadIndex].reachOut.callsConnected || 1) - 1);
+            leads[leadIndex].reachOut.callAttempts = Math.max(0, (leads[leadIndex].reachOut.callAttempts || 1) - 1);
+
+            // Remove the latest call log entry if it exists
+            if (leads[leadIndex].reachOut.callLogs && leads[leadIndex].reachOut.callLogs.length > 0) {
+                leads[leadIndex].reachOut.callLogs.pop();
+            }
+
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            console.log('✅ Reach-out state reset to TO DO');
+        }
+
+        // Uncheck the call checkbox in the profile
+        const callCheckbox = document.getElementById(`call-made-${leadId}`);
+        if (callCheckbox) {
+            callCheckbox.checked = false;
+            console.log('✅ Call checkbox unchecked');
+        }
+
+        // Force refresh the profile to show updated reach-out state
+        setTimeout(() => {
+            const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const updatedLead = updatedLeads.find(l => String(l.id) === String(leadId));
+            if (updatedLead && window.createEnhancedProfile) {
+                console.log('🔄 Force refreshing profile after reset...');
+                window.createEnhancedProfile(updatedLead);
+            }
+        }, 100);
+
+        // Close popup and show email confirmation
+        document.querySelector('.call-scheduled-modal').remove();
+        showEmailConfirmationPopup(leadId);
+    }
+};
+
+// Confirm call scheduled with date and time
+window.confirmCallScheduled = function(leadId) {
+    const dateInput = document.getElementById(`call-date-${leadId}`);
+    const timeInput = document.getElementById(`call-time-${leadId}`);
+    const selectedDate = dateInput ? dateInput.value : null;
+    const selectedTime = timeInput ? timeInput.value : null;
+
+    if (!selectedDate) {
+        alert('Please select a date for the scheduled call.');
+        return;
+    }
+
+    if (!selectedTime) {
+        alert('Please select a time for the scheduled call.');
+        return;
+    }
+
+    console.log(`📅 Call scheduled for ${selectedDate} at ${selectedTime} for lead ${leadId}`);
+
+    // Calculate days until the scheduled date for green highlighting
+    const scheduledDate = new Date(selectedDate);
+    const today = new Date();
+    const daysDiff = Math.ceil((scheduledDate - today) / (1000 * 60 * 60 * 24));
+
+    // Set green highlight until the scheduled date
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {};
+        }
+
+        // Initialize reachOut with proper structure (matching email confirmation)
+        if (!leads[leadIndex].reachOut.emailCount) leads[leadIndex].reachOut.emailCount = 0;
+        if (!leads[leadIndex].reachOut.textCount) leads[leadIndex].reachOut.textCount = 0;
+        if (!leads[leadIndex].reachOut.callAttempts) leads[leadIndex].reachOut.callAttempts = 0;
+        if (!leads[leadIndex].reachOut.callsConnected) leads[leadIndex].reachOut.callsConnected = 0;
+        if (!leads[leadIndex].reachOut.voicemailCount) leads[leadIndex].reachOut.voicemailCount = 0;
+        if (!leads[leadIndex].reachOut.callLogs) leads[leadIndex].reachOut.callLogs = [];
+
+        // Add 1 connected call (since call was scheduled)
+        leads[leadIndex].reachOut.callsConnected = leads[leadIndex].reachOut.callsConnected + 1;
+        leads[leadIndex].reachOut.callAttempts = leads[leadIndex].reachOut.callAttempts + 1;
+
+        // Add call log entry with time
+        const callLog = {
+            timestamp: new Date().toISOString(),
+            connected: true,
+            duration: '5 min',
+            leftVoicemail: false,
+            notes: `Call scheduled for ${selectedDate} at ${selectedTime} - Lead agreed to scheduled call`
+        };
+        leads[leadIndex].reachOut.callLogs.push(callLog);
+
+        // Mark reach-out as COMPLETE (matching email confirmation)
+        leads[leadIndex].reachOut.completedAt = new Date().toISOString();
+        leads[leadIndex].reachOut.called = true;
+
+        // Set green highlight until scheduled call time (Eastern Time)
+        // Simple approach: treat the input as if it's in the user's current timezone
+        // Since you're in Eastern Time, this should work correctly
+        const [hours, minutes] = selectedTime.split(':');
+        const highlightUntil = new Date(selectedDate + 'T' + selectedTime + ':00');
+
+        console.log(`🕐 TIMEZONE DEBUG: Selected time: ${selectedDate} ${selectedTime}`);
+        console.log(`🕐 TIMEZONE DEBUG: Parsed highlightUntil: ${highlightUntil.toISOString()}`);
+        console.log(`🕐 TIMEZONE DEBUG: Local time string: ${highlightUntil.toString()}`);
+
+        leads[leadIndex].reachOut.greenHighlightUntil = highlightUntil.toISOString();
+        leads[leadIndex].reachOut.greenHighlightDays = daysDiff;
+        leads[leadIndex].reachOut.callScheduled = true;
+        leads[leadIndex].reachOut.scheduledCallDate = selectedDate;
+        leads[leadIndex].reachOut.scheduledCallTime = selectedTime;
+        leads[leadIndex].reachOut.scheduledCallDateTime = `${selectedDate} ${selectedTime}`;
+        leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
+
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // CRITICAL: Save to server for persistence (matching email confirmation approach)
+        const updateData = {
+            reachOut: leads[leadIndex].reachOut
+        };
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Call scheduled reach-out data saved to server successfully');
+
+                // Force immediate profile refresh after server save
+                setTimeout(() => {
+                    console.log('🔄 FORCE REFRESH after server save...');
+                    const finalLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                    const finalLead = finalLeads.find(l => String(l.id) === String(leadId));
+                    if (finalLead && window.createEnhancedProfile) {
+                        console.log('📊 Final lead reach-out data:', finalLead.reachOut);
+                        window.createEnhancedProfile(finalLead);
+                    }
+                }, 200);
+            } else {
+                console.error('❌ Server reach-out update failed:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Server reach-out update error:', error);
+        });
+
+        console.log(`✅ Call scheduled: connected=${leads[leadIndex].reachOut.callsConnected}`);
+        console.log(`✅ Call scheduled for ${selectedDate} at ${selectedTime}`);
+        console.log(`✅ Green highlight set until ${selectedDate} (${daysDiff} days) for scheduled call`);
+        console.log(`✅ Reach-out marked as COMPLETE with timestamp: ${leads[leadIndex].reachOut.completedAt}`);
+    }
+
+    // Close popup (skip email confirmation since call is scheduled)
+    document.querySelector('.call-scheduled-modal').remove();
+
+    // Refresh the table to show green highlighting
+    if (window.displayLeads) {
+        setTimeout(() => window.displayLeads(), 100);
+    }
+
+    // Refresh the lead profile if it's open to update reach-out section
+    console.log('🔄 Checking for open profile to refresh...');
+    const currentProfile = document.querySelector('.lead-profile-modal');
+    if (currentProfile && currentProfile.style.display !== 'none') {
+        const profileLeadId = currentProfile.getAttribute('data-lead-id');
+        console.log(`🔍 Found profile for lead ${profileLeadId}, target lead ${leadId}`);
+        if (String(profileLeadId) === String(leadId)) {
+            console.log('✅ Profile matches target lead, refreshing...');
+            setTimeout(() => {
+                if (window.showLeadProfile) {
+                    console.log('🔄 Calling showLeadProfile to refresh...');
+                    window.showLeadProfile(leadId);
+                } else {
+                    console.log('❌ showLeadProfile not available');
+                }
+            }, 300);
+        }
+    } else {
+        console.log('❌ No profile modal found or not visible');
+    }
+
+    // ALSO try alternative refresh method
+    setTimeout(() => {
+        const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const updatedLead = updatedLeads.find(l => String(l.id) === String(leadId));
+        if (updatedLead) {
+            console.log('🔄 FORCE REFRESH: Creating new profile with updated data...');
+            console.log(`📊 Updated lead reach-out data:`, updatedLead.reachOut);
+            if (window.createEnhancedProfile) {
+                window.createEnhancedProfile(updatedLead);
+            }
+        }
+    }, 500);
+};
+
 // Function to show email confirmation popup
 window.showEmailConfirmationPopup = function(leadId) {
     console.log(`📧 Showing email confirmation popup for lead: ${leadId}`);
@@ -3621,6 +3967,8 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
         // Add 1 connected call (regardless of YES/NO)
         const currentConnected = leads[leadIndex].reachOut.callsConnected || 0;
         leads[leadIndex].reachOut.callsConnected = currentConnected + 1;
+        const currentAttempts = leads[leadIndex].reachOut.callAttempts || 0;
+        leads[leadIndex].reachOut.callAttempts = currentAttempts + 1;
 
         // Add call log entry
         const callLog = {
@@ -4175,9 +4523,21 @@ function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
         leads[leadIndex].stage = stage;
         leads[leadIndex].stageUpdatedAt = now;
 
-        // Reset reach-out data when stage changes (unless Contact Attempted was completed)
-        if (!contactAttemptedCompleted) {
-            console.log('🔄 Stage changed - resetting reach-out data for lead:', leadId);
+        // Reset reach-out data when stage changes
+        const hasExistingCompletion = leads[leadIndex].reachOut &&
+            (leads[leadIndex].reachOut.completedAt || leads[leadIndex].reachOut.reachOutCompletedAt) &&
+            (leads[leadIndex].reachOut.callsConnected > 0 || leads[leadIndex].reachOut.callAttempts > 0);
+
+        // ALWAYS reset reach-out for stages that require fresh reach-out attempts
+        const stagesRequiringFreshReachOut = ['info_requested', 'loss_runs_requested', 'quoted'];
+        const shouldForceReset = stagesRequiringFreshReachOut.includes(stage);
+
+        if (!contactAttemptedCompleted && (!hasExistingCompletion || shouldForceReset)) {
+            if (shouldForceReset) {
+                console.log(`🔄 Stage changed to ${stage} - FORCE resetting reach-out data for lead:`, leadId);
+            } else {
+                console.log('🔄 Stage changed - resetting reach-out data for lead:', leadId);
+            }
             if (leads[leadIndex].reachOut) {
                 // Reset all reach-out completion data
                 leads[leadIndex].reachOut.completedAt = null;
@@ -4193,14 +4553,18 @@ function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
                 console.log('✅ Reach-out data reset for lead:', leadId);
             }
         } else {
-            console.log('⏭️ Skipping reach-out reset - Contact Attempted was completed');
+            if (contactAttemptedCompleted) {
+                console.log('⏭️ Skipping reach-out reset - Contact Attempted was completed');
+            } else {
+                console.log('⏭️ Skipping reach-out reset - Existing reach-out completion preserved');
+            }
         }
 
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
 
-        // Check if email confirmation popup should be shown
+        // Check if call scheduled popup should be shown first
         if (stage === 'info_requested' || stage === 'loss_runs_requested') {
-            showEmailConfirmationPopup(leadId);
+            showCallScheduledPopup(leadId);
         }
 
         // Save stage change to server (including reset reach-out data)
@@ -7027,7 +7391,8 @@ window.getReachOutStatus = function(lead) {
     console.log(`🔍 REACH OUT CHECK: ❗ Stage "${lead.stage}" REQUIRES reach out`);
 
     // Check if reach out is completed - MUST verify actual completion actions
-    const hasActuallyCompleted = (reachOut.callsConnected > 0) || (reachOut.textCount > 0);
+    // NEW LOGIC: Consider any call attempt as completion (not just connected calls)
+    const hasActuallyCompleted = (reachOut.callAttempts > 0);
 
     if ((reachOut.completedAt || reachOut.reachOutCompletedAt) && hasActuallyCompleted) {
         // Check if reach out has EXPIRED based on green highlight duration - UPDATED LOGIC
@@ -7095,12 +7460,9 @@ window.getReachOutStatus = function(lead) {
     }
 
     // Not completed (either no completion timestamp or no actual completion) - show what's needed
-    if (reachOut.textCount > 0) {
+    // NEW LOGIC: Mark as complete if any call attempt was made (regardless of pickup)
+    if (reachOut.callAttempts > 0) {
         return '<span style="color: #10b981;">REACH OUT COMPLETE</span>';
-    } else if (reachOut.emailCount > 0) {
-        return '<span style="color: #dc2626;">TO DO - Text Lead</span>';
-    } else if (reachOut.callAttempts > 0) {
-        return '<span style="color: #dc2626;">TO DO - Email Lead</span>';
     } else {
         return '<span style="color: #dc2626;">TO DO - Call Lead</span>';
     }
@@ -7263,6 +7625,248 @@ window.forceCleanup = function() {
 
 console.log('✅ DOM and network cleanup systems initialized');
 console.log('💡 Tip: If requests are stuck, type forceCleanup() in console');
+
+// Automatic response rate calculation based on call attempts to connected ratio
+protectedFunctions.calculateAndUpdateResponseRate = function(leadId) {
+    console.log('🎯 calculateAndUpdateResponseRate called for leadId:', leadId);
+
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex === -1) {
+        console.log('❌ Lead not found for response rate calculation:', leadId);
+        return;
+    }
+
+    const lead = leads[leadIndex];
+    const reachOut = lead.reachOut || {};
+    const attempts = parseInt(reachOut.callAttempts) || 0;
+    const connected = parseInt(reachOut.callsConnected) || 0;
+
+    console.log(`📊 Response rate calculation: ${attempts} attempts, ${connected} connected`);
+
+    // Only calculate if there have been call attempts
+    if (attempts === 0) {
+        console.log('ℹ️ No call attempts yet, keeping current priority');
+        return;
+    }
+
+    // Calculate ratio (attempts per connection)
+    let ratio = connected > 0 ? attempts / connected : attempts;
+    let newPriority = lead.priority || 'Mid'; // Keep existing if no change needed
+    let shouldClose = false;
+
+    console.log(`📈 Calculated ratio: ${ratio} (${attempts}:${connected})`);
+
+    // Determine new response rate based on ratio
+    if (connected > 0 && ratio <= 2) {
+        // 2 or fewer attempts per connection = High response rate
+        newPriority = 'High';
+        console.log('✅ High response rate: ≤2 attempts per connection');
+    } else if (connected > 0 && ratio <= 3) {
+        // 3 attempts per connection = Mid response rate
+        newPriority = 'Mid';
+        console.log('⚡ Mid response rate: 3 attempts per connection');
+    } else if (connected > 0 && ratio <= 4) {
+        // 4 attempts per connection = Lower response rate
+        newPriority = 'Lower';
+        console.log('⚠️ Lower response rate: 4 attempts per connection');
+    } else if (connected > 0 && ratio <= 5) {
+        // 5 attempts per connection = Low response rate
+        newPriority = 'Low';
+        console.log('🔴 Low response rate: 5 attempts per connection');
+    } else if (connected > 0 && ratio >= 6) {
+        // 6+ attempts per connection = Very low response rate - should close
+        newPriority = 'Low';
+        shouldClose = true;
+        console.log('🚨 VERY LOW response rate: ≥6:1 ratio - suggesting closure');
+    } else if (attempts >= 6 && connected === 0) {
+        // 6+ attempts with no connections = Very low pickup rate
+        newPriority = 'Low';
+        shouldClose = true;
+        console.log('🚨 VERY LOW pickup rate: 6+ attempts with no connections');
+    }
+
+    // Update priority if it changed
+    if (newPriority !== lead.priority) {
+        console.log(`🔄 AUTO-CALCULATION: Updating priority from "${lead.priority}" to "${newPriority}"`);
+
+        // Use the SAME pathway as manual selection by calling updateLeadPriority
+        if (window.updateLeadPriority) {
+            console.log(`🎯 AUTO-CALCULATION: Using updateLeadPriority function`);
+            window.updateLeadPriority(leadId, newPriority);
+        } else {
+            console.log(`⚠️ AUTO-CALCULATION: updateLeadPriority not found, using fallback`);
+
+            // Fallback to direct save if updateLeadPriority isn't available
+            leads[leadIndex].priority = newPriority;
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+            // Update the dropdown in the modal if it exists
+            const prioritySelect = document.querySelector(`select[onchange*="updateLeadPriority('${leadId}"]`);
+            if (prioritySelect) {
+                prioritySelect.value = newPriority;
+                console.log('✅ Updated priority dropdown in modal');
+            }
+        }
+    }
+
+    // Handle very low pickup rate case
+    if (shouldClose) {
+        console.log('🚨 Showing close lead popup due to very low pickup rate');
+        protectedFunctions.showLowPickupRatePopup(leadId, attempts);
+    }
+};
+
+// Popup for very low pickup rate (6+ attempts with no connections)
+protectedFunctions.showLowPickupRatePopup = function(leadId, attempts) {
+    console.log('🚨 SHOWING LOW RESPONSE RATE POPUP - z-index: 99999999');
+
+    // Create backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = 'low-response-rate-popup-backdrop';
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 99999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.3s ease-out;
+    `;
+
+    // Add animation styles
+    if (!document.getElementById('popup-animation-styles')) {
+        const style = document.createElement('style');
+        style.id = 'popup-animation-styles';
+        style.innerHTML = `
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes popIn {
+                from { opacity: 0; transform: scale(0.8); }
+                to { opacity: 1; transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Create popup
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        max-width: 450px;
+        width: 90%;
+        text-align: center;
+        position: relative;
+        z-index: 999999999;
+        animation: popIn 0.4s ease-out;
+        border: 2px solid #dc2626;
+    `;
+
+    popup.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="color: #ef4444; font-size: 48px; margin-bottom: 15px;">⚠️</div>
+            <h3 style="color: #dc2626; margin: 0 0 15px 0;">Low Response Rate</h3>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; font-weight: 600;">
+                Lead's response rate is very low. Move to closed?
+            </p>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button id="close-lead-yes" style="background: #dc2626; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 16px;">
+                Yes
+            </button>
+            <button id="close-lead-no" style="background: #6b7280; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 16px;">
+                No
+            </button>
+        </div>
+    `;
+
+    backdrop.appendChild(popup);
+    document.body.appendChild(backdrop);
+
+    console.log('✅ LOW RESPONSE RATE POPUP ADDED TO DOM');
+    console.log('🔍 Popup element:', backdrop);
+    console.log('🔍 Popup z-index:', backdrop.style.zIndex);
+
+    // Handle button clicks
+    document.getElementById('close-lead-yes').onclick = function() {
+        console.log('🔒 User chose to close lead due to low response rate');
+
+        // Use the same save pathway as manual stage updates
+        if (window.updateLeadStage) {
+            console.log('🎯 AUTO-CLOSE: Using updateLeadStage function');
+            window.updateLeadStage(leadId, 'closed');
+        } else {
+            console.log('⚠️ AUTO-CLOSE: updateLeadStage not found, using fallback');
+
+            // Fallback to direct save
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+            if (leadIndex !== -1) {
+                leads[leadIndex].stage = 'closed';
+                leads[leadIndex].closedReason = 'Very low response rate - automatic closure';
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                console.log('✅ Lead closed due to low response rate');
+
+                // Update stage dropdown in modal if open
+                const stageSelect = document.querySelector(`select[onchange*="updateLeadStage('${leadId}"]`);
+                if (stageSelect) {
+                    stageSelect.value = 'closed';
+                }
+
+                // Refresh table
+                if (window.displayLeads) {
+                    setTimeout(() => window.displayLeads(), 100);
+                }
+            }
+        }
+
+        // Close the lead profile modal if open
+        const profileModal = document.querySelector('.lead-profile-modal');
+        if (profileModal) {
+            profileModal.remove();
+        }
+
+        backdrop.remove();
+    };
+
+    document.getElementById('close-lead-no').onclick = function() {
+        console.log('ℹ️ User chose to keep lead open despite low pickup rate');
+        backdrop.remove();
+    };
+
+    // Close on backdrop click
+    backdrop.onclick = function(e) {
+        if (e.target === backdrop) {
+            backdrop.remove();
+        }
+    };
+};
+
+// Function to update name field color based on content
+window.updateNameFieldColor = function(inputElement) {
+    const value = inputElement.value.trim();
+
+    if (value) {
+        // Has content - normal styling
+        inputElement.style.border = '1px solid #d1d5db';
+        inputElement.style.backgroundColor = 'white';
+    } else {
+        // Empty - red tinting
+        inputElement.style.border = '1px solid #ef4444';
+        inputElement.style.backgroundColor = '#fef2f2';
+    }
+};
 
 // Set up periodic monitoring to detect and prevent function override
 setInterval(() => {

@@ -4470,11 +4470,71 @@ function generateSimpleLeadRowsWithDividers(leads) {
     });
 
     // Generate divider row function
-    function createDividerRow(title, count, color) {
+    function createDividerRow(title, count, color, leadsGroup = []) {
+        // Count green and blue text leads (excluding red and orange)
+        let greenBlueCount = 0;
+        if (leadsGroup && leadsGroup.length > 0) {
+            console.log(`🔍 ANALYZING ${title}: ${leadsGroup.length} total leads`);
+
+            let highCount = 0;
+            let midCount = 0;
+            let lowerCount = 0;
+            let lowCount = 0;
+            let undefinedCount = 0;
+
+            greenBlueCount = leadsGroup.filter(lead => {
+                const priority = lead.priority || 'Mid';
+                console.log(`🎯 ${title} - LEAD: ${lead.name} - Priority: "${priority}" (type: ${typeof priority})`);
+
+                // Count by priority type for debugging
+                if (priority === 'High') highCount++;
+                else if (priority === 'Mid') midCount++;
+                else if (priority === 'Lower') lowerCount++;
+                else if (priority === 'Low') lowCount++;
+                else if (!priority) undefinedCount++;
+
+                // Count ONLY High (green) and Mid/default (blue) priorities
+                // Exclude Low (red) and Lower (orange)
+                const isGreenOrBlue = priority === 'High' || priority === 'Mid' || !priority;
+                if (isGreenOrBlue) {
+                    console.log(`✅ ${title} - COUNTED: ${lead.name} (${priority})`);
+                } else {
+                    console.log(`❌ ${title} - NOT COUNTED: ${lead.name} (${priority})`);
+                }
+                return isGreenOrBlue;
+            }).length;
+
+            console.log(`📊 ${title} PRIORITY BREAKDOWN:`);
+            console.log(`   High (green): ${highCount}`);
+            console.log(`   Mid (blue): ${midCount}`);
+            console.log(`   Lower (orange): ${lowerCount}`);
+            console.log(`   Low (red): ${lowCount}`);
+            console.log(`   Undefined: ${undefinedCount}`);
+            console.log(`   GREEN + BLUE TOTAL: ${greenBlueCount}`);
+        }
+
+        // Format the header with X/20 pattern (always out of 20) with color coding
+        let greenBlueDisplay = '';
+        if (greenBlueCount > 0) {
+            // Determine color based on progress toward 20
+            let progressColor = '#ef4444'; // Red (default for 0-5)
+
+            if (greenBlueCount >= 16) {
+                progressColor = '#10b981'; // Green (16-20)
+            } else if (greenBlueCount >= 11) {
+                progressColor = '#eab308'; // Yellow (11-15)
+            } else if (greenBlueCount >= 6) {
+                progressColor = '#f97316'; // Orange (6-10)
+            }
+            // Stays red for 0-5
+
+            greenBlueDisplay = ` <span style="color: ${progressColor}; font-weight: bold;">${greenBlueCount}/20</span>`;
+        }
+
         return `
             <tr class="lead-divider" style="background: #374151 !important; border: none;">
                 <td colspan="12" style="padding: 12px 20px; font-weight: bold; color: #9ca3af; font-size: 16px; text-align: center; text-transform: uppercase; letter-spacing: 1px; text-shadow: none;">
-                    ${title} (${count} ${count === 1 ? 'lead' : 'leads'})
+                    ${title}${greenBlueDisplay} (${count} ${count === 1 ? 'lead' : 'leads'})
                 </td>
             </tr>
         `;
@@ -4502,20 +4562,20 @@ function generateSimpleLeadRowsWithDividers(leads) {
     // Add user groups in the sorted order (high value leads are automatically at top of each group)
     sortedUserGroups.forEach(userGroup => {
         if (userGroup.group.length > 0) {
-            rows.push(createDividerRow(userGroup.name, userGroup.group.length, "#6b7280"));
+            rows.push(createDividerRow(userGroup.name, userGroup.group.length, "#6b7280", userGroup.group));
             rows.push(generateSimpleLeadRows(userGroup.group));
         }
     });
 
     // Add Unassigned leads
     if (groups.unassigned.length > 0) {
-        rows.push(createDividerRow("Unassigned Leads", groups.unassigned.length, "#6b7280"));
+        rows.push(createDividerRow("Unassigned Leads", groups.unassigned.length, "#6b7280", groups.unassigned));
         rows.push(generateSimpleLeadRows(groups.unassigned));
     }
 
     // Add Closed leads at the bottom
     if (groups.closed.length > 0) {
-        rows.push(createDividerRow("Closed Leads", groups.closed.length, "#6b7280"));
+        rows.push(createDividerRow("Closed Leads", groups.closed.length, "#6b7280", groups.closed));
         rows.push(generateSimpleLeadRows(groups.closed));
     }
 
@@ -4525,6 +4585,88 @@ function generateSimpleLeadRowsWithDividers(leads) {
 // Make generateSimpleLeadRows globally accessible so other scripts use the updated version
 window.generateSimpleLeadRows = generateSimpleLeadRows;
 window.generateSimpleLeadRowsWithDividers = generateSimpleLeadRowsWithDividers;
+
+// Generate Leads Report for Grant, Hunter, and Carson
+window.generateLeadsReport = function() {
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    console.log('🔍 GENERATING LEADS REPORT FOR GRANT, HUNTER, AND CARSON');
+    console.log('===============================================================');
+
+    // Group leads by agent
+    const agents = {
+        Grant: leads.filter(lead => lead.assignedTo === 'Grant'),
+        Hunter: leads.filter(lead => lead.assignedTo === 'Hunter'),
+        Carson: leads.filter(lead => lead.assignedTo === 'Carson')
+    };
+
+    Object.keys(agents).forEach(agentName => {
+        const agentLeads = agents[agentName];
+
+        console.log(`\n📊 ${agentName.toUpperCase()} LEADS REPORT:`);
+        console.log('─'.repeat(40));
+
+        // Total leads
+        console.log(`📈 Total Leads: ${agentLeads.length}`);
+
+        // High value golden leads (60+ minutes call time)
+        const highValueLeads = agentLeads.filter(lead => {
+            if (!lead.reachOut) return false;
+            const totalMinutes = (lead.reachOut.callsConnected || 0);
+            return totalMinutes >= 60;
+        });
+        console.log(`🏆 High Value Golden Leads: ${highValueLeads.length}`);
+
+        // Average call time
+        const totalCallTime = agentLeads.reduce((sum, lead) => {
+            return sum + (lead.reachOut?.callsConnected || 0);
+        }, 0);
+        const avgCallTime = agentLeads.length > 0 ? (totalCallTime / agentLeads.length).toFixed(1) : 0;
+        console.log(`⏱️  Average Call Time: ${avgCallTime} minutes`);
+
+        // Average calls made (connected)
+        const totalCallsMade = agentLeads.reduce((sum, lead) => {
+            return sum + (lead.reachOut?.callsConnected || 0);
+        }, 0);
+        const avgCallsMade = agentLeads.length > 0 ? (totalCallsMade / agentLeads.length).toFixed(1) : 0;
+        console.log(`📞 Average Calls Made: ${avgCallsMade}`);
+
+        // Average call attempts
+        const totalCallAttempts = agentLeads.reduce((sum, lead) => {
+            return sum + (lead.reachOut?.callAttempts || 0);
+        }, 0);
+        const avgCallAttempts = agentLeads.length > 0 ? (totalCallAttempts / agentLeads.length).toFixed(1) : 0;
+        console.log(`🎯 Average Call Attempts: ${avgCallAttempts}`);
+
+        // Leads with "app_sent" stage
+        const appSentLeads = agentLeads.filter(lead =>
+            lead.stage === 'app_sent' || lead.stage === 'App Sent'
+        );
+        console.log(`📝 Leads with App Sent Stage: ${appSentLeads.length}`);
+
+        // Additional detailed breakdown
+        if (agentLeads.length > 0) {
+            console.log(`\n📋 DETAILED BREAKDOWN:`);
+            console.log(`   • Total Call Time: ${totalCallTime} minutes`);
+            console.log(`   • Total Call Attempts: ${totalCallAttempts}`);
+            console.log(`   • Success Rate: ${totalCallAttempts > 0 ? ((totalCallsMade / totalCallAttempts) * 100).toFixed(1) : 0}%`);
+
+            // Stage breakdown
+            const stages = {};
+            agentLeads.forEach(lead => {
+                const stage = lead.stage || 'unknown';
+                stages[stage] = (stages[stage] || 0) + 1;
+            });
+            console.log(`   • Stage Breakdown:`);
+            Object.keys(stages).forEach(stage => {
+                console.log(`     - ${stage}: ${stages[stage]}`);
+            });
+        }
+    });
+
+    console.log('\n🏁 REPORT COMPLETE');
+    console.log('===============================================================');
+};
 
 // Leads Management Functions
 async function loadLeadsView() {
@@ -5788,6 +5930,7 @@ async function saveNewLead(event) {
         product: insuranceType, // Add product field for compatibility
         assignedTo,
         premium,
+        priority: 'Mid', // Set default priority to Mid (blue text)
         stage,
         address,
         notes,

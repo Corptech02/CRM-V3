@@ -838,6 +838,10 @@ function handleCallOutcome(leadId, answered) {
             console.log(`🐛 DEBUG handleCallOutcome - calling updateReachOutStatus`);
             updateReachOutStatus(leadId);
 
+            // Calculate and update response rate based on new call data
+            console.log(`🎯 DEBUG handleCallOutcome - calculating response rate`);
+            calculateAndUpdateResponseRate(leadId);
+
             // Refresh leads table to update TO DO column
             if (window.loadLeadsView) {
                 setTimeout(() => window.loadLeadsView(), 100);
@@ -1251,6 +1255,190 @@ window.updateWinLossStatus = function(leadId, winLoss) {
 window.updateLeadAssignedTo = function(leadId, assignedTo) {
     updateLeadField(leadId, 'assignedTo', assignedTo);
 };
+
+// Automatic response rate calculation based on call attempts to connected ratio
+function calculateAndUpdateResponseRate(leadId) {
+    console.log('🎯 calculateAndUpdateResponseRate called for leadId:', leadId);
+
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex === -1) {
+        console.log('❌ Lead not found for response rate calculation:', leadId);
+        return;
+    }
+
+    const lead = leads[leadIndex];
+    const reachOut = lead.reachOut || {};
+    const attempts = parseInt(reachOut.callAttempts) || 0;
+    const connected = parseInt(reachOut.callsConnected) || 0;
+
+    console.log(`📊 Response rate calculation: ${attempts} attempts, ${connected} connected`);
+
+    // Only calculate if there have been call attempts
+    if (attempts === 0) {
+        console.log('ℹ️ No call attempts yet, keeping current priority');
+        return;
+    }
+
+    // Calculate ratio (attempts per connection)
+    let ratio = connected > 0 ? attempts / connected : attempts;
+    let newPriority = lead.priority || 'Mid'; // Keep existing if no change needed
+    let shouldClose = false;
+
+    console.log(`📈 Calculated ratio: ${ratio} (${attempts}:${connected})`);
+
+    // Determine new response rate based on ratio
+    if (connected > 0 && ratio <= 2) {
+        // 2 or fewer attempts per connection = High response rate
+        newPriority = 'High';
+        console.log('✅ High response rate: ≤2 attempts per connection');
+    } else if (connected > 0 && ratio <= 3) {
+        // 3 attempts per connection = Mid response rate
+        newPriority = 'Mid';
+        console.log('⚡ Mid response rate: 3 attempts per connection');
+    } else if (connected > 0 && ratio <= 4) {
+        // 4 attempts per connection = Lower response rate
+        newPriority = 'Lower';
+        console.log('⚠️ Lower response rate: 4 attempts per connection');
+    } else if (connected > 0 && ratio <= 5) {
+        // 5 attempts per connection = Low response rate
+        newPriority = 'Low';
+        console.log('🔴 Low response rate: 5 attempts per connection');
+    } else if (attempts >= 6 && connected === 0) {
+        // 6+ attempts with no connections = Very low pickup rate
+        newPriority = 'Low';
+        shouldClose = true;
+        console.log('🚨 VERY LOW pickup rate: 6+ attempts with no connections');
+    }
+
+    // Update priority if it changed
+    if (newPriority !== lead.priority) {
+        console.log(`🔄 Updating priority from "${lead.priority}" to "${newPriority}"`);
+        leads[leadIndex].priority = newPriority;
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Update the dropdown in the modal if it exists
+        const prioritySelect = document.querySelector(`select[onchange*="updateLeadPriority('${leadId}"]`);
+        if (prioritySelect) {
+            prioritySelect.value = newPriority;
+            console.log('✅ Updated priority dropdown in modal');
+        }
+
+        // Update the table display
+        if (window.displayLeads) {
+            setTimeout(() => window.displayLeads(), 100);
+        }
+    }
+
+    // Handle very low pickup rate case
+    if (shouldClose) {
+        console.log('🚨 Showing close lead popup due to very low pickup rate');
+        showLowPickupRatePopup(leadId, attempts);
+    }
+}
+
+// Popup for very low pickup rate (6+ attempts with no connections)
+function showLowPickupRatePopup(leadId, attempts) {
+    // Create backdrop
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+
+    // Create popup
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+    `;
+
+    popup.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="color: #ef4444; font-size: 48px; margin-bottom: 15px;">⚠️</div>
+            <h3 style="color: #dc2626; margin: 0 0 15px 0;">Very Low Pickup Rate</h3>
+            <p style="color: #374151; margin: 0 0 20px 0;">
+                This lead has a very low pickup rate with <strong>${attempts} attempts</strong> and <strong>no connections</strong>.
+            </p>
+            <p style="color: #6b7280; margin: 0;">
+                Would you like to close this lead?
+            </p>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button id="close-lead-yes" style="background: #dc2626; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                Yes, Close Lead
+            </button>
+            <button id="close-lead-no" style="background: #6b7280; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                No, Keep Open
+            </button>
+        </div>
+    `;
+
+    backdrop.appendChild(popup);
+    document.body.appendChild(backdrop);
+
+    // Handle button clicks
+    document.getElementById('close-lead-yes').onclick = function() {
+        console.log('🔒 User chose to close lead due to low pickup rate');
+
+        // Update lead stage to closed
+        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+        if (leadIndex !== -1) {
+            leads[leadIndex].stage = 'closed';
+            leads[leadIndex].closedReason = 'Very low pickup rate - no response after multiple attempts';
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+            console.log('✅ Lead closed due to low pickup rate');
+
+            // Update stage dropdown in modal if open
+            const stageSelect = document.querySelector(`select[onchange*="updateLeadStage('${leadId}"]`);
+            if (stageSelect) {
+                stageSelect.value = 'closed';
+            }
+
+            // Refresh table
+            if (window.displayLeads) {
+                setTimeout(() => window.displayLeads(), 100);
+            }
+
+            // Close the lead profile modal if open
+            const profileModal = document.querySelector('.lead-profile-modal');
+            if (profileModal) {
+                profileModal.remove();
+            }
+        }
+
+        backdrop.remove();
+    };
+
+    document.getElementById('close-lead-no').onclick = function() {
+        console.log('ℹ️ User chose to keep lead open despite low pickup rate');
+        backdrop.remove();
+    };
+
+    // Close on backdrop click
+    backdrop.onclick = function(e) {
+        if (e.target === backdrop) {
+            backdrop.remove();
+        }
+    };
+}
 
 window.updateLeadPriority = function(leadId, priority) {
     console.log('Updating lead priority:', leadId, 'to', priority);
