@@ -3965,6 +3965,7 @@ window.showEmailConfirmationPopup = function(leadId) {
 // Function to handle email confirmation response
 window.handleEmailConfirmation = function(leadId, confirmed) {
     console.log(`📧 Email confirmation for lead ${leadId}: ${confirmed ? 'YES' : 'NO'}`);
+    console.log(`📧 NOTE: Email confirmation will NOT create fake call logs - only tracks email response`);
 
     const days = confirmed ? 7 : 2;
     const expiryDate = new Date();
@@ -3992,26 +3993,27 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
             leads[leadIndex].reachOut.callLogs = [];
         }
 
-        // Add 1 connected call (regardless of YES/NO)
-        const currentConnected = leads[leadIndex].reachOut.callsConnected || 0;
-        leads[leadIndex].reachOut.callsConnected = currentConnected + 1;
-        const currentAttempts = leads[leadIndex].reachOut.callAttempts || 0;
-        leads[leadIndex].reachOut.callAttempts = currentAttempts + 1;
+        // Track email confirmation without creating fake call logs
+        if (!leads[leadIndex].reachOut.emailConfirmations) {
+            leads[leadIndex].reachOut.emailConfirmations = [];
+        }
 
-        // Add call log entry
-        const callLog = {
+        // Add email confirmation entry (not a call log)
+        const emailConfirmation = {
             timestamp: new Date().toISOString(),
-            connected: true,
-            duration: '5 min',
-            leftVoicemail: false,
-            notes: `Email confirmation call - ${confirmed ? 'Lead confirmed receiving email' : 'Lead did not confirm email'}`
+            confirmed: confirmed,
+            notes: `Email confirmation - ${confirmed ? 'Lead confirmed receiving email' : 'Lead did not confirm email'}`
         };
-        leads[leadIndex].reachOut.callLogs.push(callLog);
+        leads[leadIndex].reachOut.emailConfirmations.push(emailConfirmation);
 
-        // Mark reach-out as COMPLETE
+        // Update email count (actual emails sent)
+        const currentEmailCount = leads[leadIndex].reachOut.emailCount || 0;
+        leads[leadIndex].reachOut.emailCount = currentEmailCount + 1;
+
+        // Mark reach-out as COMPLETE (due to email confirmation)
         leads[leadIndex].reachOut.completedAt = new Date().toISOString();
         leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
-        leads[leadIndex].reachOut.called = true;
+        leads[leadIndex].reachOut.emailConfirmed = true; // More accurate than 'called'
 
         // Set green highlight (using existing format)
         if (!leads[leadIndex].reachOut) {
