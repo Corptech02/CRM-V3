@@ -22585,6 +22585,12 @@ function getNextAction(stage, lead) {
     console.log(`🔍 GET NEXT ACTION: Lead ${lead.id} - ${lead.name}, stage: ${stage}`);
     console.log(`🔍 GET NEXT ACTION: Lead data:`, lead);
 
+    // SPECIAL CASE: App sent stage never shows TODO text (always green highlighted)
+    if (stage === 'app_sent' || stage === 'app sent' || stage === 'App Sent') {
+        console.log(`✅ Lead ${lead?.id}: App sent stage - no TODO text (indefinite green)`);
+        return '';
+    }
+
     // Check if reach out is complete
     if (lead && lead.reachOut) {
         // Create a copy to avoid modifying the original lead data
