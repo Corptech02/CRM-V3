@@ -2312,6 +2312,11 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
 
                     // Mark as not completed
                     isCompleted = false;
+                }
+                // ENHANCEMENT: Check if highlight has expired (from auto-expiration cleanup)
+                else if (lead.reachOut.highlightExpired) {
+                    console.log(`🔴 PROFILE DISPLAY - GREEN HIGHLIGHT EXPIRED: Lead ${leadId} - ${lead.name}, expired at ${lead.reachOut.expiredAt}`);
+                    isCompleted = false;
                 } else if ((lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) && hasActuallyCompleted) {
                     const completedTime = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
 
@@ -2785,13 +2790,36 @@ protectedFunctions.showCallStatus = function(leadId) {
             if (currentLead) {
                 console.log(`🔍 Checking current lead state for green highlight eligibility...`);
 
-                // Use the getNextAction function to check if lead should have green highlighting
+                // CRITICAL FIX: Check highlight status independently without using getNextAction (avoid circular dependency)
                 let shouldShowGreenHighlight = false;
-                if (typeof window.getNextAction === 'function') {
-                    const todoText = window.getNextAction(currentLead.stage, currentLead);
-                    shouldShowGreenHighlight = !todoText || todoText.trim() === '';
-                    console.log(`🔍 Current stage: ${currentLead.stage}, TO DO: "${todoText}", Should show green: ${shouldShowGreenHighlight}`);
+
+                // Check if lead has active green highlight based on actual highlight data
+                if (currentLead.reachOut &&
+                    (currentLead.reachOut.completedAt || currentLead.reachOut.reachOutCompletedAt)) {
+
+                    // Check if highlight duration is still active
+                    let highlightExpiry = null;
+
+                    if (serverLead.reachOut?.greenHighlightUntil) {
+                        highlightExpiry = new Date(serverLead.reachOut.greenHighlightUntil);
+                    } else if (currentLead.reachOut.greenHighlightUntil) {
+                        highlightExpiry = new Date(currentLead.reachOut.greenHighlightUntil);
+                    }
+
+                    if (highlightExpiry) {
+                        const now = new Date();
+                        shouldShowGreenHighlight = now < highlightExpiry;
+                        console.log(`🔍 Highlight expiry: ${highlightExpiry}, Now: ${now}, Should show green: ${shouldShowGreenHighlight}`);
+                    } else {
+                        console.log(`🔍 No highlight expiry found - no green highlight`);
+                        shouldShowGreenHighlight = false;
+                    }
+                } else {
+                    console.log(`🔍 No reach-out completion found - no green highlight`);
+                    shouldShowGreenHighlight = false;
                 }
+
+                console.log(`🔍 INDEPENDENT CHECK: Stage: ${currentLead.stage}, Should show green: ${shouldShowGreenHighlight}`);
 
                 // If lead no longer qualifies for green highlighting, show "no highlight" message
                 if (!shouldShowGreenHighlight) {
