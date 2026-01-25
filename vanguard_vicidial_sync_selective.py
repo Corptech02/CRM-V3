@@ -177,210 +177,255 @@ class VanguardViciDialSelectiveSync:
             return None
 
     def extract_call_info(self, page_html, lead_id=None):
-        """Extract call duration and timestamp from ViciDial lead page"""
+        """Enhanced call duration extraction with improved reliability"""
         import re
+        import os
+        import subprocess
+        from bs4 import BeautifulSoup
 
         call_info = {
             'call_duration': None,
             'call_timestamp': None,
-            'talk_time': None
+            'talk_time': None,
+            'extraction_method': None
         }
 
         try:
-            # Debug: Look specifically for RECORDINGS section
-            import re as re_debug
-            recordings_match = re_debug.search(r'RECORDINGS FOR THIS LEAD:(.*?)(?:Click here|$)', page_html, re_debug.DOTALL)
-            if recordings_match:
-                recordings_section = recordings_match.group(1)
-                logger.info(f"🎬 Found RECORDINGS section: {recordings_section[:500]}")  # First 500 chars
+            # STRATEGY 1: Parse HTML with BeautifulSoup for better structure understanding
+            soup = BeautifulSoup(page_html, 'html.parser')
 
-                # Look for the seconds column specifically
-                seconds_matches = re_debug.findall(r'(\d{2,4})', recordings_section)
-                if seconds_matches:
-                    logger.info(f"🕐 Numbers found in RECORDINGS: {seconds_matches}")
+            # Look for RECORDINGS section specifically
+            recordings_markers = soup.find_all(string=re.compile(r"RECORDINGS FOR THIS LEAD", re.IGNORECASE))
 
-            # Debug: Log all time-related content in the HTML
-            time_content = re_debug.findall(r'(?i)(time|length|duration|sec)[^>]*>[^<]*<|>[^<]*(?:time|length|duration|sec)[^<]*<|<td[^>]*>\s*\d+\s*</td>', page_html)
-            if time_content:
-                logger.info(f"🔍 All time-related content found: {time_content[:20]}")  # First 20 matches
+            if recordings_markers:
+                logger.info(f"🎬 Found RECORDINGS markers: {len(recordings_markers)}")
 
-            # Also log any table rows with numbers that could be durations
-            table_rows = re_debug.findall(r'<tr[^>]*>.*?</tr>', page_html, re_debug.DOTALL)
-            for i, row in enumerate(table_rows[:10]):  # Check first 10 rows
-                if re_debug.search(r'\b\d{1,4}\b', row):
-                    logger.info(f"🔍 Table row {i+1} with numbers: {row[:200]}")  # First 200 chars
+                # Get the parent elements and find nearby table data
+                for marker in recordings_markers:
+                    parent = marker.parent
 
-            # Pattern 1: Look for call duration in seconds (ViciDial specific patterns)
-            # Priority order: RECORDINGS table seconds first, then other patterns
-            duration_patterns = [
-                # HIGHEST PRIORITY: ViciDial HTML RECORDINGS table (most accurate)
-                # Pattern for HTML table: <td> LEAD </td><td> DATE/TIME </td><td> SECONDS </td><td> RECID </td>
-                r'(?s)RECORDINGS FOR THIS LEAD:.*?SECONDS.*?<tr[^>]*>.*?<td[^>]*>\s*\d+\s*</td>.*?<td[^>]*>.*?</td>.*?<td[^>]*>.*?</td>.*?<td[^>]*>\s*(\d{3,4})\s*</td>',  # HTML table SECONDS column
-                # Alternative HTML patterns for RECORDINGS table
-                r'(?s)RECORDINGS FOR THIS LEAD:.*?SECONDS.*?<td[^>]*>\s*(\d{3,4})\s*</td>',  # Any SECONDS cell after header
-                r'(?s)<font[^>]*>SECONDS.*?<td[^>]*>\s*(\d{3,4})\s*</td>',                   # Font-wrapped SECONDS header
-                # Plain text RECORDINGS patterns (fallback)
-                r'RECORDINGS FOR THIS LEAD:.*?(?:\d+\s+\d+\s+[\d\-:\s]+)\s+(\d{3,4})\s+(?:\d+\s+)',  # Specific RECORDINGS row format
-                r'(?s)RECORDINGS FOR THIS LEAD:.*?SECONDS.*?\n.*?(\d{3,4})\s+\d+\s+',  # Line after SECONDS header with proper format
-                r'(?s)RECORDINGS FOR THIS LEAD:.*?(\d{3,4})\s+\d{4,}\s+',              # Duration followed by RECID (4+ digits)
-                # ViciDial specific patterns - TOTAL CALL TIME
-                r'total[_\s]*time[^>]*>(\d+)<',     # Total call time
-                r'total[_\s]*length[^>]*>(\d+)<',   # Total call length
-                r'call[_\s]*length[^>]*>(\d+)<',    # Call length field
-                r'recording[_\s]*length[^>]*>(\d+)<', # Recording length
-                r'length_in_sec[^>]*>(\d+)<',       # ViciDial HTML table cell
-                r'talk_sec[^>]*>(\d+)<',            # ViciDial talk seconds field
-                r'talk[_\s]*time[^>]*>(\d+)<',      # Talk time field
-                r'Total.*?(\d+)\s*seconds?',        # "Total: 737 seconds"
-                r'Call\s*Length:\s*(\d+)\s*seconds?', # "Call Length: 737 seconds"
-                r'Recording.*?(\d+)\s*seconds?',    # "Recording: 737 seconds"
-                r'Duration:\s*(\d+)\s*seconds?',    # "Duration: 737 seconds"
-                r'Length:\s*(\d+)\s*seconds?',      # "Length: 737 seconds"
-                r'Talk\s*Time:\s*(\d+)\s*seconds?', # "Talk Time: 737 seconds"
-                # Look for the LONGEST number in table cells (likely the total time)
-                r'<td[^>]*>(\d{3,4})</td>',         # 3-4 digit numbers (300+ seconds = 5+ minutes)
-                r'(\d{3,4})\s*seconds?\s*$',        # 3-4 digit seconds at end of line
-                r'(\d{3,4})\s*sec(?:onds?)?',       # 3-4 digit "sec" format
-                # Generic patterns as fallback
-                r'length_in_sec.*?(\d+)',           # ViciDial length field
-                r'time[^>]*>(\d+)<',                # Any field with 'time' in name
-                r'duration[^>]*>(\d+)<',            # Any field with 'duration' in name
-                r'<td[^>]*>\s*(\d+)\s*</td>',       # Table cell with potential whitespace
-                r'(\d+)\s*(?:sec|second|seconds)\b', # Flexible seconds matching
-                r'>(\d+)s<',                        # ">737s<" format
-                r'(\d+)\s*$',                       # Just digits at end of line (last resort)
-            ]
+                    # Look for the next table after this marker
+                    table = parent.find_next('table')
+                    if table:
+                        logger.info("📊 Found table after RECORDINGS marker")
 
-            found_duration = False
-            best_duration = 0
-            best_pattern_info = None
+                        # Look for rows with numeric data that could be call duration
+                        rows = table.find_all('tr')
 
-            # Collect ALL possible durations, then pick the best one
-            all_durations = []
-            for i, pattern in enumerate(duration_patterns):
-                matches = re.findall(pattern, page_html, re.IGNORECASE)
-                for match in matches:
-                    try:
-                        seconds = int(match if isinstance(match, str) else match[0] if isinstance(match, tuple) else match)
-                        # Reasonable bounds check - calls should be between 1 second and 30 minutes (1800 seconds)
-                        if 1 <= seconds <= 1800:
-                            all_durations.append((seconds, i+1, pattern))
-                    except (ValueError, IndexError):
-                        continue
+                        for i, row in enumerate(rows):
+                            cells = row.find_all(['td', 'th'])
 
-            if all_durations:
-                # Sort by duration (longest first) and pick the longest reasonable duration
-                all_durations.sort(key=lambda x: x[0], reverse=True)
-                logger.info(f"🔍 All found durations: {[(d[0], f'pattern {d[1]}') for d in all_durations[:5]]}")
+                            # Look for header row first to understand structure
+                            if any('SECONDS' in cell.get_text().upper() for cell in cells):
+                                logger.info(f"🎯 Found SECONDS header in row {i}")
 
-                # Pick the longest duration that's reasonable
-                for seconds, pattern_num, pattern in all_durations:
-                    # Prefer longer durations unless they seem unreasonable
-                    if seconds >= 30:  # At least 30 seconds for a real call
-                        best_duration = seconds
-                        best_pattern_info = (pattern_num, pattern)
-                        break
+                                # The next data row should contain the actual duration
+                                if i + 1 < len(rows):
+                                    data_row = rows[i + 1]
+                                    data_cells = data_row.find_all(['td', 'th'])
 
-                # Fallback to any duration if no long ones found
-                if best_duration == 0 and all_durations:
-                    best_duration, pattern_num, pattern = all_durations[0]
-                    best_pattern_info = (pattern_num, pattern)
+                                    # Find the cell that corresponds to SECONDS column
+                                    seconds_col_index = None
+                                    for idx, cell in enumerate(cells):
+                                        if 'SECONDS' in cell.get_text().upper():
+                                            seconds_col_index = idx
+                                            break
 
-            if best_duration > 0:
-                # Convert to minutes and seconds
-                minutes = best_duration // 60
-                remaining_seconds = best_duration % 60
-                if minutes > 0:
-                    call_info['call_duration'] = f"{minutes}:{remaining_seconds:02d}"
-                    call_info['talk_time'] = f"{minutes} min {remaining_seconds} sec"
-                else:
-                    call_info['call_duration'] = f"0:{remaining_seconds:02d}"
-                    call_info['talk_time'] = f"{best_duration} sec"
-                logger.info(f"✅ Selected call duration with pattern {best_pattern_info[0]}: {call_info['talk_time']} ({best_duration} seconds) using pattern: {best_pattern_info[1]}")
-                found_duration = True
+                                    if seconds_col_index is not None and seconds_col_index < len(data_cells):
+                                        seconds_text = data_cells[seconds_col_index].get_text().strip()
 
-            if not found_duration:
-                logger.warning("⚠️ No call duration found in ViciDial HTML - trying to get duration from recording file")
-                # Try to get duration from downloaded recording file using ffprobe
-                try:
-                    import subprocess
-                    # Try both possible recording paths (short ID and full ID with 8 prefix)
-                    recording_paths = [
-                        f"/var/www/vanguard/recordings/recording_{lead_id}.mp3",  # Short ID like 132511
-                        f"/var/www/vanguard/recordings/recording_8{lead_id}.mp3"  # Full ID like 8132511
-                    ]
-                    recording_path = None
-                    for path in recording_paths:
-                        if os.path.exists(path):
-                            recording_path = path
-                            break
+                                        # Extract numeric value
+                                        seconds_match = re.search(r'(\d{1,4})', seconds_text)
+                                        if seconds_match:
+                                            seconds = int(seconds_match.group(1))
 
-                    if recording_path:
-                        result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', recording_path],
-                                              capture_output=True, text=True, timeout=10)
-                        if result.returncode == 0 and result.stdout.strip():
-                            duration_seconds = float(result.stdout.strip())
-                            best_duration = int(round(duration_seconds))
-                            minutes = best_duration // 60
-                            remaining_seconds = best_duration % 60
-                            if minutes > 0:
-                                call_info['call_duration'] = f"{minutes}:{remaining_seconds:02d}"
-                                call_info['talk_time'] = f"{minutes} min {remaining_seconds} sec"
-                            else:
-                                call_info['call_duration'] = f"0:{remaining_seconds:02d}"
-                                call_info['talk_time'] = f"{best_duration} sec"
-                            logger.info(f"✅ Got call duration from recording file: {call_info['talk_time']} ({best_duration} seconds)")
-                            found_duration = True
-                        else:
-                            logger.warning(f"❌ ffprobe failed for {recording_path}: {result.stderr}")
-                    else:
-                        logger.warning(f"❌ Recording file not found. Tried: {recording_paths}")
-                except Exception as e:
-                    logger.error(f"❌ Error getting duration from recording file: {e}")
+                                            if 1 <= seconds <= 3600:  # Reasonable bounds
+                                                call_info['call_duration'] = self.format_duration(seconds)
+                                                call_info['talk_time'] = self.format_talk_time(seconds)
+                                                call_info['extraction_method'] = 'HTML_TABLE_SECONDS_COLUMN'
+                                                logger.info(f"✅ Method 1 (Table SECONDS): {call_info['talk_time']} ({seconds}s)")
+                                                return self.add_timestamp(call_info, page_html)
 
-                if not found_duration:
-                    logger.warning("⚠️ Recording file fallback failed - checking for any numeric patterns in the content")
-                    # Last resort: look for any reasonable numbers that could be call duration
-                    all_numbers = re.findall(r'\b(\d{1,4})\b', page_html)
-                    for num_str in all_numbers:
-                        num = int(num_str)
-                        if 10 <= num <= 600:  # 10 seconds to 10 minutes seems reasonable
-                            minutes = num // 60
-                            remaining_seconds = num % 60
-                            if minutes > 0:
-                                call_info['call_duration'] = f"{minutes}:{remaining_seconds:02d}"
-                                call_info['talk_time'] = f"{minutes} min {remaining_seconds} sec"
-                            else:
-                                call_info['call_duration'] = f"0:{remaining_seconds:02d}"
-                                call_info['talk_time'] = f"{num} sec"
-                            logger.info(f"🔍 Found potential call duration (fallback): {call_info['talk_time']} ({num} seconds)")
-                            break
+            # STRATEGY 2: Enhanced regex patterns with better structure awareness
+            if not call_info['call_duration']:
+                logger.info("🔍 Trying enhanced regex patterns...")
 
-            # Pattern 2: Look for call timestamp
-            timestamp_patterns = [
-                r'Call\s*Time:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})',
-                r'Start\s*Time:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})',
-                r'call_date[^>]*>([^<]+)<',
-                r'start_epoch[^>]*>(\d+)<',
-                r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})',  # Generic datetime format
-                r'(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})',  # MM/DD/YYYY format
-            ]
+                # More specific patterns for ViciDial RECORDINGS section
+                enhanced_patterns = [
+                    # Pattern 1: Full RECORDINGS table structure
+                    r'(?s)RECORDINGS FOR THIS LEAD:.*?SECONDS.*?<tr[^>]*>.*?<td[^>]*>\s*\d+\s*</td>.*?<td[^>]*>[^<]*</td>.*?<td[^>]*>[^<]*</td>.*?<td[^>]*>\s*(\d{1,4})\s*</td>',
 
-            for pattern in timestamp_patterns:
-                matches = re.search(pattern, page_html, re.IGNORECASE)
-                if matches:
-                    timestamp_str = matches.group(1)
-                    # Handle epoch timestamp
-                    if timestamp_str.isdigit() and len(timestamp_str) == 10:
-                        from datetime import datetime
-                        call_info['call_timestamp'] = datetime.fromtimestamp(int(timestamp_str)).isoformat()
-                    else:
-                        call_info['call_timestamp'] = timestamp_str
-                    logger.info(f"✅ Found call timestamp: {call_info['call_timestamp']}")
-                    break
+                    # Pattern 2: Any SECONDS cell after RECORDINGS marker
+                    r'(?s)RECORDINGS FOR THIS LEAD:.*?SECONDS.*?<td[^>]*>\s*(\d{1,4})\s*</td>',
+
+                    # Pattern 3: Look for patterns like "123 seconds" or "123s" after RECORDINGS
+                    r'(?s)RECORDINGS FOR THIS LEAD:.*?(\d{1,4})\s*(?:seconds?|sec|s)\b',
+
+                    # Pattern 4: Numeric value followed by recording ID pattern
+                    r'(?s)RECORDINGS FOR THIS LEAD:.*?(\d{1,4})\s+\d{6,}\s+',
+
+                    # Pattern 5: Time duration in table cell format
+                    r'<td[^>]*>\s*(\d{2,4})\s*</td>',
+
+                    # Pattern 6: Look for time patterns anywhere
+                    r'\b(\d{1,4})\s*(?:seconds?|sec)\b',
+                ]
+
+                for i, pattern in enumerate(enhanced_patterns, 1):
+                    matches = re.findall(pattern, page_html, re.IGNORECASE)
+
+                    for match in matches:
+                        try:
+                            seconds = int(match if isinstance(match, str) else match[0])
+
+                            # Better bounds checking
+                            if 5 <= seconds <= 1800:  # 5 seconds to 30 minutes
+                                call_info['call_duration'] = self.format_duration(seconds)
+                                call_info['talk_time'] = self.format_talk_time(seconds)
+                                call_info['extraction_method'] = f'REGEX_PATTERN_{i}'
+                                logger.info(f"✅ Method 2 (Pattern {i}): {call_info['talk_time']} ({seconds}s)")
+                                return self.add_timestamp(call_info, page_html)
+
+                        except (ValueError, IndexError):
+                            continue
+
+            # STRATEGY 3: Parse raw text for RECORDINGS section
+            if not call_info['call_duration']:
+                logger.info("🔍 Trying raw text parsing...")
+
+                # Find RECORDINGS section in plain text
+                recordings_match = re.search(r'RECORDINGS FOR THIS LEAD:(.*?)(?:\n\n|\n[A-Z]|$)', page_html, re.DOTALL)
+
+                if recordings_match:
+                    recordings_section = recordings_match.group(1)
+                    logger.info(f"📋 RECORDINGS section found: {recordings_section[:200]}...")
+
+                    # Look for numeric patterns in the recordings section
+                    # ViciDial format is typically: LEAD_ID DATE/TIME SECONDS RECORDING_ID
+                    lines = recordings_section.strip().split('\n')
+
+                    for line in lines:
+                        line = line.strip()
+                        if line and not 'SECONDS' in line.upper():  # Skip header
+                            # Look for pattern: numbers, datetime, seconds, recording_id
+                            parts = line.split()
+
+                            for part in parts:
+                                if part.isdigit():
+                                    seconds = int(part)
+                                    # If it's a reasonable call duration (not a date/ID)
+                                    if 5 <= seconds <= 1800:
+                                        call_info['call_duration'] = self.format_duration(seconds)
+                                        call_info['talk_time'] = self.format_talk_time(seconds)
+                                        call_info['extraction_method'] = 'RAW_TEXT_PARSING'
+                                        logger.info(f"✅ Method 3 (Raw Text): {call_info['talk_time']} ({seconds}s)")
+                                        return self.add_timestamp(call_info, page_html)
+
+            # STRATEGY 4: Recording file duration fallback (if file exists)
+            if not call_info['call_duration'] and lead_id:
+                logger.info("🎵 Trying recording file duration...")
+
+                recording_paths = [
+                    f"/var/www/vanguard/recordings/recording_{lead_id}.mp3",
+                    f"/var/www/vanguard/recordings/recording_8{lead_id}.mp3"
+                ]
+
+                for recording_path in recording_paths:
+                    if os.path.exists(recording_path):
+                        try:
+                            result = subprocess.run([
+                                'ffprobe', '-v', 'quiet', '-show_entries',
+                                'format=duration', '-of', 'csv=p=0', recording_path
+                            ], capture_output=True, text=True, timeout=10)
+
+                            if result.returncode == 0 and result.stdout.strip():
+                                duration_seconds = int(float(result.stdout.strip()))
+
+                                call_info['call_duration'] = self.format_duration(duration_seconds)
+                                call_info['talk_time'] = self.format_talk_time(duration_seconds)
+                                call_info['extraction_method'] = 'RECORDING_FILE_FFPROBE'
+                                logger.info(f"✅ Method 4 (File): {call_info['talk_time']} ({duration_seconds}s)")
+                                return self.add_timestamp(call_info, page_html)
+
+                        except Exception as e:
+                            logger.warning(f"⚠️ ffprobe error for {recording_path}: {e}")
+
+            # STRATEGY 5: Last resort - look for any reasonable numbers
+            if not call_info['call_duration']:
+                logger.info("🔍 Last resort: scanning all numbers...")
+
+                # Find all numbers in the page
+                all_numbers = re.findall(r'\b(\d{1,4})\b', page_html)
+
+                # Sort by value (longer calls more likely to be real)
+                valid_numbers = []
+                for num_str in all_numbers:
+                    num = int(num_str)
+                    if 30 <= num <= 1800:  # 30 seconds to 30 minutes
+                        valid_numbers.append(num)
+
+                if valid_numbers:
+                    # Take the longest reasonable duration
+                    valid_numbers.sort(reverse=True)
+                    seconds = valid_numbers[0]
+
+                    call_info['call_duration'] = self.format_duration(seconds)
+                    call_info['talk_time'] = self.format_talk_time(seconds)
+                    call_info['extraction_method'] = 'LAST_RESORT_LONGEST'
+                    logger.info(f"✅ Method 5 (Last Resort): {call_info['talk_time']} ({seconds}s)")
+                    return self.add_timestamp(call_info, page_html)
+
+            logger.warning("❌ No call duration found with any method")
 
         except Exception as e:
-            logger.warning(f"⚠️ Error extracting call info: {str(e)}")
+            logger.error(f"❌ Error in enhanced call duration extraction: {e}")
+
+        return self.add_timestamp(call_info, page_html)
+
+    def format_duration(self, seconds):
+        """Format seconds into MM:SS format"""
+        if seconds <= 0:
+            return "0:00"
+
+        minutes = seconds // 60
+        remaining_seconds = seconds % 60
+        return f"{minutes}:{remaining_seconds:02d}"
+
+    def format_talk_time(self, seconds):
+        """Format seconds into human readable format"""
+        if seconds <= 0:
+            return "0 sec"
+
+        if seconds < 60:
+            return f"{seconds} sec"
+
+        minutes = seconds // 60
+        remaining_seconds = seconds % 60
+
+        if remaining_seconds == 0:
+            return f"{minutes} min"
+        else:
+            return f"{minutes} min {remaining_seconds} sec"
+
+    def add_timestamp(self, call_info, page_html):
+        """Add timestamp extraction to call_info"""
+
+        # Pattern 2: Look for call timestamp
+        timestamp_patterns = [
+            r'Call\s*Time:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})',
+            r'Start\s*Time:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})',
+            r'call_date[^>]*>([^<]+)<',
+            r'start_epoch[^>]*>(\d+)<',
+            r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})',  # Generic datetime format
+            r'(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})',  # MM/DD/YYYY format
+        ]
+
+        for pattern in timestamp_patterns:
+            matches = re.findall(pattern, page_html, re.IGNORECASE)
+            if matches:
+                call_info['call_timestamp'] = matches[0]
+                logger.info(f"✅ Found call timestamp: {call_info['call_timestamp']}")
+                break
 
         return call_info
 
