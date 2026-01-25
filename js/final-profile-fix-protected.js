@@ -4061,10 +4061,43 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
     // Close modal
     document.querySelector('.email-confirmation-modal').remove();
 
-    // Refresh table to show green highlighting and completion
+    // INSTEAD OF refreshLeadsTable() which resets data, just update UI directly
     setTimeout(() => {
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
-        refreshLeadsTable();
+
+        console.log('🔧 PRESERVING email confirmation - NOT calling refreshLeadsTable()');
+        console.log('🔧 Email confirmation data should persist in profile');
+
+        // Instead of full table refresh that resets data, just apply highlighting
+        if (window.applyReachOutCompleteHighlighting) {
+            window.applyReachOutCompleteHighlighting();
+        }
+
+        // Force apply green highlighting directly to this specific lead
+        const tableBody = document.querySelector('#leadsTableBody') || document.querySelector('tbody');
+        if (tableBody) {
+            const rows = tableBody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const checkbox = row.querySelector('.lead-checkbox');
+                if (checkbox && String(checkbox.value) === String(leadId)) {
+                    console.log(`🟢 Applying direct green highlight to lead ${leadId} row`);
+                    row.style.setProperty('background-color', 'rgba(16, 185, 129, 0.2)', 'important');
+                    row.style.setProperty('background', 'rgba(16, 185, 129, 0.2)', 'important');
+                    row.style.setProperty('border-left', '4px solid #10b981', 'important');
+                    row.style.setProperty('border-right', '2px solid #10b981', 'important');
+                    row.classList.add('reach-out-complete');
+
+                    // Clear TODO text since reach-out is complete
+                    const todoCell = row.querySelectorAll('td')[6];
+                    if (todoCell) {
+                        todoCell.innerHTML = '';
+                        console.log(`🔧 Cleared TODO text for email confirmed lead ${leadId}`);
+                    }
+                }
+            });
+        }
+
+        console.log('✅ Email confirmation UI updates applied without data reset');
     }, 300);
 };
 
@@ -4554,16 +4587,27 @@ function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
         leads[leadIndex].stageUpdatedAt = now;
 
         // Reset reach-out data when stage changes
+        // Check for email confirmations as valid completions
+        const hasEmailConfirmation = leads[leadIndex].reachOut &&
+            leads[leadIndex].reachOut.emailConfirmations &&
+            leads[leadIndex].reachOut.emailConfirmations.length > 0 &&
+            leads[leadIndex].reachOut.emailConfirmations.some(conf => conf.confirmed === true);
+
         const hasExistingCompletion = leads[leadIndex].reachOut &&
             (leads[leadIndex].reachOut.completedAt || leads[leadIndex].reachOut.reachOutCompletedAt) &&
-            (leads[leadIndex].reachOut.callsConnected > 0 || leads[leadIndex].reachOut.callAttempts > 0);
+            (leads[leadIndex].reachOut.callsConnected > 0 || leads[leadIndex].reachOut.callAttempts > 0 || hasEmailConfirmation);
 
         // ALWAYS reset reach-out for stages that require fresh reach-out attempts
         const stagesRequiringFreshReachOut = ['info_requested', 'loss_runs_requested', 'quoted'];
         const shouldForceReset = stagesRequiringFreshReachOut.includes(stage);
 
-        if (!contactAttemptedCompleted && (!hasExistingCompletion || shouldForceReset)) {
-            if (shouldForceReset) {
+        // Don't force reset if there are confirmed email confirmations
+        const shouldPreserveEmailConfirmations = hasEmailConfirmation;
+
+        if (!contactAttemptedCompleted && (!hasExistingCompletion || (shouldForceReset && !shouldPreserveEmailConfirmations))) {
+            if (shouldForceReset && shouldPreserveEmailConfirmations) {
+                console.log(`🔄 Stage changed to ${stage} - PRESERVING reach-out data due to email confirmation for lead:`, leadId);
+            } else if (shouldForceReset) {
                 console.log(`🔄 Stage changed to ${stage} - FORCE resetting reach-out data for lead:`, leadId);
             } else {
                 console.log('🔄 Stage changed - resetting reach-out data for lead:', leadId);
@@ -4585,6 +4629,8 @@ function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
         } else {
             if (contactAttemptedCompleted) {
                 console.log('⏭️ Skipping reach-out reset - Contact Attempted was completed');
+            } else if (shouldPreserveEmailConfirmations) {
+                console.log('⏭️ Skipping reach-out reset - Email confirmation completion preserved');
             } else {
                 console.log('⏭️ Skipping reach-out reset - Existing reach-out completion preserved');
             }
