@@ -571,6 +571,34 @@ class VanguardViciDialSelectiveSync:
                 parsed_info['callback_time'] = callback_match.group(2).strip()
                 logger.info(f"✅ Callback scheduled: {parsed_info['callback_date']} at {parsed_info['callback_time']}")
 
+                # Compute highlight expiry timestamp from callback date/time
+                try:
+                    from datetime import datetime
+                    # Parse callback date: 01/27/2026
+                    callback_date_str = parsed_info['callback_date']
+                    callback_time_str = parsed_info['callback_time']
+
+                    # Convert time format: 10:00AM -> 10:00 AM
+                    callback_time_str = re.sub(r'(\d+:\d+)([AP]M)', r'\1 \2', callback_time_str.upper())
+
+                    # Combine date and time: "01/27/2026 10:00 AM"
+                    callback_datetime_str = f"{callback_date_str} {callback_time_str}"
+
+                    # Parse the combined datetime string
+                    callback_datetime = datetime.strptime(callback_datetime_str, "%m/%d/%Y %I:%M %p")
+
+                    # Convert to ISO format for storage
+                    parsed_info['callback_datetime_iso'] = callback_datetime.isoformat() + 'Z'
+                    parsed_info['has_callback'] = True
+
+                    logger.info(f"✅ Callback datetime computed: {parsed_info['callback_datetime_iso']}")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ Error parsing callback datetime '{callback_date_str} {callback_time_str}': {e}")
+                    parsed_info['has_callback'] = False
+            else:
+                parsed_info['has_callback'] = False
+
         except Exception as e:
             logger.warning(f"⚠️ Error parsing enhanced comments: {e}")
 
@@ -799,6 +827,40 @@ class VanguardViciDialSelectiveSync:
                     "hasRecording": bool(recording_path),
                     "ownerName": enhanced_info['owner_name'] if enhanced_info['owner_name'] else '',  # Owner name from comments
                 }
+
+                # Initialize reachOut structure if it doesn't exist
+                if 'reachOut' not in lead_data:
+                    lead_data['reachOut'] = {
+                        'callAttempts': 0,
+                        'callsConnected': 0,
+                        'emailCount': 0,
+                        'textCount': 0,
+                        'voicemailCount': 0,
+                        'emailSent': False,
+                        'textSent': False,
+                        'callMade': False,
+                        'contacted': False,
+                        'emailConfirmed': False,
+                        'reachOutCompletedAt': None,
+                        'callLogs': []
+                    }
+
+                # Handle callback scheduling for highlight duration and completion
+                if enhanced_info.get('has_callback', False):
+                    logger.info(f"🎯 Setting up callback-based highlight and completion for lead {lead_id}")
+
+                    # Set highlight duration until callback time
+                    lead_data['reachOut']['greenHighlightUntil'] = enhanced_info['callback_datetime_iso']
+
+                    # Mark reach-out as completed since callback is scheduled
+                    lead_data['reachOut']['reachOutCompletedAt'] = datetime.now().isoformat() + 'Z'
+                    lead_data['reachOut']['completedAt'] = datetime.now().isoformat() + 'Z'
+                    lead_data['reachOut']['emailConfirmed'] = True  # Mark as email confirmed since callback was scheduled
+                    lead_data['reachOut']['contacted'] = True
+
+                    logger.info(f"✅ Callback-based setup complete: highlight until {enhanced_info['callback_datetime_iso']}, marked as completed")
+                else:
+                    logger.info(f"📅 No callback scheduled for lead {lead_id}, using standard reach-out setup")
 
                 # Create automatic call log from ViciDial call information
                 if 'call_duration' in lead_details or 'call_timestamp' in lead_details:
