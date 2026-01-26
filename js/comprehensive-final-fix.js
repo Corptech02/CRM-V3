@@ -59,8 +59,27 @@
             }
         }
 
-        // Default actions for other stages
+        // Default actions for other stages - CHECK FOR COMPLETION FIRST
         if (stage === 'contact_attempted' || stage === 'loss_runs_requested') {
+            // Check if reach out is complete before showing TODO
+            if (lead && lead.reachOut) {
+                const reachOut = { ...lead.reachOut };
+
+                // Check completion conditions (same as main getNextAction function)
+                const hasTimestamp = reachOut.completedAt || reachOut.reachOutCompletedAt;
+                const hasActualCompletion = reachOut.callsConnected > 0 ||
+                                          reachOut.textCount > 0 ||
+                                          reachOut.emailConfirmed === true;
+                const isActuallyCompleted = hasTimestamp && hasActualCompletion;
+
+                console.log(`🔍 COMPLETION CHECK (${stage}): Lead ${lead.id} - hasTimestamp=${hasTimestamp}, hasActualCompletion=${hasActualCompletion}, isActuallyCompleted=${isActuallyCompleted}`);
+
+                if (isActuallyCompleted) {
+                    console.log(`✅ REACH-OUT COMPLETE: Lead ${lead.id} - returning empty TODO`);
+                    return ''; // No TODO when reach out is complete
+                }
+            }
+
             const phoneNumber = lead?.phone || '';
             const leadId = lead?.id || '';
             const clickHandler = `handleReachOutCall('${leadId}', '${phoneNumber}')`;

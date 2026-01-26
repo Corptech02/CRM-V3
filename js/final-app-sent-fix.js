@@ -88,32 +88,29 @@
             }
 
             // For other stages, use fallback logic
-            const stagesRequiringReachOut = ['quoted', 'info_requested', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware', 'interested'];
+            const stagesRequiringReachOut = ['quoted', 'info_requested', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware', 'interested', 'contact_attempted', 'loss_runs_requested'];
 
             if (stagesRequiringReachOut.includes(stage)) {
-                // Check if reach-out is completed (any of these conditions)
-                const hasActuallyCompleted = lead && lead.reachOut && (
-                    (lead.reachOut.callAttempts > 0) ||
-                    (lead.reachOut.emailConfirmed === true) ||
-                    (lead.reachOut.textCount > 0) ||
-                    (lead.reachOut.callsConnected > 0)
-                );
+                // Check if reach-out is completed (PROPER completion check with timestamps)
+                if (lead && lead.reachOut) {
+                    const reachOut = lead.reachOut;
 
+                    // Check completion conditions (same as main getNextAction function)
+                    const hasTimestamp = reachOut.completedAt || reachOut.reachOutCompletedAt;
+                    const hasActualCompletion = reachOut.callsConnected > 0 ||
+                                              reachOut.textCount > 0 ||
+                                              reachOut.emailConfirmed === true;
+                    const isActuallyCompleted = hasTimestamp && hasActualCompletion;
 
-                if (hasActuallyCompleted) {
-                    // If reach-out is completed, show empty cell regardless of highlight status
-                    return '';
-                } else {
-                    // Create clickable reach out call link
-                    const phoneNumber = lead?.phone || '';
-                    const leadId = lead?.id || '';
-                    const clickHandler = `handleReachOutCall('${leadId}', '${phoneNumber}')`;
-                    return `<a href="tel:${phoneNumber}" onclick="${clickHandler}" style="color: #dc2626; font-weight: bold; text-decoration: none; cursor: pointer;">Reach out: CALL</a>`;
+                    console.log(`🔍 ULTIMATE CHECK (${stage}): Lead ${lead.id} - hasTimestamp=${hasTimestamp}, hasActualCompletion=${hasActualCompletion}, isActuallyCompleted=${isActuallyCompleted}`);
+
+                    if (isActuallyCompleted) {
+                        console.log(`✅ ULTIMATE COMPLETE: Lead ${lead.id} - returning empty TODO`);
+                        return '';
+                    }
                 }
-            }
 
-            // Default fallback
-            if (stage === 'contact_attempted' || stage === 'loss_runs_requested') {
+                // Create clickable reach out call link
                 const phoneNumber = lead?.phone || '';
                 const leadId = lead?.id || '';
                 const clickHandler = `handleReachOutCall('${leadId}', '${phoneNumber}')`;
