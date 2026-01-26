@@ -144,3 +144,44 @@ console.log('🚀 Applying critical performance fixes...');
 
     console.log('✅ Performance fixes applied');
 })();
+
+// REACH OUT CALL HANDLER - Define globally for immediate availability
+function handleReachOutCall(leadId, phoneNumber) {
+    console.log(`📞 Reach out call clicked for lead ${leadId}, phone: ${phoneNumber}`);
+
+    // 1. Open the lead profile
+    if (window.viewLead) {
+        setTimeout(() => {
+            console.log(`🔧 Opening profile for lead ${leadId}`);
+            window.viewLead(leadId);
+        }, 100);
+    } else {
+        console.log(`❌ viewLead function not available`);
+    }
+
+    // 2. Check the call checkbox after profile opens (multiple attempts with increasing delays)
+    const attempts = [500, 1000, 1500, 2000];
+    attempts.forEach(delay => {
+        setTimeout(() => {
+            const callCheckbox = document.getElementById(`call-made-${leadId}`);
+            if (callCheckbox && !callCheckbox.checked) {
+                callCheckbox.checked = true;
+
+                // Trigger the onchange event to update reach out
+                if (window.updateReachOut) {
+                    window.updateReachOut(leadId, 'call', true);
+                    console.log(`✅ Auto-checked call box for lead ${leadId} at ${delay}ms delay`);
+                } else {
+                    console.log(`❌ updateReachOut function not available`);
+                }
+            }
+        }, delay);
+    });
+
+    // 3. The tel: link will automatically open the phone dialer
+    return true; // Allow the tel: link to proceed
+}
+
+// Make it globally available immediately
+window.handleReachOutCall = handleReachOutCall;
+console.log('✅ handleReachOutCall function defined globally');

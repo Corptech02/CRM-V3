@@ -36,6 +36,9 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     if (typeof lead.reachOut.textCount !== 'number') lead.reachOut.textCount = 0;
     if (typeof lead.reachOut.voicemailCount !== 'number') lead.reachOut.voicemailCount = 0;
 
+    // PRESERVE completion-related fields - DO NOT overwrite if they exist
+    // emailConfirmed, completedAt, reachOutCompletedAt, greenHighlightUntil, etc.
+
     console.log(`🔍 LEAD ${lead.id} REACHOUT INITIALIZED:`, lead.reachOut);
 
     // Check if lead.id is the problematic hardcoded value
@@ -72,6 +75,10 @@ protectedFunctions.createEnhancedProfile = function(lead) {
         ...(originalData.callLogs && { callLogs: JSON.parse(JSON.stringify(originalData.callLogs)) }),
         ...(originalData.completedAt && { completedAt: originalData.completedAt }),
         ...(originalData.reachOutCompletedAt && { reachOutCompletedAt: originalData.reachOutCompletedAt }),
+        ...(originalData.emailConfirmed !== undefined && { emailConfirmed: originalData.emailConfirmed }),
+        ...(originalData.greenHighlightUntil && { greenHighlightUntil: originalData.greenHighlightUntil }),
+        ...(originalData.greenHighlightDays !== undefined && { greenHighlightDays: originalData.greenHighlightDays }),
+        ...(originalData.emailConfirmations && { emailConfirmations: JSON.parse(JSON.stringify(originalData.emailConfirmations)) }),
         ...(originalData.emailSent !== undefined && { emailSent: originalData.emailSent }),
         ...(originalData.textSent !== undefined && { textSent: originalData.textSent }),
         ...(originalData.contacted !== undefined && { contacted: originalData.contacted })
@@ -195,7 +202,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h3 style="margin: 0; font-weight: bold;" id="reach-out-header-title-${lead.id}"><i class="fas fa-tasks"></i> <span style="color: #dc2626;">Reach Out</span></h3>
                         <div id="reach-out-todo-${lead.id}" style="font-weight: bold; font-size: 18px; color: #dc2626;">
-                            TO DO: Call
+                            <!-- Dynamic content will be set by JavaScript -->
                         </div>
                     </div>
 
@@ -231,13 +238,10 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             </div>
                         </div>
 
-                        <!-- Call Logs and Call Status Buttons -->
+                        <!-- Call Logs Button -->
                         <div style="padding-left: 30px; display: flex; gap: 10px;">
                             <button onclick="showCallLogs('${lead.id}')" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
                                 <i class="fas fa-phone-alt"></i> Call Logs
-                            </button>
-                            <button onclick="showCallStatus('${lead.id}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
-                                <i class="fas fa-highlight"></i> Highlight Duration
                             </button>
                         </div>
 
@@ -2294,8 +2298,14 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
             if (hasReachOutTodo) {
                 // First check if reach-out is already completed - MUST verify actual completion actions
                 let isCompleted = false;
-                // NEW LOGIC: Consider any call attempt as completion (not just connected calls)
-                const hasActuallyCompleted = (lead.reachOut.callAttempts > 0);
+                // NEW LOGIC: Consider call attempts OR email confirmation as completion
+                const hasActuallyCompleted = (lead.reachOut.callAttempts > 0) ||
+                                           (lead.reachOut.emailConfirmed === true) ||
+                                           (lead.reachOut.textCount > 0) ||
+                                           (lead.reachOut.callsConnected > 0);
+
+                console.log(`🔍 DEBUG Lead ${lead.id}: callAttempts=${lead.reachOut.callAttempts}, emailConfirmed=${lead.reachOut.emailConfirmed}, textCount=${lead.reachOut.textCount}, callsConnected=${lead.reachOut.callsConnected}`);
+                console.log(`🔍 DEBUG Lead ${lead.id}: hasActuallyCompleted=${hasActuallyCompleted}`);
 
                 // Clean up orphaned completion timestamps (timestamps without actual completion)
                 if ((lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt) && !hasActuallyCompleted) {
@@ -2363,9 +2373,14 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
                 // STAGE REQUIRES REACH-OUT AND NOT COMPLETED - Show red styling
                 todoDiv.style.display = 'block'; // Show TO DO text
 
-                // Show TO DO or COMPLETE based on call attempts only
+                // Show TO DO or COMPLETE based on call attempts, email confirmation, texts, or connected calls
                 let nextAction = '';
-                if (!lead.reachOut.callAttempts || lead.reachOut.callAttempts === 0) {
+                const hasActuallyCompleted = (lead.reachOut.callAttempts > 0) ||
+                                           (lead.reachOut.emailConfirmed === true) ||
+                                           (lead.reachOut.textCount > 0) ||
+                                           (lead.reachOut.callsConnected > 0);
+
+                if (!hasActuallyCompleted) {
                     nextAction = 'TO DO: Call';
                 } else {
                     nextAction = 'REACH OUT COMPLETE';
@@ -4727,6 +4742,29 @@ protectedFunctions.viewLead = async function(leadId) {
 
     if (lead) {
         console.log(`✅ FOUND LEAD: ID=${lead.id}, Name=${lead.name}`);
+
+        // 🔥 EMAIL COMPLETION FIX: Sync individual lead data from server before profile display
+        try {
+            console.log('🔥 FORCE_SYNC_FIX: SERVER SYNC STARTING FOR LEAD', leadId);
+            const response = await fetch(`/api/leads/${leadId}`);
+            if (response.ok) {
+                const serverLead = await response.json();
+                console.log('🔍 SERVER DATA emailConfirmed:', serverLead.reachOut?.emailConfirmed);
+                console.log('🔍 LOCAL DATA emailConfirmed:', lead.reachOut?.emailConfirmed);
+
+                // Update localStorage lead with server data
+                const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+                if (leadIndex !== -1) {
+                    leads[leadIndex] = serverLead;
+                    localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                    lead = serverLead; // Use fresh server data
+                    console.log('✅ Lead synced with server data');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error syncing individual lead from server:', error);
+        }
+
         protectedFunctions.createEnhancedProfile(lead);
     } else {
         console.error('❌ Lead not found:', leadId);
@@ -7467,8 +7505,11 @@ window.getReachOutStatus = function(lead) {
     console.log(`🔍 REACH OUT CHECK: ❗ Stage "${lead.stage}" REQUIRES reach out`);
 
     // Check if reach out is completed - MUST verify actual completion actions
-    // NEW LOGIC: Consider any call attempt as completion (not just connected calls)
-    const hasActuallyCompleted = (reachOut.callAttempts > 0);
+    // NEW LOGIC: Consider call attempts OR email confirmation as completion
+    const hasActuallyCompleted = (reachOut.callAttempts > 0) ||
+                                (reachOut.emailConfirmed === true) ||
+                                (reachOut.textCount > 0) ||
+                                (reachOut.callsConnected > 0);
 
     if ((reachOut.completedAt || reachOut.reachOutCompletedAt) && hasActuallyCompleted) {
         // Check if reach out has EXPIRED based on green highlight duration - UPDATED LOGIC
@@ -7536,8 +7577,8 @@ window.getReachOutStatus = function(lead) {
     }
 
     // Not completed (either no completion timestamp or no actual completion) - show what's needed
-    // NEW LOGIC: Mark as complete if any call attempt was made (regardless of pickup)
-    if (reachOut.callAttempts > 0) {
+    // NEW LOGIC: Mark as complete if call attempt, email confirmation, text, or connected call was made
+    if (reachOut.callAttempts > 0 || reachOut.emailConfirmed === true || reachOut.textCount > 0 || reachOut.callsConnected > 0) {
         return '<span style="color: #10b981;">REACH OUT COMPLETE</span>';
     } else {
         return '<span style="color: #dc2626;">TO DO - Call Lead</span>';

@@ -1,158 +1,141 @@
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
 
-# Production builds
-dist/
-build/
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
 *~
-
-# OS generated files
-.DS_Store
-.DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.temp
-temp/
-tmp/
-
-# Cache files
-.cache/
-*.cache
-
-# Backup files
-*.backup
-*.bak
-
-# Python
-__pycache__/
-*.py[cod]
 *$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# API keys and secrets
-*.key
-*.pem
-.env*
-config.json
-secrets.json
-token.json
-
-# Upload directories
-uploads/
-*.zip
-
-# Logs with potential API keys
-logs/
-*.log
-
-# Database files with potential sensitive data
-*.db
-*.db-wal
-*.db-shm
-
-.idea
-
-# Large files and downloads
-*.tar.gz
-*.AppImage
-downloaded-*
-*-downloaded*
-vanguard-crm-*
-vanguard-vps-*
-
-# Lead files
-leads_*
-*leads*
-Leads/
-LLCinfo/
-
-# FCSMA data
-fcsma_*
-FCSMA_*
-
-# Analysis and processing files
-*.csv
 *analysis*
-*matcher*
-*_list.py
-*search*
-*dedup*
-
-# Test files
-test_*
-test-*
-debug*
-sample_*
-reproduce_*
-
-# Generated files
-hyper_detailed_*
-matched_carriers_*
-unmatched_*
-*carriers*.json
-
-# Script outputs
-# *.txt
-
-# Personal files
+# Analysis and processing files
+# API keys and secrets
+*.AppImage
+backend/add-gmail-token.js
+backend/add-gmail-token-web.js
+*.backup
+# Backup files
+*.bak
 .bash_history
 .bash_logout
 .bashrc
+build/
+*.cache
 .cache/
-.claude.json*
+# Cache files
+*carriers*.json
+check-whisper-alternative.py
 .claude/
+.claude.json*
 .cloudflared/
 .config/
+config.json
+*credentials*.json
+*.csv
+# Database files with potential sensitive data
+*.db
+*.db-shm
+*.db-wal
+debug*
+*dedup*
+# Dependencies
+dist/
+*-downloaded*
+downloaded-*
+.DS_Store
+.DS_Store?
+ehthumbs.db
 .electron-gyp/
-.git-credentials
+*.env
+.env
+.env*
+env/
+ENV/
+env.bak/
+.env.development.local
+# Environment variables
+.env.local
+.env.production.local
+.env.test.local
+fcsma_*
+FCSMA_*
+# FCSMA data
+# Generated files
 .gitconfig
+.git-credentials
+hyper_detailed_*
+.idea
+.idea/
+# IDE and editor files
+.ipynb_checkpoints
+# Jupyter Notebook
+*.key
+# Large files and downloads
+# Lead files
+*leads*
+leads_*
+Leads/
 .lesshst
+*_list.py
+LLCinfo/
 .local/
-.npm-global/
+*.log
+logs/
+# Logs with potential API keys
+matched_carriers_*
+*matcher*
+node_modules/
 .npm/
+npm-debug.log*
+.npm-global/
 .npmrc
 .nvm/
+# OS generated files
+package-lock.json
+*.pem
+# Personal files
 .pki/
 .pm2/
+# Production builds
 .profile
+__pycache__/
+*.py[cod]
+# pyenv
+# Python
+.Python
+.python-version
+reproduce_*
+sample_*
+# Script outputs
+*search*
+secrets.json
+# Sensitive files
+*.so
+.Spotlight-V100
 .ssh/
 .sudo_as_admin_successful
-.wget-hsts
-
-# Website builds
+*.swo
+*.swp
+*.tar.gz
+*.temp
+temp/
+# Temporary files
+test-*
+test_*
+# Test files
+Thumbs.db
+*.tmp
+tmp/
+*token*.json
+token.json
+.Trashes
+# *.txt
+unmatched_*
+# Upload directories
+uploads/
+vanguard-crm-*
+vanguard-vps-*
+venv/
+venv.bak/
 vig-website/
+.vscode/
+# Website builds
+.wget-hsts
+yarn-debug.log*
+yarn-error.log*
+*.zip
