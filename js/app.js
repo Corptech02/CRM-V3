@@ -22616,7 +22616,9 @@ function getNextAction(stage, lead) {
             console.log(`🔍 COMPLETION CHECK TYPES: completedAt=${typeof reachOut.completedAt}, reachOutCompletedAt=${typeof reachOut.reachOutCompletedAt}, callsConnected=${typeof reachOut.callsConnected}, textCount=${typeof reachOut.textCount}`);
 
             const hasTimestamp = reachOut.completedAt || reachOut.reachOutCompletedAt;
-            const hasActualCompletion = reachOut.callsConnected > 0 || reachOut.textCount > 0;
+            const hasActualCompletion = reachOut.callsConnected > 0 ||
+                                      reachOut.textCount > 0 ||
+                                      reachOut.emailConfirmed === true;
             const isActuallyCompleted = hasTimestamp && hasActualCompletion;
 
             console.log(`🔍 COMPLETION CONDITIONS: hasTimestamp=${hasTimestamp}, hasActualCompletion=${hasActualCompletion}, isActuallyCompleted=${isActuallyCompleted}`);
@@ -22696,10 +22698,64 @@ function getNextAction(stage, lead) {
     if (actionText === 'Process complete') {
         return `<span style="color: #16a34a; font-weight: bold;">${actionText}</span>`;
     } else if (actionText === 'Reach out') {
-        return `<span style="color: #dc2626; font-weight: bold;">${actionText}</span>`;
+        // Calculate highlight duration stamp for "Reach out" actions
+        const durationStamp = getHighlightDurationStamp(lead);
+        return `<span style="color: #dc2626; font-weight: bold;">${actionText}</span>${durationStamp}`;
     } else {
         return actionText;
     }
+}
+
+// Helper function to calculate highlight duration stamp for reach out actions
+function getHighlightDurationStamp(lead) {
+    if (!lead || !lead.reachOut) {
+        return '';
+    }
+
+    // Check if reach out is completed (required for highlight duration)
+    const hasCompletion = lead.reachOut.completedAt || lead.reachOut.reachOutCompletedAt;
+    if (!hasCompletion) {
+        return '';
+    }
+
+    // Check for highlight expiry in all possible formats
+    let highlightExpiry = null;
+    if (lead.greenHighlight && lead.greenHighlight.expiresAt) {
+        highlightExpiry = new Date(lead.greenHighlight.expiresAt);
+    } else if (lead.reachOut && lead.reachOut.greenHighlightUntil) {
+        highlightExpiry = new Date(lead.reachOut.greenHighlightUntil);
+    } else if (lead.greenUntil) {
+        highlightExpiry = new Date(lead.greenUntil);
+    }
+
+    if (!highlightExpiry) {
+        return ' <span style="color: #6b7280; font-size: 12px; margin-left: 8px;">No Duration</span>';
+    }
+
+    const now = new Date();
+    const diffMs = highlightExpiry - now;
+
+    if (diffMs <= 0) {
+        return ' <span style="color: #6b7280; font-size: 12px; margin-left: 8px;">Expired</span>';
+    }
+
+    // Calculate display format
+    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+
+    let durationText;
+    if (days > 0) {
+        durationText = `${days}d ${hours}h left`;
+    } else if (totalHours > 0) {
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        durationText = `${totalHours}h ${minutes}m left`;
+    } else {
+        const minutes = Math.floor(diffMs / (1000 * 60));
+        durationText = `${minutes}m left`;
+    }
+
+    return ` <span style="color: #10b981; font-size: 12px; margin-left: 8px; font-weight: 600;">${durationText}</span>`;
 }
 
 // Helper function to get the appropriate reach out action text based on stage

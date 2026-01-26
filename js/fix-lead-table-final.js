@@ -366,7 +366,8 @@ function formatPremiumDisplay(premium) {
                     <td>${window.getStageHtml ? window.getStageHtml(lead.stage, lead) : getStageHtmlFixed(lead.stage)}</td>
                     <td>
                         ${(() => {
-                            const todoText = getNextActionFixed(lead.stage || 'new', lead);
+                            // Use the global getNextAction function that gets overridden by other scripts
+                            const todoText = window.getNextAction ? window.getNextAction(lead.stage || 'new', lead) : getNextActionFixed(lead.stage || 'new', lead);
 
                             // Enhanced debug logging for leads requiring reach-out
                             const requiresReachoutStages = ['quoted', 'info_requested', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware', 'interested', 'contact_attempted', 'loss_runs_requested'];
@@ -1426,9 +1427,9 @@ function formatPremiumDisplay(premium) {
         });
     };
 
-    // Run immediately
-    setTimeout(runAggressiveHighlighting, 500);
-    setTimeout(runAggressiveHighlighting, 1000);
+    // DISABLED: These were overriding correct initial highlighting
+    // setTimeout(runAggressiveHighlighting, 500);
+    // setTimeout(runAggressiveHighlighting, 1000);
     // DISABLED multiple aggressive timeouts to prevent blinking
     // setTimeout(runAggressiveHighlighting, 1500);
     // setTimeout(runAggressiveHighlighting, 2000);
@@ -1450,8 +1451,8 @@ function formatPremiumDisplay(premium) {
 
     console.log('✅ FINAL LEAD TABLE FIX READY');
 
-    // CRITICAL: Auto-fix Harry Welling on page load
-    setTimeout(() => {
+    // DISABLED: This was interfering with correct initial highlighting
+    // setTimeout(() => {
         console.log('🚨 AUTO-FIXING HARRY WELLING...');
 
         // Force table regeneration if needed
@@ -1464,43 +1465,43 @@ function formatPremiumDisplay(premium) {
             }
         }
 
-        // Apply highlighting with corrected logic
-        setTimeout(applyReachOutCompleteHighlighting, 500);
+        // DISABLED: This was interfering with correct initial highlighting
+        // setTimeout(applyReachOutCompleteHighlighting, 500);
 
         // Verify and manual fix if needed
-        setTimeout(() => {
-            const tableBody = document.querySelector('#leadsTableBody') || document.querySelector('tbody');
-            if (tableBody) {
-                const rows = tableBody.querySelectorAll('tr');
-                rows.forEach(row => {
-                    const nameCell = row.querySelector('td:first-child');
-                    if (nameCell && nameCell.textContent.includes('HARRY WELLING')) {
-                        const todoCell = row.querySelectorAll('td')[6];
-                        if (todoCell) {
-                            const currentText = todoCell.textContent.trim();
-                            const hasRedStyling = todoCell.innerHTML.includes('color: #dc2626');
+        // setTimeout(() => {
+            // const tableBody = document.querySelector('#leadsTableBody') || document.querySelector('tbody');
+            // if (tableBody) {
+                // const rows = tableBody.querySelectorAll('tr');
+                // rows.forEach(row => {
+                    // const nameCell = row.querySelector('td:first-child');
+                    // if (nameCell && nameCell.textContent.includes('HARRY WELLING')) {
+                        // const todoCell = row.querySelectorAll('td')[6];
+                        // if (todoCell) {
+                            // const currentText = todoCell.textContent.trim();
+                            // const hasRedStyling = todoCell.innerHTML.includes('color: #dc2626');
 
-                            console.log(`🔍 Harry Welling TODO: "${currentText}", Red styling: ${hasRedStyling}`);
+                            // console.log(`🔍 Harry Welling TODO: "${currentText}", Red styling: ${hasRedStyling}`);
 
-                            if (!hasRedStyling || !currentText.toLowerCase().includes('reach')) {
-                                console.log('🔧 FORCE FIXING Harry Welling TODO cell...');
-                                todoCell.innerHTML = '<span style="color: #dc2626; font-weight: bold;">Reach out</span>';
-                            }
-                        }
+                            // if (!hasRedStyling || !currentText.toLowerCase().includes('reach')) {
+                                // console.log('🔧 FORCE FIXING Harry Welling TODO cell...');
+                                // todoCell.innerHTML = '<span style="color: #dc2626; font-weight: bold;">Reach out</span>';
+                            // }
+                        // }
 
                         // Remove any green highlighting
-                        row.style.removeProperty('background-color');
-                        row.style.removeProperty('background');
-                        row.style.removeProperty('border-left');
-                        row.style.removeProperty('border-right');
-                        row.classList.remove('reach-out-complete');
+                        // row.style.removeProperty('background-color');
+                        // row.style.removeProperty('background');
+                        // row.style.removeProperty('border-left');
+                        // row.style.removeProperty('border-right');
+                        // row.classList.remove('reach-out-complete');
 
-                        console.log('✅ Harry Welling fixed: Red TODO text + No green highlight');
-                    }
-                });
-            }
-        }, 1500);
-    }, 3000);
+                        // console.log('✅ Harry Welling fixed: Red TODO text + No green highlight');
+                    // }
+                // });
+            // }
+        // }, 1500);
+    // }, 3000);
 
     // RUN IMMEDIATELY ONE MORE TIME - DISABLED to prevent blinking
     // setTimeout(() => {

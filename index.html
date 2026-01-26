@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- Cache buster: 2025-01-13-VICIDIAL-BUTTON-FIX -->
+    <!-- Cache buster: 2025-01-26-AGGRESSIVE-AUTOREFRESH-FIX -->
     <title>Vanguard Insurance Software - All-in-One Agency Management Platform</title>
     <link rel="icon" type="image/png" href="images/V-Logo.png">
     <link rel="stylesheet" href="css/styles.css?v=35">
@@ -3321,13 +3321,48 @@
     <!-- Call logs feature implemented -->
 
     <!-- REACHOUT INITIALIZATION FIX - Must load before table generation -->
-    <script src="js/fix-reachout-initialization.js?v=1"></script>
+    <script src="js/fix-reachout-initialization.js?v=2"></script>
 
     <!-- DEBUG ALASKA LEAD ISSUE -->
     <script src="js/debug-alaska-lead.js?v=1"></script>
 
+    <!-- SIMPLE AUTO REFRESH - Just call loadLeadsView after 5 seconds -->
+    <script>
+        console.log('🔄 AGGRESSIVE AUTO REFRESH: Script starting...');
+
+        function tryRefresh(attempt) {
+            console.log(`🔄 ATTEMPT ${attempt}: Trying refresh...`);
+            console.log('Current location hash:', window.location.hash);
+            console.log('loadLeadsView available?', typeof window.loadLeadsView);
+
+            if (window.loadLeadsView && typeof window.loadLeadsView === 'function') {
+                console.log(`✅ ATTEMPT ${attempt}: FOUND loadLeadsView - calling it!`);
+                try {
+                    window.loadLeadsView();
+                    console.log(`✅ ATTEMPT ${attempt}: loadLeadsView() called successfully!`);
+                    return true;
+                } catch (error) {
+                    console.error(`❌ ATTEMPT ${attempt}: Error calling loadLeadsView:`, error);
+                }
+            } else {
+                console.log(`❌ ATTEMPT ${attempt}: loadLeadsView not available yet`);
+                console.log('Available window functions:', Object.keys(window).filter(key => key.includes('load')));
+            }
+            return false;
+        }
+
+        // Try multiple times at different intervals
+        setTimeout(() => tryRefresh(1), 1000);   // 1 second
+        setTimeout(() => tryRefresh(2), 3000);   // 3 seconds
+        setTimeout(() => tryRefresh(3), 5000);   // 5 seconds
+        setTimeout(() => tryRefresh(4), 8000);   // 8 seconds
+        setTimeout(() => tryRefresh(5), 12000);  // 12 seconds
+
+        console.log('✅ AGGRESSIVE AUTO REFRESH: Multiple refresh attempts scheduled');
+    </script>
+
     <!-- COMPREHENSIVE TODO/HIGHLIGHTING FIX - Load last to override everything -->
-    <script src="js/comprehensive-final-fix.js?v=GLOBAL_HANDLER"></script>
+    <script src="js/comprehensive-final-fix.js?v=CACHE_BUST_2"></script>
 
     <!-- APP SENT STAGE INDEFINITE HIGHLIGHT FIX -->
     <script src="js/app-sent-highlight-fix.js?v=3"></script>
@@ -3339,7 +3374,7 @@
     <script src="js/app-sent-todo-override.js?v=2"></script>
 
     <!-- FINAL APP SENT FIX - Ultimate override for all TODO generation -->
-    <script src="js/final-app-sent-fix.js?v=DEBUG_ALASKA"></script>
+    <script src="js/final-app-sent-fix.js?v=CACHE_BUST_2"></script>
 
     <!-- FIX FIRST TABLE TEMPLATE - Ensure first loading template works correctly -->
     <script src="js/fix-first-table-template.js?v=1"></script>
