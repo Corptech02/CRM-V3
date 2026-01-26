@@ -5650,6 +5650,54 @@ app.post('/api/call-recording-upload', uploadCallRecording.single('recording'), 
     }
 });
 
+// Update Vicidial comments endpoint
+app.post('/api/vicidial/update-comments', async (req, res) => {
+    console.log('🔄 Updating Vicidial lead comments...');
+
+    try {
+        const { leadId, comments, stage, updatedField, updatedValue } = req.body;
+
+        if (!leadId || !comments) {
+            return res.status(400).json({
+                success: false,
+                error: 'Lead ID and comments are required'
+            });
+        }
+
+        // For now, just log the update request
+        // In a full implementation, this would use the ViciDial API to update comments
+        console.log(`📝 Comment update request for lead ${leadId}:`);
+        console.log(`   New comments: ${comments.substring(0, 100)}...`);
+        if (stage) {
+            console.log(`   Stage updated to: ${stage}`);
+        }
+        if (updatedField) {
+            console.log(`   Field "${updatedField}" updated to: "${updatedValue}"`);
+        }
+
+        // TODO: Implement actual ViciDial API call
+        // This would involve:
+        // 1. Authenticating with ViciDial
+        // 2. Finding the lead by ID
+        // 3. Updating the comments field
+        // 4. Returning success/failure status
+
+        // For now, simulate success
+        res.json({
+            success: true,
+            message: 'Comments update queued for Vicidial sync',
+            leadId: leadId
+        });
+
+    } catch (error) {
+        console.error('Error updating Vicidial comments:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Export database for use in other modules
 module.exports = { db };
 

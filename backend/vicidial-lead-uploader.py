@@ -64,28 +64,19 @@ def add_lead_to_vicidial(list_id, lead_data):
     # Create your exact format
     basic_info = ' | '.join(comments_parts)
 
-    # Add your specified compact format
+    # Add your updated comment format
     script_addendum = """
-----TRUCKS-------
-Amount:
-Year:
-Brand:
-Value:
-----TRAILERS-----
-Amount:
-Year:
-Brand:
-Value:
-----OWNER--------
-Year of birth:
-CDL:
-----DRIVER(S)----
-Amount:
-Year of birth:
-CDL:
----OPERATION-----
-Mile Radius (80%):
-Additional:"""
+------------Name--------------
+
+---------Lead Select----------
+New:
+Info Requested:
+Loss Runs Requested:
+Loss Runs Received:
+
+--scheduled next call---------
+Date: MM/DD/2026 Time: 00:00AM
+------------------------------"""
 
     # Combine basic info with organized script
     comments = basic_info + script_addendum

@@ -528,6 +528,54 @@ class VanguardViciDialSelectiveSync:
 
         return policy_info
 
+    def parse_enhanced_comments(self, comments):
+        """Parse enhanced comments format to extract owner name, lead stage, and callback info"""
+        parsed_info = {
+            'owner_name': '',
+            'lead_stage': 'new',
+            'callback_date': '',
+            'callback_time': '',
+            'stage_selections': {}
+        }
+
+        if not comments:
+            return parsed_info
+
+        logger.info(f"🔍 Parsing enhanced comments: {comments[:200]}...")
+
+        try:
+            # Extract owner name from Name section
+            name_match = re.search(r'------------Name--------------\s*\n\s*([^\n\r-]+)', comments, re.IGNORECASE | re.MULTILINE)
+            if name_match:
+                parsed_info['owner_name'] = name_match.group(1).strip()
+                logger.info(f"✅ Owner name extracted: '{parsed_info['owner_name']}'")
+
+            # Extract stage selections and determine current stage
+            stage_patterns = [
+                ('new', r'New:\s*([Xx])', 'new'),
+                ('info_requested', r'Info Requested:\s*([Xx])', 'info_requested'),
+                ('loss_runs_requested', r'Loss Runs Requested:\s*([Xx])', 'loss_runs_requested'),
+                ('loss_runs_received', r'Loss Runs Received:\s*([Xx])', 'loss_runs_received')
+            ]
+
+            for stage_key, pattern, stage_value in stage_patterns:
+                if re.search(pattern, comments, re.IGNORECASE):
+                    parsed_info['stage_selections'][stage_key] = True
+                    parsed_info['lead_stage'] = stage_value
+                    logger.info(f"✅ Stage detected: {stage_value}")
+
+            # Extract callback information
+            callback_match = re.search(r'--scheduled next call-+\s*\n\s*Date:\s*([^\s]+)\s+Time:\s*([^\n\r]+)', comments, re.IGNORECASE | re.MULTILINE)
+            if callback_match:
+                parsed_info['callback_date'] = callback_match.group(1).strip()
+                parsed_info['callback_time'] = callback_match.group(2).strip()
+                logger.info(f"✅ Callback scheduled: {parsed_info['callback_date']} at {parsed_info['callback_time']}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error parsing enhanced comments: {e}")
+
+        return parsed_info
+
     def format_phone(self, phone):
         """Format phone number consistently"""
         if not phone:
@@ -665,6 +713,9 @@ class VanguardViciDialSelectiveSync:
                 comments = lead_details.get('comments', '')
                 policy_info = self.extract_policy_from_comments(comments)
 
+                # Parse enhanced comments for owner name, stage, and callback info
+                enhanced_info = self.parse_enhanced_comments(comments)
+
                 # Extract insurance company from address fields
                 insurance_company = ""
                 address1 = lead_details.get('address1', '').strip()
@@ -724,7 +775,7 @@ class VanguardViciDialSelectiveSync:
                     "phone": self.format_phone(lead_info.get('phone', '')),
                     "email": lead_info.get('email', ''),
                     "product": "Commercial Auto",
-                    "stage": "new",
+                    "stage": enhanced_info['lead_stage'],  # Use parsed stage from comments
                     "status": "hot_lead",
                     "assignedTo": assigned_agent,
                     "created": datetime.now().strftime("%-m/%-d/%Y"),
@@ -745,7 +796,8 @@ class VanguardViciDialSelectiveSync:
                     "listId": list_id,
                     "leadStatus": lead_info.get('status', 'SALE'),
                     "recordingPath": recording_path or "",
-                    "hasRecording": bool(recording_path)
+                    "hasRecording": bool(recording_path),
+                    "ownerName": enhanced_info['owner_name'] if enhanced_info['owner_name'] else '',  # Owner name from comments
                 }
 
                 # Create automatic call log from ViciDial call information
