@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Policy Implementation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>Policy Implementation Verification</h1>
+    <div id="results"></div>
+
+    <script>
+        let results = '';
+
+        function addResult(message, type = 'info') {
+            results += `<div class="status ${type}">${message}</div>`;
+        }
+
+        function updateResults() {
+            document.getElementById('results').innerHTML = results;
+        }
+
+        // Verification script
+        setTimeout(() => {
+            addResult('🔍 Starting policy implementation verification...', 'info');
+            updateResults();
+
+            try {
+                // Check localStorage policies
+                const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                addResult(`📊 Total policies in localStorage: ${policies.length}`, 'info');
+
+                if (policies.length > 0) {
+                    policies.forEach((policy, index) => {
+                        addResult(`📋 Policy ${index + 1}: ${policy.clientName} (${policy.carrierName}) - $${policy.premium ? policy.premium.toLocaleString() : 'N/A'}`, 'success');
+                    });
+
+                    // Check for our specific policies
+                    const alsTowing = policies.find(p => p.clientName === 'AL\'S TOWING LLC');
+                    const blueSky = policies.find(p => p.clientName === 'BLUE SKY LOGISTICS INC');
+
+                    if (alsTowing) {
+                        addResult('✅ AL\'S TOWING LLC policy found!', 'success');
+                        addResult(`   - Premium: $${alsTowing.premium.toLocaleString()}`, 'success');
+                        addResult(`   - Vehicles: ${alsTowing.vehicles ? alsTowing.vehicles.length : 0}`, 'success');
+                        addResult(`   - Drivers: ${alsTowing.drivers ? alsTowing.drivers.length : 0}`, 'success');
+
+                        if (alsTowing.vehicles && alsTowing.vehicles.length > 0) {
+                            addResult(`   - Vehicle breakdown: ${alsTowing.vehicles.map(v => `${v.year} ${v.make} ${v.model}`).join(', ')}`, 'info');
+                        }
+                    } else {
+                        addResult('❌ AL\'S TOWING LLC policy NOT found!', 'error');
+                    }
+
+                    if (blueSky) {
+                        addResult('✅ BLUE SKY LOGISTICS policy found!', 'success');
+                        addResult(`   - Premium: $${blueSky.premium.toLocaleString()}`, 'success');
+                        addResult(`   - Vehicles: ${blueSky.vehicles ? blueSky.vehicles.length : 0}`, 'success');
+                        addResult(`   - Drivers: ${blueSky.drivers ? blueSky.drivers.length : 0}`, 'success');
+                    } else {
+                        addResult('❌ BLUE SKY LOGISTICS policy NOT found!', 'error');
+                    }
+                } else {
+                    addResult('❌ No policies found in localStorage!', 'error');
+                    addResult('🔄 This might be a new browser session or the scripts haven\'t run yet.', 'warning');
+                }
+
+                // Check available functions
+                addResult('🔧 Checking available functions:', 'info');
+                addResult(`   - addAlsTowingPolicy: ${typeof window.addAlsTowingPolicy !== 'undefined' ? '✅ Available' : '❌ Not available'}`,
+                         typeof window.addAlsTowingPolicy !== 'undefined' ? 'success' : 'error');
+                addResult(`   - addBlueSkyPolicy: ${typeof window.addBlueSkyPolicy !== 'undefined' ? '✅ Available' : '❌ Not available'}`,
+                         typeof window.addBlueSkyPolicy !== 'undefined' ? 'success' : 'error');
+                addResult(`   - fixPolicyTabStructure: ${typeof window.fixPolicyTabStructure !== 'undefined' ? '✅ Available' : '❌ Not available'}`,
+                         typeof window.fixPolicyTabStructure !== 'undefined' ? 'success' : 'error');
+                addResult(`   - populateAllPolicyTabs: ${typeof window.populateAllPolicyTabs !== 'undefined' ? '✅ Available' : '❌ Not available'}`,
+                         typeof window.populateAllPolicyTabs !== 'undefined' ? 'success' : 'error');
+
+                // If functions are available but policies aren't found, try to add them
+                if (policies.length === 0) {
+                    if (typeof window.addAlsTowingPolicy === 'function') {
+                        addResult('🔄 Attempting to add AL\'S TOWING LLC policy...', 'warning');
+                        try {
+                            const result = window.addAlsTowingPolicy();
+                            addResult(result ? '✅ AL\'S TOWING LLC policy added successfully!' : '❌ Failed to add AL\'S TOWING LLC policy',
+                                     result ? 'success' : 'error');
+                        } catch (error) {
+                            addResult(`❌ Error adding AL\'S TOWING LLC policy: ${error.message}`, 'error');
+                        }
+                    }
+
+                    if (typeof window.addBlueSkyPolicy === 'function') {
+                        addResult('🔄 Attempting to add BLUE SKY LOGISTICS policy...', 'warning');
+                        try {
+                            const result = window.addBlueSkyPolicy();
+                            addResult(result ? '✅ BLUE SKY LOGISTICS policy added successfully!' : '❌ Failed to add BLUE SKY LOGISTICS policy',
+                                     result ? 'success' : 'error');
+                        } catch (error) {
+                            addResult(`❌ Error adding BLUE SKY LOGISTICS policy: ${error.message}`, 'error');
+                        }
+                    }
+
+                    // Recheck after adding
+                    setTimeout(() => {
+                        const updatedPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                        addResult(`📊 After addition: Total policies: ${updatedPolicies.length}`, 'info');
+                        updateResults();
+                    }, 1000);
+                }
+
+            } catch (error) {
+                addResult(`❌ Error during verification: ${error.message}`, 'error');
+            }
+
+            updateResults();
+        }, 1000);
+    </script>
+
+    <!-- Load the same scripts as the main page to test functionality -->
+    <script src="js/add-als-towing-policy.js?v=1"></script>
+    <script src="js/add-second-policy.js?v=1"></script>
+    <script src="js/fix-policy-tabs-display.js?v=1"></script>
+    <script src="js/policy-tab-content-filler.js?v=1"></script>
+</body>
+</html>

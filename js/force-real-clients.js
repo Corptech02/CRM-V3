@@ -18,14 +18,25 @@ async function loadRealClients() {
             throw new Error(`API Error: ${response.status}`);
         }
 
-        const clients = await response.json();
-        console.log(`✅ Loaded ${clients.length} real clients from API`);
+        const serverClients = await response.json();
+        console.log(`✅ Loaded ${serverClients.length} real clients from API`);
 
-        // CRITICAL: Save to localStorage so viewClient can find them
-        localStorage.setItem('insurance_clients', JSON.stringify(clients));
-        console.log(`💾 FORCE-REAL-CLIENTS: Saved ${clients.length} clients to localStorage`);
+        // Get existing local clients
+        const localClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        console.log(`📱 Found ${localClients.length} local clients in localStorage`);
 
-        if (clients.length === 0) {
+        // Merge: Keep local clients that aren't on server, add server clients
+        const serverClientIds = new Set(serverClients.map(c => String(c.id)));
+        const localOnlyClients = localClients.filter(c => !serverClientIds.has(String(c.id)));
+
+        const mergedClients = [...serverClients, ...localOnlyClients];
+        console.log(`🔀 Merged clients: ${serverClients.length} from server + ${localOnlyClients.length} local-only = ${mergedClients.length} total`);
+
+        // CRITICAL: Save merged clients to localStorage so viewClient can find them
+        localStorage.setItem('insurance_clients', JSON.stringify(mergedClients));
+        console.log(`💾 FORCE-REAL-CLIENTS: Saved ${mergedClients.length} merged clients to localStorage`);
+
+        if (mergedClients.length === 0) {
             return `
                 <tr>
                     <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
@@ -38,7 +49,7 @@ async function loadRealClients() {
         }
 
         // Generate client rows with real data
-        return clients.map(client => {
+        return mergedClients.map(client => {
             // Get initials for avatar
             const nameParts = (client.name || 'Unknown').split(' ').filter(n => n);
             const initials = nameParts.map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'UN';

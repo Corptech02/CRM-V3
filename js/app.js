@@ -2541,7 +2541,54 @@ function showModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.add('active');
-        modal.style.display = 'flex';
+        modal.style.cssText = `
+            display: flex !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(0, 0, 0, 0.5) !important;
+            justify-content: center !important;
+            align-items: center !important;
+            z-index: 99999 !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        `;
+
+        // Also ensure modal content is interactive
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.style.cssText = `
+                background: white !important;
+                border-radius: 12px !important;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+                position: relative !important;
+                z-index: 100000 !important;
+                pointer-events: auto !important;
+                max-width: 600px !important;
+                width: 90% !important;
+                max-height: 90vh !important;
+                overflow: auto !important;
+            `;
+        }
+
+        // Add backdrop click handler to close modal
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal(modalId);
+            }
+        });
+
+        // Ensure all form elements are interactive
+        const formElements = modal.querySelectorAll('input, select, textarea, button');
+        formElements.forEach(element => {
+            element.style.pointerEvents = 'auto';
+            element.style.position = 'relative';
+            element.style.zIndex = '100001';
+        });
+
+        console.log('Modal shown with forced CSS and event handlers:', modalId);
     }
 }
 
@@ -8458,16 +8505,6 @@ function loadRenewalsView() {
                     <span class="stat-value">${stats.dueNextMonth.count}</span>
                     <span class="stat-label">${stats.dueNextMonth.premium} Premium</span>
                 </div>
-                <div class="stat-card urgent">
-                    <h4>Overdue</h4>
-                    <span class="stat-value">${stats.overdue.count}</span>
-                    <span class="stat-label">${stats.overdue.premium === '$0' ? 'No overdue policies' : stats.overdue.premium + ' Total'}</span>
-                </div>
-                <div class="stat-card">
-                    <h4>Renewal Rate</h4>
-                    <span class="stat-value">${stats.renewalRate}</span>
-                    <span class="stat-label">Last 12 Months</span>
-                </div>
             </div>
             
             <div class="renewal-content">
@@ -9745,28 +9782,43 @@ function addRenewalStyles() {
         
         .renewal-stats {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
             margin: 20px 0;
         }
-        
-        .stat-card {
+
+        .renewal-stats .stat-card {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            text-align: center;
         }
-        
+
+        .renewal-stats .stat-card h4 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #374151;
+        }
+
+        .renewal-stats .stat-card .stat-value {
+            font-size: 48px;
+            font-weight: bold;
+            display: block;
+            margin: 15px 0;
+            color: #1f2937;
+        }
+
+        .renewal-stats .stat-card .stat-label {
+            font-size: 16px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
         .stat-card.urgent {
             background: #fff5f5;
             border-left: 4px solid #ff4444;
-        }
-        
-        .stat-value {
-            font-size: 32px;
-            font-weight: bold;
-            display: block;
-            margin: 10px 0;
         }
         
         .stat-label {
@@ -13070,18 +13122,144 @@ function generateClientPoliciesList(policies) {
 }
 
 function addPolicyToClient(clientId) {
-    // Store the client ID globally for the policy modal to use
-    window.currentClientId = clientId;
-    window.currentViewingClientId = clientId; // Also store as viewing client ID
+    // Show the policy choice popup first
+    showPolicyChoicePopup(clientId);
+}
 
-    // Get client data
+function showPolicyChoicePopup(clientId) {
+    // Get client data for display
     const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
     const client = clients.find(c => c.id == clientId);
-
     if (!client) {
         showNotification('Client not found', 'error');
         return;
     }
+
+    // Create the choice popup
+    const popupHtml = `
+        <div class="modal-overlay" id="policyChoiceModal" style="
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(0, 0, 0, 0.5) !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            z-index: 9999 !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        ">
+            <div class="modal" style="
+                max-width: 500px !important;
+                width: 90% !important;
+                background: white !important;
+                border-radius: 12px !important;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3) !important;
+                overflow: hidden !important;
+                position: relative !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            ">
+                <div class="modal-header" style="
+                    background: #f8f9fa;
+                    padding: 20px 30px;
+                    border-bottom: 1px solid #e9ecef;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                ">
+                    <h2 style="margin: 0; color: #1f2937; font-size: 20px; font-weight: 600;">Add Policy for ${client.name}</h2>
+                    <button class="close-btn" onclick="closePolicyChoiceModal()" style="
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        color: #6b7280;
+                        cursor: pointer;
+                        padding: 0;
+                        width: 30px;
+                        height: 30px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 50%;
+                        transition: all 0.2s;
+                    " onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">×</button>
+                </div>
+                <div class="modal-body" style="text-align: center; padding: 40px 30px;">
+                    <p style="margin-bottom: 30px; color: #6b7280; font-size: 16px;">
+                        How would you like to add a policy for this client?
+                    </p>
+                    <div style="display: flex; gap: 20px; justify-content: center;">
+                        <button onclick="createNewPolicyForClient('${clientId}')"
+                                style="flex: 1; max-width: 200px; padding: 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 500; transition: 0.2s;"
+                                onmouseover="this.style.background='#2563eb'"
+                                onmouseout="this.style.background='#3b82f6'">
+                            <i class="fas fa-plus-circle" style="display: block; font-size: 24px; margin-bottom: 10px;"></i>
+                            Create New Policy
+                        </button>
+                        <button onclick="importExistingPolicyForClient('${clientId}')"
+                                style="flex: 1; max-width: 200px; padding: 20px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 500; transition: 0.2s;"
+                                onmouseover="this.style.background='#059669'"
+                                onmouseout="this.style.background='#10b981'">
+                            <i class="fas fa-download" style="display: block; font-size: 24px; margin-bottom: 10px;"></i>
+                            Import Existing Policy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add popup to document
+    document.body.insertAdjacentHTML('beforeend', popupHtml);
+
+    // Debug: Check if modal was added and add click handler
+    console.log('Policy choice modal added to DOM');
+    setTimeout(() => {
+        const modal = document.getElementById('policyChoiceModal');
+        if (modal) {
+            console.log('Modal found in DOM:', modal);
+            console.log('Modal visibility:', modal.offsetWidth, modal.offsetHeight);
+            console.log('Modal styles:', {
+                display: modal.style.display,
+                position: modal.style.position,
+                zIndex: modal.style.zIndex,
+                background: modal.style.background
+            });
+
+            // Add click handler to close on backdrop click
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closePolicyChoiceModal();
+                }
+            });
+        } else {
+            console.error('Modal not found in DOM after timeout');
+        }
+    }, 100);
+}
+
+function closePolicyChoiceModal() {
+    const modal = document.getElementById('policyChoiceModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function createNewPolicyForClient(clientId) {
+    // Close the choice popup
+    closePolicyChoiceModal();
+
+    // Store the client ID globally for the policy modal to use
+    window.currentClientId = clientId;
+    window.currentViewingClientId = clientId;
+
+    // Get client data
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const client = clients.find(c => c.id == clientId);
 
     // Store client info for policy creation
     window.currentClientInfo = client;
@@ -13103,6 +13281,244 @@ function addPolicyToClient(clientId) {
     } else {
         console.error('Policy modal script not loaded');
         showNotification('Policy creation feature not available', 'error');
+    }
+}
+
+function importExistingPolicyForClient(clientId) {
+    // Close the choice popup
+    closePolicyChoiceModal();
+
+    // Store the client ID for import
+    window.currentClientId = clientId;
+    window.currentViewingClientId = clientId;
+
+    // Get client data
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const client = clients.find(c => c.id == clientId);
+
+    // Get existing policies
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+    // Create policy selection modal
+    const importHtml = `
+        <div class="modal-overlay" id="importPolicyModal" style="
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(0, 0, 0, 0.5) !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            z-index: 10000 !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        ">
+            <div class="modal" style="
+                max-width: 1400px !important;
+                width: 98% !important;
+                height: 85vh !important;
+                background: white !important;
+                border-radius: 12px !important;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3) !important;
+                overflow: hidden !important;
+                position: relative !important;
+                display: flex !important;
+                flex-direction: column !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            ">
+                <div class="modal-header" style="
+                    background: #f8f9fa !important;
+                    padding: 20px 30px !important;
+                    border-bottom: 1px solid #e9ecef !important;
+                    display: flex !important;
+                    justify-content: space-between !important;
+                    align-items: center !important;
+                    flex-shrink: 0 !important;
+                ">
+                    <h2 style="margin: 0; color: #6b7280; font-size: 20px; font-weight: 500;">
+                        Select Policy to Import for <span style="color: #6b7280; font-weight: 500;">${client.name}</span>
+                    </h2>
+                    <button class="close-btn" onclick="closeImportPolicyModal()" style="
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        color: #6b7280;
+                        cursor: pointer;
+                        padding: 0;
+                        width: 30px;
+                        height: 30px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 50%;
+                        transition: all 0.2s;
+                    " onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">×</button>
+                </div>
+                <div class="modal-body" style="padding: 0; flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+                    <div style="padding: 20px 30px 10px; flex-shrink: 0;">
+                        <p style="margin: 0; color: #6b7280; font-size: 16px;">
+                            Select an existing policy to link/import to this client:
+                        </p>
+                    </div>
+                    <div style="flex: 1; overflow: auto; padding: 0 30px 30px;">
+                        <div class="data-table-container" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f8f9fa;">
+                                        <th style="width: 18%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Policy #</th>
+                                        <th style="width: 25%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Client</th>
+                                        <th style="width: 15%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Carrier</th>
+                                        <th style="width: 12%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Effective Date</th>
+                                        <th style="width: 12%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Expiration</th>
+                                        <th style="width: 10%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Premium</th>
+                                        <th style="width: 8%; padding: 15px; text-align: center; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${generatePolicyImportRows(policies, clientId)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', importHtml);
+}
+
+function generatePolicyImportRows(policies, targetClientId) {
+    if (!policies || policies.length === 0) {
+        return `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280; font-style: italic;">
+                    No policies found to import
+                </td>
+            </tr>
+        `;
+    }
+
+    return policies.map(policy => {
+        // Get policy type badge class
+        const badgeClass = policy.policyType === 'Commercial Auto' ? 'badge-orange' : 'badge-blue';
+
+        // Format dates
+        const effectiveDate = policy.effectiveDate ? new Date(policy.effectiveDate).toLocaleDateString() : 'N/A';
+        const expirationDate = policy.expirationDate ? new Date(policy.expirationDate).toLocaleDateString() : 'N/A';
+
+        // Format premium
+        const premium = policy.premium ?
+            (typeof policy.premium === 'string' ? policy.premium : `$${parseFloat(policy.premium).toLocaleString()}`)
+            : '$0';
+
+        // Get client name
+        const clientName = policy.clientName || policy.namedInsured || 'Unknown Client';
+
+        // Get carrier name
+        const carrierName = policy.carrier || policy.insuranceCarrier || 'N/A';
+
+        return `
+            <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 15px;">
+                    <span class="policy-number" style="font-weight: 600; color: #1f2937;">${policy.policyNumber || 'N/A'}</span>
+                    <div class="policy-type-badge ${badgeClass}" style="
+                        display: inline-block;
+                        margin-top: 4px;
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        font-size: 11px;
+                        font-weight: 500;
+                        background: ${badgeClass === 'badge-orange' ? '#fed7aa' : '#dbeafe'};
+                        color: ${badgeClass === 'badge-orange' ? '#ea580c' : '#2563eb'};
+                    ">${policy.policyType || 'Commercial Auto'}</div>
+                </td>
+                <td style="padding: 15px;">
+                    <span class="client-name" style="font-weight: 500; color: #1f2937; word-break: break-word;">${clientName}</span>
+                </td>
+                <td style="padding: 15px;">
+                    <span class="carrier-name" style="color: #374151;">${carrierName}</span>
+                </td>
+                <td style="padding: 15px;">
+                    <span class="effective-date" style="color: #374151;">${effectiveDate}</span>
+                </td>
+                <td style="padding: 15px;">
+                    <span class="expiration-date" style="color: #374151;">${expirationDate}</span>
+                </td>
+                <td style="padding: 15px;">
+                    <span class="premium-amount" style="font-weight: 600; color: #059669;">${premium}</span>
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <button onclick="linkPolicyToClient('${policy.id}', '${targetClientId}')"
+                            style="
+                                padding: 8px 16px;
+                                background: #10b981;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: 0.2s;
+                            "
+                            onmouseover="this.style.background='#059669'"
+                            onmouseout="this.style.background='#10b981'">
+                        <i class="fas fa-link"></i> Import
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function linkPolicyToClient(policyId, clientId) {
+    // Get the policy and client data
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+
+    const policy = policies.find(p => p.id === policyId);
+    const client = clients.find(c => c.id == clientId);
+
+    if (!policy || !client) {
+        showNotification('Policy or client not found', 'error');
+        return;
+    }
+
+    // Create a copy of the policy and link it to the new client
+    const linkedPolicy = {
+        ...policy,
+        id: `POL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // New ID
+        clientId: clientId,
+        clientName: client.name,
+        namedInsured: client.name,
+        originalPolicyId: policyId // Keep reference to original
+    };
+
+    // Add the linked policy
+    policies.push(linkedPolicy);
+    localStorage.setItem('insurance_policies', JSON.stringify(policies));
+
+    // Close the import modal
+    closeImportPolicyModal();
+
+    // Show success notification
+    showNotification(`Policy ${policy.policyNumber} successfully imported for ${client.name}`, 'success');
+
+    // Refresh the client view if we're still on the client page
+    if (window.currentViewingClientId) {
+        setTimeout(() => {
+            viewClient(window.currentViewingClientId);
+        }, 500);
+    }
+}
+
+function closeImportPolicyModal() {
+    const modal = document.getElementById('importPolicyModal');
+    if (modal) {
+        modal.remove();
     }
 }
 

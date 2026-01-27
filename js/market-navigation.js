@@ -1,5 +1,5 @@
-// Market Navigation - Simple Fix
-console.log('🏪 Loading simple market navigation...');
+// Market Navigation - Minimal Interference Fix
+console.log('🏪 Loading minimal market navigation...');
 
 // Market page switching function
 function loadMarketView() {
@@ -22,16 +22,13 @@ function loadMarketView() {
     updateSidebarActive('market');
 }
 
-// Function to hide market and show dashboard
+// Function to hide market view only
 function hideMarketView() {
+    console.log('📤 Hiding Market view...');
     const marketContent = document.querySelector('.market-content');
     if (marketContent) {
         marketContent.style.display = 'none';
-    }
-
-    const dashboardContent = document.querySelector('.dashboard-content');
-    if (dashboardContent) {
-        dashboardContent.style.display = 'block';
+        console.log('✅ Market content hidden');
     }
 }
 
@@ -51,35 +48,54 @@ function updateSidebarActive(activeSection) {
     }
 }
 
-// Setup navigation for market only
-function setupMarketNavigation() {
-    console.log('🔧 Setting up simple market navigation...');
+// VERY minimal navigation handler - ONLY for market clicks
+function handleMarketOnly(event) {
+    const target = event.target.closest('a');
+    if (!target) return;
 
-    // Only handle market link clicks
-    const marketLink = document.querySelector('a[href="#market"]');
-    if (marketLink) {
-        marketLink.addEventListener('click', function(event) {
-            event.preventDefault();
-            loadMarketView();
-        });
-        console.log('✅ Market navigation link bound');
+    const href = target.getAttribute('href');
+
+    // ONLY handle market tab clicks - ignore everything else
+    if (href === '#market') {
+        event.preventDefault();
+        event.stopPropagation();
+        loadMarketView();
+        console.log('✅ Market navigation handled');
+        return;
     }
+
+    // For any other click, if market is visible, hide it
+    const marketContent = document.querySelector('.market-content');
+    if (marketContent && marketContent.style.display === 'block') {
+        console.log('👋 Market was visible, hiding it for other navigation');
+        hideMarketView();
+    }
+
+    // Let all other navigation work normally - DO NOT INTERFERE
+}
+
+// Setup ONLY market-specific navigation
+function setupMinimalMarketNavigation() {
+    console.log('🔧 Setting up minimal market navigation...');
+
+    // Remove any existing listeners first
+    document.removeEventListener('click', handleMarketOnly);
+
+    // Add minimal click handler
+    document.addEventListener('click', handleMarketOnly);
 
     // Make functions globally available
     window.loadMarketView = loadMarketView;
     window.hideMarketView = hideMarketView;
 
-    console.log('✅ Simple market navigation setup complete');
+    console.log('✅ Minimal market navigation setup complete');
 }
 
 // Initialize
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupMarketNavigation);
+    document.addEventListener('DOMContentLoaded', setupMinimalMarketNavigation);
 } else {
-    setupMarketNavigation();
+    setupMinimalMarketNavigation();
 }
 
-// Also set up after delay
-setTimeout(setupMarketNavigation, 500);
-
-console.log('✅ Simple market navigation script loaded');
+console.log('✅ Minimal market navigation script loaded');
