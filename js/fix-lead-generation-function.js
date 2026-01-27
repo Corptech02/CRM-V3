@@ -170,18 +170,6 @@ if (typeof window.loadLeadGenerationView !== 'function' && !window.completeLeadG
                                                 <span id="totalLeadsCount">-</span>
                                             </p>
                                         </div>
-                                        <div class="stat-box" style="background: #fef3c7; padding: 12px; border-radius: 6px; flex: 1;">
-                                            <span style="color: #d97706;">Expiring Soon</span>
-                                            <p style="font-weight: bold; color: #d97706; margin: 4px 0 0 0;">
-                                                <span id="expiringSoonCount">-</span>
-                                            </p>
-                                        </div>
-                                        <div class="stat-box" style="background: #dbeafe; padding: 12px; border-radius: 6px; flex: 1;">
-                                            <span style="color: #2563eb;">With Contact Info</span>
-                                            <p style="font-weight: bold; color: #1d4ed8; margin: 4px 0 0 0;">
-                                                <span id="withContactCount">-</span>
-                                            </p>
-                                        </div>
                                     </div>
                                     <div class="export-options" style="margin-top: 0.75rem;">
                                         <div class="export-buttons" style="display: flex; gap: 0.75rem; align-items: center;">

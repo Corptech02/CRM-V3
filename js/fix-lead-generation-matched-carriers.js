@@ -31,8 +31,6 @@ window.generateLeadsFromForm = async function() {
 
     // Show loading state
     document.getElementById('totalLeadsCount').textContent = 'Loading...';
-    document.getElementById('expiringSoonCount').textContent = 'Loading...';
-    document.getElementById('withContactCount').textContent = 'Loading...';
 
     const successDiv = document.getElementById('successMessage');
     successDiv.style.display = 'none';
@@ -140,12 +138,8 @@ window.generateLeadsFromForm = async function() {
 
             // Update statistics display using the API's stats
             const totalLeads = data.stats.total_leads || data.leads.length;
-            const expiringSoon = data.leads.filter(lead => parseInt(lead.days_until_expiry) <= 7).length;
-            const withContact = data.stats.with_email + data.stats.with_phone || data.leads.filter(lead => lead.email || lead.phone).length;
 
             document.getElementById('totalLeadsCount').textContent = totalLeads.toLocaleString();
-            document.getElementById('expiringSoonCount').textContent = expiringSoon.toLocaleString();
-            document.getElementById('withContactCount').textContent = withContact.toLocaleString();
 
             // Show success message
             successDiv.style.display = 'block';
@@ -161,8 +155,6 @@ window.generateLeadsFromForm = async function() {
 
         // Reset display
         document.getElementById('totalLeadsCount').textContent = '-';
-        document.getElementById('expiringSoonCount').textContent = '-';
-        document.getElementById('withContactCount').textContent = '-';
     }
 };
 

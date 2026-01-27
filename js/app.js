@@ -2720,6 +2720,14 @@ function loadContent(section) {
         dashboardContent.style.display = 'none';
         if (marketContent) {
             marketContent.style.display = 'block';
+
+            // Trigger market table rebuild when market becomes visible
+            setTimeout(() => {
+                if (typeof window.rebuildMarketTable === 'function') {
+                    console.log('📊 Market content now visible - rebuilding table');
+                    window.rebuildMarketTable();
+                }
+            }, 100);
         }
         return; // Exit early for market
     } else {
@@ -19805,18 +19813,6 @@ function getGenerateLeadsContent() {
                                     <span id="totalLeadsCount">-</span>
                                 </p>
                             </div>
-                            <div class="stat-box" style="background: #fef3c7;">
-                                <span style="color: #d97706;">Expiring Soon</span>
-                                <p style="font-weight: bold; color: #d97706;">
-                                    <span id="expiringSoonCount">-</span>
-                                </p>
-                            </div>
-                            <div class="stat-box" style="background: #dbeafe;">
-                                <span style="color: #2563eb;">With Contact Info</span>
-                                <p style="font-weight: bold; color: #1d4ed8;">
-                                    <span id="withContactCount">-</span>
-                                </p>
-                            </div>
                         </div>
                         <div class="export-options" style="margin-top: 0.75rem;">
                             <div class="export-buttons" style="display: flex; gap: 0.75rem; align-items: center;">
@@ -19906,12 +19902,12 @@ function getGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Minimum Fleet Size</label>
-                            <input type="number" class="form-control" id="minFleet" placeholder="e.g., 1" value="1">
-                        </div>
-                        <div class="form-group">
-                            <label>Maximum Fleet Size</label>
-                            <input type="number" class="form-control" id="maxFleet" placeholder="e.g., 999" value="999">
+                            <label>Fleet filter</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" class="form-control" id="minFleet" value="1" min="1" style="flex: 1; text-align: center;">
+                                <span style="font-weight: bold; color: #374151; user-select: none;">-</span>
+                                <input type="number" class="form-control" id="maxFleet" value="9999" min="1" style="flex: 1; text-align: center;">
+                            </div>
                         </div>
                     </div>
                     
@@ -19934,56 +19930,110 @@ function getGenerateLeadsContent() {
                                 <option value="UNSATISFACTORY">Unsatisfactory</option>
                             </select>
                         </div>
-                        <div class="form-group" style="grid-column: span 3;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Insurance Companies</label>
-                            <div class="insurance-checkbox-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; max-height: 120px; overflow-y: auto;">
+                            <div class="insurance-checkbox-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.4rem; padding: 0.75rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; max-height: 120px; overflow-y: auto;">
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="PROGRESSIVE"> Progressive
+                                <input type="checkbox" name="insurance" value="PROGRESSIVE" checked> Progressive
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="GEICO"> GEICO
+                                <input type="checkbox" name="insurance" value="GEICO" checked> GEICO
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="GREAT_WEST"> Great West Casualty
+                                <input type="checkbox" name="insurance" value="GREAT_WEST" checked> Great West Casualty
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="CANAL"> Canal Insurance
+                                <input type="checkbox" name="insurance" value="CANAL" checked> Canal Insurance
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="ACUITY"> Acuity
+                                <input type="checkbox" name="insurance" value="ACUITY" checked> Acuity
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="NORTHLAND"> Northland
+                                <input type="checkbox" name="insurance" value="NORTHLAND" checked> Northland
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="CINCINNATI"> Cincinnati Insurance
+                                <input type="checkbox" name="insurance" value="CINCINNATI" checked> Cincinnati Insurance
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="AUTO_OWNERS"> Auto Owners
+                                <input type="checkbox" name="insurance" value="AUTO_OWNERS" checked> Auto Owners
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="SENTRY"> Sentry Select
+                                <input type="checkbox" name="insurance" value="SENTRY" checked> Sentry Select
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="ERIE"> Erie Insurance
+                                <input type="checkbox" name="insurance" value="ERIE" checked> Erie Insurance
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="TRAVELERS"> Travelers
+                                <input type="checkbox" name="insurance" value="TRAVELERS" checked> Travelers
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="BITCO"> Bitco General
+                                <input type="checkbox" name="insurance" value="BITCO" checked> Bitco General
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="CAROLINA"> Carolina Casualty
+                                <input type="checkbox" name="insurance" value="CAROLINA" checked> Carolina Casualty
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="STATE_FARM"> State Farm
+                                <input type="checkbox" name="insurance" value="STATE_FARM" checked> State Farm
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="ALLSTATE"> Allstate
+                                <input type="checkbox" name="insurance" value="ALLSTATE" checked> Allstate
                             </label>
                             <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" name="insurance" value="NATIONWIDE"> Nationwide
+                                <input type="checkbox" name="insurance" value="NATIONWIDE" checked> Nationwide
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="FARMERS" checked> Farmers Insurance
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="LIBERTY_MUTUAL" checked> Liberty Mutual
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="AMERICAN_FAMILY" checked> American Family
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="USAA" checked> USAA
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="SAFECO" checked> Safeco
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="THE_HARTFORD" checked> The Hartford
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="ZURICH" checked> Zurich North America
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="CNA" checked> CNA Insurance
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="BERKSHIRE_HATHAWAY" checked> Berkshire Hathaway
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="AIG" checked> AIG
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="CHUBB" checked> Chubb
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="MERCURY" checked> Mercury Insurance
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="ENCOMPASS" checked> Encompass Insurance
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="ESURANCE" checked> Esurance
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="METLIFE" checked> MetLife Auto & Home
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="AMERICAN_NATIONAL" checked> American National
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="OCCIDENTAL" checked> Occidental Fire & Casualty
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="insurance" value="OTHERS" checked> Others
                             </label>
                             </div>
                             <div style="margin-top: 0.5rem; display: flex; gap: 0.75rem;">
