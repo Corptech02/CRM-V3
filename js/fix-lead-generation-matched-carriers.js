@@ -18,11 +18,29 @@ window.generateLeadsFromForm = async function() {
     const minFleet = document.getElementById('genMinFleet')?.value || '1';
     const maxFleet = document.getElementById('genMaxFleet')?.value || '9999';
 
+    // Get selected insurance companies
+    const selectedInsurance = [];
+    const insuranceCheckboxes = document.querySelectorAll('input[name="insurance"]:checked');
+    insuranceCheckboxes.forEach(checkbox => {
+        selectedInsurance.push(checkbox.value);
+    });
+
+    // Check if "OTHERS" is selected - if so, don't apply any insurance filter (get ALL companies)
+    const hasOthersSelected = selectedInsurance.includes('OTHERS');
+    const specificInsurance = selectedInsurance.filter(company => company !== 'OTHERS');
+
     // Log the criteria being applied
     console.log(`   🏛️  State: ${state}`);
     console.log(`   📅  Days until expiry: ${expiry}`);
     console.log(`   ⏭️   Skip days: ${skipDays}`);
     console.log(`   🚛  Fleet size: ${minFleet} - ${maxFleet}`);
+    console.log(`   🏢  Insurance companies: ${selectedInsurance.length > 0 ? selectedInsurance.join(', ') : 'ALL'}`);
+
+    if (hasOthersSelected) {
+        console.log(`   🔍  "Others" selected - API will get ALL companies (no insurance filter applied)`);
+    } else {
+        console.log(`   🔍  API will filter by: ${specificInsurance.length > 0 ? specificInsurance.join(', ') : 'ALL (no specific filter)'}`);
+    }
 
     if (!state) {
         alert('Please select a state to generate leads.');
@@ -45,6 +63,11 @@ window.generateLeadsFromForm = async function() {
             max_fleet: maxFleet
             // No limit - fetch all available leads
         });
+
+        // Add insurance companies ONLY if "Others" is NOT selected AND specific companies are selected
+        if (!hasOthersSelected && specificInsurance.length > 0) {
+            params.append('insurance_companies', specificInsurance.join(','));
+        }
 
         // Use proxy endpoint through main backend - use current location to avoid CORS
         console.log('🔍 Current location:', window.location.origin);

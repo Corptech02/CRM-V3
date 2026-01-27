@@ -2333,6 +2333,7 @@ app.get('/api/matched-carriers-leads', async (req, res) => {
         if (req.query.skip_days) params.append('skip_days', req.query.skip_days);
         if (req.query.min_fleet) params.append('min_fleet', req.query.min_fleet);
         if (req.query.max_fleet) params.append('max_fleet', req.query.max_fleet);
+        if (req.query.insurance_companies) params.append('insurance_companies', req.query.insurance_companies);
 
         const targetUrl = `http://localhost:5002/api/matched-carriers-leads?${params}`;
         console.log('🔗 Proxying to:', targetUrl);
