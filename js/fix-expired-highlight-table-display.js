@@ -226,22 +226,60 @@ setTimeout(() => {
     fixExpiredHighlightTableDisplay();
 }, 2000);
 
-// Fix whenever leads are refreshed
-if (window.displayLeads) {
-    const originalDisplayLeads = window.displayLeads;
+// AGGRESSIVE HOOKING - Hook into ALL possible table refresh functions
+const functionsToHook = ['displayLeads', 'loadLeadsView', 'refreshLeads', 'renderLeads'];
 
-    window.displayLeads = function() {
-        const result = originalDisplayLeads.apply(this, arguments);
+functionsToHook.forEach(funcName => {
+    if (window[funcName]) {
+        const originalFunc = window[funcName];
 
-        // Fix expired highlights after table is displayed
+        window[funcName] = function() {
+            console.log(`🔧 EXPIRED FIX: ${funcName} called - will fix table after`);
+            const result = originalFunc.apply(this, arguments);
+
+            // Fix expired highlights after each function call
+            setTimeout(() => {
+                fixExpiredHighlightTableDisplay();
+            }, 100);
+
+            // Also fix after a longer delay in case there are cascading calls
+            setTimeout(() => {
+                fixExpiredHighlightTableDisplay();
+            }, 1000);
+
+            return result;
+        };
+
+        console.log(`✅ EXPIRED FIX: Hooked into ${funcName} function`);
+    }
+});
+
+// Also hook into localStorage changes that might trigger table updates
+const originalSetItem = localStorage.setItem;
+localStorage.setItem = function(key, value) {
+    const result = originalSetItem.apply(this, arguments);
+
+    if (key === 'insurance_leads') {
+        console.log('🔧 EXPIRED FIX: localStorage updated - will fix table');
         setTimeout(() => {
             fixExpiredHighlightTableDisplay();
-        }, 500);
+        }, 200);
+        setTimeout(() => {
+            fixExpiredHighlightTableDisplay();
+        }, 1500);
+    }
 
-        return result;
-    };
+    return result;
+};
 
-    console.log('✅ EXPIRED FIX: Hooked into displayLeads function');
-}
+// Periodic aggressive checking every 5 seconds
+setInterval(() => {
+    const tableBody = document.querySelector('#leadsTableBody, #leadsTable tbody');
+    if (tableBody) {
+        fixExpiredHighlightTableDisplay();
+    }
+}, 5000);
+
+console.log('✅ EXPIRED FIX: Aggressive hooking and periodic checking enabled');
 
 console.log('✅ EXPIRED HIGHLIGHT TABLE FIX: Comprehensive fix loaded successfully!');
