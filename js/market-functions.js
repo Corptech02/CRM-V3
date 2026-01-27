@@ -184,23 +184,45 @@ function showCarrierDetails(carrierName) {
             </div>
         </div>
 
-        <div style="padding: 30px;">
-            ${generateCarrierQuoteSections(carrier.name)}
-
-            <!-- Action Buttons -->
-            <div style="margin-top: 30px; display: flex; gap: 12px; justify-content: center;">
-                <button onclick="closeCarrierDetailsModal()"
-                        style="background: #6b7280; color: white; border: none; padding: 14px 24px;
-                               border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
-                               transition: all 0.2s ease;">
-                    <i class="fas fa-times" style="margin-right: 8px;"></i>Close
-                </button>
+        <div style="padding: 30px;" id="carrier-quote-sections">
+            <div style="text-align: center; padding: 40px; color: #6b7280;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i><br>
+                Loading quote data...
             </div>
         </div>
     `;
 
     modalOverlay.appendChild(modalContent);
     document.body.appendChild(modalOverlay);
+
+    // Load quote sections asynchronously
+    generateCarrierQuoteSections(carrierName).then(sectionsHTML => {
+        const sectionsContainer = document.getElementById('carrier-quote-sections');
+        if (sectionsContainer) {
+            sectionsContainer.innerHTML = sectionsHTML + `
+                <!-- Action Buttons -->
+                <div style="margin-top: 30px; display: flex; gap: 12px; justify-content: center;">
+                    <button onclick="closeCarrierDetailsModal()"
+                            style="background: #6b7280; color: white; border: none; padding: 14px 24px;
+                                   border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+                                   transition: all 0.2s ease;">
+                        <i class="fas fa-times" style="margin-right: 8px;"></i>Close
+                    </button>
+                </div>
+            `;
+        }
+    }).catch(error => {
+        console.error('Error loading carrier quote sections:', error);
+        const sectionsContainer = document.getElementById('carrier-quote-sections');
+        if (sectionsContainer) {
+            sectionsContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #dc2626;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 10px;"></i><br>
+                    Error loading quote data
+                </div>
+            `;
+        }
+    });
 
     // Close on overlay click
     modalOverlay.addEventListener('click', function(e) {
@@ -213,8 +235,30 @@ function showCarrierDetails(carrierName) {
 }
 
 // Generate carrier quote sections for details modal
-function generateCarrierQuoteSections(carrierName) {
-    const quotes = JSON.parse(localStorage.getItem('market_quotes') || '[]');
+async function generateCarrierQuoteSections(carrierName) {
+    let quotes = [];
+
+    try {
+        const response = await fetch('/api/market-quotes');
+        if (response.ok) {
+            quotes = await response.json();
+            // Convert to frontend format
+            quotes = quotes.map(quote => ({
+                id: quote.id,
+                carrier: quote.carrier,
+                clientName: quote.physical_coverage,
+                physicalCoverage: quote.physical_coverage,
+                premiumText: quote.premium_text,
+                liabilityPerUnit: quote.liability_per_unit,
+                dateCreated: quote.date_created
+            }));
+        }
+    } catch (error) {
+        console.error('Error fetching quotes for carrier details:', error);
+        // Fallback to localStorage
+        quotes = JSON.parse(localStorage.getItem('market_quotes') || '[]');
+    }
+
     const carrierQuotes = quotes.filter(q => q.carrier === carrierName);
 
     // Separate quotes by type
@@ -318,42 +362,64 @@ function generateCarrierQuoteSections(carrierName) {
 }
 
 // Delete individual quote
-function deleteQuote(quoteId, carrierName) {
+async function deleteQuote(quoteId, carrierName) {
     if (confirm('Are you sure you want to delete this quote entry?')) {
-        let quotes = JSON.parse(localStorage.getItem('market_quotes') || '[]');
-        quotes = quotes.filter(q => q.id !== quoteId);
-        localStorage.setItem('market_quotes', JSON.stringify(quotes));
+        try {
+            const response = await fetch(`/api/market-quotes/${quoteId}`, {
+                method: 'DELETE'
+            });
 
-        console.log(`🗑️ Deleted quote ${quoteId} for ${carrierName}`);
-
-        // Refresh the modal and market data
-        closeCarrierDetailsModal();
-        setTimeout(() => {
-            showCarrierDetails(carrierName);
-            if (window.refreshMarketData) {
-                window.refreshMarketData();
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
             }
-        }, 100);
+
+            const result = await response.json();
+            console.log(`🗑️ Deleted quote ${quoteId} for ${carrierName}`);
+
+            // Refresh the modal and market data
+            closeCarrierDetailsModal();
+            setTimeout(() => {
+                showCarrierDetails(carrierName);
+                if (window.refreshMarketData) {
+                    window.refreshMarketData();
+                }
+            }, 100);
+
+        } catch (error) {
+            console.error('Error deleting quote:', error);
+            alert('Error deleting quote from server. Please try again.');
+        }
     }
 }
 
 // Clear all data for a specific carrier
-function clearAllCarrierData(carrierName) {
+async function clearAllCarrierData(carrierName) {
     if (confirm(`Are you sure you want to clear ALL quote data for ${carrierName}? This cannot be undone.`)) {
-        let quotes = JSON.parse(localStorage.getItem('market_quotes') || '[]');
-        quotes = quotes.filter(q => q.carrier !== carrierName);
-        localStorage.setItem('market_quotes', JSON.stringify(quotes));
+        try {
+            const response = await fetch(`/api/market-quotes/carrier/${encodeURIComponent(carrierName)}`, {
+                method: 'DELETE'
+            });
 
-        console.log(`🗑️ Cleared all data for ${carrierName}`);
-
-        // Refresh the modal and market data
-        closeCarrierDetailsModal();
-        setTimeout(() => {
-            showCarrierDetails(carrierName);
-            if (window.refreshMarketData) {
-                window.refreshMarketData();
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
             }
-        }, 100);
+
+            const result = await response.json();
+            console.log(`🗑️ Cleared ${result.deletedCount} quotes for ${carrierName}`);
+
+            // Refresh the modal and market data
+            closeCarrierDetailsModal();
+            setTimeout(() => {
+                showCarrierDetails(carrierName);
+                if (window.refreshMarketData) {
+                    window.refreshMarketData();
+                }
+            }, 100);
+
+        } catch (error) {
+            console.error('Error clearing carrier data:', error);
+            alert('Error clearing carrier data from server. Please try again.');
+        }
     }
 }
 
@@ -545,7 +611,7 @@ function closeLogQuoteModal() {
 }
 
 // Save quote function
-function saveQuote() {
+async function saveQuote() {
     const carrierName = document.getElementById('carrier-selection').value.trim();
     const physicalCoverage = document.getElementById('client-name').value.trim();
     const premiumText = document.getElementById('premium-text').value.trim();
@@ -562,72 +628,69 @@ function saveQuote() {
         return;
     }
 
-    const quote = {
-        id: Date.now(),
-        carrier: carrierName,
-        clientName: physicalCoverage, // For compatibility with existing data structure
-        physicalCoverage: physicalCoverage,
-        premiumText: premiumText,
-        liabilityPerUnit: liabilityPerUnit,
-        dateCreated: new Date().toISOString(),
-        dateCreatedFormatted: new Date().toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
-    };
+    try {
+        // Save to server
+        const response = await fetch('/api/market-quotes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                carrier: carrierName,
+                physical_coverage: physicalCoverage || null,
+                premium_text: premiumText || null,
+                liability_per_unit: liabilityPerUnit || null
+            })
+        });
 
-    // Save to localStorage
-    let savedQuotes = JSON.parse(localStorage.getItem('market_quotes') || '[]');
-    savedQuotes.unshift(quote); // Add to beginning of array
-
-    // Keep only the latest 100 quotes
-    if (savedQuotes.length > 100) {
-        savedQuotes = savedQuotes.slice(0, 100);
-    }
-
-    localStorage.setItem('market_quotes', JSON.stringify(savedQuotes));
-
-    console.log('💾 Quote saved:', quote);
-
-    // Show success message
-    closeLogQuoteModal();
-
-    // Refresh market data and table
-    setTimeout(() => {
-        if (typeof refreshMarketData === 'function') {
-            refreshMarketData();
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
         }
-    }, 100);
 
-    // Create success notification
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-        padding: 16px 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-        z-index: 10001;
-        animation: slideInRight 0.3s ease-out;
-        font-weight: 600;
-    `;
-    notification.innerHTML = `
-        <i class="fas fa-check-circle" style="margin-right: 8px;"></i>
-        Quote saved for ${carrierName}! Market data updated.
-    `;
+        const savedQuote = await response.json();
+        console.log('💾 Quote saved to server:', savedQuote);
 
-    document.body.appendChild(notification);
+        // Show success message
+        closeLogQuoteModal();
 
-    // Remove notification after 3 seconds
-    setTimeout(() => {
-        notification.remove();
-    }, 3000);
+        // Refresh market data and table
+        setTimeout(() => {
+            if (typeof refreshMarketData === 'function') {
+                refreshMarketData();
+            }
+        }, 100);
+
+        // Create success notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            z-index: 10001;
+            animation: slideInRight 0.3s ease-out;
+            font-weight: 600;
+        `;
+        notification.innerHTML = `
+            <i class="fas fa-check-circle" style="margin-right: 8px;"></i>
+            Quote saved for ${carrierName}! Market data updated.
+        `;
+
+        document.body.appendChild(notification);
+
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+
+    } catch (error) {
+        console.error('Error saving quote:', error);
+        alert('Error saving quote to server. Please try again.');
+    }
 }
 
 // Add modal animation styles

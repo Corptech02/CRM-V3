@@ -4,18 +4,56 @@ console.log('📊 Loading Market real data calculator...');
 // Market data calculator class
 class MarketDataCalculator {
     constructor() {
-        this.quotes = this.loadQuotes();
+        this.quotes = [];
         this.currentMetric = localStorage.getItem('market_metric') || 'liability';
-        this.carrierStats = this.calculateCarrierStats();
+        this.carrierStats = {};
+        this.initialized = false;
+        this.initialize();
     }
 
-    // Load quotes from localStorage
-    loadQuotes() {
+    async initialize() {
+        this.quotes = await this.loadQuotes();
+        this.carrierStats = this.calculateCarrierStats();
+        this.initialized = true;
+        console.log('📊 Market data calculator initialized');
+    }
+
+    // Load quotes from server
+    async loadQuotes() {
         try {
-            return JSON.parse(localStorage.getItem('market_quotes') || '[]');
+            const response = await fetch('/api/market-quotes');
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            const quotes = await response.json();
+
+            // Convert server format to frontend format for compatibility
+            return quotes.map(quote => ({
+                id: quote.id,
+                carrier: quote.carrier,
+                clientName: quote.physical_coverage, // For backward compatibility
+                physicalCoverage: quote.physical_coverage,
+                premiumText: quote.premium_text,
+                liabilityPerUnit: quote.liability_per_unit,
+                dateCreated: quote.date_created,
+                dateCreatedFormatted: new Date(quote.date_created).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+            }));
         } catch (error) {
-            console.error('Error loading quotes:', error);
-            return [];
+            console.error('Error loading quotes from server:', error);
+            // Fallback to localStorage for backward compatibility
+            try {
+                return JSON.parse(localStorage.getItem('market_quotes') || '[]');
+            } catch (localError) {
+                console.error('Error loading quotes from localStorage:', localError);
+                return [];
+            }
         }
     }
 
@@ -217,8 +255,8 @@ class MarketDataCalculator {
     }
 
     // Refresh data when new quotes are added
-    refresh() {
-        this.quotes = this.loadQuotes();
+    async refresh() {
+        this.quotes = await this.loadQuotes();
         this.carrierStats = this.calculateCarrierStats();
         console.log('📊 Market data refreshed');
     }
@@ -311,11 +349,54 @@ if (typeof originalSaveQuote === 'function') {
     };
 }
 
-// Clear any existing sample/fake data on load
-function clearFakeData() {
-    console.log('🧹 Clearing any fake/sample data to start fresh...');
-    localStorage.removeItem('market_quotes');
-    console.log('✅ Cleared market quotes data');
+// Clear any existing sample/fake data on load and migrate localStorage to server
+async function migrateLocalDataToServer() {
+    console.log('🔄 Checking for localStorage data to migrate...');
+
+    try {
+        const localQuotes = JSON.parse(localStorage.getItem('market_quotes') || '[]');
+
+        if (localQuotes.length > 0) {
+            console.log(`📦 Found ${localQuotes.length} quotes in localStorage, migrating to server...`);
+
+            // Migrate each quote to server
+            let migrated = 0;
+            for (const quote of localQuotes) {
+                try {
+                    const response = await fetch('/api/market-quotes', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            carrier: quote.carrier,
+                            physical_coverage: quote.physicalCoverage || quote.clientName || null,
+                            premium_text: quote.premiumText || null,
+                            liability_per_unit: quote.liabilityPerUnit || null
+                        })
+                    });
+
+                    if (response.ok) {
+                        migrated++;
+                    }
+                } catch (error) {
+                    console.error('Error migrating quote:', error);
+                }
+            }
+
+            console.log(`✅ Migrated ${migrated} out of ${localQuotes.length} quotes to server`);
+
+            // Clear localStorage after successful migration
+            if (migrated > 0) {
+                localStorage.removeItem('market_quotes');
+                console.log('🧹 Cleared localStorage market_quotes after migration');
+            }
+        } else {
+            console.log('✅ No localStorage data to migrate');
+        }
+    } catch (error) {
+        console.error('Error during migration:', error);
+    }
 }
 
 // Initialize header text based on saved metric
@@ -354,7 +435,7 @@ function initializeMetricHeader() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         console.log('🔄 DOM loaded - initializing market data');
-        clearFakeData();
+        migrateLocalDataToServer();
         setTimeout(() => {
             initializeMetricHeader();
             console.log('🔄 About to rebuild market table');
@@ -363,7 +444,7 @@ if (document.readyState === 'loading') {
     });
 } else {
     console.log('🔄 DOM already loaded - initializing market data');
-    clearFakeData();
+    migrateLocalDataToServer();
     setTimeout(() => {
         initializeMetricHeader();
         console.log('🔄 About to rebuild market table');

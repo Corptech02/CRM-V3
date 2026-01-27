@@ -110,6 +110,23 @@ const db = new sqlite3.Database('/var/www/vanguard/vanguard.db', (err) => {
             }
         });
 
+        // Create market_quotes table if it doesn't exist
+        db.run(`CREATE TABLE IF NOT EXISTS market_quotes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            carrier TEXT NOT NULL,
+            physical_coverage TEXT,
+            premium_text TEXT,
+            liability_per_unit TEXT,
+            date_created DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) {
+                console.error('Error creating market_quotes table:', err.message);
+            } else {
+                console.log('✅ Market quotes table ready');
+            }
+        });
+
         initializeDatabase();
     }
 });
@@ -5696,6 +5713,114 @@ app.post('/api/vicidial/update-comments', async (req, res) => {
             error: error.message
         });
     }
+});
+
+// ==================== MARKET QUOTES API ENDPOINTS ====================
+
+// Get all market quotes
+app.get('/api/market-quotes', (req, res) => {
+    console.log('📊 Fetching all market quotes');
+
+    db.all(`
+        SELECT
+            id,
+            carrier,
+            physical_coverage,
+            premium_text,
+            liability_per_unit,
+            date_created,
+            created_at
+        FROM market_quotes
+        ORDER BY created_at DESC
+    `, (err, rows) => {
+        if (err) {
+            console.error('Error fetching market quotes:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        console.log(`📊 Retrieved ${rows.length} market quotes`);
+        res.json(rows);
+    });
+});
+
+// Create a new market quote
+app.post('/api/market-quotes', (req, res) => {
+    const { carrier, physical_coverage, premium_text, liability_per_unit } = req.body;
+
+    console.log('📝 Creating new market quote:', { carrier, physical_coverage, premium_text, liability_per_unit });
+
+    if (!carrier) {
+        return res.status(400).json({ error: 'Carrier is required' });
+    }
+
+    db.run(`
+        INSERT INTO market_quotes (carrier, physical_coverage, premium_text, liability_per_unit)
+        VALUES (?, ?, ?, ?)
+    `, [carrier, physical_coverage || null, premium_text || null, liability_per_unit || null],
+    function(err) {
+        if (err) {
+            console.error('Error creating market quote:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        console.log(`✅ Market quote created with ID: ${this.lastID}`);
+        res.json({
+            id: this.lastID,
+            carrier,
+            physical_coverage,
+            premium_text,
+            liability_per_unit,
+            date_created: new Date().toISOString()
+        });
+    });
+});
+
+// Delete a market quote by ID
+app.delete('/api/market-quotes/:id', (req, res) => {
+    const { id } = req.params;
+
+    console.log(`🗑️ Deleting market quote with ID: ${id}`);
+
+    db.run('DELETE FROM market_quotes WHERE id = ?', [id], function(err) {
+        if (err) {
+            console.error('Error deleting market quote:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (this.changes === 0) {
+            console.log(`❌ No market quote found with ID: ${id}`);
+            res.status(404).json({ error: 'Quote not found' });
+            return;
+        }
+
+        console.log(`✅ Market quote deleted with ID: ${id}`);
+        res.json({ success: true, deletedId: id });
+    });
+});
+
+// Clear all market quotes for a specific carrier
+app.delete('/api/market-quotes/carrier/:carrier', (req, res) => {
+    const { carrier } = req.params;
+
+    console.log(`🗑️ Clearing all market quotes for carrier: ${carrier}`);
+
+    db.run('DELETE FROM market_quotes WHERE carrier = ?', [carrier], function(err) {
+        if (err) {
+            console.error('Error clearing carrier market quotes:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        console.log(`✅ Cleared ${this.changes} market quotes for carrier: ${carrier}`);
+        res.json({
+            success: true,
+            carrier,
+            deletedCount: this.changes
+        });
+    });
 });
 
 // Export database for use in other modules
