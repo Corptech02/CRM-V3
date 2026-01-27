@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- Cache buster: 2025-01-26-AGGRESSIVE-AUTOREFRESH-FIX -->
+    <!-- Cache buster: 2025-01-26-COMPREHENSIVE-POLICY-FIX -->
     <title>Vanguard Insurance Software - All-in-One Agency Management Platform</title>
     <link rel="icon" type="image/png" href="images/V-Logo.png">
     <link rel="stylesheet" href="css/styles.css?v=35">
@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="css/fix-sidebar-text.css?v=1">
     <!-- Enhanced Lead Management Action Button Fixes -->
     <link rel="stylesheet" href="css/enhanced-lead-actions.css?v=1">
+    <!-- Market Page Styles -->
+    <link rel="stylesheet" href="css/market-styles.css?v=1">
     <!-- Sticky Table Header -->
     <link rel="stylesheet" href="css/sticky-table-header.css?v=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -971,6 +973,12 @@
                                 <span>Communications</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="#market" data-tooltip="Market">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Market</span>
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 <div class="menu-section">
@@ -1104,6 +1112,126 @@
             <!-- Removed static conflicting HTML to prevent conflicts with JavaScript-generated dashboard -->
 
             <!-- Charts Section Removed -->
+        </section>
+
+        <!-- Market Content -->
+        <section class="market-content" style="display: none;">
+            <div class="market-header">
+                <h2>Insurance Market Overview</h2>
+                <p>Carrier ranking by average unit pricing - sorted by competitiveness</p>
+            </div>
+
+            <div class="market-table-container">
+                <table class="market-table">
+                    <thead>
+                        <tr>
+                            <th class="rank-col">#</th>
+                            <th class="carrier-col">Carrier</th>
+                            <th class="price-col">Avg Rate Per Unit</th>
+                            <th class="volume-col">Quote Volume</th>
+                            <th class="action-col">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="carrier-row best-price">
+                            <td class="rank">1</td>
+                            <td class="carrier">Progressive</td>
+                            <td class="price">
+                                <div class="price-bar best">
+                                    <span class="price-value">$4,250</span>
+                                    <div class="price-visual" style="width: 34%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">156 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                        <tr class="carrier-row good-price">
+                            <td class="rank">2</td>
+                            <td class="carrier">Geico</td>
+                            <td class="price">
+                                <div class="price-bar good">
+                                    <span class="price-value">$4,890</span>
+                                    <div class="price-visual" style="width: 39%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">142 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                        <tr class="carrier-row average-price">
+                            <td class="rank">3</td>
+                            <td class="carrier">Northland</td>
+                            <td class="price">
+                                <div class="price-bar average">
+                                    <span class="price-value">$5,420</span>
+                                    <div class="price-visual" style="width: 44%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">67 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                        <tr class="carrier-row average-price">
+                            <td class="rank">4</td>
+                            <td class="carrier">Canal</td>
+                            <td class="price">
+                                <div class="price-bar average">
+                                    <span class="price-value">$6,180</span>
+                                    <div class="price-visual" style="width: 50%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">45 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                        <tr class="carrier-row higher-price">
+                            <td class="rank">5</td>
+                            <td class="carrier">Occidental</td>
+                            <td class="price">
+                                <div class="price-bar higher">
+                                    <span class="price-value">$7,290</span>
+                                    <div class="price-visual" style="width: 59%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">34 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                        <tr class="carrier-row expensive-price">
+                            <td class="rank">6</td>
+                            <td class="carrier">Crum & Forster</td>
+                            <td class="price">
+                                <div class="price-bar expensive">
+                                    <span class="price-value">$8,950</span>
+                                    <div class="price-visual" style="width: 72%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">38 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                        <tr class="carrier-row expensive-price">
+                            <td class="rank">7</td>
+                            <td class="carrier">Nico</td>
+                            <td class="price">
+                                <div class="price-bar expensive">
+                                    <span class="price-value">$9,875</span>
+                                    <div class="price-visual" style="width: 79%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">29 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                        <tr class="carrier-row most-expensive">
+                            <td class="rank">8</td>
+                            <td class="carrier">Berkley Prime</td>
+                            <td class="price">
+                                <div class="price-bar most-expensive">
+                                    <span class="price-value">$12,450</span>
+                                    <div class="price-visual" style="width: 100%;"></div>
+                                </div>
+                            </td>
+                            <td class="volume">21 quotes</td>
+                            <td class="action"><button class="btn-quote">Log Quote</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
     </main>
 
@@ -3375,6 +3503,20 @@
 
     <!-- FINAL APP SENT FIX - Ultimate override for all TODO generation -->
     <script src="js/final-app-sent-fix.js?v=CACHE_BUST_2"></script>
+    <!-- ADD AL'S TOWING LLC POLICY -->
+    <script src="js/add-als-towing-policy.js?v=1"></script>
+    <!-- ADD BLUE SKY LOGISTICS POLICY -->
+    <script src="js/add-second-policy.js?v=1"></script>
+    <!-- FIX POLICY TABS DISPLAY -->
+    <script src="js/fix-policy-tabs-display.js?v=1"></script>
+    <!-- POLICY TAB CONTENT FILLER -->
+    <script src="js/policy-tab-content-filler.js?v=1"></script>
+    <!-- QUICK POLICY CHECK -->
+    <script src="js/quick-policy-check.js?v=1"></script>
+    <!-- NAVIGATION FIX -->
+    <script src="js/navigation-fix.js?v=1"></script>
+    <!-- MARKET NAVIGATION -->
+    <script src="js/market-navigation.js?v=2"></script>
 
     <!-- FIX FIRST TABLE TEMPLATE - Ensure first loading template works correctly -->
     <script src="js/fix-first-table-template.js?v=1"></script>

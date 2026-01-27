@@ -1,0 +1,273 @@
+/* Market Table Layout Styles */
+.market-content {
+    padding: 24px;
+    background: #f8fafc;
+    min-height: 100vh;
+}
+
+.market-header {
+    margin-bottom: 32px;
+    text-align: center;
+}
+
+.market-header h2 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 8px 0;
+}
+
+.market-header p {
+    font-size: 16px;
+    color: #6b7280;
+    margin: 0;
+}
+
+.market-table-container {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    max-width: none;
+    margin: 0;
+    width: 100%;
+}
+
+.market-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.market-table thead {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+}
+
+.market-table th {
+    padding: 20px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.market-table tbody tr {
+    border-bottom: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+}
+
+.market-table tbody tr:hover {
+    background: #f8fafc;
+    transform: scale(1.01);
+}
+
+.market-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.market-table td {
+    padding: 20px 16px;
+    vertical-align: middle;
+}
+
+/* Column Widths */
+.rank-col { width: 120px; }
+.carrier-col { width: 480px; }
+.price-col { width: 420px; }
+.volume-col { width: 240px; }
+.action-col { width: 200px; }
+
+/* Rank Column */
+.rank {
+    font-size: 20px;
+    font-weight: 700;
+    color: #374151;
+    text-align: center;
+}
+
+.best-price .rank {
+    color: #059669;
+    font-weight: 800;
+}
+
+.good-price .rank {
+    color: #059669;
+    font-weight: 800;
+}
+
+/* Carrier Column */
+.carrier {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 17px;
+}
+
+/* Price Column with Visual Bars */
+.price {
+    position: relative;
+}
+
+.price-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.price-value {
+    font-weight: 700;
+    font-size: 17px;
+    color: #1f2937;
+    min-width: 100px;
+    z-index: 2;
+    position: relative;
+}
+
+.price-visual {
+    height: 10px;
+    border-radius: 5px;
+    position: absolute;
+    left: 110px;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 0.3s ease;
+    max-width: 250px;
+}
+
+/* Price Color Coding */
+.price-bar.best .price-visual {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.price-bar.good .price-visual {
+    background: linear-gradient(90deg, #10b981, #16a34a);
+}
+
+.price-bar.average .price-visual {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.price-bar.higher .price-visual {
+    background: linear-gradient(90deg, #f97316, #ea580c);
+}
+
+.price-bar.expensive .price-visual {
+    background: linear-gradient(90deg, #dc2626, #b91c1c);
+}
+
+.price-bar.most-expensive .price-visual {
+    background: linear-gradient(90deg, #991b1b, #7f1d1d);
+}
+
+.best-price .price-value {
+    color: #059669;
+    font-weight: 800;
+}
+
+.good-price .price-value {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.expensive-price .price-value,
+.most-expensive .price-value {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+/* Volume and Action Buttons */
+.volume {
+    color: #6b7280;
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.btn-quote {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-quote:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Row Hover Effects */
+.carrier-row:hover .price-visual {
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.best-price:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(5, 150, 105, 0.05));
+}
+
+.good-price:hover {
+    background: linear-gradient(135deg, rgba(22, 163, 74, 0.05), rgba(16, 185, 129, 0.05));
+}
+
+.expensive-price:hover,
+.most-expensive:hover {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.05), rgba(185, 28, 28, 0.05));
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .market-table-container {
+        margin: 0 16px;
+        border-radius: 12px;
+        width: calc(100% - 32px);
+        max-width: none;
+    }
+
+    .market-table {
+        font-size: 12px;
+    }
+
+    .market-table th,
+    .market-table td {
+        padding: 12px 8px;
+    }
+
+    .carrier {
+        font-size: 15px;
+    }
+
+    .price-visual {
+        max-width: 60px;
+        left: 60px;
+    }
+
+    .price-value {
+        min-width: 55px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .action-col {
+        width: 80px;
+    }
+
+    .btn-quote {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+
+    .volume {
+        font-size: 11px;
+    }
+}
+
+/* Animation removed - no more pulsing */
