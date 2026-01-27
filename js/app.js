@@ -2713,6 +2713,23 @@ function loadContent(section) {
         return;
     }
 
+    // Handle market content visibility
+    const marketContent = document.querySelector('.market-content');
+    if (section === '#market') {
+        // Going to market - hide dashboard, show market
+        dashboardContent.style.display = 'none';
+        if (marketContent) {
+            marketContent.style.display = 'block';
+        }
+        return; // Exit early for market
+    } else {
+        // Going to any other view - hide market, show dashboard
+        if (marketContent) {
+            marketContent.style.display = 'none';
+        }
+        dashboardContent.style.display = 'block';
+    }
+
     switch(section) {
         case '':
         case '#':
