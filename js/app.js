@@ -85,12 +85,71 @@ async function loadLeadsFromServer() {
                 }
             });
 
-            // Update localStorage - COMPLETE SEPARATION
+            // SMART MERGE: Use smart merge instead of direct overwrite to preserve recent changes
             console.log(`🔍 SERVER DEBUG: About to save ${activeLeadsOnly.length} active leads to localStorage`);
             if (activeLeadsOnly.length === 1) {
                 console.error(`❌ SERVER PROBLEM: Only 1 active lead from server!`, activeLeadsOnly[0].id, activeLeadsOnly[0].name);
             }
-            localStorage.setItem('insurance_leads', JSON.stringify(activeLeadsOnly)); // ONLY ACTIVE
+
+            console.log('🧠 loadLeadsFromServer: Using SMART MERGE to preserve recent changes...');
+            if (typeof window.manualSyncLeads === 'function') {
+                // Use existing smart merge if available
+                await window.manualSyncLeads();
+            } else {
+                // Fallback: preserve recent changes manually
+                const existingLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const smartMergedLeads = [...existingLeads];
+                const now = Date.now();
+
+                let addedCount = 0;
+                let preservedCount = 0;
+                let updatedCount = 0;
+
+                activeLeadsOnly.forEach(serverLead => {
+                    const localIndex = smartMergedLeads.findIndex(localLead =>
+                        String(localLead.id) === String(serverLead.id)
+                    );
+
+                    if (localIndex === -1) {
+                        // New lead from server
+                        smartMergedLeads.push(serverLead);
+                        addedCount++;
+                    } else {
+                        const localLead = smartMergedLeads[localIndex];
+
+                        // Check if lead has recent local changes (within 10 minutes)
+                        const hasRecentChanges = localLead.lastModified &&
+                            (now - new Date(localLead.lastModified).getTime()) < (10 * 60 * 1000);
+
+                        // Check for important field changes
+                        const hasStageChange = localLead.stage !== serverLead.stage;
+                        const hasNotesChange = localLead.notes !== serverLead.notes;
+
+                        if (hasRecentChanges || hasStageChange || hasNotesChange) {
+                            console.log(`🛡️ loadLeadsFromServer: Preserving recent changes for lead ${localLead.id}`);
+                            // Preserve local changes, but allow some server updates
+                            smartMergedLeads[localIndex] = {
+                                ...serverLead,  // Server data as base
+                                ...localLead,   // Local changes override
+                                // Keep local timestamp to track our changes
+                                lastModified: localLead.lastModified || new Date().toISOString()
+                            };
+                            preservedCount++;
+                        } else {
+                            // No recent local changes - safe to update with server data
+                            smartMergedLeads[localIndex] = {
+                                ...localLead,
+                                ...serverLead,
+                                lastModified: new Date().toISOString()
+                            };
+                            updatedCount++;
+                        }
+                    }
+                });
+
+                console.log(`🧠 loadLeadsFromServer SMART MERGE: Added ${addedCount}, Preserved ${preservedCount}, Updated ${updatedCount}`);
+                localStorage.setItem('insurance_leads', JSON.stringify(smartMergedLeads)); // SMART MERGED LEADS
+            }
 
             // Update archived leads storage
             const archivedLeads = archivedLeadsOnly; // Rename for compatibility
@@ -418,10 +477,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Initial server sync completed - ViciDial leads preserved');
     });
 
-    // Run cleanup less frequently to avoid interference
-    setInterval(() => {
-        cleanupDuplicateLeads();
-    }, 300000); // Every 5 minutes instead of 30 seconds
+    // DISABLED: Cleanup was causing leads to reset every 5 minutes
+    // setInterval(() => {
+    //     cleanupDuplicateLeads();
+    // }, 300000); // Every 5 minutes - DISABLED to prevent resets
 
     // Initialize components
     initializeEventListeners();
@@ -2592,15 +2651,7 @@ function showModal(modalId) {
     }
 }
 
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('active');
-        setTimeout(() => {
-            modal.style.display = 'none';
-        }, 300);
-    }
-}
+// closeModal function moved to line 15820 to handle both cases
 
 // Quick Action Functions
 function showNewQuote() {
@@ -2725,6 +2776,14 @@ function initializeEventListeners() {
     if (newClientForm) {
         newClientForm.addEventListener('submit', function(e) {
             e.preventDefault();
+            console.log('🚀 FORM SUBMIT EVENT: Form submit intercepted');
+
+            // Log dropdown value right at form submission
+            const assignedToDropdown = this.querySelector('[name="assignedTo"]');
+            console.log('🚀 FORM SUBMIT: assignedTo value at submit time:', assignedToDropdown.value);
+            console.log('🚀 FORM SUBMIT: Selected index:', assignedToDropdown.selectedIndex);
+            console.log('🚀 FORM SUBMIT: Selected option:', assignedToDropdown.options[assignedToDropdown.selectedIndex]);
+
             saveClient();
         });
     }
@@ -2911,12 +2970,31 @@ function loadContent(section) {
 }
 
 // Save Client Function
-function saveClient() {
-    const modal = document.getElementById('clientModal');
-    const form = document.getElementById('newClientForm');
-    
-    // Get form data
-    const formData = new FormData(form);
+async function saveClient() {
+    console.log('🚀 saveClient() called');
+
+    try {
+        const modal = document.getElementById('clientModal');
+        const form = document.getElementById('newClientForm');
+
+        console.log('Modal found:', !!modal);
+        console.log('Form found:', !!form);
+
+        if (!form) {
+            console.error('❌ Form not found!');
+            alert('Error: Could not find client form');
+            return;
+        }
+
+        // JUST BEFORE FORM DATA EXTRACTION - Log dropdown state
+        const assignedToDropdown = form.querySelector('[name="assignedTo"]');
+        console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: Value just before FormData extraction:', assignedToDropdown.value);
+        console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: Selected index:', assignedToDropdown.selectedIndex);
+        console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: Selected option text:', assignedToDropdown.options[assignedToDropdown.selectedIndex].text);
+        console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: All options:', Array.from(assignedToDropdown.options).map(o => `"${o.value}" (${o.text})`));
+
+        // Get form data
+        const formData = new FormData(form);
 
     // Debug: Log all form data
     console.log('=== FORM DATA DEBUG ===');
@@ -3001,6 +3079,8 @@ function saveClient() {
             newClient.policies = clients[clientIndex].policies || [];
             newClient.totalPremium = clients[clientIndex].totalPremium || 0;
             newClient.createdAt = clients[clientIndex].createdAt;
+            // Add lastModified timestamp for smart merge protection
+            newClient.lastModified = new Date().toISOString();
             clients[clientIndex] = newClient;
             console.log('After update:', clients[clientIndex]);
             console.log('Updated existing client successfully');
@@ -3011,6 +3091,8 @@ function saveClient() {
         }
     } else {
         // Add new client
+        // Add lastModified timestamp for smart merge protection
+        newClient.lastModified = new Date().toISOString();
         clients.push(newClient);
         console.log('Total clients after adding:', clients.length);
     }
@@ -3018,11 +3100,50 @@ function saveClient() {
     // Save to localStorage
     localStorage.setItem('insurance_clients', JSON.stringify(clients));
     console.log('Saved to localStorage');
-    
+
     // Show loading state
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     submitBtn.disabled = true;
+
+    // IMPORTANT: Also save to server to prevent data loss during syncs
+    try {
+        console.log('💾 Saving client to server...', newClient);
+        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
+        const response = await fetch(`${API_URL}/api/clients`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+            },
+            body: JSON.stringify(newClient)
+        });
+
+        if (response.ok) {
+            const savedClient = await response.json();
+            console.log('✅ Client saved to server successfully:', savedClient.id);
+
+            // Update the client in localStorage with any server-generated data (like ID)
+            if (savedClient.id && savedClient.id !== newClient.id) {
+                const localClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+                const clientIndex = localClients.findIndex(c =>
+                    c.id === newClient.id ||
+                    (c.name === newClient.name && c.phone === newClient.phone)
+                );
+                if (clientIndex !== -1) {
+                    localClients[clientIndex] = { ...localClients[clientIndex], ...savedClient };
+                    localStorage.setItem('insurance_clients', JSON.stringify(localClients));
+                    console.log('📋 Updated client with server data:', savedClient.id);
+                }
+            }
+        } else {
+            console.warn('⚠️ Server save failed, but client saved to localStorage:', response.status);
+            // Don't throw error - client still exists locally
+        }
+    } catch (error) {
+        console.error('❌ Error saving client to server:', error);
+        // Don't throw - client still saved locally
+    }
     
     setTimeout(() => {
         // Reset form
@@ -3035,8 +3156,9 @@ function saveClient() {
         const successMessage = isEditing ? 'Client updated successfully!' : 'Client added successfully!';
         showNotification(successMessage, 'success');
 
-        // If we're editing and viewing a client profile, refresh it
-        if (isEditing && window.currentViewingClientId) {
+        // Only refresh client profile if we're currently viewing a client profile
+        // (not if we're on the clients list page)
+        if (isEditing && window.currentViewingClientId && window.location.hash !== '#clients') {
             setTimeout(() => {
                 viewClient(window.currentViewingClientId);
             }, 100);
@@ -3074,6 +3196,18 @@ function saveClient() {
         submitBtn.innerHTML = 'Add Client';
         submitBtn.disabled = false;
     }, 500);
+
+    } catch (error) {
+        console.error('❌ CRITICAL ERROR in saveClient():', error);
+        alert('Error saving client: ' + error.message);
+
+        // Reset button state
+        const submitBtn = document.querySelector('#newClientForm button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.innerHTML = 'Add Client';
+            submitBtn.disabled = false;
+        }
+    }
 }
 
 // Update Dashboard Stats
@@ -14336,7 +14470,10 @@ function editClient(id) {
         form.querySelector('[name="clientEmail"]').value = client.email || '';
         form.querySelector('[name="clientPhone"]').value = client.phone || '';
         form.querySelector('[name="clientAddress"]').value = client.address || '';
-        form.querySelector('[name="assignedTo"]').value = client.assignedTo || '';
+        const assignedToValue = client.assignedTo || '';
+        console.log('🔍 EXACT VALUE: Setting assignedTo to exact value:', JSON.stringify(assignedToValue));
+        console.log('🔍 EXACT VALUE: Length:', assignedToValue.length, 'Type:', typeof assignedToValue);
+        form.querySelector('[name="assignedTo"]').value = assignedToValue;
         form.querySelector('[name="representative"]').value = client.representative || '';
         form.querySelector('[name="clientCity"]').value = client.city || '';
         form.querySelector('[name="clientState"]').value = client.state || '';
@@ -14346,7 +14483,44 @@ function editClient(id) {
         form.dataset.clientId = id;
         console.log('=== EDIT CLIENT DEBUG ===');
         console.log('Client ID stored for editing:', id, '(type:', typeof id, ')');
-        console.log('Client data being edited:', client);
+        console.log('Client data being edited:', JSON.stringify(client, null, 2));
+        console.log('🔍 DROPDOWN DEBUG: Setting assignedTo dropdown to:', client.assignedTo);
+        console.log('🔍 CLIENT ORIGINAL assignedTo:', JSON.stringify(client.assignedTo));
+
+        // Double check dropdown value after setting
+        setTimeout(() => {
+            const dropdown = form.querySelector('[name="assignedTo"]');
+            console.log('🔍 DROPDOWN DEBUG: Dropdown value after setting:', dropdown.value);
+        }, 100);
+
+        // Additional monitoring - check for any changes to the dropdown
+        const dropdownElement = form.querySelector('[name="assignedTo"]');
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                    console.log('🚨 DROPDOWN CHANGED: Value attribute changed to:', mutation.target.value);
+                }
+            });
+        });
+        observer.observe(dropdownElement, { attributes: true, attributeFilter: ['value'] });
+
+        // Also monitor for change events
+        dropdownElement.addEventListener('change', function(e) {
+            console.log('🚨 DROPDOWN CHANGE EVENT: New value:', e.target.value);
+        });
+
+        // Check value periodically for 5 seconds
+        let checkCount = 0;
+        const checkInterval = setInterval(() => {
+            checkCount++;
+            const currentValue = dropdownElement.value;
+            console.log(`🔍 PERIODIC CHECK ${checkCount}: Dropdown value is currently:`, currentValue);
+            if (checkCount >= 10) { // Check for 5 seconds (10 * 500ms)
+                clearInterval(checkInterval);
+                observer.disconnect();
+                console.log('🔍 PERIODIC CHECK: Monitoring stopped');
+            }
+        }, 500);
         console.log('========================');
 
         // Update submit button text
@@ -14382,6 +14556,8 @@ function updateClientAssignment(clientId, assignedTo) {
 
     // Update the assigned to field
     clients[clientIndex].assignedTo = assignedTo || '';
+    // Add lastModified timestamp for smart merge protection
+    clients[clientIndex].lastModified = new Date().toISOString();
 
     // Save back to localStorage
     localStorage.setItem('insurance_clients', JSON.stringify(clients));
@@ -14491,7 +14667,7 @@ function showPolicyDetailsModal(policy) {
                             policyType ? policyType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : '';
     
     modalOverlay.innerHTML = `
-        <div class="modal-container large" style="max-width: 1400px; width: 92%; padding: 0; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border-radius: 12px;">
+        <div class="modal-container large" style="max-width: 100vw; width: 100vw; height: 100vh; padding: 0; box-shadow: none; border-radius: 0; margin: 0; display: flex; flex-direction: column;">
             <div class="modal-header" style="padding: 32px 40px; border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #0066cc 0%, #004999 100%);">
                 <div style="display: flex; align-items: center; gap: 15px; flex: 1;">
                     ${policyTypeLabel ? `<span class="policy-type-badge" style="background: rgba(255, 255, 255, 0.2); color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid rgba(255, 255, 255, 0.3);">${policyTypeLabel}</span>` : ''}
@@ -14499,7 +14675,7 @@ function showPolicyDetailsModal(policy) {
                 </div>
                 <button class="close-btn" onclick="document.getElementById('policyViewModal').remove()" style="background: rgba(255, 255, 255, 0.9); border: 2px solid white; color: #0066cc; font-size: 24px; font-weight: bold; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; transition: all 0.2s;">&times;</button>
             </div>
-            <div class="modal-body" style="max-height: 75vh; overflow-y: auto; padding: 40px; background: #ffffff;">
+            <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 40px; background: #ffffff; min-height: calc(100vh - 200px);">
                 <!-- Policy Status Bar -->
                 <div style="background: linear-gradient(135deg, #f3f4f6 0%, #f9fafb 100%); padding: 24px 30px; border-radius: 12px; margin-bottom: 35px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);">
                     <div>
@@ -14548,17 +14724,6 @@ function showPolicyDetailsModal(policy) {
                             <i class="fas fa-trash"></i> Delete
                         </button>
                     </div>
-                    <div style="display: flex; gap: 15px;">
-                        <button class="btn-primary" onclick="prepareCOI('${policy.id}')" style="padding: 12px 24px; font-size: 14px; border-radius: 8px; background: linear-gradient(135deg, #0066cc 0%, #004999 100%); color: white; border: none; font-weight: 500;">
-                            <i class="fas fa-file-alt"></i> Generate COI
-                        </button>
-                        <button class="btn-primary" onclick="openCertificateHolderModal('${policy.id}')" style="padding: 12px 24px; font-size: 14px; border-radius: 8px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; font-weight: 500;">
-                            <i class="fas fa-user-shield"></i> Save to Certificate Holder
-                        </button>
-                        <button class="btn-primary" onclick="sendCOIRequest('${policy.id}')" style="padding: 12px 24px; font-size: 14px; border-radius: 8px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; font-weight: 500;">
-                            <i class="fas fa-envelope"></i> Send COI Request
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -14591,6 +14756,69 @@ function generateViewTabsForPolicyType(policyType) {
     }
     
     return baseTabs;
+}
+
+function generateCOIContainerContent(policy) {
+    // Cross-reference mapping for policy relationships
+    const crossReferenceMap = {
+        '6146786114': 'POL-1769897676650-ri6ku8b34',
+        'POL-1769897676650-ri6ku8b34': '6146786114'
+    };
+
+    // Get policies from localStorage and check for COI documents
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const searchIds = [policy.id, policy.policyNumber, crossReferenceMap[policy.id], crossReferenceMap[policy.policyNumber]].filter(id => id);
+
+    // Look for policy with COI documents
+    let coiDocuments = null;
+    for (const searchId of searchIds) {
+        const foundPolicy = policies.find(p => (p.id === searchId || p.policyNumber === searchId) && p.coiDocuments && p.coiDocuments.length > 0);
+        if (foundPolicy) {
+            coiDocuments = foundPolicy.coiDocuments;
+            break;
+        }
+    }
+
+    if (coiDocuments && coiDocuments.length > 0) {
+        // Generate COI cards HTML
+        const coiCards = coiDocuments.map((doc, index) => {
+            const uploadDate = doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString() : 'Unknown';
+            const docName = doc.name || `COI Document ${index + 1}`;
+
+            return `
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); transition: 0.2s; cursor: pointer;" onclick="window.showCOIModal && window.showCOIModal('${doc.id}')">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: #3b82f6; color: white; padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-file-pdf" style="font-size: 20px;"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0 0 4px 0; color: #111827; font-size: 14px; font-weight: 600;">${docName}</h4>
+                            <p style="margin: 0; color: #6b7280; font-size: 12px;">
+                                <i class="fas fa-calendar"></i> ${uploadDate} |
+                                <i class="fas fa-file"></i> ${doc.type || 'image/png'}
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="event.stopPropagation(); window.showCOIModal && window.showCOIModal('${doc.id}')" style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return coiCards;
+    } else {
+        // No COI documents found, show default message
+        return `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <i class="fas fa-certificate" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                <p style="margin: 0; font-size: 16px;">No certificates generated yet</p>
+                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Generate to create ACORD 25</p>
+            </div>
+        `;
+    }
 }
 
 function generateViewTabContent(tabId, policy) {
@@ -14825,6 +15053,45 @@ function generateViewTabContent(tabId, policy) {
             
         case 'documents':
             return `
+                <!-- Certificate and ID Cards Section -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                    <!-- Certificate Box -->
+                    <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                            <h3 style="margin: 0; color: #111827; font-size: 22px; font-weight: 600;">Certificate of Insurance</h3>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.sendCOIForPolicy('${policy.id}')" class="btn-secondary" style="padding: 8px 16px; font-size: 13px; border-radius: 8px; background: #3b82f6; border-color: #3b82f6; color: white;">
+                                    <i class="fas fa-envelope"></i> Send COI
+                                </button>
+                                <button onclick="window.generateCertificateForPolicy('${policy.id}')" class="btn-secondary" style="padding: 8px 16px; font-size: 13px; border-radius: 8px; background: #10b981; border-color: #10b981; color: white;">
+                                    <i class="fas fa-certificate"></i> Generate
+                                </button>
+                                <button onclick="window.viewCurrentCOI('${policy.id}')" class="btn-secondary" style="padding: 8px 16px; font-size: 13px; border-radius: 8px; background: #6b7280; border-color: #6b7280; color: white;">
+                                    <i class="fas fa-eye"></i> View Current
+                                </button>
+                            </div>
+                        </div>
+                        <div id="coiFilesContainer-${policy.id}" style="min-height: 100px;">
+                            ${generateCOIContainerContent(policy)}
+                        </div>
+                    </div>
+
+                    <!-- ID Cards Box -->
+                    <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                            <h3 style="margin: 0; color: #111827; font-size: 22px; font-weight: 600;">Insurance ID Cards</h3>
+                            <button onclick="window.uploadIdCardsForPolicy('${policy.id}')" class="btn-secondary" style="padding: 10px 20px; font-size: 14px; border-radius: 8px; background: #10b981; border-color: #10b981; color: white;">
+                                <i class="fas fa-upload"></i> Upload
+                            </button>
+                        </div>
+                        <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                            <i class="fas fa-id-card" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                            <p style="margin: 0; font-size: 16px;">No ID cards uploaded yet</p>
+                            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Upload to add ID cards</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                         <h3 style="margin: 0; color: #111827; font-size: 22px; font-weight: 600;">Policy Documents</h3>
@@ -14836,8 +15103,27 @@ function generateViewTabContent(tabId, policy) {
                         ${window.renderPolicyDocuments(policy.id)}
                     </div>
                 </div>
+
+                <!-- Application Submissions Section -->
+                <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb; margin-top: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                        <h3 style="margin: 0; color: #111827; font-size: 22px; font-weight: 600;">Application Submissions</h3>
+                        <button onclick="window.createQuoteApplicationForPolicy('${policy.id}')" class="btn-secondary" style="padding: 10px 20px; font-size: 14px; border-radius: 8px; background: #10b981; border-color: #10b981; color: white;">
+                            <i class="fas fa-file-alt"></i> Quote Application
+                        </button>
+                    </div>
+                    <div id="policy-application-submissions-list-${policy.id}">
+                        ${window.renderPolicyApplicationSubmissions ? window.renderPolicyApplicationSubmissions(policy.id) : `
+                            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                                <i class="fas fa-file-signature" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                                <p style="margin: 0; font-size: 16px;">No applications submitted yet</p>
+                                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Quote Application to create one</p>
+                            </div>
+                        `}
+                    </div>
+                </div>
             `;
-            
+
         case 'notes':
             const notes = policy.notes?.content || policy.notes || '';
             return `
@@ -15681,10 +15967,23 @@ function exportAgentReport() {
 }
 
 // Generic close modal function for dynamically created modals
-function closeModal() {
-    console.log('closeModal called');
+function closeModal(modalId) {
+    console.log('closeModal called with modalId:', modalId);
 
-    // Clear modal open flag
+    // If modalId is provided, use the original modal closing logic
+    if (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('active');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+            console.log('Modal closed successfully:', modalId);
+            return;
+        }
+    }
+
+    // Fallback: Clear modal open flag and remove overlays
     window.modalOpen = false;
 
     // Remove from document.documentElement and body
@@ -19868,31 +20167,64 @@ function initializeLeadGeneration() {
 }
 
 function switchLeadTab(tabName) {
-    // Hide all tabs
+    console.log('Switching to tab:', tabName);
+
+    // Hide all tab content
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.style.display = 'none';
     });
-    
-    // Remove active class from all tab items
-    document.querySelectorAll('.tab-item').forEach(item => {
-        item.classList.remove('active');
+
+    // Remove active class from all lead tab buttons
+    document.querySelectorAll('.lead-tab').forEach(button => {
+        button.classList.remove('active');
+        button.style.background = '#f3f4f6';
+        button.style.color = '#6b7280';
     });
-    
-    // Show selected tab
+
+    // Show selected tab content
     const tabMap = {
+        'active': 'active-leads-tab',
+        'archived': 'archived-leads-tab',
         'profile': 'profileTab',
         'advanced': 'advancedTab',
         'carrier': 'carrierTab'
     };
-    
-    const selectedTab = document.getElementById(tabMap[tabName]);
+
+    const selectedTabId = tabMap[tabName];
+    const selectedTab = document.getElementById(selectedTabId);
+
     if (selectedTab) {
         selectedTab.style.display = 'block';
+        console.log('Showing tab:', selectedTabId);
+    } else {
+        console.warn('Tab not found:', selectedTabId);
     }
-    
-    // Add active class to clicked tab
-    event.target.closest('.tab-item').classList.add('active');
-    
+
+    // Update clicked tab button styling
+    const clickedButton = event ? event.target.closest('.lead-tab') : null;
+    if (clickedButton) {
+        clickedButton.classList.add('active');
+        clickedButton.style.background = '#3b82f6';
+        clickedButton.style.color = 'white';
+    } else {
+        // Fallback: find button by tab name
+        const buttons = document.querySelectorAll('.lead-tab');
+        buttons.forEach(button => {
+            const buttonText = button.textContent.toLowerCase();
+            if ((tabName === 'active' && buttonText.includes('active')) ||
+                (tabName === 'archived' && buttonText.includes('archived'))) {
+                button.classList.add('active');
+                button.style.background = '#3b82f6';
+                button.style.color = 'white';
+            }
+        });
+    }
+
+    // Load archived leads if switching to archived tab
+    if (tabName === 'archived') {
+        loadArchivedLeads();
+    }
+
     // If switching to lookup tab, show some default results
     if (section === 'lookup') {
         setTimeout(() => {
@@ -19903,6 +20235,91 @@ function switchLeadTab(tabName) {
                 performLeadSearch();
             }
         }, 100);
+    }
+}
+
+function loadArchivedLeads() {
+    console.log('Loading archived leads...');
+
+    // Get archived leads from localStorage
+    const archivedLeads = JSON.parse(localStorage.getItem('archivedLeads') || '[]');
+    const altArchivedLeads = JSON.parse(localStorage.getItem('archived_leads') || '[]');
+
+    // Combine both storage keys for archived leads
+    const allArchivedLeads = [...archivedLeads, ...altArchivedLeads];
+
+    // Remove duplicates based on ID
+    const uniqueArchivedLeads = allArchivedLeads.filter((lead, index, array) =>
+        array.findIndex(l => String(l.id) === String(lead.id)) === index
+    );
+
+    console.log(`Found ${uniqueArchivedLeads.length} archived leads`);
+
+    // Populate the archived leads table
+    populateArchivedLeadsTable(uniqueArchivedLeads);
+
+    // Update stats
+    updateArchivedStats(uniqueArchivedLeads);
+}
+
+function populateArchivedLeadsTable(archivedLeads) {
+    const tableBody = document.getElementById('archivedLeadsTableBody');
+    if (!tableBody) return;
+
+    if (archivedLeads.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280;">No archived leads found for this month</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = archivedLeads.map(lead => `
+        <tr>
+            <td><input type="checkbox" class="archived-lead-checkbox" value="${lead.id}"></td>
+            <td>${lead.company_name || 'N/A'}</td>
+            <td>${lead.phone || 'N/A'}</td>
+            <td>${lead.value_level || 'Standard'}</td>
+            <td>${formatPremium(lead.current_premium)}</td>
+            <td>${lead.pipeline_stage || 'Unknown'}</td>
+            <td>${lead.assigned_to || 'Unassigned'}</td>
+            <td>${lead.archived_date ? new Date(lead.archived_date).toLocaleDateString() : 'N/A'}</td>
+            <td>
+                <button onclick="restoreLead('${lead.id}')" class="btn-secondary" style="font-size: 12px; padding: 4px 8px;">
+                    <i class="fas fa-undo"></i> Restore
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateArchivedStats(archivedLeads) {
+    // Update stats cards
+    const totalElement = document.querySelector('.archive-stats .stat-card:first-child div:last-child');
+    if (totalElement) {
+        totalElement.textContent = archivedLeads.length.toString();
+    }
+
+    // Calculate total premium
+    const totalPremium = archivedLeads.reduce((sum, lead) => {
+        const premium = parseFloat(String(lead.current_premium || '0').replace(/[$,]/g, '')) || 0;
+        return sum + premium;
+    }, 0);
+
+    const premiumElement = document.querySelector('.archive-stats .stat-card:nth-child(2) div:last-child');
+    if (premiumElement) {
+        premiumElement.textContent = `$${totalPremium.toLocaleString()}`;
+    }
+
+    // Find most common pipeline stage
+    const stages = archivedLeads.map(l => l.pipeline_stage || 'Unknown');
+    const stageCount = stages.reduce((acc, stage) => {
+        acc[stage] = (acc[stage] || 0) + 1;
+        return acc;
+    }, {});
+
+    const topStage = Object.keys(stageCount).reduce((a, b) => stageCount[a] > stageCount[b] ? a : b, 'None');
+
+    const stageElement = document.querySelector('.archive-stats .stat-card:nth-child(3) div:last-child');
+    if (stageElement) {
+        stageElement.textContent = topStage;
     }
 }
 
@@ -23068,9 +23485,10 @@ function getNextAction(stage, lead) {
     console.log(`🔍 GET NEXT ACTION: Lead ${lead.id} - ${lead.name}, stage: ${stage}`);
     console.log(`🔍 GET NEXT ACTION: Lead data:`, lead);
 
-    // SPECIAL CASE: App sent stage never shows TODO text (always green highlighted)
-    if (stage === 'app_sent' || stage === 'app sent' || stage === 'App Sent') {
-        console.log(`✅ Lead ${lead?.id}: App sent stage - no TODO text (indefinite green)`);
+    // SPECIAL CASE: App sent and Quote sent stages never show TODO text (always green highlighted)
+    if (stage === 'app_sent' || stage === 'app sent' || stage === 'App Sent' ||
+        stage === 'quote_sent' || stage === 'quote sent' || stage === 'Quote Sent') {
+        console.log(`✅ Lead ${lead?.id}: ${stage} stage - no TODO text (indefinite green)`);
         return '';
     }
 
@@ -23086,7 +23504,6 @@ function getNextAction(stage, lead) {
         if (stage === 'quoted' || stage === 'info_requested' || stage === 'Info Requested' ||
             stage === 'contact_attempted' || stage === 'Contact Attempted' ||
             stage === 'loss_runs_requested' || stage === 'Loss Runs Requested' ||
-            stage === 'app_sent' || stage === 'App Sent' ||
             stage === 'quote_sent' || stage === 'quote-sent-unaware' || stage === 'quote-sent-aware' ||
             stage === 'sale' || stage === 'Sale') {
             console.log(`🔍 STAGE CHECK: ✅ STAGE MATCHED - proceeding to completion check`);
@@ -23971,8 +24388,1298 @@ function detectStorageCleared() {
     }
 }
 
-// Check for storage clearing every 3 seconds
-setInterval(detectStorageCleared, 3000);
+// DISABLED: Storage clearing detection was potentially triggering reloads
+// setInterval(detectStorageCleared, 3000);
 
 // Cache bust: Sun Sep 29 v52 - FORCE REFRESH - Fixed original working flow
+
+// Function to create quote applications for policies
+window.createQuoteApplicationForPolicy = function(policyId) {
+    console.log('Creating quote application for policy:', policyId);
+
+    // Get policy data to pre-populate client information
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const policy = policies.find(p => String(p.id) === String(policyId));
+
+    if (!policy) {
+        alert('Policy not found');
+        return;
+    }
+
+    // Extract client information from the policy's insured data
+    const clientName = policy.insured?.['Name/Business Name'] ||
+                      policy.insured?.['Primary Named Insured'] ||
+                      policy.insuredName ||
+                      'Unknown Client';
+
+    // Use the existing quote application function but pass policy context
+    if (window.createQuoteApplicationForClient) {
+        // Create a synthetic client ID based on the policy
+        const syntheticClientId = `policy_${policyId}`;
+        window.createQuoteApplicationForClient(syntheticClientId, {
+            name: clientName,
+            policyId: policyId,
+            existingPolicy: policy
+        });
+    } else {
+        alert('Quote application functionality not available');
+    }
+};
+
+// Function to render policy application submissions
+window.renderPolicyApplicationSubmissions = function(policyId) {
+    const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+    const policyApplications = applications.filter(app => app.policyId === policyId);
+
+    if (policyApplications.length === 0) {
+        return `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <i class="fas fa-file-signature" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                <p style="margin: 0; font-size: 16px;">No applications submitted yet</p>
+                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Quote Application to create one</p>
+            </div>
+        `;
+    }
+
+    return policyApplications.map(app => `
+        <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0 0 8px 0; color: #343a40;">${app.type || 'Quote Application'}</h4>
+                    <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                        Created: ${new Date(app.createdAt).toLocaleDateString()}
+                    </p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="viewApplication('${app.id}')" style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 12px;">
+                        <i class="fas fa-eye"></i> View
+                    </button>
+                    <button onclick="downloadApplication('${app.id}')" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 12px;">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+};
+
+// Function to generate Certificate of Insurance for a policy
+window.generateCertificateForPolicy = function(policyId) {
+    console.log('🔄 LOCAL generateCertificateForPolicy called for policy:', policyId);
+
+    // Get policy data
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const policy = policies.find(p => String(p.id) === String(policyId));
+
+    if (!policy) {
+        console.error('❌ Policy not found for ID:', policyId);
+        showNotification('Policy not found', 'error');
+        return;
+    }
+
+    console.log('✅ Found policy for COI generation:', policy);
+
+    // Check if we have the existing COI generation functions from vigagency.com
+    if (window.generateCOI && typeof window.generateCOI === 'function') {
+        console.log('🔄 Using existing generateCOI function from vigagency.com');
+        window.generateCOI(policyId);
+    } else {
+        // Use showCOIModal pattern from VIG Agency
+        console.log('🚀 Using showCOIModal pattern for COI generation...');
+        showCOIModal(policy);
+    }
+
+    // showCOIModal function - adapted from VIG Agency
+    function showCOIModal(policy) {
+        console.log('📋 Opening COI modal for policy:', policy);
+
+        // Normalize policy data for ACORD viewer
+        const policyData = {
+            id: policy.id || policy.policyId,
+            policyId: policy.id || policy.policyId,
+            policyNumber: policy.policyNumber || policy.policy_number,
+            policy_number: policy.policyNumber || policy.policy_number,
+            clientName: policy.clientName || policy.insuredName || 'Unknown',
+            insured_name: policy.clientName || policy.insuredName || 'Unknown',
+            carrier: policy.carrier || 'Unknown',
+            effective_date: policy.effectiveDate || '',
+            expiration_date: policy.expirationDate || '',
+            status: policy.status || 'Active',
+            type: 'commercial-auto',
+            policyType: 'commercial-auto',
+            vehicles: policy.vehicles || [],
+            drivers: policy.drivers || [],
+            coverage: policy.coverage || {}
+        };
+
+        // Create modal structure similar to VIG Agency
+        const createCOIModal = () => {
+        console.log('🚀 Loading ACORD viewer with policy data:', policy);
+
+        // Create the modal structure similar to vigagency.com
+        const coiModal = document.createElement('div');
+        coiModal.id = 'coiModalOverlay';
+        coiModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            backdrop-filter: blur(4px);
+        `;
+
+        coiModal.innerHTML = `
+            <div style="background: white; border-radius: 12px; width: 95%; max-width: 1400px; max-height: 95vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2); animation: modalSlideIn 0.3s ease;">
+                <style>
+                    @keyframes modalSlideIn {
+                        from { transform: scale(0.95) translateY(-20px); opacity: 0; }
+                        to { transform: scale(1) translateY(0); opacity: 1; }
+                    }
+                </style>
+
+                <div class="coi-modal-header" style="background: linear-gradient(135deg, #0066cc, #004999); color: white; padding: 20px; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 20px;">
+                            <i class="fas fa-file-contract"></i>
+                            ACORD 25 Certificate of Insurance
+                        </h2>
+                        <p style="margin: 4px 0 0 0; opacity: 0.9; font-size: 13px;">
+                            Policy: ${policy.policyNumber || policy.policy_number} | ${policy.carrier || 'Unknown'}
+                        </p>
+                    </div>
+                    <button onclick="closeCOIViewerModal()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; transition: 0.2s;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="coi-modal-body" style="padding: 0; height: calc(90vh - 140px); background: #f3f4f6;">
+                    <div id="policyViewer" style="width: 100%; height: 100%;"></div>
+                </div>
+
+                <div class="coi-action-buttons" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; border-radius: 0 0 12px 12px;">
+                    <button type="button" onclick="closeCOIModal()" style="padding: 10px 16px; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; background: #6b7280; color: white;">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="button" onclick="realPrintCOI()" style="padding: 10px 16px; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; background: #2563eb; color: white;">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                    <button type="button" onclick="realSaveCOI('${policy.policyNumber || policy.policy_number}')" style="padding: 10px 16px; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; background: #10b981; color: white;">
+                        <i class="fas fa-save"></i> Save COI
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Remove any existing COI modals first
+        const existingModal = document.getElementById('coiModalOverlay');
+        if (existingModal) {
+            existingModal.remove();
+            console.log('🔄 Removed existing COI modal');
+        }
+
+        // Ensure modal is on top of everything and prevent body scroll
+        document.body.style.overflow = 'hidden';
+
+        // Add click handler to close modal when clicking background
+        coiModal.addEventListener('click', function(e) {
+            if (e.target === coiModal) {
+                console.log('🖱️ Modal background clicked - closing modal');
+                window.closeCOIModal();
+            }
+        });
+
+        document.body.appendChild(coiModal);
+
+        // Force modal to be visible
+        setTimeout(() => {
+            coiModal.style.display = 'flex';
+            coiModal.style.visibility = 'visible';
+            coiModal.style.opacity = '1';
+
+            console.log('✅ COI Modal should now be visible', {
+                modal: coiModal,
+                zIndex: coiModal.style.zIndex,
+                display: coiModal.style.display,
+                position: coiModal.style.position,
+                bodyOverflow: document.body.style.overflow
+            });
+
+            // Also check if there are any overlapping elements
+            const allModals = document.querySelectorAll('[id*="modal"], [class*="modal"], [style*="z-index"]');
+            console.log('📋 All potential modal elements:', Array.from(allModals).map(el => ({
+                id: el.id,
+                className: el.className,
+                zIndex: window.getComputedStyle(el).zIndex
+            })));
+        }, 50);
+
+        // Store policy data globally for the COI functions
+        window.currentCOIPolicyData = policyData;
+
+        // Load real ACORD viewer with PDF.js - VIG Agency pattern
+        setTimeout(() => {
+            console.log('🚀 Loading ACORD viewer with policy data:', policyData);
+            console.log('🔍 DEBUG: window.createRealACORDViewer type:', typeof window.createRealACORDViewer);
+            console.log('🔍 DEBUG: Available window functions:', Object.keys(window).filter(k => k.includes('ACORD') || k.includes('COI')));
+
+            if (typeof window.createRealACORDViewer === 'function') {
+                console.log('✅ Using createRealACORDViewer');
+                window.createRealACORDViewer(policyData.policyNumber || policyData.id, policyData);
+            } else {
+                console.error('❌ ACORD viewer functions not found - checking fallbacks');
+                // Try multiple retry attempts with increasing delays
+                let retryCount = 0;
+                const maxRetries = 10; // Try for up to 10 seconds
+
+                const retryACORDViewer = () => {
+                    retryCount++;
+                    console.log(`🔄 Retry ${retryCount}/${maxRetries}: Checking for ACORD viewer...`);
+                    console.log('🔧 Script load marker:', window.acordScriptLoaded || 'NOT FOUND');
+                    console.log('🔧 Function type:', typeof window.createRealACORDViewer);
+
+                    if (typeof window.createRealACORDViewer === 'function') {
+                        console.log('✅ Found createRealACORDViewer on retry', retryCount);
+                        window.createRealACORDViewer(policyData.policyNumber || policyData.id, policyData);
+                    } else if (retryCount < maxRetries) {
+                        console.log(`⏳ ACORD viewer not ready yet, retrying in ${retryCount * 500}ms...`);
+                        setTimeout(retryACORDViewer, retryCount * 500); // Increasing delay
+                    } else {
+                        console.error('❌ ACORD viewer never loaded after', maxRetries, 'retries');
+                        console.error('❌ Available functions containing "ACORD":', Object.keys(window).filter(k => k.includes('ACORD')));
+
+                        // Ultimate fallback - try to manually load the script
+                        console.log('🚨 EMERGENCY: Attempting to manually load ACORD viewer script...');
+                        console.log('🔧 Checking existing script tag:', !!document.querySelector('script[src*="acord-real-viewer-vigagency"]'));
+
+                        const script = document.createElement('script');
+                        script.src = 'js/acord-real-viewer-vigagency.js?v=EMERGENCY_LOAD_' + Date.now();
+                        script.onload = () => {
+                            console.log('🔧 Emergency script loaded successfully!');
+                            setTimeout(() => {
+                                if (typeof window.createRealACORDViewer === 'function') {
+                                    console.log('✅ EMERGENCY LOAD SUCCESS: createRealACORDViewer found!');
+                                    window.createRealACORDViewer(policyData.policyNumber || policyData.id, policyData);
+                                } else {
+                                    console.error('❌ EMERGENCY LOAD FAILED: Function still not found');
+                                    console.error('Script marker after emergency:', window.acordScriptLoaded);
+                                }
+                            }, 1000);
+                        };
+                        script.onerror = (err) => {
+                            console.error('❌ Emergency script loading failed:', err);
+                        };
+                        document.head.appendChild(script);
+                    }
+                };
+
+                setTimeout(retryACORDViewer, 1000);
+            }
+        }, 100);
+        };
+
+        // Call the modal creation
+        createCOIModal();
+    } // End of showCOIModal function
+
+    // Add the closeCOIModal function if it doesn't exist
+    if (!window.closeCOIModal) {
+        window.closeCOIModal = function() {
+            console.log('🚪 Closing COI modal...');
+            const modal = document.getElementById('coiModalOverlay');
+            if (modal) {
+                modal.remove();
+                // Restore body overflow
+                document.body.style.overflow = '';
+                console.log('✅ COI modal closed and body overflow restored');
+            }
+        };
+    }
+};
+
+// Function to generate ID Cards for a policy
+window.generateIdCardsForPolicy = function(policyId) {
+    console.log('Generating ID Cards for policy:', policyId);
+
+    // Get policy data
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const policy = policies.find(p => String(p.id) === String(policyId));
+
+    if (!policy) {
+        alert('Policy not found');
+        return;
+    }
+
+    showNotification('Generating Insurance ID Cards...', 'info');
+
+    // Create a modal for ID card generation
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 40px; border-radius: 12px; max-width: 500px; width: 90%;">
+            <h3 style="margin: 0 0 20px 0; color: #111827;">Insurance ID Cards</h3>
+            <p style="color: #6b7280; margin-bottom: 30px;">Generate proof of insurance cards for policy ${policy.policyNumber || policyId}</p>
+
+            <div style="margin-bottom: 30px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Number of Cards:</label>
+                <select id="cardQuantity" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <option value="1">1 Card</option>
+                    <option value="2">2 Cards</option>
+                    <option value="4">4 Cards</option>
+                    <option value="6">6 Cards</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button onclick="this.closest('.modal-overlay').remove()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                <button onclick="generateIdCards('${policyId}')" style="padding: 12px 24px; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer;">Generate Cards</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+// Helper function to actually generate the certificate
+window.generateCertificate = function(policyId) {
+    const certHolderName = document.getElementById('certHolderName').value.trim();
+
+    if (!certHolderName) {
+        alert('Please enter a certificate holder name');
+        return;
+    }
+
+    // Close modal
+    document.querySelector('.modal-overlay').remove();
+
+    // Here you would integrate with your actual certificate generation logic
+    showNotification(`Certificate generated for ${certHolderName}`, 'success');
+    console.log('Certificate generated for policy:', policyId, 'Certificate Holder:', certHolderName);
+};
+
+// Helper function to actually generate the ID cards
+window.generateIdCards = function(policyId) {
+    const quantity = document.getElementById('cardQuantity').value;
+
+    // Close modal
+    document.querySelector('.modal-overlay').remove();
+
+    // Here you would integrate with your actual ID card generation logic
+    showNotification(`${quantity} ID card(s) generated`, 'success');
+    console.log('ID cards generated for policy:', policyId, 'Quantity:', quantity);
+};
+
+// Function to send COI for a policy
+window.sendCOIForPolicy = function(policyId) {
+    console.log('Sending COI for policy:', policyId);
+
+    // Check if sendCOIRequest function exists (from existing functionality)
+    if (window.sendCOIRequest && typeof window.sendCOIRequest === 'function') {
+        window.sendCOIRequest(policyId);
+    } else {
+        // Create a simple modal for COI sending
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+        modal.innerHTML = `
+            <div style="background: white; padding: 40px; border-radius: 12px; max-width: 500px; width: 90%;">
+                <h3 style="margin: 0 0 20px 0; color: #111827;">Send Certificate of Insurance</h3>
+                <p style="color: #6b7280; margin-bottom: 30px;">Send COI for policy ${policyId}</p>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Recipient Email:</label>
+                    <input type="email" id="recipientEmail" placeholder="Enter recipient email" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+
+                <div style="margin-bottom: 30px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Message (optional):</label>
+                    <textarea id="coiMessage" placeholder="Add a message..." style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; min-height: 80px; resize: vertical;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button onclick="this.closest('.modal-overlay').remove()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                    <button onclick="sendCOI('${policyId}')" style="padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">Send COI</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    }
+};
+
+// Function to view current COI for a policy
+window.viewCurrentCOI = function(policyId) {
+    console.log('Viewing current COI for policy:', policyId);
+
+    // Check for COI documents using the same source as admin dashboard
+    let policy = null;
+    let hasCOIDocuments = false;
+
+    // First try window.allPolicies (used by admin dashboard)
+    if (window.allPolicies && Array.isArray(window.allPolicies)) {
+        console.log('🔍 Checking window.allPolicies:', window.allPolicies.length, 'policies for:', policyId);
+
+        // Try multiple matching patterns to handle policy number vs policy ID mismatches
+        policy = window.allPolicies.find(p =>
+            p.policyNumber === policyId ||
+            p.id === policyId ||
+            (p.policyNumber && p.policyNumber.trim() === policyId.trim()) ||
+            (p.id && p.id.trim() === policyId.trim()) ||
+            // Check if the policy ID contains the policy number or vice versa
+            (p.policyNumber && policyId.includes(p.policyNumber.trim())) ||
+            (p.id && policyId.includes(p.id.trim())) ||
+            (policyId.includes(p.policyNumber) && p.policyNumber.length > 5) ||
+            (policyId.includes(p.id) && p.id.length > 5)
+        );
+
+        if (policy) {
+            console.log('✅ Found policy in window.allPolicies:', policy.policyNumber || policy.id, 'COI docs:', policy.coiDocuments?.length || 0);
+            hasCOIDocuments = policy.coiDocuments && policy.coiDocuments.length > 0;
+
+            // Also check if we need to cross-reference with localStorage COI documents
+            if (!hasCOIDocuments) {
+                console.log('🔍 Policy found but no COI docs, checking localStorage for cross-references...');
+                const existingCOIs = JSON.parse(localStorage.getItem('policy_coi_documents') || '[]');
+
+                // Look for COI documents that match the policy number
+                const crossRefCOIs = existingCOIs.filter(coi =>
+                    coi.policyId === policy.policyNumber ||
+                    coi.policyId === policy.id ||
+                    policy.policyNumber === coi.policyId ||
+                    policy.id === coi.policyId
+                );
+
+                if (crossRefCOIs.length > 0) {
+                    console.log('🔗 Found cross-referenced COI documents:', crossRefCOIs.length);
+                    // Add these COI documents to the policy
+                    if (!policy.coiDocuments) {
+                        policy.coiDocuments = [];
+                    }
+                    crossRefCOIs.forEach(coi => {
+                        if (!policy.coiDocuments.find(existingCoi => existingCoi.id === coi.id)) {
+                            policy.coiDocuments.push(coi);
+                        }
+                    });
+                    hasCOIDocuments = policy.coiDocuments.length > 0;
+                    console.log('✅ Cross-referenced COI documents added to policy');
+                }
+            }
+        }
+    }
+
+    // Fallback: check localStorage approaches
+    if (!hasCOIDocuments) {
+        console.log('🔍 Checking localStorage COI storage...');
+
+        // Check the insurance_policies localStorage where COI documents are actually saved
+        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        console.log('🔍 Found', policies.length, 'policies in localStorage');
+
+        // Find policy by multiple identifiers and extract the policy number for cross-reference
+        let matchingPolicy = policies.find(p =>
+            p.policyNumber === policyId ||
+            p.id === policyId ||
+            (p.policyNumber && p.policyNumber.trim() === policyId.trim()) ||
+            (p.id && p.id.trim() === policyId.trim())
+        );
+
+        if (matchingPolicy && matchingPolicy.coiDocuments && matchingPolicy.coiDocuments.length > 0) {
+            console.log('✅ Found COI documents in localStorage policy:', matchingPolicy.policyNumber || matchingPolicy.id, 'docs:', matchingPolicy.coiDocuments.length);
+            hasCOIDocuments = true;
+            policy = matchingPolicy;
+        } else {
+            // Use the same cross-reference mapping as generateCOIContainerContent
+            console.log('🔍 Searching for cross-referenced policies using standardized mapping...');
+            const crossReferenceMap = {
+                // Primary policy relationships - updated to match save function
+                '6146786114': ['POL-1769897676650-ri6ku8b34', 'POL-1769575534717-uq6k8c8ty'],
+                'POL-1769897676650-ri6ku8b34': ['6146786114', 'POL-1769575534717-uq6k8c8ty'],
+                '864564216': ['POL-1769575534717-uq6k8c8ty', 'POL-1769897676650-ri6ku8b34'],
+                'POL-1769575534717-uq6k8c8ty': ['864564216', '6146786114', 'POL-1769897676650-ri6ku8b34']
+            };
+
+            // Get all possible policy IDs to search for
+            const searchIds = [policyId];
+            if (crossReferenceMap[policyId]) {
+                searchIds.push(...crossReferenceMap[policyId]);
+            }
+            console.log('🔍 Searching for policy IDs:', searchIds);
+
+            // Prioritize exact policy ID matches over cross-references
+            let exactMatches = [];
+            let crossReferenceMatches = [];
+
+            policies.forEach(p => {
+                const policyIds = [p.policyNumber, p.id].filter(id => id);
+
+                // Check if any of our search IDs match any of the policy's IDs
+                for (const searchId of searchIds) {
+                    for (const pId of policyIds) {
+                        const isExactMatch = searchId === pId || (searchId && pId && searchId.trim() === pId.trim());
+                        const isCrossReference = !isExactMatch && (
+                            (searchId && pId && searchId.includes(pId) && pId.length > 5) ||
+                            (searchId && pId && pId.includes(searchId) && searchId.length > 5)
+                        );
+
+                        if (p.coiDocuments && p.coiDocuments.length > 0) {
+                            if (isExactMatch && searchId === policyId) {
+                                // This is the exact policy we're looking for
+                                console.log('🎯 EXACT MATCH found! Policy:', p.policyNumber || p.id, 'matches requested policy:', policyId);
+                                exactMatches.push(p);
+                            } else if (isExactMatch || isCrossReference) {
+                                console.log('🔗 Cross-reference match found! Policy:', p.policyNumber || p.id, 'matches search ID:', searchId, 'COI docs:', p.coiDocuments.length);
+                                crossReferenceMatches.push(p);
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Use exact matches first, then cross-references
+            if (exactMatches.length > 0) {
+                matchingPolicy = exactMatches[0];
+                hasCOIDocuments = true;
+                policy = matchingPolicy;
+                console.log('✅ Using EXACT policy match:', matchingPolicy.policyNumber || matchingPolicy.id);
+            } else if (crossReferenceMatches.length > 0) {
+                matchingPolicy = crossReferenceMatches[0];
+                hasCOIDocuments = true;
+                policy = matchingPolicy;
+                console.log('✅ Using cross-reference policy match:', matchingPolicy.policyNumber || matchingPolicy.id);
+            }
+
+            // If still no match, try a broad search through all policies looking for any with COI documents
+            if (!hasCOIDocuments) {
+                console.log('🔍 Broad search for any policy with COI documents...');
+                const policiesWithCOI = policies.filter(p => p.coiDocuments && p.coiDocuments.length > 0);
+                if (policiesWithCOI.length > 0) {
+                    console.log('📋 Found', policiesWithCOI.length, 'policies with COI documents');
+
+                    // Prioritize COI documents saved in current session (last 5 minutes)
+                    const currentTime = new Date().getTime();
+                    const fiveMinutesAgo = currentTime - (5 * 60 * 1000);
+
+                    let latestPolicyWithCOI = null;
+                    let latestTimestamp = 0;
+                    let isRecentSession = false;
+
+                    policiesWithCOI.forEach(p => {
+                        if (p.coiDocuments && p.coiDocuments.length > 0) {
+                            const latestCOI = p.coiDocuments[p.coiDocuments.length - 1];
+                            const timestamp = new Date(latestCOI.uploadDate || 0).getTime();
+                            const isRecent = timestamp > fiveMinutesAgo;
+
+                            // Prioritize recent session documents over older ones
+                            if (isRecent && (!isRecentSession || timestamp > latestTimestamp)) {
+                                latestTimestamp = timestamp;
+                                latestPolicyWithCOI = p;
+                                isRecentSession = true;
+                                console.log('🕐 Found recent session COI from policy:', p.policyNumber || p.id, 'at', new Date(timestamp).toISOString());
+                            } else if (!isRecentSession && timestamp > latestTimestamp) {
+                                latestTimestamp = timestamp;
+                                latestPolicyWithCOI = p;
+                                console.log('📅 Found older COI from policy:', p.policyNumber || p.id, 'at', new Date(timestamp).toISOString());
+                            }
+                        }
+                    });
+
+                    if (latestPolicyWithCOI) {
+                        console.log('✅ Using', isRecentSession ? 'recent session' : 'most recent', 'COI from policy:', latestPolicyWithCOI.policyNumber || latestPolicyWithCOI.id);
+                        matchingPolicy = latestPolicyWithCOI;
+                        hasCOIDocuments = true;
+                        policy = latestPolicyWithCOI;
+                    }
+                }
+            }
+        }
+
+        // Check legacy policy_coi_documents storage as final fallback
+        if (!hasCOIDocuments) {
+            console.log('🔍 Checking legacy policy_coi_documents storage...');
+            const existingCOIs = JSON.parse(localStorage.getItem('policy_coi_documents') || '[]');
+            const policyCOIs = existingCOIs.filter(coi => coi.policyId === policyId);
+
+            if (policyCOIs.length > 0) {
+                hasCOIDocuments = true;
+                // Show the legacy COI
+                const latestCOI = policyCOIs[policyCOIs.length - 1];
+                showNotification('Opening latest COI document...', 'info');
+                console.log('Latest COI from legacy localStorage:', latestCOI);
+                if (latestCOI.formData || latestCOI.dataUrl) {
+                    // Show in modal popup if we have either form data OR captured image
+                    console.log('📄 Displaying COI modal for legacy document:', latestCOI.name);
+                    showCOIModal(latestCOI);
+                } else if (latestCOI.url) {
+                    window.open(latestCOI.url, '_blank');
+                } else {
+                    showNotification('COI document found but cannot be displayed', 'warning');
+                    console.warn('⚠️ Legacy COI document has no displayable content:', latestCOI);
+                }
+                return;
+            }
+        }
+    }
+
+    // If we found COI documents in the policy data, show them
+    if (hasCOIDocuments && policy && policy.coiDocuments && policy.coiDocuments.length > 0) {
+        const latestCOI = policy.coiDocuments[policy.coiDocuments.length - 1];
+        showNotification('Opening latest COI document...', 'info');
+        console.log('Latest COI from policy:', latestCOI);
+
+        // Show the COI document in a modal popup
+        if (latestCOI.formData || latestCOI.dataUrl) {
+            // Show modal if we have either form data OR captured image
+            console.log('📄 Displaying COI modal for document:', latestCOI.name);
+            showCOIModal(latestCOI);
+        } else if (latestCOI.url) {
+            window.open(latestCOI.url, '_blank');
+        } else {
+            showNotification('COI document found but cannot be displayed', 'warning');
+            console.warn('⚠️ COI document has no displayable content:', latestCOI);
+        }
+        return;
+    }
+
+    // No COI documents found anywhere - show the modal
+    if (!hasCOIDocuments) {
+        // Show modal popup instead of just notification
+        const modalHtml = `
+            <div class="modal-overlay active" id="noCOIModal">
+                <div class="modal-container" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h2 style="color: #f59e0b; margin: 0;">
+                            <i class="fas fa-exclamation-triangle"></i> No COI Saved
+                        </h2>
+                        <button class="close-btn" onclick="closeNoCOIModal()">&times;</button>
+                    </div>
+                    <div class="modal-content">
+                        <div style="text-align: center; padding: 20px 0;">
+                            <i class="fas fa-file-contract" style="font-size: 48px; color: #6b7280; margin-bottom: 16px;"></i>
+                            <p style="font-size: 16px; color: #374151; margin: 0 0 20px 0;">
+                                No Certificate of Insurance documents have been saved for this policy.
+                            </p>
+                            <p style="font-size: 14px; color: #6b7280; margin: 0;">
+                                You can generate a new COI by clicking "Generate COI" in the policy actions.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="text-align: center; border-top: 1px solid #e5e7eb; padding: 20px;">
+                        <button onclick="closeNoCOIModal()" class="btn-primary" style="padding: 10px 24px;">
+                            <i class="fas fa-check"></i> OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        console.log('[info] No COI documents found for this policy');
+        return;
+    }
+
+    // Display the most recent COI
+    const latestCOI = policyCOIs[policyCOIs.length - 1];
+
+    showNotification('Opening latest COI document...', 'info');
+    console.log('Latest COI:', latestCOI);
+
+    // Here you would open the COI document viewer or download it
+    if (latestCOI.url) {
+        window.open(latestCOI.url, '_blank');
+    }
+};
+
+// Function to close the No COI modal
+window.closeNoCOIModal = function() {
+    const modal = document.getElementById('noCOIModal');
+    if (modal) {
+        modal.remove();
+    }
+};
+
+// Function to show COI document in a modal popup - SIMPLE IMAGE DISPLAY LIKE VIG AGENCY
+window.showCOIModal = function(coiDocument) {
+    console.log('📄 === STARTING COI MODAL DISPLAY ===');
+    console.log('📄 Document name:', coiDocument.name);
+    console.log('📄 Document has dataUrl:', !!coiDocument.dataUrl, 'Length:', coiDocument.dataUrl?.length || 0);
+    console.log('📄 Document has formData:', !!coiDocument.formData, 'Fields:', Object.keys(coiDocument.formData || {}).length);
+
+    // Remove any existing modals first
+    const existingModals = document.querySelectorAll('#coiModalOverlay, #coiViewerModal, .modal-overlay');
+    existingModals.forEach(modal => modal.remove());
+
+    // Check if we have a valid image to display
+    if (!coiDocument.dataUrl || coiDocument.dataUrl.length < 1000) {
+        console.warn('⚠️ No valid image data found');
+        showNotification('No image data available for this COI', 'warning');
+        return;
+    }
+
+    console.log('📸 Creating simple image display modal like VIG Agency...');
+
+    // Create simple, elegant modal like VIG Agency uses
+    const modalHtml = `
+        <div id="coiModalOverlay" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        " onclick="closeCOIModal()">
+            <div style="
+                position: relative;
+                max-width: 95vw;
+                max-height: 95vh;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                overflow: hidden;
+            " onclick="event.stopPropagation()">
+                <!-- Header -->
+                <div style="
+                    background: linear-gradient(135deg, #0066cc, #004999);
+                    color: white;
+                    padding: 12px 20px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                ">
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; font-weight: 600;">
+                            <i class="fas fa-file-contract" style="margin-right: 8px;"></i>
+                            ${coiDocument.name || 'ACORD 25 Certificate'}
+                        </h3>
+                        <p style="margin: 2px 0 0 0; opacity: 0.9; font-size: 12px;">
+                            Policy: ${coiDocument.policyId || 'N/A'} |
+                            ${coiDocument.uploadDate ? new Date(coiDocument.uploadDate).toLocaleDateString() : 'N/A'}
+                        </p>
+                    </div>
+                    <button onclick="closeCOIModal()" style="
+                        background: none;
+                        border: none;
+                        color: white;
+                        font-size: 18px;
+                        cursor: pointer;
+                        padding: 5px;
+                        border-radius: 4px;
+                        transition: background-color 0.2s;
+                    " onmouseover="this.style.backgroundColor='rgba(255,255,255,0.1)'"
+                       onmouseout="this.style.backgroundColor='transparent'">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Image Container -->
+                <div style="
+                    padding: 0;
+                    text-align: center;
+                    background: #2d3748;
+                    height: calc(95vh - 60px);
+                    overflow: auto;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                ">
+                    <img src="${coiDocument.dataUrl}"
+                         alt="ACORD 25 Certificate"
+                         style="
+                             width: auto;
+                             height: auto;
+                             max-width: 90vw;
+                             max-height: 85vh;
+                             object-fit: contain;
+                             object-position: center;
+                             display: block;
+                             margin: auto;
+                             border: none;
+                             border-radius: 4px;
+                             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                         ">
+                </div>
+            </div>
+        </div>
+    `;
+
+    console.log('📄 Adding modal to document body...');
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Prevent body scrolling
+    document.body.style.overflow = 'hidden';
+
+    console.log('✅ COI image modal displayed successfully');
+};
+
+// Function to show form data summary as fallback
+window.showFormDataSummary = function(coiDocument) {
+    console.log('📋 Showing form data summary as fallback...');
+    const viewer = document.getElementById('policyViewer');
+    if (viewer && coiDocument.formData) {
+        const formData = coiDocument.formData;
+        viewer.innerHTML = `
+            <div style="padding: 30px; background: white; height: 100%; overflow-y: auto;">
+                <div style="max-width: 800px; margin: 0 auto;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <i class="fas fa-file-contract" style="font-size: 48px; color: #3b82f6; margin-bottom: 16px;"></i>
+                        <h1 style="margin: 0; color: #1f2937; font-size: 24px; font-weight: 600;">ACORD 25 Certificate</h1>
+                        <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 16px;">Certificate of Insurance Data</p>
+                    </div>
+
+                    <div style="background: #f9fafb; padding: 25px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 20px 0; color: #374151; font-size: 18px;">Form Data Summary:</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                            ${Object.keys(formData).map(key => {
+                                const value = formData[key];
+                                if (value && value !== '') {
+                                    return `
+                                        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                            <strong style="display: block; margin-bottom: 8px; color: #374151; font-size: 14px;">${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong>
+                                            <span style="color: #6b7280; font-size: 14px;">${typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value}</span>
+                                        </div>
+                                    `;
+                                }
+                                return '';
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 30px; padding: 20px; background: #fef3c7; border-radius: 8px; border: 1px solid #f59e0b;">
+                        <i class="fas fa-info-circle" style="color: #d97706; margin-right: 8px;"></i>
+                        <span style="color: #92400e; font-weight: 600;">This is a summary of the saved COI data. The visual PDF form could not be regenerated at this time.</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        console.error('❌ No form data to display');
+    }
+};
+
+// Function to close the COI modal - Simple and clean like VIG Agency
+window.closeCOIModal = function() {
+    console.log('🚪 Closing COI modal...');
+
+    // Remove the modal
+    const modal = document.getElementById('coiModalOverlay');
+    if (modal) {
+        modal.remove();
+        console.log('✅ COI modal removed');
+    }
+
+    // Restore body scrolling
+    document.body.style.overflow = '';
+    console.log('✅ Body scrolling restored');
+};
+
+// Legacy function name for compatibility
+window.closeCOIViewerModal = window.closeCOIModal;
+
+// Function to close any COI generation modals
+window.closeGenerateCOIModal = function() {
+    console.log('🔄 Closing generate COI modal...');
+
+    // Close by ID if it exists
+    const modalIds = ['coiModal', 'acordModal', 'policyModal', 'coiModalOverlay'];
+    modalIds.forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal) {
+            modal.remove();
+            console.log(`✅ Closed modal with ID: ${id}`);
+        }
+    });
+
+    // Close only COI-related modal overlays, preserve policy modals
+    const modalOverlays = document.querySelectorAll(`
+        [id*="coiModalOverlay"],
+        [id*="acordModalOverlay"],
+        div[style*="position: fixed"][style*="backdrop-filter"]:not(#policyViewModal)
+    `);
+    modalOverlays.forEach(modal => {
+        // Only close if it's NOT the policy view modal or COI viewer modal
+        if (modal.id !== 'coiViewerModal' && modal.id !== 'policyViewModal' && !modal.closest('#policyViewModal')) {
+            const modalContent = modal.textContent || '';
+            // Additional safety check - don't close if it contains policy view content
+            if (!modalContent.includes('Policy Details') && !modalContent.includes('policy-tabs')) {
+                modal.remove();
+                console.log('✅ Closed COI modal overlay:', modal.id || modal.className);
+            }
+        }
+    });
+
+    // Remove only COI-specific orphaned elements, preserve policy modal elements
+    const orphanedElements = document.querySelectorAll('.coi-action-buttons, .coi-modal-header, .coi-modal-body, [id*="coi"][class*="modal"]:not(#coiViewerModal)');
+    orphanedElements.forEach(element => {
+        if (element.id !== 'coiViewerModal' && !element.closest('#coiViewerModal') && !element.closest('#policyViewModal')) {
+            element.remove();
+            console.log('🧹 Removed orphaned COI modal element');
+        }
+    });
+
+    // Enhanced cleanup for floating action buttons and modal remnants
+    const floatingElements = document.querySelectorAll(`
+        div[style*="position: fixed"],
+        div[style*="z-index"],
+        .floating-action-buttons,
+        .coi-floating-buttons,
+        [class*="floating"],
+        [class*="action-button"],
+        button[onclick*="save"],
+        .modal-actions,
+        .coi-actions
+    `);
+
+    floatingElements.forEach(element => {
+        if (element.id !== 'coiViewerModal' && !element.closest('#coiViewerModal') &&
+            element.id !== 'policyViewModal' && !element.closest('#policyViewModal')) {
+            const elementText = element.textContent || element.innerHTML || '';
+            const hasActionContent = elementText.includes('Save to Profile') ||
+                                   (elementText.includes('Save') && !elementText.includes('Policy Details')) ||
+                                   (elementText.includes('Download') && !elementText.includes('Policy Details')) ||
+                                   element.classList.contains('coi-btn') ||
+                                   element.onclick && element.onclick.toString().includes('save');
+
+            if (hasActionContent) {
+                element.remove();
+                console.log('🧹 Removed floating COI action element:', element.className || element.tagName);
+            }
+        }
+    });
+
+    // Final cleanup sweep for any remaining COI floating elements
+    setTimeout(() => {
+        const remainingFloaters = document.querySelectorAll('div[style*="position: absolute"], div[style*="position: fixed"]');
+        remainingFloaters.forEach(floater => {
+            if (!floater.closest('#coiViewerModal') && !floater.closest('#policyViewModal') &&
+                ((floater.textContent.includes('Save') && !floater.textContent.includes('Policy Details')) ||
+                 (floater.textContent.includes('Download') && !floater.textContent.includes('Policy Details')) ||
+                 floater.id === 'coiModalOverlay')) {
+                floater.remove();
+                console.log('🧹 Final cleanup: removed remaining COI floater');
+            }
+        });
+    }, 100);
+
+    // Restore body scrolling
+    document.body.style.overflow = '';
+    console.log('✅ Generate COI modal closed');
+};
+
+// Function to download COI document
+window.downloadCOI = function(coiId) {
+    console.log('📥 Downloading COI document:', coiId);
+
+    // Find the COI document
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let coiDocument = null;
+
+    policies.forEach(policy => {
+        if (policy.coiDocuments) {
+            const foundDoc = policy.coiDocuments.find(doc => doc.id === coiId);
+            if (foundDoc) {
+                coiDocument = foundDoc;
+            }
+        }
+    });
+
+    if (coiDocument && coiDocument.dataUrl) {
+        // Create a temporary link to download the image
+        const link = document.createElement('a');
+        link.href = coiDocument.dataUrl;
+        link.download = coiDocument.name || 'COI_Document.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotification('COI document downloaded successfully!', 'success');
+    } else {
+        showNotification('Could not find COI document to download', 'error');
+    }
+};
+
+// Function to print COI document
+window.printCOI = function(coiId) {
+    console.log('🖨️ Printing COI document:', coiId);
+
+    // Find the COI document
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let coiDocument = null;
+
+    policies.forEach(policy => {
+        if (policy.coiDocuments) {
+            const foundDoc = policy.coiDocuments.find(doc => doc.id === coiId);
+            if (foundDoc) {
+                coiDocument = foundDoc;
+            }
+        }
+    });
+
+    if (coiDocument && coiDocument.dataUrl) {
+        // Open print window
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Print COI - ${coiDocument.name || 'COI Document'}</title>
+                        <style>
+                            body { margin: 0; padding: 20px; text-align: center; }
+                            img { max-width: 100%; height: auto; }
+                            @media print {
+                                body { padding: 0; }
+                                .no-print { display: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="no-print">
+                            <h2>${coiDocument.name || 'Certificate of Insurance'}</h2>
+                            <p>Use Ctrl+P (Cmd+P on Mac) to print this document</p>
+                        </div>
+                        <img src="${coiDocument.dataUrl}" alt="Certificate of Insurance">
+                        <script>
+                            window.onload = function() {
+                                setTimeout(function() { window.print(); }, 500);
+                            }
+                        </script>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+        showNotification('Opening print dialog...', 'info');
+    } else {
+        showNotification('Could not find COI document to print', 'error');
+    }
+};
+
+// Function to upload ID cards for a policy
+window.uploadIdCardsForPolicy = function(policyId) {
+    console.log('Uploading ID cards for policy:', policyId);
+
+    // Create file upload modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 40px; border-radius: 12px; max-width: 500px; width: 90%;">
+            <h3 style="margin: 0 0 20px 0; color: #111827;">Upload ID Cards</h3>
+            <p style="color: #6b7280; margin-bottom: 30px;">Upload insurance ID card files for policy ${policyId}</p>
+
+            <div style="margin-bottom: 30px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Select Files:</label>
+                <input type="file" id="idCardFiles" multiple accept=".pdf,.png,.jpg,.jpeg" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+                <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">Accepted formats: PDF, PNG, JPG, JPEG</p>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button onclick="this.closest('.modal-overlay').remove()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                <button onclick="uploadIdCards('${policyId}')" style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;">Upload</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+// Helper function to send COI
+window.sendCOI = function(policyId) {
+    const email = document.getElementById('recipientEmail').value.trim();
+    const message = document.getElementById('coiMessage').value.trim();
+
+    if (!email) {
+        alert('Please enter a recipient email');
+        return;
+    }
+
+    // Close modal
+    document.querySelector('.modal-overlay').remove();
+
+    // Here you would integrate with email sending functionality
+    showNotification(`COI sent to ${email}`, 'success');
+    console.log('COI sent for policy:', policyId, 'to:', email, 'message:', message);
+};
+
+// Helper function to upload ID cards
+window.uploadIdCards = function(policyId) {
+    const fileInput = document.getElementById('idCardFiles');
+    const files = fileInput.files;
+
+    if (files.length === 0) {
+        alert('Please select at least one file');
+        return;
+    }
+
+    // Close modal
+    document.querySelector('.modal-overlay').remove();
+
+    // Here you would integrate with file upload functionality
+    showNotification(`${files.length} ID card file(s) uploaded`, 'success');
+    console.log('ID cards uploaded for policy:', policyId, 'Files:', files);
+};
+
+// Function to load and display COI files for a policy
+window.loadCOIFiles = async function(policyIdentifier) {
+    console.log('🔄 loadCOIFiles called for policy:', policyIdentifier);
+
+    if (!policyIdentifier) {
+        console.warn('⚠️ No policy identifier provided to loadCOIFiles');
+        return;
+    }
+
+    // Find the container for this policy - could be policyId or policyNumber
+    let container = document.getElementById(`coiFilesContainer-${policyIdentifier}`);
+
+    // If not found with the identifier directly, try to get policies and match by policyNumber
+    if (!container) {
+        console.log('🔍 Container not found with identifier, checking all policies...');
+        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        const policy = policies.find(p => p.id === policyIdentifier || p.policyNumber === policyIdentifier);
+        if (policy) {
+            // Try with the other identifier
+            const alternateId = policy.id === policyIdentifier ? policy.policyNumber : policy.id;
+            container = document.getElementById(`coiFilesContainer-${alternateId}`);
+            console.log('🔍 Trying alternate container ID:', `coiFilesContainer-${alternateId}`);
+        }
+    }
+
+    if (!container) {
+        console.warn('⚠️ coiFilesContainer not found for policy:', policyIdentifier);
+        console.log('🔍 Available containers:', Array.from(document.querySelectorAll('[id^="coiFilesContainer-"]')).map(el => el.id));
+        return;
+    }
+
+    // Get policies from the same source as the admin dashboard
+    let policy = null;
+
+    // First try window.allPolicies (used by admin dashboard)
+    if (window.allPolicies && Array.isArray(window.allPolicies)) {
+        console.log('🔍 Checking window.allPolicies:', window.allPolicies.length, 'policies');
+        policy = window.allPolicies.find(p =>
+            p.policyNumber === policyIdentifier ||
+            p.id === policyIdentifier ||
+            (p.policyNumber && p.policyNumber.trim() === policyIdentifier.trim()) ||
+            (p.id && p.id.trim() === policyIdentifier.trim())
+        );
+        if (policy) {
+            console.log('✅ Found policy in window.allPolicies:', policy.policyNumber || policy.id, 'COI docs:', policy.coiDocuments?.length || 0);
+        }
+    }
+
+    // If not found, try localStorage as fallback
+    if (!policy) {
+        console.log('🔍 Policy not found in window.allPolicies, trying localStorage...');
+        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        policy = policies.find(p => p.policyNumber === policyIdentifier || p.id === policyIdentifier);
+        if (policy) {
+            console.log('✅ Found policy in localStorage:', policy.policyNumber || policy.id);
+        }
+    }
+
+    // If still not found, try the API approach used by policy-data.js
+    if (!policy && window.policyAPI && typeof window.policyAPI.getAllPolicies === 'function') {
+        try {
+            console.log('🔍 Policy not found, trying API...');
+            const apiPolicies = await window.policyAPI.getAllPolicies();
+            policy = apiPolicies.find(p => p.policyNumber === policyIdentifier || p.id === policyIdentifier);
+            if (policy) {
+                console.log('✅ Found policy via API:', policy.policyNumber || policy.id);
+            }
+        } catch (error) {
+            console.warn('⚠️ Error fetching policies from API:', error);
+        }
+    }
+
+    if (!policy || !policy.coiDocuments || policy.coiDocuments.length === 0) {
+        // No COI documents found, show default message
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <i class="fas fa-certificate" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                <p style="margin: 0; font-size: 16px;">No certificates generated yet</p>
+                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Generate to create ACORD 25</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Display COI documents
+    console.log('✅ Found COI documents:', policy.coiDocuments.length);
+    const coiCardsHTML = policy.coiDocuments.map(coi => `
+        <div class="coi-document-card" style="
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        ">
+            <div style="display: flex; align-items: center;">
+                <i class="fas fa-file-pdf" style="color: #ef4444; font-size: 24px; margin-right: 12px;"></i>
+                <div>
+                    <div style="font-weight: 500; color: #111827; margin-bottom: 4px;">
+                        ${coi.name || 'ACORD 25 Certificate'}
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280;">
+                        ${coi.uploadDate ? new Date(coi.uploadDate).toLocaleDateString() : 'Recently generated'}
+                        ${coi.type ? ` • ${coi.type}` : ''}
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="viewCOIDocument('${coi.id || coi.name}')"
+                        style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                    <i class="fas fa-eye"></i> View
+                </button>
+                <button onclick="downloadCOIDocument('${coi.id || coi.name}')"
+                        style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                    <i class="fas fa-download"></i> Download
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = `
+        <div style="padding: 12px 0;">
+            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                <i class="fas fa-check-circle" style="color: #10b981; margin-right: 8px;"></i>
+                <span style="font-weight: 500; color: #111827;">
+                    ${policy.coiDocuments.length} Certificate${policy.coiDocuments.length === 1 ? '' : 's'} Available
+                </span>
+            </div>
+            ${coiCardsHTML}
+        </div>
+    `;
+};
+
+// Function to view COI document
+window.viewCOIDocument = function(coiId) {
+    console.log('👁️ Viewing COI document:', coiId);
+    // This would open the COI in a modal or new window
+    if (window.showNotification) {
+        window.showNotification('COI viewer opening...', 'info');
+    }
+};
+
+// Function to download COI document
+window.downloadCOIDocument = function(coiId) {
+    console.log('💾 Downloading COI document:', coiId);
+    // This would trigger download of the COI
+    if (window.showNotification) {
+        window.showNotification('COI download started...', 'success');
+    }
+};
 

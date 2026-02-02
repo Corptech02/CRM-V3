@@ -4600,6 +4600,8 @@ function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
         // Update stage and timestamp
         leads[leadIndex].stage = stage;
         leads[leadIndex].stageUpdatedAt = now;
+        // Add lastModified timestamp for smart merge protection
+        leads[leadIndex].lastModified = now;
 
         // Reset reach-out data when stage changes
         // Check for email confirmations as valid completions
@@ -6173,16 +6175,82 @@ function enforceGreenHighlightRule() {
     console.log(`🧹 CLEANUP COMPLETE: Checked ${totalChecked} rows, fixed ${cleanupCount} green highlight violations`);
 }
 
-// Function to load leads from server and refresh display
+// Function to load leads from server and refresh display (SMART MERGE VERSION)
 async function loadLeadsFromServerAndRefresh() {
+    console.log('🔄 SMART loadLeadsFromServerAndRefresh called - using protective merge...');
+
     try {
         // Load fresh data from server
         const response = await fetch('/api/leads');
         if (response.ok) {
             const serverLeads = await response.json();
+            console.log(`📥 Received ${serverLeads.length} leads from server`);
 
-            // Update localStorage with fresh server data
-            localStorage.setItem('insurance_leads', JSON.stringify(serverLeads));
+            // SMART MERGE: Preserve local changes while adding new leads
+            const existingLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const mergedLeads = [...existingLeads];
+            const now = Date.now();
+
+            console.log('🧠 SMART SERVER REFRESH: Starting protective merge process...');
+
+            // Track what we're doing
+            let addedCount = 0;
+            let preservedCount = 0;
+            let updatedCount = 0;
+
+            serverLeads.forEach(serverLead => {
+                const localLeadIndex = mergedLeads.findIndex(localLead =>
+                    String(localLead.id) === String(serverLead.id)
+                );
+
+                if (localLeadIndex === -1) {
+                    // New lead from server - add it
+                    console.log('➕ Adding new lead from server:', serverLead.name);
+                    mergedLeads.push(serverLead);
+                    addedCount++;
+                } else {
+                    const localLead = mergedLeads[localLeadIndex];
+
+                    // Check if local lead has recent changes (within last 10 minutes)
+                    const hasRecentChanges = localLead.lastModified &&
+                        (now - new Date(localLead.lastModified).getTime()) < (10 * 60 * 1000);
+
+                    // Check if stage or other important fields were changed locally
+                    const hasLocalStageChange = localLead.stage !== serverLead.stage;
+                    const hasLocalNameChange = localLead.name !== serverLead.name;
+                    const hasLocalPhoneChange = localLead.phone !== serverLead.phone;
+
+                    if (hasRecentChanges || hasLocalStageChange || hasLocalNameChange || hasLocalPhoneChange) {
+                        // PRESERVE local changes - don't overwrite
+                        console.log(`🛡️ PROTECTING: Lead ${localLead.name} (stage: ${localLead.stage} vs server: ${serverLead.stage})`);
+
+                        // Only update non-critical fields from server, keep important local changes
+                        mergedLeads[localLeadIndex] = {
+                            ...serverLead,  // Server data as base
+                            ...localLead,  // Local changes override
+                            // But allow some server updates if they don't conflict
+                            updatedAt: serverLead.updatedAt || localLead.updatedAt,
+                            // Keep local lastModified to track our changes
+                            lastModified: localLead.lastModified || new Date().toISOString()
+                        };
+                        preservedCount++;
+                    } else {
+                        // No recent local changes - safe to update with server data
+                        mergedLeads[localLeadIndex] = {
+                            ...localLead,
+                            ...serverLead,
+                            lastModified: new Date().toISOString()
+                        };
+                        updatedCount++;
+                    }
+                }
+            });
+
+            console.log(`🧠 SMART SERVER REFRESH COMPLETE: Added ${addedCount}, Preserved ${preservedCount}, Updated ${updatedCount}`);
+            console.log(`🛡️ PROTECTION ACTIVE: Local changes saved from server overwrite!`);
+
+            // Save the smartly merged data
+            localStorage.setItem('insurance_leads', JSON.stringify(mergedLeads));
 
             // Trigger display refresh
             if (window.displayLeads) {
@@ -6191,7 +6259,7 @@ async function loadLeadsFromServerAndRefresh() {
                 window.loadLeadsView();
             }
 
-            console.log('✅ Leads refreshed from server');
+            console.log('✅ Leads refreshed from server with smart merge protection');
         }
     } catch (error) {
         console.error('❌ Error refreshing leads from server:', error);
