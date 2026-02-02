@@ -729,9 +729,13 @@ window.backToPolicyList = function() {
 // Generate COI for policy
 window.generateCOI = function(policyId) {
     console.log('Generate COI for policy:', policyId);
-    // This would integrate with COI generation
-    if (window.selectPolicy) {
-        window.selectPolicy(policyId);
+    // Use the real ACORD viewer function
+    if (window.createRealACORDViewer && typeof window.createRealACORDViewer === 'function') {
+        console.log('✅ Creating ACORD viewer for policy:', policyId);
+        window.createRealACORDViewer(policyId);
+    } else {
+        console.error('❌ createRealACORDViewer function not found');
+        alert('COI generation system not loaded. Please refresh the page and try again.');
     }
 };
 

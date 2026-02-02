@@ -179,10 +179,107 @@ console.log('🔧 🔥 DEFINING window.createRealACORDViewer NOW! 🔥');
 window.createRealACORDViewer = async function(policyId, policyData = null) {
     console.log('Creating REAL ACORD viewer for policy:', policyId);
 
-    const policyViewer = document.getElementById('policyViewer');
+    // Store the current policy ID globally for the Save button
+    window.currentPolicyId = policyId;
+
+    let policyViewer = document.getElementById('policyViewer');
     if (!policyViewer) {
-        console.error('Policy viewer not found');
-        return;
+        console.log('📄 Policy viewer not found, creating modal...');
+
+        // Create a modal container for the ACORD viewer
+        const modal = document.createElement('div');
+        modal.id = 'acordViewerModal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.8);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: white;
+            width: 95vw;
+            height: 95vh;
+            border-radius: 8px;
+            overflow: auto;
+            position: relative;
+        `;
+
+        // Add close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+            color: #666;
+        `;
+        closeBtn.onclick = () => modal.remove();
+
+        // Create the policy viewer inside the modal
+        policyViewer = document.createElement('div');
+        policyViewer.id = 'policyViewer';
+        policyViewer.style.cssText = 'width: 100%; height: calc(100% - 120px); padding: 20px; box-sizing: border-box; overflow-y: auto;';
+
+        // Create action buttons footer
+        const actionFooter = document.createElement('div');
+        actionFooter.style.cssText = `
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            box-sizing: border-box;
+        `;
+
+        actionFooter.innerHTML = `
+            <div style="flex: 1;">
+                <span style="color: #6b7280; font-size: 14px;">
+                    <i class="fas fa-info-circle"></i>
+                    ACORD 25 (2016/03) - Certificate of Liability Insurance
+                </span>
+            </div>
+            <div class="coi-action-buttons" style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" class="coi-btn coi-btn-secondary" onclick="document.getElementById('acordViewerModal').remove()" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button type="button" class="coi-btn coi-btn-primary" onclick="window.printACORD && window.printACORD()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                    <i class="fas fa-print"></i>
+                    Print
+                </button>
+                <button type="button" class="coi-btn coi-btn-success" onclick="window.realSaveCOI && window.realSaveCOI(window.currentPolicyId || '')" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                    <i class="fas fa-save"></i>
+                    Save to Profile
+                </button>
+            </div>
+        `;
+
+        modalContent.appendChild(closeBtn);
+        modalContent.appendChild(policyViewer);
+        modalContent.appendChild(actionFooter);
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+
+        console.log('✅ Created policy viewer modal');
     }
 
     // Use passed policy data (vigagency) or get from localStorage (CRM)
@@ -484,23 +581,31 @@ function createRealFormFields(policyId, policyData) {
         { id: 'insuredAddress1', x: 94, y: 265, width: 299, height: 16,
           value: (() => {
             const fullAddress = policyData?.address || policyData?.contact?.['Mailing Address'] || '';
-            if (fullAddress) {
+            if (fullAddress && typeof fullAddress === 'string') {
               // Split address to extract street address only
               const parts = fullAddress.split(',');
               return parts[0]?.trim() || ''; // Just the street address
+            } else if (fullAddress && typeof fullAddress === 'object') {
+              return fullAddress.street || fullAddress.address || fullAddress.line1 || '';
             }
             return '';
           })() },
         { id: 'insuredAddress2', x: 94, y: 281, width: 299, height: 16,
           value: (() => {
             const fullAddress = policyData?.address || policyData?.contact?.['Mailing Address'] || '';
-            if (fullAddress) {
+            if (fullAddress && typeof fullAddress === 'string') {
               // Extract city, state, zip from full address
               const parts = fullAddress.split(',');
               if (parts.length >= 2) {
                 // Join everything after the first part (city, state, zip)
                 return parts.slice(1).join(',').trim();
               }
+            } else if (fullAddress && typeof fullAddress === 'object') {
+              // Handle object address format
+              const city = fullAddress.city || '';
+              const state = fullAddress.state || '';
+              const zip = fullAddress.zip || fullAddress.postalCode || '';
+              return [city, state, zip].filter(Boolean).join(', ');
             }
             return '';
           })() },
