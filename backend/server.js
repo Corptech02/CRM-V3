@@ -254,6 +254,18 @@ function initializeDatabase() {
         FOREIGN KEY (lead_id) REFERENCES leads(id)
     )`);
 
+    // Scheduled callbacks table
+    db.run(`CREATE TABLE IF NOT EXISTS scheduled_callbacks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lead_id TEXT NOT NULL,
+        date_time DATETIME NOT NULL,
+        notes TEXT,
+        completed BOOLEAN DEFAULT 0,
+        completed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     console.log('Database tables initialized');
 }
 
@@ -6940,6 +6952,273 @@ app.put('/api/policies', (req, res) => {
             res.status(500).json({ error: 'Invalid policy data format' });
         }
     });
+});
+
+// Initialize scheduled_callbacks table
+db.run(`CREATE TABLE IF NOT EXISTS scheduled_callbacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    callback_id TEXT UNIQUE,
+    lead_id TEXT,
+    date_time TEXT,
+    notes TEXT,
+    completed INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+    if (err) {
+        console.error('Error creating scheduled_callbacks table:', err);
+    } else {
+        console.log('✅ Scheduled callbacks table ready');
+    }
+});
+
+// Save scheduled callback
+app.post('/api/callbacks', (req, res) => {
+    const { callback_id, lead_id, date_time, notes } = req.body;
+
+    if (!callback_id || !lead_id || !date_time) {
+        return res.status(400).json({
+            success: false,
+            error: 'Missing required fields: callback_id, lead_id, date_time'
+        });
+    }
+
+    db.run(`INSERT OR REPLACE INTO scheduled_callbacks
+            (callback_id, lead_id, date_time, notes)
+            VALUES (?, ?, ?, ?)`,
+        [callback_id, lead_id, date_time, notes || ''],
+        function(err) {
+            if (err) {
+                console.error('Error saving callback:', err);
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            console.log('✅ Callback saved:', callback_id);
+            res.json({
+                success: true,
+                id: this.lastID
+            });
+        }
+    );
+});
+
+// Get all scheduled callbacks
+app.get('/api/callbacks', (req, res) => {
+    db.all(`SELECT * FROM scheduled_callbacks WHERE completed = 0 ORDER BY date_time ASC`,
+        (err, rows) => {
+            if (err) {
+                console.error('Error fetching callbacks:', err);
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            console.log('✅ Fetched', rows.length, 'scheduled callbacks');
+            res.json({
+                success: true,
+                callbacks: rows
+            });
+        }
+    );
+});
+
+// Complete/delete scheduled callback
+app.delete('/api/callbacks/:callback_id', (req, res) => {
+    const { callback_id } = req.params;
+
+    db.run(`UPDATE scheduled_callbacks SET completed = 1 WHERE callback_id = ?`,
+        [callback_id],
+        function(err) {
+            if (err) {
+                console.error('Error completing callback:', err);
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            console.log('✅ Callback completed:', callback_id);
+            res.json({
+                success: true,
+                changes: this.changes
+            });
+        }
+    );
+});
+
+// Callback reminder email endpoint
+app.post('/api/send-callback-reminder', async (req, res) => {
+    const { to, subject, html } = req.body;
+
+    if (!to || !subject || !html) {
+        return res.status(400).json({
+            success: false,
+            error: 'Missing required fields: to, subject, html'
+        });
+    }
+
+    try {
+        const nodemailer = require('nodemailer');
+
+        // Create transporter using GoDaddy SMTP settings
+        const transporter = nodemailer.createTransport({
+            host: 'smtpout.secureserver.net',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'contact@vigagency.com',
+                pass: process.env.GODADDY_PASSWORD || '25nickc124!'
+            }
+        });
+
+        // Email options
+        const mailOptions = {
+            from: 'contact@vigagency.com',
+            to: to,
+            subject: subject,
+            html: html
+        };
+
+        // Send email
+        const info = await transporter.sendMail(mailOptions);
+
+        console.log('✅ Callback reminder email sent:', info.messageId);
+
+        res.json({
+            success: true,
+            messageId: info.messageId
+        });
+    } catch (error) {
+        console.error('❌ Failed to send callback reminder email:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Scheduled Callbacks API endpoints
+
+// Get all callbacks for a specific lead
+app.get('/api/callbacks', (req, res) => {
+    const leadId = req.query.leadId;
+
+    if (leadId) {
+        // Get callbacks for specific lead
+        db.all(
+            'SELECT * FROM scheduled_callbacks WHERE lead_id = ? ORDER BY date_time ASC',
+            [leadId],
+            (err, rows) => {
+                if (err) {
+                    console.error('Error fetching callbacks for lead:', err);
+                    res.status(500).json({ error: err.message });
+                    return;
+                }
+                res.json(rows || []);
+            }
+        );
+    } else {
+        // Get all active (non-completed) callbacks
+        db.all(
+            'SELECT * FROM scheduled_callbacks WHERE completed = 0 ORDER BY date_time ASC',
+            (err, rows) => {
+                if (err) {
+                    console.error('Error fetching all callbacks:', err);
+                    res.status(500).json({ error: err.message });
+                    return;
+                }
+                res.json(rows || []);
+            }
+        );
+    }
+});
+
+// Create a new callback
+app.post('/api/callbacks', (req, res) => {
+    const { leadId, dateTime, notes } = req.body;
+
+    if (!leadId || !dateTime) {
+        return res.status(400).json({ error: 'leadId and dateTime are required' });
+    }
+
+    db.run(
+        `INSERT INTO scheduled_callbacks (lead_id, date_time, notes)
+         VALUES (?, ?, ?)`,
+        [leadId, dateTime, notes || ''],
+        function(err) {
+            if (err) {
+                console.error('Error creating callback:', err);
+                res.status(500).json({ error: err.message });
+                return;
+            }
+
+            console.log('✅ Callback created:', this.lastID, 'for lead:', leadId);
+            res.json({
+                success: true,
+                id: this.lastID,
+                leadId: leadId,
+                dateTime: dateTime,
+                notes: notes || ''
+            });
+        }
+    );
+});
+
+// Complete a callback
+app.post('/api/complete-callback', (req, res) => {
+    const { leadId, completed, completedAt } = req.body;
+
+    if (!leadId) {
+        return res.status(400).json({ error: 'leadId is required' });
+    }
+
+    db.run(
+        `UPDATE scheduled_callbacks
+         SET completed = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE lead_id = ? AND completed = 0`,
+        [completed ? 1 : 0, completedAt || new Date().toISOString(), leadId],
+        function(err) {
+            if (err) {
+                console.error('Error completing callback:', err);
+                res.status(500).json({ error: err.message });
+                return;
+            }
+
+            console.log('✅ Callback completed for lead:', leadId, 'updated rows:', this.changes);
+            res.json({
+                success: true,
+                leadId: leadId,
+                completed: completed,
+                updatedRows: this.changes
+            });
+        }
+    );
+});
+
+// Delete a callback
+app.delete('/api/callbacks/:id', (req, res) => {
+    const callbackId = req.params.id;
+
+    db.run(
+        'DELETE FROM scheduled_callbacks WHERE id = ?',
+        [callbackId],
+        function(err) {
+            if (err) {
+                console.error('Error deleting callback:', err);
+                res.status(500).json({ error: err.message });
+                return;
+            }
+
+            console.log('✅ Callback deleted:', callbackId);
+            res.json({
+                success: true,
+                deletedRows: this.changes
+            });
+        }
+    );
 });
 
 // Export database for use in other modules

@@ -26,7 +26,7 @@ class EmailService {
                 break;
 
             case 'mailgun':
-                this.transporter = nodemailer.createTransporter({
+                this.transporter = nodemailer.createTransport({
                     host: 'smtp.mailgun.org',
                     port: 587,
                     secure: false,
@@ -39,7 +39,7 @@ class EmailService {
 
             case 'gmail':
                 // For Gmail OAuth2 (already configured in your app)
-                this.transporter = nodemailer.createTransporter({
+                this.transporter = nodemailer.createTransport({
                     service: 'gmail',
                     auth: {
                         type: 'OAuth2',
@@ -53,7 +53,7 @@ class EmailService {
 
             default:
                 // Generic SMTP
-                this.transporter = nodemailer.createTransporter({
+                this.transporter = nodemailer.createTransport({
                     host: this.config.smtpHost,
                     port: this.config.smtpPort || 587,
                     secure: this.config.smtpSecure || false,
@@ -261,6 +261,103 @@ class EmailService {
             console.error('Error sending welcome email:', error);
             return { success: false, error: error.message };
         }
+    }
+
+    // Generic email sending method
+    async sendEmail(to, subject, html, options = {}) {
+        const mailOptions = {
+            from: options.from || this.config.fromEmail || 'contact@vigagency.com',
+            to: to,
+            subject: subject,
+            html: html
+        };
+
+        // Add CC/BCC if provided
+        if (options.cc) mailOptions.cc = options.cc;
+        if (options.bcc) mailOptions.bcc = options.bcc;
+
+        // Add attachments if provided
+        if (options.attachments) mailOptions.attachments = options.attachments;
+
+        try {
+            const info = await this.transporter.sendMail(mailOptions);
+            console.log(`📧 Email sent to ${to}: ${info.messageId}`);
+            return { success: true, messageId: info.messageId };
+        } catch (error) {
+            console.error(`❌ Error sending email to ${to}:`, error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Send callback reminder email
+    async sendCallbackReminderEmail(to, callbackData) {
+        const callbackTime = new Date(callbackData.dateTime);
+        const formattedTime = callbackTime.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+
+        const subject = `🔔 Callback Reminder - ${callbackData.leadName} in 30 minutes`;
+
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #dc2626, #ef4444); color: white; padding: 20px; text-align: center;">
+                    <h1>🔔 Callback Reminder</h1>
+                    <p style="font-size: 18px; margin: 0;">30 Minutes Until Scheduled Call</p>
+                </div>
+
+                <div style="padding: 30px; background: #f9fafb;">
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; margin-bottom: 20px;">
+                        <h2 style="margin-top: 0; color: #1f2937;">Callback Details</h2>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 10px;"><strong>📋 Lead:</strong> ${callbackData.leadName}</li>
+                            <li style="margin-bottom: 10px;"><strong>📞 Phone:</strong> ${callbackData.leadPhone || 'Not provided'}</li>
+                            <li style="margin-bottom: 10px;"><strong>🕒 Scheduled Time:</strong> ${formattedTime}</li>
+                            <li style="margin-bottom: 10px;"><strong>📝 Notes:</strong> ${callbackData.notes || 'No notes provided'}</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin-bottom: 20px;">
+                        <p style="margin: 0; font-weight: 600; color: #92400e;">
+                            ⏰ This call is scheduled to begin in approximately 30 minutes. Please prepare any necessary materials and ensure you're available.
+                        </p>
+                    </div>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="https://162-220-14-239.nip.io/#leads"
+                           style="background: #dc2626; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+                            🚀 Open Lead Profile
+                        </a>
+                    </div>
+
+                    <div style="background: #f0f9ff; padding: 15px; border-radius: 6px; margin-top: 20px;">
+                        <h4 style="margin-top: 0; color: #1e40af;">Quick Actions:</h4>
+                        <ul style="margin-bottom: 0;">
+                            <li>Review lead notes and previous interactions</li>
+                            <li>Prepare any quotes or documents needed</li>
+                            <li>Check lead's current stage and requirements</li>
+                            <li>Have contact information readily available</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="background: #374151; color: white; padding: 15px; text-align: center;">
+                    <p style="margin: 0; font-size: 12px;">
+                        This is an automated reminder from Vanguard Insurance CRM<br>
+                        <strong>Vanguard Insurance Agency</strong> | contact@vigagency.com
+                    </p>
+                </div>
+            </div>
+        `;
+
+        return await this.sendEmail(to, subject, html, {
+            from: 'contact@vigagency.com'
+        });
     }
 
     // Test email configuration

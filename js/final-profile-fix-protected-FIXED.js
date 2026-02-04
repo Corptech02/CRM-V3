@@ -196,6 +196,52 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
+                <!-- Callback Scheduler -->
+                <div class="profile-section" style="background: #e0f2fe; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; font-weight: bold;"><i class="fas fa-calendar-alt"></i> <span style="color: #0277bd;">Schedule Callback</span></h3>
+                        <div id="callback-status-${lead.id}" style="font-weight: bold; font-size: 14px; color: #0277bd;">
+                            <!-- Callback status will be updated here -->
+                        </div>
+                    </div>
+
+                    <!-- Callback Date/Time Input -->
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; gap: 15px; align-items: end;">
+                            <div style="flex: 1;">
+                                <label for="callback-date-${lead.id}" style="font-weight: 600; font-size: 12px; color: #374151;">Date:</label>
+                                <input type="date"
+                                       id="callback-date-${lead.id}"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;"
+                                       min="${new Date().toISOString().split('T')[0]}">
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="callback-time-${lead.id}" style="font-weight: 600; font-size: 12px; color: #374151;">Time:</label>
+                                <input type="time"
+                                       id="callback-time-${lead.id}"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                            </div>
+                            <button onclick="scheduleCallback('${lead.id}')"
+                                    style="background: #0277bd; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap;">
+                                <i class="fas fa-plus"></i> Schedule
+                            </button>
+                        </div>
+
+                        <!-- Notes for callback -->
+                        <div>
+                            <label for="callback-notes-${lead.id}" style="font-weight: 600; font-size: 12px; color: #374151;">Callback Notes:</label>
+                            <textarea id="callback-notes-${lead.id}"
+                                      placeholder="Optional notes for the callback..."
+                                      style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white; resize: vertical; min-height: 60px; font-family: inherit;"></textarea>
+                        </div>
+
+                        <!-- Scheduled Callbacks List -->
+                        <div id="scheduled-callbacks-${lead.id}" style="margin-top: 10px;">
+                            <!-- Scheduled callbacks will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Reach Out Checklist -->
                 <div class="profile-section" style="background: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <!-- Header with TO DO message -->
@@ -725,6 +771,18 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     // Activate DOM protection to prevent hardcoded ID overwrites
     protectedFunctions.protectModalIDs(lead.id, modalContainer);
 
+    // Initialize callback display for this lead
+    setTimeout(() => {
+        displayScheduledCallbacks(lead.id);
+
+        // Also try to load from server in case it wasn't loaded yet
+        loadCallbacksFromServer().then(() => {
+            setTimeout(() => {
+                displayScheduledCallbacks(lead.id);
+            }, 500);
+        });
+    }, 100);
+
     // Force immediate ID fix in case any hardcoded elements are already present
     setTimeout(() => {
         const badElements = modalContainer.querySelectorAll('[id*="8126662"]');
@@ -787,6 +845,9 @@ protectedFunctions.createEnhancedProfile = function(lead) {
         // Load loss runs from server
         protectedFunctions.loadLossRuns(lead.id);
     }, 100);
+
+    // AUTO-CHECK REMOVED - Now only triggers from "Reach out: CALL" button click
+    console.log('📋 PROFILE OPENED: Auto-check disabled for normal profile open. Use "Reach out: CALL" button to trigger auto-check.');
 
     console.log('🔥 Enhanced Profile: Modal created successfully');
 };
@@ -2542,6 +2603,25 @@ function markReachOutComplete(leadId, completedAt, lead) {
     }
 
     console.log(`✅ Marked reach-out as complete for lead ${leadId} at ${completedAt}`);
+
+    // Complete any existing callbacks for this lead since the call was successful
+    console.log('✅ CALLBACK COMPLETION: Completing callbacks after successful reach-out for lead', leadId);
+    if (typeof completeAllCallbacksForLead === 'function') {
+        completeAllCallbacksForLead(leadId);
+    } else {
+        console.log('⚠️  CALLBACK COMPLETION: completeAllCallbacksForLead function not available');
+    }
+
+    // Show next callback scheduling popup
+    console.log('📞 NEXT CALLBACK: About to show popup for completed call, leadId:', leadId);
+    setTimeout(() => {
+        console.log('📞 NEXT CALLBACK: Timeout triggered, calling showNextCallbackPopup');
+        if (typeof showNextCallbackPopup === 'function') {
+            showNextCallbackPopup(leadId);
+        } else {
+            console.error('❌ NEXT CALLBACK: showNextCallbackPopup function not found!');
+        }
+    }, 1000);
 }
 
 // Function to show call logs for a lead
@@ -4348,6 +4428,410 @@ window.setGreenHighlightDuration = function(leadId, days) {
     // Show notification
     showNotification(`Lead will stay green for ${daysNum} ${daysNum === 1 ? 'day' : 'days'}`, 'success');
 };
+
+// Custom modal for Next Callback scheduling
+function showNextCallbackPopup(leadId) {
+    console.log('📞 NEXT CALLBACK: Showing scheduling popup for lead', leadId);
+
+    // Check if there are existing callbacks for this lead
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const leadCallbacks = callbacks[leadId] || [];
+
+    // Create modal overlay
+    const modalOverlay = document.createElement('div');
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 3000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+    `;
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-width: 400px;
+        margin: 0 20px;
+    `;
+
+    modal.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="width: 60px; height: 60px; background: #dcfce7; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-calendar-plus" style="font-size: 24px; color: #10b981;"></i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Call Completed!</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 16px; line-height: 1.5;">
+                Would you like to schedule the next callback for this lead?
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="schedule-next-callback" style="
+                background: #10b981;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 120px;
+                transition: all 0.2s;
+            ">Schedule Next Call</button>
+            <button id="no-callback-needed" style="
+                background: #f3f4f6;
+                color: #374151;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 120px;
+                transition: all 0.2s;
+            ">Not Needed</button>
+        </div>
+    `;
+
+    modalOverlay.appendChild(modal);
+    document.body.appendChild(modalOverlay);
+
+    // Add hover effects
+    const scheduleBtn = modal.querySelector('#schedule-next-callback');
+    const noNeedBtn = modal.querySelector('#no-callback-needed');
+
+    scheduleBtn.addEventListener('mouseenter', () => {
+        scheduleBtn.style.background = '#059669';
+    });
+    scheduleBtn.addEventListener('mouseleave', () => {
+        scheduleBtn.style.background = '#10b981';
+    });
+
+    noNeedBtn.addEventListener('mouseenter', () => {
+        noNeedBtn.style.background = '#e5e7eb';
+    });
+    noNeedBtn.addEventListener('mouseleave', () => {
+        noNeedBtn.style.background = '#f3f4f6';
+    });
+
+    // Handle button clicks
+    scheduleBtn.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        console.log('📞 NEXT CALLBACK: User chose to schedule next callback');
+
+        // Show the callback scheduler
+        setTimeout(() => {
+            showCallbackScheduler(leadId);
+        }, 200);
+    });
+
+    noNeedBtn.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        console.log('📞 NEXT CALLBACK: User chose no callback needed');
+
+        // Complete/remove any existing callbacks for this lead
+        if (leadCallbacks.length > 0) {
+            completeAllCallbacksForLead(leadId);
+        }
+    });
+
+    // Handle escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            document.body.removeChild(modalOverlay);
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Handle click outside modal
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) {
+            document.body.removeChild(modalOverlay);
+        }
+    });
+}
+
+// Function to complete all callbacks for a lead
+function completeAllCallbacksForLead(leadId) {
+    console.log('✅ COMPLETING ALL CALLBACKS for lead', leadId);
+
+    // Get all callbacks for this lead and complete them individually
+    const callbacksKey = 'scheduled_callbacks';
+    let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (callbacks[leadId] && callbacks[leadId].length > 0) {
+        console.log('✅ COMPLETING', callbacks[leadId].length, 'callbacks for lead', leadId);
+
+        // Complete each callback individually
+        callbacks[leadId].forEach(callback => {
+            console.log('✅ Completing callback', callback.id, 'for lead', leadId);
+            if (typeof window.completeCallback === 'function') {
+                window.completeCallback(leadId, callback.id);
+            }
+        });
+    } else {
+        console.log('📋 No callbacks found for lead', leadId);
+
+        // Still refresh the display and table
+        if (typeof displayScheduledCallbacks === 'function') {
+            displayScheduledCallbacks(leadId);
+        }
+
+        if (typeof updateTableAfterCallbackComplete === 'function') {
+            updateTableAfterCallbackComplete(leadId);
+        }
+    }
+
+    // Also update the table to remove callback messages
+    setTimeout(() => {
+        if (typeof window.emergencyCallbackFix === 'function') {
+            window.emergencyCallbackFix();
+        }
+    }, 500);
+}
+
+// Function to show callback scheduler
+function showCallbackScheduler(leadId) {
+    console.log('📅 CALLBACK SCHEDULER: Opening scheduler for lead', leadId);
+
+    // Get lead data
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.error('Lead not found for callback scheduling:', leadId);
+        return;
+    }
+
+    // Create simple scheduler modal
+    const modalOverlay = document.createElement('div');
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 3000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+    `;
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        max-width: 450px;
+        margin: 0 20px;
+    `;
+
+    // Get current date/time for default
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0); // Default to 10 AM tomorrow
+
+    const dateStr = tomorrow.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM format
+
+    modal.innerHTML = `
+        <div style="margin-bottom: 25px; text-align: center;">
+            <div style="width: 60px; height: 60px; background: #dbeafe; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-calendar-alt" style="font-size: 24px; color: #3b82f6;"></i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Schedule Next Call</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 14px;">
+                Lead: <strong>${lead.name}</strong>
+            </p>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                Callback Date & Time:
+            </label>
+            <input type="datetime-local" id="callback-datetime" value="${dateStr}"
+                   style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;" />
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                Notes (optional):
+            </label>
+            <textarea id="callback-notes" placeholder="Add any notes for the callback..."
+                      style="width: 100%; height: 60px; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="save-callback" style="
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 100px;
+            ">Schedule</button>
+            <button id="cancel-callback" style="
+                background: #f3f4f6;
+                color: #374151;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 100px;
+            ">Cancel</button>
+        </div>
+    `;
+
+    modalOverlay.appendChild(modal);
+    document.body.appendChild(modalOverlay);
+
+    // Handle save callback
+    modal.querySelector('#save-callback').addEventListener('click', () => {
+        const dateTime = modal.querySelector('#callback-datetime').value;
+        const notes = modal.querySelector('#callback-notes').value;
+
+        if (!dateTime) {
+            alert('Please select a date and time for the callback');
+            return;
+        }
+
+        // Save the callback
+        saveCallbackToLocalStorageAndServer(leadId, dateTime, notes);
+        document.body.removeChild(modalOverlay);
+    });
+
+    // Handle cancel
+    modal.querySelector('#cancel-callback').addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+    });
+}
+
+// Function to save callback
+async function saveCallbackToLocalStorageAndServer(leadId, dateTime, notes) {
+    console.log('💾 SAVING CALLBACK:', { leadId, dateTime, notes });
+
+    // FIRST: Complete any existing overdue callbacks for this lead
+    const callbacksKey = 'scheduled_callbacks';
+    let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const now = new Date();
+
+    if (callbacks[leadId]) {
+        const originalCallbacks = [...callbacks[leadId]];
+        console.log('🧹 AUTO-COMPLETE DEBUG: Checking callbacks for lead', leadId);
+        console.log('🧹 AUTO-COMPLETE DEBUG: Original callbacks:', originalCallbacks);
+        console.log('🧹 AUTO-COMPLETE DEBUG: Current time:', now.toLocaleString());
+
+        // Check each callback
+        originalCallbacks.forEach((cb, index) => {
+            const callbackTime = new Date(cb.dateTime);
+            const isOverdue = callbackTime <= now;
+            console.log(`🧹 AUTO-COMPLETE DEBUG: Callback ${index}: ${cb.dateTime} - isOverdue: ${isOverdue}, completed: ${cb.completed}`);
+        });
+
+        const overdueCallbacks = callbacks[leadId].filter(cb => {
+            const callbackTime = new Date(cb.dateTime);
+            return callbackTime <= now && !cb.completed;
+        });
+
+        if (overdueCallbacks.length > 0) {
+            console.log('🧹 AUTO-COMPLETE: Found', overdueCallbacks.length, 'overdue callbacks to complete before scheduling new one');
+            console.log('🧹 AUTO-COMPLETE: Removing callbacks:', overdueCallbacks.map(cb => cb.dateTime));
+
+            // Remove overdue callbacks
+            callbacks[leadId] = callbacks[leadId].filter(cb => !(new Date(cb.dateTime) <= now && !cb.completed));
+            console.log('🧹 AUTO-COMPLETE: Removed overdue callbacks. Count:', originalCallbacks.length, '->', callbacks[leadId].length);
+        } else {
+            console.log('🧹 AUTO-COMPLETE: No overdue incomplete callbacks found for removal');
+        }
+    } else {
+        callbacks[leadId] = [];
+        console.log('🧹 AUTO-COMPLETE: No existing callbacks for lead', leadId);
+    }
+
+    // THEN: Add the new callback
+    const callbackId = Date.now(); // Simple ID
+    const newCallback = {
+        id: callbackId,
+        leadId: leadId,
+        dateTime: dateTime,
+        notes: notes || '',
+        completed: false,
+        createdAt: new Date().toISOString()
+    };
+
+    callbacks[leadId].push(newCallback);
+    localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+    console.log('✅ CALLBACK ADDED: New callback added to localStorage');
+
+    // Save to server
+    try {
+        const urls = [
+            'http://162-220-14-239.nip.io:3001/api/callbacks',
+            'http://localhost:3001/api/callbacks'
+        ];
+
+        for (const url of urls) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newCallback)
+                });
+
+                if (response.ok) {
+                    console.log('✅ CALLBACK SAVED: Successfully saved to server');
+                    break;
+                }
+            } catch (error) {
+                console.log('❌ CALLBACK SAVE: Server error:', error.message);
+            }
+        }
+    } catch (error) {
+        console.error('Error saving callback to server:', error);
+    }
+
+    // Show notification
+    const callbackDate = new Date(dateTime);
+    const formattedDate = callbackDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    alert(`✅ Callback scheduled for ${formattedDate}`);
+    console.log('📅 CALLBACK SCHEDULED: New callback set for', formattedDate);
+
+    // Refresh the callback display to show the new callback and remove any old ones
+    if (typeof displayScheduledCallbacks === 'function') {
+        displayScheduledCallbacks(leadId);
+        console.log('🔄 DISPLAY REFRESHED: Updated callback display after scheduling');
+    }
+}
 
 // Custom modal for Contact Attempted confirmation
 function showContactAttemptedModal(leadId, callback) {
@@ -7621,6 +8105,980 @@ window.getReachOutStatus = function(lead) {
     } else {
         return '<span style="color: #dc2626;">TO DO - Call Lead</span>';
     }
+};
+
+// Callback Scheduler Functions
+window.scheduleCallback = async function(leadId) {
+    const dateInput = document.getElementById(`callback-date-${leadId}`);
+    const timeInput = document.getElementById(`callback-time-${leadId}`);
+    const notesInput = document.getElementById(`callback-notes-${leadId}`);
+
+    const date = dateInput.value;
+    const time = timeInput.value;
+    const notes = notesInput.value.trim();
+
+    if (!date || !time) {
+        alert('Please select both date and time for the callback.');
+        return;
+    }
+
+    // Combine date and time
+    const callbackDateTime = new Date(`${date}T${time}`);
+    const now = new Date();
+
+    if (callbackDateTime <= now) {
+        alert('Please select a future date and time for the callback.');
+        return;
+    }
+
+    // Create new callback object
+    const callbackId = Date.now();
+    const newCallback = {
+        id: callbackId,
+        leadId: leadId,
+        date: date,
+        time: time,
+        dateTime: callbackDateTime.toISOString(),
+        notes: notes,
+        completed: false,
+        created: new Date().toISOString()
+    };
+
+    try {
+        // Save to server
+        const response = await fetch(`http://${window.location.hostname}:3001/api/callbacks`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                callback_id: callbackId.toString(),
+                lead_id: leadId,
+                date_time: callbackDateTime.toISOString(),
+                notes: notes
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save callback to server');
+        }
+
+        console.log('✅ Callback saved to server');
+
+        // Also save to localStorage for immediate display
+        const callbacksKey = 'scheduled_callbacks';
+        let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+        if (!callbacks[leadId]) {
+            callbacks[leadId] = [];
+        }
+
+        callbacks[leadId].push(newCallback);
+        callbacks[leadId].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+        localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+
+        // Clear inputs
+        dateInput.value = '';
+        timeInput.value = '';
+        notesInput.value = '';
+
+        // Refresh display
+        displayScheduledCallbacks(leadId);
+
+        console.log('✅ Callback scheduled for:', callbackDateTime);
+    } catch (error) {
+        console.error('❌ Failed to save callback:', error);
+        alert('Failed to save callback. Please try again.');
+    }
+};
+
+window.displayScheduledCallbacks = function(leadId) {
+    const container = document.getElementById(`scheduled-callbacks-${leadId}`);
+    if (!container) return;
+
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const leadCallbacks = callbacks[leadId] || [];
+
+    // FILTER OUT COMPLETED CALLBACKS - only show active ones
+    const activeCallbacks = leadCallbacks.filter(callback => !callback.completed);
+    console.log('📋 CALLBACK DISPLAY: Lead', leadId, 'has', leadCallbacks.length, 'total callbacks,', activeCallbacks.length, 'active (incomplete)');
+
+    if (activeCallbacks.length === 0) {
+        container.innerHTML = '';
+        console.log('📋 CALLBACK DISPLAY: No active callbacks to show for lead', leadId);
+        return;
+    }
+
+    const now = new Date();
+    let html = '<div style="border-top: 1px solid #0277bd; padding-top: 15px;"><h4 style="margin: 0 0 10px 0; color: #0277bd; font-size: 14px;"><i class="fas fa-clock"></i> Scheduled Callbacks</h4>';
+
+    activeCallbacks.forEach(callback => {
+        const callbackTime = new Date(callback.dateTime);
+        const isPast = callbackTime <= now;
+        const isToday = callbackTime.toDateString() === now.toDateString();
+
+        const timeStr = callbackTime.toLocaleDateString() + ' at ' + callbackTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        html += `
+            <div style="background: ${isPast ? '#fee2e2' : isToday ? '#fef3c7' : '#f0f9ff'}; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid ${isPast ? '#dc2626' : isToday ? '#f59e0b' : '#0277bd'};">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: ${isPast ? '#dc2626' : isToday ? '#f59e0b' : '#0277bd'}; font-size: 13px;">
+                            ${isPast ? '🔴 OVERDUE' : isToday ? '⚡ TODAY' : '📅'} ${timeStr}
+                        </div>
+                        ${callback.notes ? `<div style="font-size: 12px; color: #6b7280; margin-top: 5px;">${callback.notes}</div>` : ''}
+                    </div>
+                    <button onclick="completeCallback('${leadId}', ${callback.id})"
+                            style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-check"></i> Done
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+};
+
+window.completeCallback = async function(leadId, callbackId) {
+    console.log('✅ COMPLETING CALLBACK:', leadId, callbackId);
+
+    // ALWAYS remove from localStorage first (don't wait for server)
+    const callbacksKey = 'scheduled_callbacks';
+    let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (callbacks[leadId]) {
+        const originalCount = callbacks[leadId].length;
+        callbacks[leadId] = callbacks[leadId].filter(cb => cb.id !== callbackId);
+        localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+        console.log('✅ LOCAL REMOVAL: Removed callback', callbackId, 'from localStorage. Count:', originalCount, '->', callbacks[leadId].length);
+    }
+
+    // Always refresh display immediately
+    displayScheduledCallbacks(leadId);
+    console.log('✅ DISPLAY REFRESHED: Callback display updated for lead', leadId);
+
+    // Update the table cell to remove the "Reach out: CALL" message
+    updateTableAfterCallbackComplete(leadId);
+    console.log('✅ TABLE UPDATED: Table cell updated for lead', leadId);
+
+    // Try to mark as complete on server (but don't fail if it doesn't work)
+    try {
+        const response = await fetch(`http://${window.location.hostname}:3001/api/callbacks/${callbackId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            console.log('✅ SERVER SYNC: Callback marked as complete on server');
+        } else {
+            console.log('⚠️  SERVER SYNC: Server update failed but local removal succeeded');
+        }
+    } catch (error) {
+        console.log('⚠️  SERVER SYNC: Server unavailable but local removal succeeded:', error.message);
+    }
+};
+
+// Function to update table cell after callback completion
+function updateTableAfterCallbackComplete(leadId) {
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) return;
+
+    // Find the table row for this lead
+    const tableBody = document.getElementById('leadsTableBody');
+    if (!tableBody) return;
+
+    const rows = tableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        const checkbox = row.querySelector('.lead-checkbox');
+        if (!checkbox) return;
+
+        const rowLeadId = checkbox.value;
+        if (String(rowLeadId) === String(leadId)) {
+            // Get the TODO cell (7th column, index 6)
+            const todoCell = row.querySelectorAll('td')[6];
+            if (!todoCell) return;
+
+            // Check if there are any remaining callbacks for this lead
+            const callbacksKey = 'scheduled_callbacks';
+            const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+            const leadCallbacks = callbacks[leadId] || [];
+            const now = new Date();
+            const dueCallbacks = leadCallbacks.filter(cb => new Date(cb.dateTime) <= now);
+
+            if (dueCallbacks.length === 0) {
+                // No more due callbacks, revert to normal TODO text
+                const stage = lead.stage || 'new';
+                const nextAction = window.getNextAction ? window.getNextAction(stage, lead) : 'Review lead';
+                todoCell.innerHTML = `<div style="font-weight: bold; color: black;">${nextAction}</div>`;
+                console.log('✅ Table cell reverted to normal TODO for lead', leadId);
+            }
+        }
+    });
+}
+
+// Function to monitor callbacks and update table when due
+function monitorCallbacks() {
+    console.log('🔍 CALLBACK MONITOR: Starting callback check at', new Date().toLocaleString());
+
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const now = new Date();
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    console.log('🔍 CALLBACK MONITOR: Found', Object.keys(callbacks).length, 'leads with callbacks');
+    console.log('🔍 CALLBACK MONITOR: Current time:', now.toLocaleString());
+
+    // Check for 30-minute warnings (only send once)
+    const warningsSent = JSON.parse(localStorage.getItem('callback_warnings_sent') || '{}');
+    let newWarnings = {...warningsSent};
+
+    // Check for due callbacks
+    Object.keys(callbacks).forEach(leadId => {
+        const leadCallbacks = callbacks[leadId] || [];
+        const lead = leads.find(l => String(l.id) === String(leadId));
+
+        console.log('🔍 CALLBACK MONITOR: Checking lead', leadId, 'with', leadCallbacks.length, 'callbacks');
+
+        if (!lead) {
+            console.log('❌ CALLBACK MONITOR: Lead not found in storage for ID:', leadId);
+            return;
+        }
+
+        leadCallbacks.forEach(callback => {
+            const callbackTime = new Date(callback.dateTime);
+            const timeDiff = callbackTime.getTime() - now.getTime();
+            const minutesDiff = Math.floor(timeDiff / (1000 * 60));
+
+            console.log('🔍 CALLBACK MONITOR: Lead', lead.name, 'callback scheduled for', callbackTime.toLocaleString());
+            console.log('🔍 CALLBACK MONITOR: Minutes until callback:', minutesDiff);
+
+            // Send 30-minute warning email (only for incomplete callbacks)
+            if (minutesDiff <= 30 && minutesDiff > 25 && !callback.completed && !warningsSent[callback.id]) {
+                console.log('📧 CALLBACK MONITOR: Sending 30-minute warning for lead:', lead.name);
+                sendCallbackWarningEmail(lead, callback);
+                newWarnings[callback.id] = true;
+                console.log('✅ 30-minute callback warning sent for lead:', lead.name);
+            }
+
+            // Update table when callback is due
+            if (callbackTime <= now) {
+                console.log('⏰ CALLBACK MONITOR: Callback is DUE for lead:', lead.name);
+                updateTableForDueCallback(leadId, lead);
+            } else {
+                console.log('⏳ CALLBACK MONITOR: Callback not yet due for lead:', lead.name);
+            }
+        });
+    });
+
+    // Save updated warnings
+    localStorage.setItem('callback_warnings_sent', JSON.stringify(newWarnings));
+
+    console.log('🔍 CALLBACK MONITOR: Monitor check completed');
+}
+
+// Function to send callback warning email to Grant@vigagency.com
+async function sendCallbackWarningEmail(lead, callback) {
+    console.log('📧 EMAIL ALERT: Preparing 30-minute callback reminder email for lead:', lead.name);
+
+    const callbackData = {
+        leadName: lead.name || 'Unknown Lead',
+        leadPhone: lead.phone || 'No phone number',
+        dateTime: callback.dateTime,
+        notes: callback.notes || 'No notes provided'
+    };
+
+    const callbackTime = new Date(callback.dateTime);
+    const formattedTime = callbackTime.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    const subject = `🔔 Callback Reminder - ${lead.name} in 30 minutes`;
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #dc2626, #ef4444); color: white; padding: 20px; text-align: center;">
+                <h1>🔔 Callback Reminder</h1>
+                <p style="font-size: 18px; margin: 0;">30 Minutes Until Scheduled Call</p>
+            </div>
+
+            <div style="padding: 30px; background: #f9fafb;">
+                <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; margin-bottom: 20px;">
+                    <h2 style="margin-top: 0; color: #1f2937;">Callback Details</h2>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 10px;"><strong>📋 Lead:</strong> ${callbackData.leadName}</li>
+                        <li style="margin-bottom: 10px;"><strong>📞 Phone:</strong> ${callbackData.leadPhone}</li>
+                        <li style="margin-bottom: 10px;"><strong>🕒 Scheduled Time:</strong> ${formattedTime}</li>
+                        <li style="margin-bottom: 10px;"><strong>📝 Notes:</strong> ${callbackData.notes}</li>
+                    </ul>
+                </div>
+
+                <div style="background: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin-bottom: 20px;">
+                    <p style="margin: 0; font-weight: 600; color: #92400e;">
+                        ⏰ This call is scheduled to begin in approximately 30 minutes. Please prepare any necessary materials and ensure you're available.
+                    </p>
+                </div>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://162-220-14-239.nip.io/#leads"
+                       style="background: #dc2626; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+                        🚀 Open Lead Profile
+                    </a>
+                </div>
+
+                <div style="background: #f0f9ff; padding: 15px; border-radius: 6px; margin-top: 20px;">
+                    <h4 style="margin-top: 0; color: #1e40af;">Quick Actions:</h4>
+                    <ul style="margin-bottom: 0;">
+                        <li>Review lead notes and previous interactions</li>
+                        <li>Prepare any quotes or documents needed</li>
+                        <li>Check lead's current stage and requirements</li>
+                        <li>Have contact information readily available</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="background: #374151; color: white; padding: 15px; text-align: center;">
+                <p style="margin: 0; font-size: 12px;">
+                    This is an automated reminder from Vanguard Insurance CRM<br>
+                    <strong>Vanguard Insurance Agency</strong> | contact@vigagency.com
+                </p>
+            </div>
+        </div>
+    `;
+
+    try {
+        console.log('📧 EMAIL ALERT: Sending callback reminder email to Grant@vigagency.com');
+
+        // Send email using the server endpoint
+        const response = await fetch('/api/send-callback-reminder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                to: 'Grant@vigagency.com',
+                subject: subject,
+                html: html
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ EMAIL ALERT: Callback reminder email sent successfully:', result.messageId);
+        } else {
+            const error = await response.json();
+            console.error('❌ EMAIL ALERT: Failed to send callback reminder email:', error);
+        }
+    } catch (error) {
+        console.error('❌ EMAIL ALERT: Network error sending callback reminder:', error);
+    }
+}
+
+// Function to update table cell when callback is due
+function updateTableForDueCallback(leadId, lead) {
+    console.log('🔍 CALLBACK DEBUG: Attempting to update table for lead:', leadId, lead.name);
+
+    const tableBody = document.getElementById('leadsTableBody');
+    if (!tableBody) {
+        console.log('❌ CALLBACK DEBUG: leadsTableBody not found');
+        return;
+    }
+
+    console.log('🔍 CALLBACK DEBUG: Found table body, searching for lead row...');
+
+    const rows = tableBody.querySelectorAll('tr');
+    console.log('🔍 CALLBACK DEBUG: Found', rows.length, 'rows in table');
+
+    let foundRow = false;
+    rows.forEach((row, index) => {
+        const checkbox = row.querySelector('.lead-checkbox');
+        if (!checkbox) {
+            console.log('🔍 CALLBACK DEBUG: Row', index, 'has no checkbox');
+            return;
+        }
+
+        const rowLeadId = checkbox.value;
+        console.log('🔍 CALLBACK DEBUG: Row', index, 'has leadId:', rowLeadId, 'looking for:', leadId);
+
+        if (String(rowLeadId) === String(leadId)) {
+            foundRow = true;
+            console.log('✅ CALLBACK DEBUG: Found matching row for lead', leadId);
+
+            // Get the TODO cell (7th column, index 6)
+            const cells = row.querySelectorAll('td');
+            console.log('🔍 CALLBACK DEBUG: Row has', cells.length, 'cells');
+
+            const todoCell = cells[6];
+            if (!todoCell) {
+                console.log('❌ CALLBACK DEBUG: TODO cell (index 6) not found');
+                return;
+            }
+
+            console.log('🔍 CALLBACK DEBUG: Current TODO cell content:', todoCell.innerHTML);
+
+            // Check if already shows callback message
+            if (todoCell.innerHTML.includes('Reach out: CALL')) {
+                console.log('🔍 CALLBACK DEBUG: Cell already shows callback message, skipping');
+                return;
+            }
+
+            const phone = lead.phone || '(614) 208-8222';
+            const newContent = `
+                <div style="font-weight: bold; color: #dc2626;">
+                    <a href="tel:${phone}"
+                       onclick="handleReachOutCall('${leadId}', '${phone}')"
+                       style="color: #dc2626; font-weight: bold; text-decoration: none; cursor: pointer;">
+                        Reach out: CALL
+                    </a>
+                </div>
+            `;
+
+            todoCell.innerHTML = newContent;
+            console.log('✅ CALLBACK DEBUG: Table updated with callback due message for lead:', lead.name);
+            console.log('🔍 CALLBACK DEBUG: New cell content:', todoCell.innerHTML);
+        }
+    });
+
+    if (!foundRow) {
+        console.log('❌ CALLBACK DEBUG: No matching row found for leadId:', leadId);
+        console.log('🔍 CALLBACK DEBUG: Available lead IDs in table:');
+        rows.forEach((row, index) => {
+            const checkbox = row.querySelector('.lead-checkbox');
+            if (checkbox) {
+                console.log('   Row', index, ':', checkbox.value);
+            }
+        });
+    }
+}
+
+// Function to send 30-minute warning email
+function sendCallbackWarningEmail(lead, callback) {
+    const callbackTime = new Date(callback.dateTime);
+    const timeStr = callbackTime.toLocaleDateString() + ' at ' + callbackTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+    const emailData = {
+        to: 'Grant@vigagency.com',
+        subject: `⏰ Callback Reminder - ${lead.name} in 30 minutes`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #f59e0b; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+                    <h2 style="margin: 0; font-size: 24px;">⏰ Callback Reminder</h2>
+                </div>
+
+                <div style="background: #fef3c7; padding: 20px; border-left: 4px solid #f59e0b;">
+                    <h3 style="color: #92400e; margin-top: 0;">You have a callback scheduled in 30 minutes!</h3>
+
+                    <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                        <h4 style="color: #374151; margin-top: 0;">Lead Details:</h4>
+                        <p><strong>Name:</strong> ${lead.name}</p>
+                        <p><strong>Phone:</strong> ${lead.phone || 'N/A'}</p>
+                        <p><strong>Company:</strong> ${lead.company || lead.business_name || 'N/A'}</p>
+                        <p><strong>Stage:</strong> ${lead.stage || 'N/A'}</p>
+                    </div>
+
+                    <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                        <h4 style="color: #374151; margin-top: 0;">Callback Info:</h4>
+                        <p><strong>Scheduled Time:</strong> ${timeStr}</p>
+                        ${callback.notes ? `<p><strong>Notes:</strong> ${callback.notes}</p>` : ''}
+                    </div>
+
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="https://162-220-14-239.nip.io/#leads"
+                           style="background: #0277bd; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                            📞 Open CRM & Make Call
+                        </a>
+                    </div>
+                </div>
+
+                <div style="background: #f9fafb; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #6b7280;">
+                    This is an automated reminder from Vanguard Insurance CRM
+                </div>
+            </div>
+        `
+    };
+
+    // Send email via backend
+    fetch('/api/send-callback-reminder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(emailData)
+    }).then(response => {
+        if (response.ok) {
+            console.log('✅ Callback warning email sent successfully');
+        } else {
+            console.error('❌ Failed to send callback warning email');
+        }
+    }).catch(error => {
+        console.error('❌ Error sending callback warning email:', error);
+    });
+}
+
+// Start callback monitoring when page loads
+let callbackMonitor;
+function startCallbackMonitoring() {
+    // Clear any existing monitor
+    if (callbackMonitor) {
+        clearInterval(callbackMonitor);
+    }
+
+    // Check every 5 seconds for due callbacks (very frequent)
+    callbackMonitor = setInterval(monitorCallbacks, 5000);
+
+    // Run initial check
+    monitorCallbacks();
+
+    console.log('📅 Callback monitoring started - checking every 5 seconds');
+
+    // ULTRA AGGRESSIVE monitoring for overdue callbacks
+    const overdueMonitor = setInterval(() => {
+        const callbacksKey = 'scheduled_callbacks';
+        const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+        const now = new Date();
+        let hasOverdue = false;
+
+        Object.keys(callbacks).forEach(leadId => {
+            const leadCallbacks = callbacks[leadId] || [];
+            leadCallbacks.forEach(callback => {
+                const callbackTime = new Date(callback.dateTime);
+                if (callbackTime <= now) {
+                    hasOverdue = true;
+                }
+            });
+        });
+
+        if (hasOverdue) {
+            console.log('⚡ ULTRA AGGRESSIVE: Overdue callbacks detected - forcing immediate table update');
+            checkAndRestoreCallbackMessages();
+        }
+    }, 2000); // Check every 2 seconds for overdue items
+
+    console.log('⚡ Ultra aggressive overdue monitoring started - checking every 2 seconds');
+
+    // HYPER AGGRESSIVE - Check every second for table changes
+    const hyperMonitor = setInterval(() => {
+        checkAndRestoreCallbackMessages();
+    }, 1000);
+
+    console.log('🚨 HYPER AGGRESSIVE: Checking and restoring callback messages every 1 second');
+
+    // NUCLEAR OPTION: Watch for table cell changes and immediately restore callback messages
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList' || mutation.type === 'subtree') {
+                const target = mutation.target;
+
+                // Check if this is a table cell that might contain TODO text
+                if (target && (target.tagName === 'TD' || target.tagName === 'DIV')) {
+                    // Check if this cell should show a callback message
+                    setTimeout(() => {
+                        checkAndRestoreCallbackMessages();
+                    }, 100);
+                }
+            }
+        });
+    });
+
+    // Observe the entire table for changes
+    const tableBody = document.getElementById('leadsTableBody');
+    if (tableBody) {
+        observer.observe(tableBody, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+        console.log('👀 NUCLEAR MONITOR: Watching table for any changes that override callbacks');
+    }
+}
+
+// Function to quickly check and restore callback messages
+function checkAndRestoreCallbackMessages() {
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const now = new Date();
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+    let restoredCount = 0;
+
+    Object.keys(callbacks).forEach(leadId => {
+        const leadCallbacks = callbacks[leadId] || [];
+        const lead = leads.find(l => String(l.id) === String(leadId));
+        if (!lead) return;
+
+        const hasOverdueCallback = leadCallbacks.some(callback => {
+            const callbackTime = new Date(callback.dateTime);
+            return callbackTime <= now;
+        });
+
+        if (hasOverdueCallback) {
+            // Check if table cell is correct
+            const tableBody = document.getElementById('leadsTableBody');
+            if (!tableBody) return;
+
+            const rows = tableBody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const checkbox = row.querySelector('.lead-checkbox');
+                if (!checkbox || String(checkbox.value) !== String(leadId)) return;
+
+                const todoCell = row.querySelectorAll('td')[6];
+                if (!todoCell) return;
+
+                const currentContent = todoCell.innerHTML.trim();
+
+                // Log what we found
+                if (!currentContent.includes('Reach out: CALL')) {
+                    console.log('🚨 OVERRIDE DETECTED: Lead', lead.name, 'should show callback but shows:', currentContent.substring(0, 50));
+
+                    const phone = lead.phone || '(614) 208-8222';
+                    const newContent = `
+                        <div style="font-weight: bold; color: #dc2626;">
+                            <a href="tel:${phone}"
+                               onclick="handleReachOutCall('${leadId}', '${phone}')"
+                               style="color: #dc2626; font-weight: bold; text-decoration: none; cursor: pointer;">
+                                Reach out: CALL
+                            </a>
+                        </div>
+                    `;
+
+                    todoCell.innerHTML = newContent;
+                    restoredCount++;
+                    console.log('✅ RESTORED: Lead', lead.name, 'callback message restored');
+                } else {
+                    // Already correct - no need to log every time
+                }
+            });
+        }
+    });
+
+    if (restoredCount > 0) {
+        console.log('🎯 RESTORE COMPLETE: Fixed', restoredCount, 'overridden callback messages');
+    }
+}
+
+// Function to load callbacks from server and sync with localStorage
+async function loadCallbacksFromServer() {
+    const possibleUrls = [
+        `http://${window.location.hostname}:3001/api/callbacks`,
+        `https://${window.location.hostname}:3001/api/callbacks`,
+        `/api/callbacks`,
+        `http://162.220.14.239:3001/api/callbacks`
+    ];
+
+    for (let url of possibleUrls) {
+        try {
+            console.log('🔄 SERVER SYNC: Trying URL:', url);
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.log('❌ SERVER SYNC: Failed with status:', response.status);
+                continue;
+            }
+
+            const data = await response.json();
+            const serverCallbacks = data.callbacks || [];
+
+            console.log('✅ SERVER SYNC: Successfully connected to:', url);
+            console.log('📥 SERVER SYNC: Loaded', serverCallbacks.length, 'callbacks from server');
+            console.log('📋 SERVER SYNC: Raw server data:', serverCallbacks);
+
+            // Convert server format to localStorage format and MERGE with existing local data
+            const callbacksKey = 'scheduled_callbacks';
+            const existingCallbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+            console.log('🔄 SERVER SYNC: Existing localStorage callbacks:', existingCallbacks);
+
+            const serverCallbacks_converted = {};
+
+            serverCallbacks.forEach((serverCallback, index) => {
+                const leadId = serverCallback.lead_id;
+                const callback = {
+                    id: parseInt(serverCallback.callback_id),
+                    leadId: leadId,
+                    dateTime: serverCallback.date_time,
+                    notes: serverCallback.notes || '',
+                    completed: false,
+                    created: serverCallback.created_at
+                };
+
+                if (!serverCallbacks_converted[leadId]) {
+                    serverCallbacks_converted[leadId] = [];
+                }
+
+                serverCallbacks_converted[leadId].push(callback);
+                console.log(`📝 SERVER SYNC: Converted callback ${index + 1}:`, callback);
+            });
+
+            // MERGE server and local callbacks (prioritize local for conflicts)
+            const mergedCallbacks = {...existingCallbacks};
+
+            Object.keys(serverCallbacks_converted).forEach(leadId => {
+                const serverCallbacksForLead = serverCallbacks_converted[leadId];
+                const localCallbacksForLead = existingCallbacks[leadId] || [];
+
+                console.log(`🔄 MERGE: Lead ${leadId} - Server: ${serverCallbacksForLead.length}, Local: ${localCallbacksForLead.length}`);
+
+                // Create combined list, avoiding duplicates (prefer local version if same ID)
+                const existingIds = localCallbacksForLead.map(cb => cb.id);
+                const newServerCallbacks = serverCallbacksForLead.filter(cb => !existingIds.includes(cb.id));
+
+                mergedCallbacks[leadId] = [...localCallbacksForLead, ...newServerCallbacks];
+                console.log(`✅ MERGE: Lead ${leadId} final count: ${mergedCallbacks[leadId].length}`);
+            });
+
+            // Sort callbacks by date for each lead
+            Object.keys(mergedCallbacks).forEach(leadId => {
+                mergedCallbacks[leadId].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+                console.log(`🗂️ SERVER SYNC: Lead ${leadId} has ${mergedCallbacks[leadId].length} callbacks after merge`);
+            });
+
+            // Save merged data to localStorage
+            localStorage.setItem(callbacksKey, JSON.stringify(mergedCallbacks));
+
+            console.log('✅ SERVER SYNC: Callbacks synced to localStorage');
+            console.log('📂 SERVER SYNC: Final localStorage structure:', mergedCallbacks);
+
+            // Trigger immediate monitoring and display refresh after loading
+            setTimeout(() => {
+                console.log('🔄 SERVER SYNC: Triggering callback monitoring...');
+                monitorCallbacks();
+
+                // Also refresh displays for all leads with callbacks
+                Object.keys(mergedCallbacks).forEach(leadId => {
+                    console.log(`🎨 SERVER SYNC: Refreshing display for lead ${leadId}`);
+                    displayScheduledCallbacks(leadId);
+                });
+            }, 1000);
+
+            return; // Success - exit the function
+
+        } catch (error) {
+            console.error('❌ SERVER SYNC: Error with URL', url, ':', error);
+            continue; // Try next URL
+        }
+    }
+
+    // If all URLs failed
+    console.error('❌ SERVER SYNC: All URLs failed');
+    console.log('📱 Using localStorage callbacks only');
+
+    // Show current localStorage status for debugging
+    const localCallbacks = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+    console.log('📱 Current localStorage callbacks:', localCallbacks);
+}
+
+// Load callbacks from server when page loads
+setTimeout(loadCallbacksFromServer, 2000);
+
+// Start monitoring when the script loads - delay to run after other scripts
+setTimeout(startCallbackMonitoring, 5000);
+
+// Hook into common table update functions to reapply callback updates
+function hookTableUpdates() {
+    // Hook into loadLeadsView to reapply callback updates after table loads
+    if (window.loadLeadsView) {
+        const originalLoadLeadsView = window.loadLeadsView;
+        window.loadLeadsView = function() {
+            const result = originalLoadLeadsView.apply(this, arguments);
+
+            // Reapply callback updates after table loads
+            setTimeout(() => {
+                console.log('🔄 CALLBACK HOOK: Reapplying callback updates after loadLeadsView');
+                monitorCallbacks();
+            }, 3000);
+
+            return result;
+        };
+        console.log('🔗 Hooked into loadLeadsView for callback updates');
+    }
+
+    // Hook into displayLeads if it exists
+    if (window.displayLeads) {
+        const originalDisplayLeads = window.displayLeads;
+        window.displayLeads = function() {
+            const result = originalDisplayLeads.apply(this, arguments);
+
+            // Reapply callback updates after table displays
+            setTimeout(() => {
+                console.log('🔄 CALLBACK HOOK: Reapplying callback updates after displayLeads');
+                monitorCallbacks();
+            }, 2000);
+
+            return result;
+        };
+        console.log('🔗 Hooked into displayLeads for callback updates');
+    }
+}
+
+// Apply hooks after other scripts load
+setTimeout(hookTableUpdates, 3000);
+
+// Manual test function to trigger immediate callback check
+window.testCallbackMonitor = function() {
+    console.log('🧪 MANUAL TEST: Triggering callback monitor check...');
+    monitorCallbacks();
+};
+
+// Manual test function to send a test email notification
+window.testCallbackEmail = function(leadId) {
+    console.log('🧪 EMAIL TEST: Sending test callback reminder email for lead:', leadId);
+
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.error('❌ EMAIL TEST: Lead not found:', leadId);
+        alert('Lead not found with ID: ' + leadId);
+        return;
+    }
+
+    const testCallback = {
+        id: Date.now(),
+        dateTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes from now
+        notes: 'Test callback notification'
+    };
+
+    console.log('🧪 EMAIL TEST: Sending test email for lead:', lead.name);
+    sendCallbackWarningEmail(lead, testCallback);
+    alert(`Test email sent for lead: ${lead.name}`);
+};
+
+// Manual test function to force update a specific lead's table cell
+window.testUpdateTable = function(leadId) {
+    console.log('🧪 MANUAL TEST: Force updating table for lead:', leadId);
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    if (lead) {
+        updateTableForDueCallback(leadId, lead);
+    } else {
+        console.log('❌ Lead not found:', leadId);
+    }
+};
+
+// Function to disable debug logging once system is working
+window.disableCallbackDebug = function() {
+    // Override console functions for callback debug messages
+    const originalLog = console.log;
+    console.log = function(...args) {
+        if (args[0] && typeof args[0] === 'string') {
+            if (args[0].includes('CALLBACK DEBUG') ||
+                args[0].includes('CALLBACK MONITOR') ||
+                args[0].includes('CALLBACK HOOK')) {
+                return; // Skip callback debug messages
+            }
+        }
+        originalLog.apply(console, args);
+    };
+    console.log('🔇 Callback debug logging disabled');
+};
+
+// IMMEDIATE FIX function to force callback messages right now
+window.forceCallbackFix = function() {
+    console.log('🚨 FORCE FIX: Immediately applying callback messages to all overdue callbacks');
+    checkAndRestoreCallbackMessages();
+};
+
+// Manual function to force server sync
+window.forceServerSync = function() {
+    console.log('🔄 MANUAL SYNC: Forcing callback sync from server...');
+    loadCallbacksFromServer();
+};
+
+// Function to check all scheduled callbacks and find leads by name
+window.checkCallbacks = function(searchName = null) {
+    console.log('🔍 CALLBACK CHECK: Examining all scheduled callbacks...');
+
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const now = new Date();
+
+    console.log('📋 Total leads with callbacks:', Object.keys(callbacks).length);
+
+    if (Object.keys(callbacks).length === 0) {
+        console.log('❌ No scheduled callbacks found');
+        return;
+    }
+
+    Object.keys(callbacks).forEach(leadId => {
+        const leadCallbacks = callbacks[leadId] || [];
+        const lead = leads.find(l => String(l.id) === String(leadId));
+
+        if (!lead) {
+            console.log('❌ Lead not found for callback ID:', leadId);
+            return;
+        }
+
+        const leadName = lead.name || lead.business_name || 'Unknown';
+        const isMatch = searchName ? leadName.toLowerCase().includes(searchName.toLowerCase()) : true;
+
+        if (isMatch) {
+            console.log('📞 LEAD:', leadName, '(ID:', leadId, ')');
+            console.log('   Company:', lead.company || lead.business_name || 'N/A');
+            console.log('   Phone:', lead.phone || 'N/A');
+            console.log('   Stage:', lead.stage || 'N/A');
+
+            leadCallbacks.forEach((callback, index) => {
+                const callbackTime = new Date(callback.dateTime);
+                const timeDiff = callbackTime.getTime() - now.getTime();
+                const minutesDiff = Math.floor(timeDiff / (1000 * 60));
+                const hoursDiff = Math.floor(minutesDiff / 60);
+                const daysDiff = Math.floor(hoursDiff / 24);
+
+                let timeStatus;
+                if (minutesDiff < 0) {
+                    timeStatus = '🔴 OVERDUE';
+                } else if (daysDiff === 0) {
+                    timeStatus = '⚡ TODAY';
+                } else {
+                    timeStatus = '📅 FUTURE';
+                }
+
+                console.log(`   Callback ${index + 1}: ${timeStatus}`);
+                console.log(`     Scheduled: ${callbackTime.toLocaleString()}`);
+                console.log(`     Time until: ${minutesDiff} minutes`);
+                console.log(`     Notes: ${callback.notes || 'None'}`);
+                console.log(`     Callback ID: ${callback.id}`);
+            });
+        }
+    });
+
+    if (searchName) {
+        console.log('🔍 Search completed for:', searchName);
+    }
+};
+
+// Function to find a lead by partial name match
+window.findLead = function(searchName) {
+    console.log('🔍 LEAD SEARCH: Looking for leads matching:', searchName);
+
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const matches = leads.filter(lead => {
+        const leadName = lead.name || lead.business_name || '';
+        const company = lead.company || lead.business_name || '';
+        return leadName.toLowerCase().includes(searchName.toLowerCase()) ||
+               company.toLowerCase().includes(searchName.toLowerCase());
+    });
+
+    console.log('📋 Found', matches.length, 'matching leads:');
+
+    matches.forEach((lead, index) => {
+        console.log(`${index + 1}. ${lead.name || lead.business_name || 'Unknown'}`);
+        console.log(`   ID: ${lead.id}`);
+        console.log(`   Company: ${lead.company || lead.business_name || 'N/A'}`);
+        console.log(`   Phone: ${lead.phone || 'N/A'}`);
+        console.log(`   Stage: ${lead.stage || 'N/A'}`);
+    });
+
+    return matches;
 };
 
 console.log('🔥 PROTECTED FUNCTIONS NOW ACTIVE - Enhanced profile with Reach Out section should load');
