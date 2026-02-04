@@ -8348,6 +8348,8 @@ function monitorCallbacks() {
             return;
         }
 
+        console.log('🔍 CALLBACK MONITOR: Found lead data for', lead.name, '- assignedTo:', lead.assignedTo);
+
         leadCallbacks.forEach(callback => {
             const callbackTime = new Date(callback.dateTime);
             const timeDiff = callbackTime.getTime() - now.getTime();
@@ -8380,15 +8382,60 @@ function monitorCallbacks() {
     console.log('🔍 CALLBACK MONITOR: Monitor check completed');
 }
 
-// Function to send callback warning email to Grant@vigagency.com
+// Function to send callback warning email to assigned agent
 async function sendCallbackWarningEmail(lead, callback) {
-    console.log('📧 EMAIL ALERT: Preparing 30-minute callback reminder email for lead:', lead.name);
+    console.warn('🚨 CALLBACK EMAIL DEBUG START 🚨');
+    console.warn('📧 EMAIL ALERT: Preparing 30-minute callback reminder email for lead:', lead.name);
+    console.warn('🔍 DEBUG: Full lead object:', JSON.stringify(lead, null, 2));
+    console.warn('🔍 DEBUG: lead.assignedTo value:', lead.assignedTo);
+    console.warn('🔍 DEBUG: lead.assignedTo type:', typeof lead.assignedTo);
+
+    // Determine recipient email based on assigned agent
+    let recipientEmail = 'grant@vigagency.com'; // Default to Grant
+    let recipientName = 'Grant';
+
+    console.warn('🔍 DEBUG: Starting email routing logic...');
+
+    if (lead.assignedTo) {
+        console.warn('🔍 DEBUG: assignedTo field exists, processing...');
+        const assignedTo = lead.assignedTo.toLowerCase();
+        console.warn('🔍 DEBUG: assignedTo (lowercase):', assignedTo);
+
+        console.warn('🔍 DEBUG: Entering switch statement with value:', assignedTo);
+        switch (assignedTo) {
+            case 'hunter':
+                recipientEmail = 'hunter@vigagency.com';
+                recipientName = 'Hunter';
+                console.warn('📧 EMAIL ALERT: ✅ MATCHED HUNTER - Routing to Hunter');
+                break;
+            case 'grant':
+                recipientEmail = 'grant@vigagency.com';
+                recipientName = 'Grant';
+                console.warn('📧 EMAIL ALERT: ✅ MATCHED GRANT - Routing to Grant');
+                break;
+            case 'carson':
+                recipientEmail = 'carson@vigagency.com';
+                recipientName = 'Carson';
+                console.warn('📧 EMAIL ALERT: ✅ MATCHED CARSON - Routing to Carson');
+                break;
+            default:
+                recipientEmail = 'grant@vigagency.com';
+                recipientName = 'Grant';
+                console.warn('📧 EMAIL ALERT: ❌ NO MATCH - Unknown assigned agent "' + assignedTo + '", defaulting to Grant');
+        }
+    } else {
+        console.warn('📧 EMAIL ALERT: ❌ NO assignedTo field found, defaulting to Grant');
+    }
+
+    console.warn('📧 EMAIL ALERT: 🎯 FINAL ROUTING DECISION - Sending callback reminder to', recipientName, 'at', recipientEmail);
+    console.warn('🚨 CALLBACK EMAIL DEBUG END 🚨');
 
     const callbackData = {
         leadName: lead.name || 'Unknown Lead',
         leadPhone: lead.phone || 'No phone number',
         dateTime: callback.dateTime,
-        notes: callback.notes || 'No notes provided'
+        notes: callback.notes || 'No notes provided',
+        assignedTo: lead.assignedTo || 'Unassigned'
     };
 
     const callbackTime = new Date(callback.dateTime);
@@ -8416,6 +8463,7 @@ async function sendCallbackWarningEmail(lead, callback) {
                     <h2 style="margin-top: 0; color: #1f2937;">Callback Details</h2>
                     <ul style="list-style: none; padding: 0;">
                         <li style="margin-bottom: 10px;"><strong>📋 Lead:</strong> ${callbackData.leadName}</li>
+                        <li style="margin-bottom: 10px;"><strong>👤 Assigned To:</strong> ${callbackData.assignedTo}</li>
                         <li style="margin-bottom: 10px;"><strong>📞 Phone:</strong> ${callbackData.leadPhone}</li>
                         <li style="margin-bottom: 10px;"><strong>🕒 Scheduled Time:</strong> ${formattedTime}</li>
                         <li style="margin-bottom: 10px;"><strong>📝 Notes:</strong> ${callbackData.notes}</li>
@@ -8456,7 +8504,7 @@ async function sendCallbackWarningEmail(lead, callback) {
     `;
 
     try {
-        console.log('📧 EMAIL ALERT: Sending callback reminder email to Grant@vigagency.com');
+        console.log('📧 EMAIL ALERT: Sending callback reminder email to', recipientEmail);
 
         // Send email using the server endpoint
         const response = await fetch('/api/send-callback-reminder', {
@@ -8465,7 +8513,7 @@ async function sendCallbackWarningEmail(lead, callback) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                to: 'Grant@vigagency.com',
+                to: recipientEmail,
                 subject: subject,
                 html: html
             })
@@ -8560,69 +8608,7 @@ function updateTableForDueCallback(leadId, lead) {
     }
 }
 
-// Function to send 30-minute warning email
-function sendCallbackWarningEmail(lead, callback) {
-    const callbackTime = new Date(callback.dateTime);
-    const timeStr = callbackTime.toLocaleDateString() + ' at ' + callbackTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-    const emailData = {
-        to: 'Grant@vigagency.com',
-        subject: `⏰ Callback Reminder - ${lead.name} in 30 minutes`,
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: #f59e0b; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-                    <h2 style="margin: 0; font-size: 24px;">⏰ Callback Reminder</h2>
-                </div>
-
-                <div style="background: #fef3c7; padding: 20px; border-left: 4px solid #f59e0b;">
-                    <h3 style="color: #92400e; margin-top: 0;">You have a callback scheduled in 30 minutes!</h3>
-
-                    <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
-                        <h4 style="color: #374151; margin-top: 0;">Lead Details:</h4>
-                        <p><strong>Name:</strong> ${lead.name}</p>
-                        <p><strong>Phone:</strong> ${lead.phone || 'N/A'}</p>
-                        <p><strong>Company:</strong> ${lead.company || lead.business_name || 'N/A'}</p>
-                        <p><strong>Stage:</strong> ${lead.stage || 'N/A'}</p>
-                    </div>
-
-                    <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
-                        <h4 style="color: #374151; margin-top: 0;">Callback Info:</h4>
-                        <p><strong>Scheduled Time:</strong> ${timeStr}</p>
-                        ${callback.notes ? `<p><strong>Notes:</strong> ${callback.notes}</p>` : ''}
-                    </div>
-
-                    <div style="text-align: center; margin: 20px 0;">
-                        <a href="https://162-220-14-239.nip.io/#leads"
-                           style="background: #0277bd; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                            📞 Open CRM & Make Call
-                        </a>
-                    </div>
-                </div>
-
-                <div style="background: #f9fafb; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #6b7280;">
-                    This is an automated reminder from Vanguard Insurance CRM
-                </div>
-            </div>
-        `
-    };
-
-    // Send email via backend
-    fetch('/api/send-callback-reminder', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(emailData)
-    }).then(response => {
-        if (response.ok) {
-            console.log('✅ Callback warning email sent successfully');
-        } else {
-            console.error('❌ Failed to send callback warning email');
-        }
-    }).catch(error => {
-        console.error('❌ Error sending callback warning email:', error);
-    });
-}
+// DUPLICATE FUNCTION REMOVED - Using the agent-specific version above
 
 // Start callback monitoring when page loads
 let callbackMonitor;
@@ -8940,15 +8926,37 @@ window.testCallbackEmail = function(leadId) {
         return;
     }
 
+    console.log('🧪 EMAIL TEST: Lead found - Name:', lead.name, 'AssignedTo:', lead.assignedTo);
+
     const testCallback = {
         id: Date.now(),
         dateTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes from now
-        notes: 'Test callback notification'
+        notes: 'Test callback notification - manual test'
     };
 
-    console.log('🧪 EMAIL TEST: Sending test email for lead:', lead.name);
+    console.log('🧪 EMAIL TEST: Sending test email for lead:', lead.name, 'assigned to:', lead.assignedTo);
     sendCallbackWarningEmail(lead, testCallback);
-    alert(`Test email sent for lead: ${lead.name}`);
+    alert(`Test email sent for lead: ${lead.name} (assigned to: ${lead.assignedTo || 'Unassigned'})`);
+};
+
+// Manual function to check lead assignment data
+window.checkLeadAssignment = function(leadId) {
+    console.log('🔍 ASSIGNMENT CHECK: Checking assignment for lead:', leadId);
+
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.error('❌ ASSIGNMENT CHECK: Lead not found:', leadId);
+        alert('Lead not found with ID: ' + leadId);
+        return;
+    }
+
+    console.log('🔍 ASSIGNMENT CHECK: Lead data:', JSON.stringify(lead, null, 2));
+    console.log('🔍 ASSIGNMENT CHECK: assignedTo field:', lead.assignedTo);
+    console.log('🔍 ASSIGNMENT CHECK: assignedTo type:', typeof lead.assignedTo);
+
+    alert(`Lead: ${lead.name}\nAssigned To: ${lead.assignedTo || 'Unassigned'}\nType: ${typeof lead.assignedTo}`);
 };
 
 // Manual test function to force update a specific lead's table cell
