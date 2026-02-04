@@ -431,6 +431,7 @@ app.delete('/api/clients/:id', (req, res) => {
 // Get all policies (with deduplication and limit)
 app.get('/api/policies', (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit) : 100; // Default limit of 100 policies
+    const includeInactive = req.query.includeInactive === 'true'; // Include inactive policies for CRM
 
     // Fetch more rows than limit to account for duplicates
     const fetchLimit = limit * 5; // Fetch 5x the limit to ensure we get enough unique policies
@@ -442,7 +443,7 @@ app.get('/api/policies', (req, res) => {
 
         // Deduplicate by policyNumber and limit results - FIXED FOR NESTED FORMAT
         const allPolicies = [];
-        const seen = new Set();
+        const policyMap = new Map(); // Use Map to track newest version of each policy
 
         for (const row of rows) {
             try {
@@ -461,19 +462,59 @@ app.get('/api/policies', (req, res) => {
                             policies.push(item);
                         }
                     }
-                } else if (data.id || data.policy_number) {
-                    // Direct policy object
+                } else if (data.id || data.policy_number || data.policyId || data.coiFormData) {
+                    // Direct policy object (including COI-based policies)
                     policies = [data];
                 }
 
                 // Process each policy from this row
                 for (const policy of policies) {
-                    const policyNumber = policy.policyNumber || policy.policy_number || policy.id;
+                    const policyNumber = policy.policyNumber ||
+                                          policy.policy_number ||
+                                          policy.id ||
+                                          policy.policyId ||
+                                          (policy.coiFormData && policy.coiFormData.glPolicyNum);
 
-                    if (policyNumber && !seen.has(policyNumber) && allPolicies.length < limit) {
-                        seen.add(policyNumber);
-                        allPolicies.push(policy);
-                        console.log(`✅ SERVER: Added policy ${policyNumber} - ${policy.insured_name}`);
+                    // Create a normalized policy number for deduplication
+                    let normalizedNumber = policyNumber;
+
+                    // Extract actual policy number from ID if needed
+                    if (policyNumber && policyNumber.includes('-')) {
+                        // Look for a numeric policy number in the policy data
+                        const numericNumber = policy.policyNumber ||
+                                           policy.policy_number ||
+                                           (policy.coiFormData && policy.coiFormData.glPolicyNum) ||
+                                           (policy.overview && policy.overview['Policy Number']);
+                        if (numericNumber && numericNumber !== policyNumber) {
+                            normalizedNumber = numericNumber;
+                        }
+                    }
+
+                    if (policyNumber) {
+                        // Preserve top-level status fields if they exist
+                        if (data.status || data.policyStatus) {
+                            policy.status = data.status || policy.status;
+                            policy.policyStatus = data.policyStatus || policy.policyStatus;
+                            console.log(`🔍 STATUS: Applied status ${data.status} to policy ${normalizedNumber}`);
+                        } else {
+                            console.log(`🔍 STATUS: No status found in data for policy ${normalizedNumber}`);
+                        }
+
+                        // Filter inactive policies unless explicitly requested
+                        const isActive = (policy.status || policy.policyStatus || 'Active') === 'Active';
+
+                        if (!isActive && !includeInactive) {
+                            console.log(`🔍 SERVER: Skipping inactive policy ${normalizedNumber} (includeInactive: ${includeInactive})`);
+                            continue;
+                        }
+
+                        // Always update map with newest version (records processed in desc order)
+                        if (!policyMap.has(normalizedNumber)) {
+                            policyMap.set(normalizedNumber, policy);
+                            console.log(`✅ SERVER: Added policy ${normalizedNumber} (${policyNumber}) - ${policy.insured_name} (status: ${policy.status || 'none'}) (includeInactive: ${includeInactive})`);
+                        } else {
+                            console.log(`🔍 SERVER: Skipping older version of policy ${normalizedNumber} (${policyNumber})`);
+                        }
                     }
                 }
             } catch (e) {
@@ -481,8 +522,11 @@ app.get('/api/policies', (req, res) => {
             }
         }
 
-        console.log(`✅ SERVER: Returning ${allPolicies.length} unique policies (requested limit: ${limit})`);
-        res.json(allPolicies);
+        // Convert map to array and apply limit
+        const uniquePolicies = Array.from(policyMap.values()).slice(0, limit);
+
+        console.log(`✅ SERVER: Returning ${uniquePolicies.length} unique policies (requested limit: ${limit})`);
+        res.json(uniquePolicies);
     });
 });
 
@@ -775,6 +819,386 @@ app.put('/api/policies/:id', (req, res) => {
     });
 });
 
+// Get COI document for a policy (for client portal)
+app.get('/api/coi/:policyId', (req, res) => {
+    const policyId = req.params.policyId;
+    console.log('🔍 COI API: Requesting COI for policy:', policyId);
+
+    // Since COI documents are currently stored in browser localStorage,
+    // we need to implement a documents table to store them server-side
+    // For now, let's create a basic documents table if it doesn't exist
+
+    // Check if coi_documents table exists, create if not
+    db.run(`CREATE TABLE IF NOT EXISTS coi_documents (
+        id TEXT PRIMARY KEY,
+        policy_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data_url TEXT NOT NULL,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        form_data TEXT
+    )`, (err) => {
+        if (err) {
+            console.error('Error creating documents table:', err);
+            res.status(500).json({ error: 'Database error' });
+            return;
+        }
+
+        // Look for COI document for this policy
+        db.get(`SELECT * FROM coi_documents WHERE policy_id = ? AND type LIKE '%image%' ORDER BY upload_date DESC LIMIT 1`,
+            [policyId], (err, row) => {
+            if (err) {
+                console.error('Error querying documents:', err);
+                res.status(500).json({ error: 'Database error' });
+                return;
+            }
+
+            // Check if we found a document but it's a placeholder (small size)
+            if (row && row.data_url && row.data_url.length <= 150) {
+                console.log('🔍 COI API: Found placeholder document, checking policies table for actual data...');
+                row = null; // Treat as not found to trigger fallback
+            }
+
+            if (!row) {
+                console.log('🔍 COI API: No valid COI document found in coi_documents table, checking policies table...');
+
+                // Fallback: Check policies table for COI documents
+                db.get(`SELECT id, data FROM policies WHERE id = ?`, [policyId], (err, policyRow) => {
+                    if (err) {
+                        console.error('Error querying policies table:', err);
+                        res.status(500).json({ error: 'Database error' });
+                        return;
+                    }
+
+                    if (!policyRow) {
+                        console.log('🔍 COI API: No policy found with id:', policyId);
+                        res.status(404).json({
+                            error: 'COI document not found',
+                            message: 'No COI document has been generated for this policy yet. Please contact your agent to request one.',
+                            policyId: policyId
+                        });
+                        return;
+                    }
+
+                    try {
+                        const policyData = JSON.parse(policyRow.data);
+                        if (policyData.coiDocuments && policyData.coiDocuments.length > 0) {
+                            const latestCOI = policyData.coiDocuments[policyData.coiDocuments.length - 1];
+
+                            if (latestCOI.dataUrl && latestCOI.dataUrl.length > 150) {
+                                console.log('✅ COI API: Found valid COI in policies table:', latestCOI.name);
+                                res.json({
+                                    id: latestCOI.id,
+                                    name: latestCOI.name,
+                                    type: latestCOI.type || 'image/png',
+                                    dataUrl: latestCOI.dataUrl,
+                                    uploadDate: latestCOI.uploadDate,
+                                    policyId: policyId,
+                                    source: 'policies_table'
+                                });
+                                return;
+                            }
+                        }
+
+                        console.log('🔍 COI API: No valid COI found in policies table either');
+                        res.status(404).json({
+                            error: 'COI document not found',
+                            message: 'No COI document has been generated for this policy yet. Please contact your agent to request one.',
+                            policyId: policyId
+                        });
+                    } catch (parseErr) {
+                        console.error('Error parsing policy data:', parseErr);
+                        res.status(500).json({ error: 'Database error parsing policy data' });
+                    }
+                });
+                return;
+            }
+
+            console.log('✅ COI API: Found COI document:', row.name);
+            res.json({
+                id: row.id,
+                name: row.name,
+                type: row.type,
+                dataUrl: row.data_url,
+                uploadDate: row.upload_date,
+                policyId: policyId,
+                source: 'coi_documents_table'
+            });
+        });
+    });
+});
+
+// Alternative COI endpoint using policy number
+app.get('/api/policies/:policyNumber/coi', (req, res) => {
+    const policyNumber = req.params.policyNumber;
+    console.log('🔍 COI API: Requesting COI for policy number:', policyNumber);
+
+    // Create coi_documents table if it doesn't exist
+    db.run(`CREATE TABLE IF NOT EXISTS coi_documents (
+        id TEXT PRIMARY KEY,
+        policy_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data_url TEXT NOT NULL,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        form_data TEXT
+    )`, (err) => {
+        if (err) {
+            console.error('Error creating documents table:', err);
+            res.status(500).json({ error: 'Database error' });
+            return;
+        }
+
+        // Look for COI document for this policy number
+        db.get(`SELECT * FROM coi_documents WHERE policy_id = ? AND type LIKE '%image%' ORDER BY upload_date DESC LIMIT 1`,
+            [policyNumber], (err, row) => {
+            if (err) {
+                console.error('Error querying documents:', err);
+                res.status(500).json({ error: 'Database error' });
+                return;
+            }
+
+            if (!row) {
+                console.log('🔍 COI API: No COI document found for policy number:', policyNumber);
+                res.status(404).json({
+                    error: 'COI document not found',
+                    message: 'No COI document has been generated for this policy yet. Please contact your agent to request one.',
+                    policyNumber: policyNumber
+                });
+                return;
+            }
+
+            console.log('✅ COI API: Found COI document:', row.name);
+            res.json({
+                id: row.id,
+                name: row.name,
+                type: row.type,
+                dataUrl: row.data_url,
+                uploadDate: row.upload_date,
+                policyNumber: policyNumber
+            });
+        });
+    });
+});
+
+// Get ID cards for a policy (for client portal)
+app.get('/api/id-cards/:policyId', (req, res) => {
+    const policyId = req.params.policyId;
+    console.log('🆔 ID Cards API: Requesting ID cards for policy:', policyId);
+
+    // Create id_cards table if it doesn't exist
+    db.run(`CREATE TABLE IF NOT EXISTS id_cards (
+        id TEXT PRIMARY KEY,
+        policy_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data_url TEXT NOT NULL,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        size INTEGER
+    )`, (err) => {
+        if (err) {
+            console.error('Error creating id_cards table:', err);
+            res.status(500).json({ error: 'Database error' });
+            return;
+        }
+
+        // Look for ID cards for this policy
+        db.all(`SELECT * FROM id_cards WHERE policy_id = ? ORDER BY upload_date DESC`,
+            [policyId], (err, rows) => {
+            if (err) {
+                console.error('Error querying id_cards:', err);
+                res.status(500).json({ error: 'Database error' });
+                return;
+            }
+
+            if (!rows || rows.length === 0) {
+                console.log('🆔 ID Cards API: No ID cards found for policy:', policyId);
+                res.json([]);
+                return;
+            }
+
+            console.log(`✅ ID Cards API: Found ${rows.length} ID cards for policy:`, policyId);
+            res.json(rows.map(row => ({
+                id: row.id,
+                name: row.name,
+                type: row.type,
+                dataUrl: row.data_url,
+                uploadDate: row.upload_date,
+                policyId: policyId,
+                size: row.size
+            })));
+        });
+    });
+});
+
+// Store ID cards from CRM upload
+app.post('/api/id-cards', (req, res) => {
+    const { policyId, idCards } = req.body;
+    console.log('🆔 ID Cards API: Storing ID cards for policy:', policyId, 'Count:', idCards?.length || 0);
+
+    if (!policyId || !idCards || !Array.isArray(idCards)) {
+        return res.status(400).json({ error: 'Invalid request: policyId and idCards array required' });
+    }
+
+    // Create id_cards table if it doesn't exist
+    db.run(`CREATE TABLE IF NOT EXISTS id_cards (
+        id TEXT PRIMARY KEY,
+        policy_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data_url TEXT NOT NULL,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        size INTEGER
+    )`, (err) => {
+        if (err) {
+            console.error('Error creating id_cards table:', err);
+            res.status(500).json({ error: 'Database error' });
+            return;
+        }
+
+        // Insert each ID card
+        const insertPromises = idCards.map(card => {
+            return new Promise((resolve, reject) => {
+                db.run(`INSERT INTO id_cards (id, policy_id, name, type, data_url, upload_date, size)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            name = ?, type = ?, data_url = ?, upload_date = ?, size = ?`,
+                    [
+                        card.id, policyId, card.name, card.type, card.dataUrl, card.uploadDate, card.size,
+                        card.name, card.type, card.dataUrl, card.uploadDate, card.size
+                    ], (err) => {
+                    if (err) {
+                        console.error('Error inserting ID card:', err);
+                        reject(err);
+                    } else {
+                        console.log('✅ ID Card stored:', card.name);
+                        resolve();
+                    }
+                });
+            });
+        });
+
+        Promise.all(insertPromises)
+            .then(() => {
+                console.log(`✅ ID Cards API: Successfully stored ${idCards.length} ID cards`);
+                res.json({ success: true, count: idCards.length });
+            })
+            .catch(err => {
+                console.error('Error storing ID cards:', err);
+                res.status(500).json({ error: 'Failed to store ID cards' });
+            });
+    });
+});
+
+// Migrate COI documents from localStorage to database
+app.post('/api/coi/migrate', (req, res) => {
+    const documents = req.body.documents;
+    console.log('📦 COI Migration: Migrating', documents?.length || 0, 'COI documents to database');
+
+    if (!documents || !Array.isArray(documents)) {
+        return res.status(400).json({
+            error: 'Invalid input',
+            message: 'Expected an array of documents'
+        });
+    }
+
+    // Create coi_documents table if it doesn't exist
+    db.run(`CREATE TABLE IF NOT EXISTS coi_documents (
+        id TEXT PRIMARY KEY,
+        policy_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data_url TEXT NOT NULL,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        form_data TEXT
+    )`, (err) => {
+        if (err) {
+            console.error('Error creating documents table:', err);
+            res.status(500).json({ error: 'Database error' });
+            return;
+        }
+
+        let processed = 0;
+        let errors = [];
+        let successful = 0;
+
+        if (documents.length === 0) {
+            return res.json({
+                success: true,
+                processed: 0,
+                successful: 0,
+                errors: []
+            });
+        }
+
+        documents.forEach((doc, index) => {
+            // Extract policy ID from the document name or formData
+            let policyId = 'unknown';
+            try {
+                if (doc.formData && doc.formData.policyNumber) {
+                    policyId = doc.formData.policyNumber;
+                } else if (doc.name && doc.name.includes('POL-')) {
+                    // Extract from filename like "ACORD_25_POL-1770054490788-j7krpi31r_2026-02-02.png"
+                    const match = doc.name.match(/POL-([^-]+)/);
+                    if (match) {
+                        policyId = 'POL-' + match[1];
+                    }
+                }
+            } catch (e) {
+                console.error('Error extracting policy ID:', e);
+            }
+
+            // Insert document into database
+            db.run(`INSERT INTO coi_documents (id, policy_id, name, type, data_url, upload_date, form_data)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        policy_id = ?, name = ?, type = ?, data_url = ?, form_data = ?`,
+                [
+                    doc.id,
+                    policyId,
+                    doc.name,
+                    doc.type,
+                    doc.dataUrl,
+                    doc.uploadDate,
+                    JSON.stringify(doc.formData || {}),
+                    // For ON CONFLICT update
+                    policyId,
+                    doc.name,
+                    doc.type,
+                    doc.dataUrl,
+                    JSON.stringify(doc.formData || {})
+                ],
+                function(err) {
+                    processed++;
+
+                    if (err) {
+                        console.error('Error inserting document:', err);
+                        errors.push({
+                            index: index,
+                            docId: doc.id,
+                            error: err.message
+                        });
+                    } else {
+                        successful++;
+                        console.log('✅ Migrated COI document:', doc.id, 'for policy:', policyId);
+                    }
+
+                    // Check if all documents have been processed
+                    if (processed === documents.length) {
+                        console.log('📦 COI Migration Complete:', successful, 'successful,', errors.length, 'errors');
+                        res.json({
+                            success: errors.length === 0,
+                            processed: processed,
+                            successful: successful,
+                            errors: errors
+                        });
+                    }
+                }
+            );
+        });
+    });
+});
+
 // Get all leads
 app.get('/api/leads', (req, res) => {
     db.all('SELECT * FROM leads', (err, rows) => {
@@ -893,6 +1317,203 @@ app.post('/api/cleanup-invalid-leads', (req, res) => {
         }
         console.log(`✅ CLEANUP: Removed ${this.changes} invalid leads`);
         res.json({ success: true, deleted: this.changes });
+    });
+});
+
+// ============================================
+// VIGAGENCY CRM API ENDPOINTS
+// ============================================
+
+// Get leads for vigagency.com CRM interface
+app.get('/api/vigagency/crm/leads', (req, res) => {
+    console.log('🔗 VigAgency CRM leads request received');
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    // Get total count first
+    db.get('SELECT COUNT(*) as total FROM leads', (err, countRow) => {
+        if (err) {
+            console.error('❌ VigAgency CRM error getting lead count:', err);
+            return res.status(500).json({
+                success: false,
+                error: err.message,
+                leads: [],
+                total: 0
+            });
+        }
+
+        const totalLeads = countRow.total;
+
+        // Get paginated leads
+        db.all(`SELECT * FROM leads ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+            [limit, offset],
+            (err, rows) => {
+                if (err) {
+                    console.error('❌ VigAgency CRM error getting leads:', err);
+                    return res.status(500).json({
+                        success: false,
+                        error: err.message,
+                        leads: [],
+                        total: 0
+                    });
+                }
+
+                const leads = rows.map(row => {
+                    try {
+                        const leadData = JSON.parse(row.data);
+                        return {
+                            id: leadData.id,
+                            name: leadData.name || 'Unknown',
+                            email: leadData.email || '',
+                            phone: leadData.phone || '',
+                            company: leadData.company || '',
+                            stage: leadData.stage || 'new',
+                            source: leadData.source || 'unknown',
+                            created_at: row.created_at,
+                            updated_at: row.updated_at,
+                            address: leadData.address || '',
+                            city: leadData.city || '',
+                            state: leadData.state || '',
+                            zip: leadData.zip || ''
+                        };
+                    } catch (parseErr) {
+                        console.error('Error parsing lead data:', parseErr);
+                        return {
+                            id: row.id || 'unknown',
+                            name: 'Parse Error',
+                            email: '',
+                            phone: '',
+                            company: '',
+                            stage: 'error',
+                            source: 'unknown',
+                            created_at: row.created_at,
+                            updated_at: row.updated_at
+                        };
+                    }
+                });
+
+                console.log(`✅ VigAgency CRM returning ${leads.length} of ${totalLeads} leads`);
+
+                res.json({
+                    success: true,
+                    leads: leads,
+                    total: totalLeads,
+                    page: page,
+                    limit: limit,
+                    total_pages: Math.ceil(totalLeads / limit)
+                });
+            }
+        );
+    });
+});
+
+// Get clients for vigagency.com (for email/password functionality)
+app.get('/api/vigagency/crm/clients', (req, res) => {
+    console.log('🔗 VigAgency CRM clients request received');
+
+    db.all('SELECT * FROM clients ORDER BY created_at DESC', (err, rows) => {
+        if (err) {
+            console.error('❌ VigAgency CRM error getting clients:', err);
+            return res.status(500).json({
+                success: false,
+                error: err.message,
+                clients: []
+            });
+        }
+
+        const clients = rows.map(row => {
+            try {
+                const clientData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+                return {
+                    id: row.id,
+                    email: clientData.email || row.email || '',
+                    password: clientData.password || '',
+                    name: clientData.name || '',
+                    phone: clientData.phone || '',
+                    company: clientData.company || '',
+                    created_at: row.created_at,
+                    updated_at: row.updated_at
+                };
+            } catch (parseErr) {
+                console.error('Error parsing client data:', parseErr);
+                return {
+                    id: row.id,
+                    email: row.email || '',
+                    password: '',
+                    name: '',
+                    phone: '',
+                    company: '',
+                    created_at: row.created_at,
+                    updated_at: row.updated_at
+                };
+            }
+        });
+
+        console.log(`✅ VigAgency CRM returning ${clients.length} clients`);
+
+        res.json({
+            success: true,
+            clients: clients
+        });
+    });
+});
+
+// Update client (for password creation)
+app.post('/api/vigagency/crm/clients/:id', (req, res) => {
+    const clientId = req.params.id;
+    const updateData = req.body;
+
+    console.log('🔗 VigAgency CRM client update request for:', clientId);
+
+    // Get existing client first
+    db.get('SELECT * FROM clients WHERE id = ?', [clientId], (err, row) => {
+        if (err) {
+            console.error('❌ VigAgency CRM error getting client for update:', err);
+            return res.status(500).json({
+                success: false,
+                error: err.message
+            });
+        }
+
+        if (!row) {
+            return res.status(404).json({
+                success: false,
+                error: 'Client not found'
+            });
+        }
+
+        try {
+            const existingData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+            const mergedData = { ...existingData, ...updateData };
+
+            db.run('UPDATE clients SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [JSON.stringify(mergedData), clientId],
+                function(err) {
+                    if (err) {
+                        console.error('❌ VigAgency CRM error updating client:', err);
+                        return res.status(500).json({
+                            success: false,
+                            error: err.message
+                        });
+                    }
+
+                    console.log(`✅ VigAgency CRM client ${clientId} updated successfully`);
+                    res.json({
+                        success: true,
+                        client_id: clientId,
+                        updated_fields: Object.keys(updateData)
+                    });
+                }
+            );
+        } catch (parseErr) {
+            console.error('Error parsing client data for update:', parseErr);
+            res.status(500).json({
+                success: false,
+                error: 'Invalid client data format'
+            });
+        }
     });
 });
 
@@ -3486,15 +4107,50 @@ app.post('/api/save-coi-form', (req, res) => {
             });
         }
 
-        // For now, we'll save to localStorage via the client side
-        // The form data is already being handled by the client-side save process
-        // This endpoint serves as confirmation that the save was intended
-        console.log('✅ COI form data save request processed for policy:', policyId);
+        // Actually save the COI form data to the database
+        const db = new sqlite3.Database('/var/www/vanguard/vanguard.db');
 
-        res.json({
-            success: true,
-            policyId: policyId,
-            message: 'COI form data processed successfully'
+        // Store COI data as part of the policy
+        db.get('SELECT data FROM policies WHERE id = ?', [policyId], (err, row) => {
+            if (err) {
+                console.error('❌ Database error:', err);
+                return res.status(500).json({ success: false, error: 'Database error' });
+            }
+
+            let policyData = {};
+            if (row) {
+                try {
+                    policyData = JSON.parse(row.data || '{}');
+                } catch (e) {
+                    console.warn('⚠️ Invalid JSON in policy data, creating new');
+                }
+            }
+
+            // Add/update COI form data
+            policyData.coiFormData = formData;
+            policyData.lastCOIUpdate = new Date().toISOString();
+
+            const query = row ?
+                'UPDATE policies SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?' :
+                'INSERT INTO policies (id, data, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+
+            const params = row ? [JSON.stringify(policyData), policyId] : [policyId, JSON.stringify(policyData)];
+
+            db.run(query, params, function(err) {
+                if (err) {
+                    console.error('❌ Error saving COI form data:', err);
+                    return res.status(500).json({ success: false, error: 'Failed to save COI data' });
+                }
+
+                console.log('✅ COI form data saved to database for policy:', policyId);
+                res.json({
+                    success: true,
+                    policyId: policyId,
+                    message: 'COI form data processed successfully'
+                });
+            });
+
+            db.close();
         });
     } catch (error) {
         console.error('❌ Error saving COI form data:', error);
@@ -3534,6 +4190,136 @@ app.post('/api/generate-filled-coi', (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Internal server error while generating COI'
+        });
+    }
+});
+
+// COI Documents API endpoints
+app.get('/api/coi-documents', (req, res) => {
+    try {
+        const { policyId } = req.query;
+        console.log('📄 Loading COI documents for policy:', policyId);
+
+        if (!policyId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Policy ID is required'
+            });
+        }
+
+        const db = new sqlite3.Database('/var/www/vanguard/vanguard.db');
+
+        // Get COI documents from the policy data
+        db.get('SELECT data FROM policies WHERE id = ?', [policyId], (err, row) => {
+            if (err) {
+                console.error('❌ Database error:', err);
+                return res.status(500).json({ success: false, error: 'Database error' });
+            }
+
+            let coiDocuments = [];
+            if (row) {
+                try {
+                    const policyData = JSON.parse(row.data || '{}');
+                    coiDocuments = policyData.coiDocuments || [];
+                    console.log('✅ Found COI documents:', coiDocuments.length);
+                } catch (e) {
+                    console.warn('⚠️ Invalid JSON in policy data');
+                }
+            } else {
+                console.log('⚠️ Policy not found:', policyId);
+            }
+
+            db.close();
+            res.json({
+                success: true,
+                policyId: policyId,
+                coiDocuments: coiDocuments
+            });
+        });
+    } catch (error) {
+        console.error('❌ Error loading COI documents:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error while loading COI documents'
+        });
+    }
+});
+
+app.post('/api/coi-documents', (req, res) => {
+    try {
+        const { policyId, document } = req.body;
+        console.log('💾 Saving COI document for policy:', policyId);
+
+        if (!policyId || !document) {
+            return res.status(400).json({
+                success: false,
+                error: 'Policy ID and document data are required'
+            });
+        }
+
+        const db = new sqlite3.Database('/var/www/vanguard/vanguard.db');
+
+        // Get existing policy data and add the COI document
+        db.get('SELECT data FROM policies WHERE id = ?', [policyId], (err, row) => {
+            if (err) {
+                console.error('❌ Database error:', err);
+                return res.status(500).json({ success: false, error: 'Database error' });
+            }
+
+            let policyData = {};
+            if (row) {
+                try {
+                    policyData = JSON.parse(row.data || '{}');
+                } catch (e) {
+                    console.warn('⚠️ Invalid JSON in policy data, creating new');
+                }
+            }
+
+            // Initialize COI documents array if it doesn't exist
+            if (!policyData.coiDocuments) {
+                policyData.coiDocuments = [];
+            }
+
+            // Create the new document with timestamp
+            const newDocument = {
+                ...document,
+                id: `coi_${Date.now()}`,
+                createdAt: new Date().toISOString(),
+                policyId: policyId
+            };
+
+            // Replace existing COI documents with just the new one (keep only latest)
+            policyData.coiDocuments = [newDocument];
+            policyData.lastCOIUpdate = new Date().toISOString();
+
+            const query = row ?
+                'UPDATE policies SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?' :
+                'INSERT INTO policies (id, data, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+
+            const params = row ? [JSON.stringify(policyData), policyId] : [policyId, JSON.stringify(policyData)];
+
+            db.run(query, params, function(err) {
+                if (err) {
+                    console.error('❌ Error saving COI document:', err);
+                    return res.status(500).json({ success: false, error: 'Failed to save COI document' });
+                }
+
+                console.log('✅ COI document saved to database for policy:', policyId);
+                res.json({
+                    success: true,
+                    policyId: policyId,
+                    documentId: newDocument.id,
+                    message: 'COI document saved successfully'
+                });
+            });
+
+            db.close();
+        });
+    } catch (error) {
+        console.error('❌ Error saving COI document:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error while saving COI document'
         });
     }
 });
@@ -5974,6 +6760,69 @@ app.delete('/api/market-quotes/carrier/:carrier', (req, res) => {
             carrier,
             deletedCount: this.changes
         });
+    });
+});
+
+// Policy status update endpoint
+app.put('/api/policies', (req, res) => {
+    const { id, status, policyStatus } = req.body;
+
+    if (!id || !status) {
+        return res.status(400).json({ error: 'Policy ID and status are required' });
+    }
+
+    console.log('🔄 Updating policy status:', { id, status });
+
+    // Find and update the policy in the database
+    db.get(`SELECT rowid, * FROM policies WHERE id = ?`, [id], (err, row) => {
+        if (err) {
+            console.error('Error finding policy:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (!row) {
+            console.error('Policy not found:', id);
+            return res.status(404).json({ error: 'Policy not found' });
+        }
+
+        try {
+            // Parse existing policy data
+            const policyData = JSON.parse(row.data);
+
+            // Update the status fields
+            policyData.status = status;
+            policyData.policyStatus = status;
+
+            // If it's a nested structure, also update the inner policy
+            if (policyData.policies && Array.isArray(policyData.policies)) {
+                policyData.policies.forEach(policy => {
+                    if (policy.id === id || policy.policyNumber === id) {
+                        policy.status = status;
+                        policy.policyStatus = status;
+                    }
+                });
+            }
+
+            // Save updated data back to database
+            db.run(`UPDATE policies SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                [JSON.stringify(policyData), id], (updateErr) => {
+                if (updateErr) {
+                    console.error('Error updating policy:', updateErr);
+                    return res.status(500).json({ error: 'Failed to update policy' });
+                }
+
+                console.log('✅ Policy status updated successfully:', id, status);
+                res.json({
+                    success: true,
+                    message: 'Policy status updated successfully',
+                    id: id,
+                    status: status
+                });
+            });
+        } catch (parseErr) {
+            console.error('Error parsing policy data:', parseErr);
+            res.status(500).json({ error: 'Invalid policy data format' });
+        }
     });
 });
 

@@ -13656,7 +13656,7 @@ function closeImportPolicyModal() {
     }
 }
 
-function savePolicyForClient(clientId) {
+async function savePolicyForClient(clientId) {
     // This function saves the policy data from the tabbed modal and links it to the client
     
     // Get the policy data from the modal (using the same structure as savePolicy in policy-modal.js)
@@ -13683,7 +13683,7 @@ function savePolicyForClient(clientId) {
     }
     
     // Add policy to client
-    if (!clients[clientIndex].policies) {
+    if (!clients[clientIndex].policies || !Array.isArray(clients[clientIndex].policies)) {
         clients[clientIndex].policies = [];
     }
     clients[clientIndex].policies.push(policyData);
@@ -13697,10 +13697,10 @@ function savePolicyForClient(clientId) {
     
     // Save updated clients
     localStorage.setItem('insurance_clients', JSON.stringify(clients));
-    
+
     // Also save to global policies list (use insurance_policies for consistency)
     const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    
+
     // Add client name to policy data for display
     policyData.clientName = clients[clientIndex].name;
     policyData.insured = policyData.insured || {};
@@ -13708,7 +13708,42 @@ function savePolicyForClient(clientId) {
     
     policies.push(policyData);
     localStorage.setItem('insurance_policies', JSON.stringify(policies));
-    
+
+    // Save to database via API calls
+    try {
+        console.log('💾 Saving policy to database...');
+
+        // Save the policy to database
+        const policyResponse = await fetch('/api/policies', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(policyData)
+        });
+
+        // Update the client in database with new policy count and premium
+        const clientResponse = await fetch('/api/clients', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: clientId,
+                policies: clients[clientIndex].policies.length,
+                totalPremium: clients[clientIndex].totalPremium
+            })
+        });
+
+        if (policyResponse.ok && clientResponse.ok) {
+            console.log('✅ Policy and client saved to database successfully');
+        } else {
+            console.warn('⚠️ Database save partially failed, but data is preserved in localStorage');
+        }
+    } catch (error) {
+        console.warn('⚠️ Failed to save to database, but data is preserved in localStorage:', error);
+    }
+
     // Close modal
     closePolicyModal();
     
@@ -14730,6 +14765,13 @@ function showPolicyDetailsModal(policy) {
     `;
 
     document.body.appendChild(modalOverlay);
+
+    // Initialize ID cards display for this policy
+    setTimeout(() => {
+        if (window.loadIdCardsFromServer) {
+            loadIdCardsFromServer(policy.id);
+        }
+    }, 100);
 }
 
 function generateViewTabsForPolicyType(policyType) {
@@ -14778,6 +14820,14 @@ function generateCOIContainerContent(policy) {
             break;
         }
     }
+
+    // Schedule a database load after DOM update to refresh COI documents
+    setTimeout(() => {
+        if (window.loadCOIFiles) {
+            console.log('🔄 Auto-loading COI files from database for policy:', policy.id);
+            window.loadCOIFiles(policy.id);
+        }
+    }, 100);
 
     if (coiDocuments && coiDocuments.length > 0) {
         // Generate COI cards HTML
@@ -15066,8 +15116,8 @@ function generateViewTabContent(tabId, policy) {
                                 <button onclick="window.generateCertificateForPolicy('${policy.id}')" class="btn-secondary" style="padding: 8px 16px; font-size: 13px; border-radius: 8px; background: #10b981; border-color: #10b981; color: white;">
                                     <i class="fas fa-certificate"></i> Generate
                                 </button>
-                                <button onclick="window.viewCurrentCOI('${policy.id}')" class="btn-secondary" style="padding: 8px 16px; font-size: 13px; border-radius: 8px; background: #6b7280; border-color: #6b7280; color: white;">
-                                    <i class="fas fa-eye"></i> View Current
+                                <button onclick="window.uploadCOIForPolicy('${policy.id}')" class="btn-secondary" style="padding: 8px 16px; font-size: 13px; border-radius: 8px; background: #f59e0b; border-color: #f59e0b; color: white;">
+                                    <i class="fas fa-upload"></i> Upload
                                 </button>
                             </div>
                         </div>
@@ -15084,10 +15134,12 @@ function generateViewTabContent(tabId, policy) {
                                 <i class="fas fa-upload"></i> Upload
                             </button>
                         </div>
-                        <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
-                            <i class="fas fa-id-card" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
-                            <p style="margin: 0; font-size: 16px;">No ID cards uploaded yet</p>
-                            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Upload to add ID cards</p>
+                        <div id="idCardsContainer-${policy.id}" style="min-height: 100px;">
+                            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                                <i class="fas fa-id-card" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                                <p style="margin: 0; font-size: 16px;">No ID cards uploaded yet</p>
+                                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Upload to add ID cards</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -24529,7 +24581,7 @@ window.generateCertificateForPolicy = function(policyId) {
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 999999;
+            z-index: 999999999;
             backdrop-filter: blur(4px);
         `;
 
@@ -24779,40 +24831,601 @@ window.generateIdCards = function(policyId) {
 window.sendCOIForPolicy = function(policyId) {
     console.log('Sending COI for policy:', policyId);
 
-    // Check if sendCOIRequest function exists (from existing functionality)
-    if (window.sendCOIRequest && typeof window.sendCOIRequest === 'function') {
-        window.sendCOIRequest(policyId);
-    } else {
-        // Create a simple modal for COI sending
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    // ALWAYS use the new comprehensive COI modal - don't fall back to old sendCOIRequest
+    // Find the policy data from multiple possible sources in CRM
+    let policy = null;
 
-        modal.innerHTML = `
-            <div style="background: white; padding: 40px; border-radius: 12px; max-width: 500px; width: 90%;">
-                <h3 style="margin: 0 0 20px 0; color: #111827;">Send Certificate of Insurance</h3>
-                <p style="color: #6b7280; margin-bottom: 30px;">Send COI for policy ${policyId}</p>
+    console.log('🔍 Looking for policy:', policyId);
 
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Recipient Email:</label>
-                    <input type="email" id="recipientEmail" placeholder="Enter recipient email" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-                </div>
+    // Method 1: Try window.allPolicies (admin dashboard)
+    if (window.allPolicies && Array.isArray(window.allPolicies)) {
+        console.log('🔍 Searching in window.allPolicies:', window.allPolicies.length, 'policies');
+        policy = window.allPolicies.find(p =>
+            p.policyNumber === policyId ||
+            p.id === policyId ||
+            (p.policyNumber && p.policyNumber.trim() === policyId.trim()) ||
+            (p.id && p.id.trim() === policyId.trim())
+        );
+        if (policy) console.log('✅ Found policy in window.allPolicies:', policy.policyNumber || policy.id);
+    }
 
-                <div style="margin-bottom: 30px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Message (optional):</label>
-                    <textarea id="coiMessage" placeholder="Add a message..." style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; min-height: 80px; resize: vertical;"></textarea>
-                </div>
+    // Method 2: Try localStorage insurance_policies (CRM)
+    if (!policy) {
+        const storedPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        console.log('🔍 Searching in localStorage insurance_policies:', storedPolicies.length, 'policies');
+        if (Array.isArray(storedPolicies)) {
+            policy = storedPolicies.find(p =>
+                p.policyNumber === policyId ||
+                p.id === policyId ||
+                (p.policyNumber && p.policyNumber.trim() === policyId.trim()) ||
+                (p.id && p.id.trim() === policyId.trim())
+            );
+            if (policy) console.log('✅ Found policy in localStorage:', policy.policyNumber || policy.id);
+        }
+    }
 
-                <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                    <button onclick="this.closest('.modal-overlay').remove()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
-                    <button onclick="sendCOI('${policyId}')" style="padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">Send COI</button>
-                </div>
+    // Method 3: Try to extract policy info from current page DOM
+    if (!policy) {
+        console.log('🔍 Attempting to extract policy info from DOM');
+        const policyContainer = document.querySelector(`[id*="${policyId}"], [data-policy="${policyId}"]`);
+        if (policyContainer) {
+            // Try to extract basic policy info from the visible DOM
+            const policyText = policyContainer.textContent || '';
+            const clientNameMatch = policyText.match(/Client:\s*([^•\n]+)/);
+            const policyNumberMatch = policyText.match(/Policy(?:\s*#)?:\s*([^\s•\n]+)/);
+
+            policy = {
+                id: policyId,
+                policyNumber: policyNumberMatch ? policyNumberMatch[1].trim() : policyId,
+                clientName: clientNameMatch ? clientNameMatch[1].trim() : 'Unknown Client',
+                insured_name: clientNameMatch ? clientNameMatch[1].trim() : 'Unknown Client'
+            };
+            console.log('✅ Extracted basic policy info from DOM:', policy);
+        }
+    }
+
+    // Method 4: Create minimal policy object as fallback
+    if (!policy) {
+        console.log('⚠️ Creating fallback policy object');
+        policy = {
+            id: policyId,
+            policyNumber: policyId.replace('POL-', ''),
+            clientName: 'Unknown Client',
+            insured_name: 'Unknown Client'
+        };
+    }
+
+    console.log('📋 Final policy object:', policy);
+
+    // Create comprehensive COI modal similar to client portal
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay active';  // Add 'active' class
+    modal.id = 'crmCOIModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex !important; align-items: center; justify-content: center; z-index: 10000; opacity: 1; visibility: visible;';
+
+    modal.innerHTML = `
+        <div class="modal-content coi-modal" onclick="event.stopPropagation()" style="background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px; border-radius: 12px 12px 0 0; position: relative;">
+                <h3 style="margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; color: white;">
+                    <i class="fas fa-certificate" style="color: white;"></i> Request Certificate of Insurance
+                </h3>
+                <button class="modal-close-btn" onclick="closeCRMCOIModal()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">×</button>
             </div>
-        `;
+            <div class="modal-body" style="padding: 20px;">
+                <div class="policy-info-banner" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 25px; color: #0c4a6e;">
+                    <strong>Policy:</strong> ${policy.policyNumber || policy.id} - ${policy.clientName || policy.insured_name || 'Unknown Client'}
+                </div>
 
-        document.body.appendChild(modal);
+                <form id="crmCOIModalForm">
+                    <div class="form-group" style="margin-bottom: 25px;">
+                        <label style="display: block; margin-bottom: 12px; font-weight: 600; color: #374151;">Certificate Holder Type</label>
+                        <div class="radio-group" style="display: flex; gap: 20px;">
+                            <label class="radio-option" style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="crmHolderType" value="self" checked onchange="toggleCRMHolderFields()" style="margin-right: 8px;">
+                                <span>For myself/business</span>
+                            </label>
+                            <label class="radio-option" style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="crmHolderType" value="third-party" onchange="toggleCRMHolderFields()" style="margin-right: 8px;">
+                                <span>For third-party/subcontractor</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="crmThirdPartyFields" class="hidden" style="display: none;">
+                        <!-- Saved Certificate Holders Button -->
+                        <div style="margin-bottom: 20px; text-align: center;">
+                            <button type="button" onclick="showCRMSavedCertificateHolders()" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2); transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(5, 150, 105, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(5, 150, 105, 0.2)'">
+                                <i class="fas fa-address-book" style="margin-right: 8px;"></i>
+                                Saved Certificate Holders
+                            </button>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Certificate Holder Name *</label>
+                            <input type="text" id="crmHolderName" placeholder="Business or individual name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Certificate Holder Address *</label>
+                            <input type="text" id="crmHolderAddress" placeholder="Street address" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <input type="text" id="crmHolderCity" placeholder="City, State ZIP" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 25px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label style="font-weight: 600; color: #374151;"><strong>Email Recipients</strong></label>
+                            <button type="button" onclick="addCRMCOIEmailRecipient()" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                + Add Recipient
+                            </button>
+                        </div>
+                        <div id="crmCoiEmailRecipientsContainer">
+                            <div class="crm-coi-email-recipient-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
+                                <input type="email" class="crm-coi-email-recipient" required style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" placeholder="recipient@example.com" value="">
+                                <button type="button" onclick="removeCRMCOIEmailRecipient(this)" style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                        <div class="help-text" style="color: #666; font-size: 12px; margin-top: 8px;">Click "Add Recipient" to add more email addresses</div>
+                    </div>
+
+                    <div class="form-actions" style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        <button type="button" class="btn-submit" onclick="submitCRMCOIModal()" style="padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                            <i class="fas fa-envelope"></i> Send Certificate
+                        </button>
+                        <button type="button" class="btn-cancel" onclick="closeCRMCOIModal()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeCRMCOIModal();
+        }
+    });
+};
+
+// Supporting functions for CRM COI Modal
+window.closeCRMCOIModal = function() {
+    const modal = document.getElementById('crmCOIModal');
+    if (modal) {
+        modal.remove();
     }
 };
+
+window.toggleCRMHolderFields = function() {
+    const holderType = document.querySelector('input[name="crmHolderType"]:checked').value;
+    const thirdPartyFields = document.getElementById('crmThirdPartyFields');
+
+    if (holderType === 'third-party') {
+        thirdPartyFields.style.display = 'block';
+    } else {
+        thirdPartyFields.style.display = 'none';
+    }
+};
+
+window.addCRMCOIEmailRecipient = function() {
+    const container = document.getElementById('crmCoiEmailRecipientsContainer');
+    const newRow = document.createElement('div');
+    newRow.className = 'crm-coi-email-recipient-row';
+    newRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+
+    newRow.innerHTML = `
+        <input type="email" class="crm-coi-email-recipient" required style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" placeholder="recipient@example.com" value="">
+        <button type="button" onclick="removeCRMCOIEmailRecipient(this)" style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+            Remove
+        </button>
+    `;
+
+    container.appendChild(newRow);
+};
+
+window.removeCRMCOIEmailRecipient = function(button) {
+    const container = document.getElementById('crmCoiEmailRecipientsContainer');
+    const rows = container.querySelectorAll('.crm-coi-email-recipient-row');
+
+    // Don't allow removing if there's only one row
+    if (rows.length > 1) {
+        button.parentElement.remove();
+    } else {
+        alert('At least one email recipient is required.');
+    }
+};
+
+window.submitCRMCOIModal = async function() {
+    const form = document.getElementById('crmCOIModalForm');
+    const submitBtn = document.querySelector('#crmCOIModal .btn-submit');
+
+    // Get form values
+    const holderType = document.querySelector('input[name="crmHolderType"]:checked').value;
+
+    // Collect all email recipients
+    const emailInputs = document.querySelectorAll('.crm-coi-email-recipient');
+    const emails = Array.from(emailInputs).map(input => input.value.trim()).filter(email => email);
+
+    if (emails.length === 0) {
+        alert('Please enter at least one email address');
+        return;
+    }
+
+    let certificateHolder = '';
+
+    if (holderType === 'third-party') {
+        const holderName = document.getElementById('crmHolderName').value.trim();
+        const holderAddress = document.getElementById('crmHolderAddress').value.trim();
+        const holderCity = document.getElementById('crmHolderCity').value.trim();
+
+        if (!holderName || !holderAddress) {
+            alert('Please fill in certificate holder name and address');
+            return;
+        }
+
+        certificateHolder = holderName + '\n' + holderAddress;
+        if (holderCity) {
+            certificateHolder += '\n' + holderCity;
+        }
+    }
+
+    // Disable button and show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+    // Get policy data from the modal
+    const policyBanner = document.querySelector('#crmCOIModal .policy-info-banner strong');
+    const policyText = policyBanner ? policyBanner.nextSibling.textContent.trim() : '';
+    const policyId = policyText.split(' - ')[0] || 'Unknown';
+
+    try {
+        // First, try to get the COI document for this policy
+        let coiDocument = null;
+
+        console.log('🔍 Looking for COI document for policy:', policyId);
+
+        // Check localStorage for COI documents
+        const storedPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        for (const policy of storedPolicies) {
+            if (policy.coiDocuments && Array.isArray(policy.coiDocuments) && policy.coiDocuments.length > 0) {
+                console.log('📋 Found COI documents for policy:', policy.policyNumber || policy.id);
+                coiDocument = policy.coiDocuments[0]; // Use the first COI document
+                break;
+            }
+        }
+
+        // If no COI found in localStorage, try API
+        if (!coiDocument) {
+            try {
+                console.log('🔍 Fetching COI document from API for policy:', policyId);
+                const coiResponse = await fetch(`https://162-220-14-239.nip.io/api/coi/${policyId}`);
+                if (coiResponse.ok) {
+                    coiDocument = await coiResponse.json();
+                    console.log('✅ Found COI document via API:', coiDocument.name || 'unnamed');
+                }
+            } catch (error) {
+                console.log('⚠️ Could not fetch COI from API:', error.message);
+            }
+        }
+
+        // Prepare the COI request data as FormData (not JSON) to match the API
+        const formData = new FormData();
+
+        // Set sender email
+        formData.append('from', 'contact@vigagency.com');
+
+        // Set recipient email (first email from the array)
+        formData.append('to', emails[0]);
+
+        // Set email subject
+        const subjectText = `Certificate of Insurance Request - Policy ${policyId}`;
+        formData.append('subject', subjectText);
+
+        // Set policy ID
+        formData.append('policyId', policyId);
+
+        // Build email message body
+        let messageBody = `Dear Valued Client,\n\n`;
+        messageBody += `We are requesting a Certificate of Insurance.\n\n`;
+
+        if (holderType === 'third-party') {
+            messageBody += `Please ensure the certificate includes the following holder information:\n\n`;
+            messageBody += `${certificateHolder}\n\n`;
+        } else {
+            messageBody += `The certificate should be issued to the policy holder.\n\n`;
+        }
+
+        messageBody += `Policy Details:\n`;
+        messageBody += `- Policy Number: ${policyId}\n\n`;
+
+        messageBody += `Please send the COI at your earliest convenience.\n\n`;
+        messageBody += `Best regards,\n`;
+        messageBody += `VIG Agency Team\n`;
+        messageBody += `contact@vigagency.com\n`;
+        messageBody += `(555) 123-4567`;
+
+        formData.append('message', messageBody);
+
+        // Add COI document as attachment if available
+        if (coiDocument) {
+            try {
+                console.log('📎 Attaching COI document:', coiDocument.name || 'COI Document');
+
+                let coiBlob = null;
+
+                // Try to get the COI document blob from different sources
+                if (coiDocument.dataUrl) {
+                    // Convert dataUrl to blob
+                    const response = await fetch(coiDocument.dataUrl);
+                    coiBlob = await response.blob();
+                    console.log('✅ Created blob from dataUrl, size:', coiBlob.size);
+                } else if (coiDocument.url) {
+                    // Fetch from URL
+                    const response = await fetch(coiDocument.url);
+                    coiBlob = await response.blob();
+                    console.log('✅ Created blob from URL, size:', coiBlob.size);
+                } else if (coiDocument.file) {
+                    // Use file directly
+                    coiBlob = coiDocument.file;
+                    console.log('✅ Using file directly, size:', coiBlob.size);
+                }
+
+                if (coiBlob) {
+                    const fileName = coiDocument.name || `COI_Certificate_${policyId}.png`;
+                    formData.append('attachment', coiBlob, fileName);
+                    console.log('📎 COI document attached as:', fileName);
+                } else {
+                    console.log('⚠️ Could not create blob from COI document');
+                }
+            } catch (error) {
+                console.error('❌ Error attaching COI document:', error);
+            }
+        } else {
+            console.log('⚠️ No COI document found to attach');
+        }
+
+        console.log('Submitting COI request via FormData to:', 'https://162-220-14-239.nip.io/api/coi/send-request');
+        console.log('FormData contents:', {
+            from: 'contact@vigagency.com',
+            to: emails[0],
+            subject: subjectText,
+            policyId: policyId,
+            messagePreview: messageBody.substring(0, 200) + '...',
+            hasAttachment: !!coiDocument
+        });
+
+        // Send to the same endpoint as client portal using FormData
+        const response = await fetch('https://162-220-14-239.nip.io/api/coi/send-request', {
+            method: 'POST',
+            body: formData  // Send as FormData, not JSON
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Certificate of Insurance sent successfully!\n\n' + (data.message || 'The certificate has been emailed.'));
+            closeCRMCOIModal();
+        } else {
+            alert('Error sending COI:\n\n' + (data.error || 'An unexpected error occurred. Please try again.'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-envelope"></i> Send Certificate';
+        }
+
+    } catch (error) {
+        console.error('Error submitting COI request:', error);
+        alert('Connection Error\n\nUnable to connect to the server. Please try again.\n\nError: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-envelope"></i> Send Certificate';
+    }
+};
+
+// CRM Version of Saved Certificate Holders functionality
+window.showCRMSavedCertificateHolders = function() {
+    // Use the same data as the client portal but adapted for CRM
+    const globalHolders = [
+        {
+            name: 'US Department of Transportation',
+            address: '1200 New Jersey Ave SE, Washington, DC 20590',
+            email: 'compliance@dot.gov'
+        },
+        {
+            name: 'Federal Motor Carrier Safety Administration',
+            address: '1200 New Jersey Ave SE, Washington, DC 20590',
+            email: 'safety@fmcsa.dot.gov'
+        }
+    ];
+
+    const savedHolders = [
+        {
+            name: 'ABC Construction Co.',
+            address: '123 Main St, City, ST 12345',
+            email: 'admin@abcconstruction.com'
+        },
+        {
+            name: 'XYZ Logistics Inc.',
+            address: '456 Oak Ave, City, ST 67890',
+            email: 'certificates@xyzlogistics.com'
+        },
+        {
+            name: 'DEF Contractors LLC',
+            address: '789 Pine Rd, City, ST 54321',
+            email: 'office@defcontractors.com'
+        }
+    ];
+
+    // Generate global holders HTML
+    let globalHoldersHTML = globalHolders.map((holder, index) => `
+        <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s ease; position: relative;"
+             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.email}')"
+             onmouseover="this.style.backgroundColor='#f8f9fa'; this.style.borderColor='#007bff'"
+             onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#ddd'">
+            <div style="position: absolute; top: 8px; right: 8px; background: linear-gradient(135deg, #dc3545, #c82333); color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase; box-shadow: 0 1px 3px rgba(220, 53, 69, 0.3);">
+                GLOBAL
+            </div>
+            <div style="font-weight: bold; margin-bottom: 5px; padding-right: 60px;">${holder.name}</div>
+            <div style="color: #666; font-size: 14px; margin-bottom: 3px;">${holder.address}</div>
+            <div style="color: #007bff; font-size: 12px; font-weight: 500;">
+                <i class="fas fa-envelope" style="margin-right: 4px;"></i>${holder.email}
+            </div>
+        </div>
+    `).join('');
+
+    // Generate saved holders HTML
+    let savedHoldersHTML = savedHolders.map((holder, index) => `
+        <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s ease;"
+             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.email}')"
+             onmouseover="this.style.backgroundColor='#f8f9fa'; this.style.borderColor='#007bff'"
+             onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#ddd'">
+            <div style="font-weight: bold; margin-bottom: 5px;">${holder.name}</div>
+            <div style="color: #666; font-size: 14px; margin-bottom: 3px;">${holder.address}</div>
+            <div style="color: #007bff; font-size: 12px; font-weight: 500;">
+                <i class="fas fa-envelope" style="margin-right: 4px;"></i>${holder.email}
+            </div>
+        </div>
+    `).join('');
+
+    const modalHTML = `
+        <div id="crmSavedHoldersModal" class="modal-overlay active" onclick="closeCRMSavedHoldersModal(event)" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10001;">
+            <div class="modal-content" onclick="event.stopPropagation()" style="background: white; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+                <div class="modal-header" style="background: linear-gradient(135deg, #007bff, #0056b3); color: white; padding: 20px; border-radius: 12px 12px 0 0; position: relative;">
+                    <h3 style="margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-address-book"></i> Certificate Holders
+                    </h3>
+                    <button class="modal-close-btn" onclick="closeCRMSavedHoldersModal()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">×</button>
+                </div>
+                <div class="modal-body" style="padding: 20px;">
+                    <p style="margin-bottom: 25px; color: #666;">Click on a certificate holder to use their information:</p>
+
+                    <!-- Global Certificate Holders Section -->
+                    <div style="margin-bottom: 30px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0; padding-bottom: 8px; border-bottom: 2px solid #dc3545; color: #333; font-size: 16px; font-weight: 600; flex: 1;">
+                                <i class="fas fa-globe-americas" style="color: #dc3545; margin-right: 8px;"></i>
+                                Global Certificate Holders
+                            </h4>
+                            <div style="margin-left: 20px;">
+                                <input type="text" id="crmGlobalHoldersSearch" placeholder="Search global holders..."
+                                       style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 200px;"
+                                       onkeyup="filterCRMCertificateHolders('global', this.value)">
+                            </div>
+                        </div>
+                        <div id="crmGlobalHoldersContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; background-color: #fafafa;">
+                            ${globalHoldersHTML}
+                        </div>
+                    </div>
+
+                    <!-- Saved Certificate Holders Section -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0; padding-bottom: 8px; border-bottom: 2px solid #28a745; color: #333; font-size: 16px; font-weight: 600; flex: 1;">
+                                <i class="fas fa-user-check" style="color: #28a745; margin-right: 8px;"></i>
+                                Saved Certificate Holders
+                            </h4>
+                            <div style="margin-left: 20px;">
+                                <input type="text" id="crmSavedHoldersSearch" placeholder="Search saved holders..."
+                                       style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 200px;"
+                                       onkeyup="filterCRMCertificateHolders('saved', this.value)">
+                            </div>
+                        </div>
+                        <div id="crmSavedHoldersContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; background-color: #fafafa;">
+                            ${savedHoldersHTML}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.selectCRMSavedHolder = function(name, address, email) {
+    // Fill in the certificate holder fields in CRM modal
+    document.getElementById('crmHolderName').value = name;
+    document.getElementById('crmHolderAddress').value = address.split(',')[0]; // Just the street address
+    document.getElementById('crmHolderCity').value = address.split(',').slice(1).join(',').trim(); // City, state, zip
+
+    // Add the email to the first recipient field
+    const firstEmailInput = document.querySelector('.crm-coi-email-recipient');
+    if (firstEmailInput && email) {
+        firstEmailInput.value = email;
+    }
+
+    // Switch to third-party radio button
+    document.querySelector('input[name="crmHolderType"][value="third-party"]').checked = true;
+    toggleCRMHolderFields();
+
+    // Close the saved holders modal
+    closeCRMSavedHoldersModal();
+};
+
+window.closeCRMSavedHoldersModal = function(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const modal = document.getElementById('crmSavedHoldersModal');
+    if (modal) {
+        modal.remove();
+    }
+};
+
+window.filterCRMCertificateHolders = function(section, searchTerm) {
+    const containerId = section === 'global' ? 'crmGlobalHoldersContainer' : 'crmSavedHoldersContainer';
+    const container = document.getElementById(containerId);
+
+    if (!container) return;
+
+    const holderDivs = container.querySelectorAll('div[onclick*="selectCRMSavedHolder"]');
+
+    holderDivs.forEach(div => {
+        const text = div.textContent.toLowerCase();
+        const matches = searchTerm.toLowerCase().split(' ').every(term =>
+            text.includes(term.trim())
+        );
+
+        if (matches || searchTerm.trim() === '') {
+            div.style.display = 'block';
+        } else {
+            div.style.display = 'none';
+        }
+    });
+
+    // Show "No results" message if no holders are visible
+    const visibleHolders = Array.from(holderDivs).filter(div => div.style.display !== 'none');
+
+    // Remove any existing "no results" message
+    const existingNoResults = container.querySelector('.crm-no-results-message');
+    if (existingNoResults) {
+        existingNoResults.remove();
+    }
+
+    if (visibleHolders.length === 0 && searchTerm.trim() !== '') {
+        const noResultsDiv = document.createElement('div');
+        noResultsDiv.className = 'crm-no-results-message';
+        noResultsDiv.style.cssText = `
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        `;
+        noResultsDiv.innerHTML = `
+            <i class="fas fa-search" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
+            No certificate holders found matching "${searchTerm}"
+        `;
+        container.appendChild(noResultsDiv);
+    }
+};
+
+// Override any existing sendCOIRequest function to use our new comprehensive modal
+window.sendCOIRequest = function(policyId) {
+    console.log('⚠️ sendCOIRequest called - redirecting to new comprehensive COI modal');
+    window.sendCOIForPolicy(policyId);
+};
+
+// Ensure this function takes priority over any existing sendCOIForPolicy
+console.log('🔧 CRM COI Modal functions loaded and taking priority over existing COI functionality');
 
 // Function to view current COI for a policy
 window.viewCurrentCOI = function(policyId) {
@@ -25047,8 +25660,57 @@ window.viewCurrentCOI = function(policyId) {
         return;
     }
 
-    // No COI documents found anywhere - show the modal
+    // No COI documents found in localStorage - try database as final fallback
     if (!hasCOIDocuments) {
+        console.log('🔍 No COI found in localStorage, checking database...');
+
+        // Try to fetch COI documents from database
+        fetch(`/api/coi-documents?policyId=${encodeURIComponent(policyId)}`)
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Database fetch failed');
+            })
+            .then(data => {
+                console.log('✅ Database response:', data);
+                if (data.success && data.coiDocuments && data.coiDocuments.length > 0) {
+                    console.log('✅ Found COI documents in database:', data.coiDocuments.length);
+                    // Use the latest COI document
+                    const latestCOI = data.coiDocuments[data.coiDocuments.length - 1];
+
+                    // Check if database COI has valid image data
+                    const hasValidImageData = latestCOI.dataUrl && latestCOI.dataUrl.length > 1000 &&
+                                            !latestCOI.dataUrl.includes('iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB');
+
+                    if (hasValidImageData) {
+                        console.log('📄 Displaying COI from database:', latestCOI.name);
+                        showCOIModal(latestCOI);
+                    } else {
+                        console.log('⚠️ Database COI has invalid image data, checking localStorage...');
+                        // Try to find valid COI in localStorage
+                        const legacyCOIs = JSON.parse(localStorage.getItem('policy_coi_documents') || '[]');
+                        const validCOI = legacyCOIs.find(coi => coi.policyId === policyId && coi.dataUrl && coi.dataUrl.length > 1000);
+
+                        if (validCOI) {
+                            console.log('✅ Found valid COI in localStorage:', validCOI.name);
+                            showCOIModal(validCOI);
+                        } else {
+                            showNoCOIModal();
+                        }
+                    }
+                } else {
+                    showNoCOIModal();
+                }
+            })
+            .catch(error => {
+                console.warn('⚠️ Database fetch failed, showing no COI modal:', error);
+                showNoCOIModal();
+            });
+        return;
+    }
+
+    function showNoCOIModal() {
         // Show modal popup instead of just notification
         const modalHtml = `
             <div class="modal-overlay active" id="noCOIModal">
@@ -25083,15 +25745,20 @@ window.viewCurrentCOI = function(policyId) {
         return;
     }
 
-    // Display the most recent COI
-    const latestCOI = policyCOIs[policyCOIs.length - 1];
+    // This should only execute if we found COI documents in localStorage (legacy code)
+    if (policy && policy.coiDocuments && policy.coiDocuments.length > 0) {
+        // Display the most recent COI
+        const latestCOI = policy.coiDocuments[policy.coiDocuments.length - 1];
 
-    showNotification('Opening latest COI document...', 'info');
-    console.log('Latest COI:', latestCOI);
+        showNotification('Opening latest COI document...', 'info');
+        console.log('Latest COI from policy:', latestCOI);
 
-    // Here you would open the COI document viewer or download it
-    if (latestCOI.url) {
-        window.open(latestCOI.url, '_blank');
+        if (latestCOI.dataUrl || (latestCOI.formData && Object.keys(latestCOI.formData).length > 0)) {
+            console.log('[info] Opening latest COI document...');
+            showCOIModal(latestCOI);
+        } else if (latestCOI.url) {
+            window.open(latestCOI.url, '_blank');
+        }
     }
 };
 
@@ -25110,10 +25777,6 @@ window.showCOIModal = function(coiDocument) {
     console.log('📄 Document has dataUrl:', !!coiDocument.dataUrl, 'Length:', coiDocument.dataUrl?.length || 0);
     console.log('📄 Document has formData:', !!coiDocument.formData, 'Fields:', Object.keys(coiDocument.formData || {}).length);
 
-    // Remove any existing modals first
-    const existingModals = document.querySelectorAll('#coiModalOverlay, #coiViewerModal, .modal-overlay');
-    existingModals.forEach(modal => modal.remove());
-
     // Check if we have a valid image to display
     if (!coiDocument.dataUrl || coiDocument.dataUrl.length < 1000) {
         console.warn('⚠️ No valid image data found');
@@ -25121,7 +25784,24 @@ window.showCOIModal = function(coiDocument) {
         return;
     }
 
+    // Check if we're inside a policy popup modal - if so, use lower z-index to stay within it
+    const existingPolicyModal = document.querySelector('#policyModal, #policyViewModal, .modal-overlay[style*="z-index"]');
+    const isInsidePolicyModal = existingPolicyModal !== null;
+
+    if (isInsidePolicyModal) {
+        console.log('📋 Detected existing policy modal - using embedded COI viewer');
+        // Don't remove existing modals, just add COI viewer with compatible z-index
+    } else {
+        console.log('📄 No policy modal detected - using standalone COI viewer');
+        // Remove any existing COI modals but preserve policy modals
+        const existingCOIModals = document.querySelectorAll('#coiModalOverlay, #coiViewerModal');
+        existingCOIModals.forEach(modal => modal.remove());
+    }
+
     console.log('📸 Creating simple image display modal like VIG Agency...');
+
+    // Use very high z-index to ensure COI modal is always on top
+    const zIndex = '999999999';
 
     // Create simple, elegant modal like VIG Agency uses
     const modalHtml = `
@@ -25132,7 +25812,7 @@ window.showCOIModal = function(coiDocument) {
             width: 100vw;
             height: 100vh;
             background-color: rgba(0, 0, 0, 0.9);
-            z-index: 99999;
+            z-index: ${zIndex};
             display: flex;
             align-items: center;
             justify-content: center;
@@ -25271,16 +25951,21 @@ window.showFormDataSummary = function(coiDocument) {
 window.closeCOIModal = function() {
     console.log('🚪 Closing COI modal...');
 
-    // Remove the modal
+    // Remove only the COI modal, not other modals
     const modal = document.getElementById('coiModalOverlay');
     if (modal) {
         modal.remove();
         console.log('✅ COI modal removed');
     }
 
-    // Restore body scrolling
-    document.body.style.overflow = '';
-    console.log('✅ Body scrolling restored');
+    // Only restore body scrolling if no other modals are open
+    const remainingModals = document.querySelectorAll('.modal-overlay, #policyModal, #policyViewModal, [id*="Modal"]');
+    if (remainingModals.length === 0) {
+        document.body.style.overflow = '';
+        console.log('✅ Body scrolling restored (no other modals detected)');
+    } else {
+        console.log('📋 Keeping body scroll disabled (other modals still open)');
+    }
 };
 
 // Legacy function name for compatibility
@@ -25467,30 +26152,27 @@ window.printCOI = function(coiId) {
 window.uploadIdCardsForPolicy = function(policyId) {
     console.log('Uploading ID cards for policy:', policyId);
 
-    // Create file upload modal
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    // Create hidden file input and trigger it directly
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.accept = '.pdf,.png,.jpg,.jpeg';
+    fileInput.style.display = 'none';
 
-    modal.innerHTML = `
-        <div style="background: white; padding: 40px; border-radius: 12px; max-width: 500px; width: 90%;">
-            <h3 style="margin: 0 0 20px 0; color: #111827;">Upload ID Cards</h3>
-            <p style="color: #6b7280; margin-bottom: 30px;">Upload insurance ID card files for policy ${policyId}</p>
+    // Handle file selection
+    fileInput.addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+            console.log(`Selected ${files.length} ID card files for policy ${policyId}:`, files.map(f => f.name));
+            uploadIdCards(policyId, files);
+        }
+        // Clean up
+        document.body.removeChild(fileInput);
+    });
 
-            <div style="margin-bottom: 30px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Select Files:</label>
-                <input type="file" id="idCardFiles" multiple accept=".pdf,.png,.jpg,.jpeg" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-                <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">Accepted formats: PDF, PNG, JPG, JPEG</p>
-            </div>
-
-            <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                <button onclick="this.closest('.modal-overlay').remove()" style="padding: 12px 24px; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
-                <button onclick="uploadIdCards('${policyId}')" style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;">Upload</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
+    // Add to DOM and trigger click
+    document.body.appendChild(fileInput);
+    fileInput.click();
 };
 
 // Helper function to send COI
@@ -25512,21 +26194,286 @@ window.sendCOI = function(policyId) {
 };
 
 // Helper function to upload ID cards
-window.uploadIdCards = function(policyId) {
-    const fileInput = document.getElementById('idCardFiles');
-    const files = fileInput.files;
+window.uploadIdCards = function(policyId, files) {
+    // If files not provided as parameter, try to get from modal (backwards compatibility)
+    if (!files) {
+        const fileInput = document.getElementById('idCardFiles');
+        files = fileInput ? fileInput.files : null;
 
-    if (files.length === 0) {
+        // Close modal if it exists
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) modal.remove();
+    }
+
+    if (!files || files.length === 0) {
         alert('Please select at least one file');
         return;
     }
 
-    // Close modal
-    document.querySelector('.modal-overlay').remove();
+    // Process each file
+    const processedCards = [];
+    let processedCount = 0;
 
-    // Here you would integrate with file upload functionality
-    showNotification(`${files.length} ID card file(s) uploaded`, 'success');
-    console.log('ID cards uploaded for policy:', policyId, 'Files:', files);
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Create ID card document object
+            const idCardDoc = {
+                id: `idcard_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                policyId: policyId,
+                name: file.name,
+                type: file.type,
+                dataUrl: e.target.result,
+                uploadDate: new Date().toISOString(),
+                size: file.size
+            };
+
+            // Store in localStorage for immediate CRM access
+            let idCards = JSON.parse(localStorage.getItem('id_cards') || '[]');
+            idCards.push(idCardDoc);
+            localStorage.setItem('id_cards', JSON.stringify(idCards));
+
+            // Add to processed cards for server storage
+            processedCards.push(idCardDoc);
+            processedCount++;
+
+            console.log('ID card processed:', idCardDoc);
+
+            // When all files are processed, save to server
+            if (processedCount === files.length) {
+                saveIdCardsToServer(policyId, processedCards);
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Show success notification and refresh the ID cards display
+    showNotification(`${files.length} ID card file(s) uploaded successfully`, 'success');
+    console.log('ID cards processed for policy:', policyId, 'Files:', Array.from(files).map(f => f.name));
+
+    // Refresh the ID cards display after a short delay to allow file processing
+    setTimeout(() => {
+        refreshIdCardsDisplay(policyId);
+    }, 500);
+};
+
+// Function to save ID cards to server
+async function saveIdCardsToServer(policyId, idCards) {
+    try {
+        console.log('📤 Saving ID cards to server for policy:', policyId);
+
+        const API_URL = window.location.hostname.includes('nip.io')
+            ? `https://${window.location.hostname.split('.')[0]}.nip.io/api`
+            : window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : 'https://162-220-14-239.nip.io/api';
+
+        const response = await fetch(`${API_URL}/id-cards`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                policyId: policyId,
+                idCards: idCards
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`✅ Successfully saved ${result.count} ID cards to server`);
+        } else {
+            console.error('Failed to save ID cards to server:', response.status);
+        }
+    } catch (error) {
+        console.error('Error saving ID cards to server:', error);
+    }
+}
+
+// Function to load ID cards from server
+async function loadIdCardsFromServer(policyId) {
+    try {
+        console.log('📥 Loading ID cards from server for policy:', policyId);
+
+        const API_URL = window.location.hostname.includes('nip.io')
+            ? `https://${window.location.hostname.split('.')[0]}.nip.io/api`
+            : window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : 'https://162-220-14-239.nip.io/api';
+
+        const response = await fetch(`${API_URL}/id-cards/${policyId}`);
+
+        if (response.ok) {
+            const serverIdCards = await response.json();
+            console.log(`📥 Loaded ${serverIdCards.length} ID cards from server`);
+
+            // Merge with localStorage (server is source of truth)
+            if (serverIdCards.length > 0) {
+                // Get existing localStorage cards
+                let localIdCards = JSON.parse(localStorage.getItem('id_cards') || '[]');
+
+                // Remove any existing cards for this policy from localStorage
+                localIdCards = localIdCards.filter(card => card.policyId !== policyId);
+
+                // Add server cards to localStorage
+                localIdCards.push(...serverIdCards);
+
+                // Update localStorage
+                localStorage.setItem('id_cards', JSON.stringify(localIdCards));
+            }
+
+            // Refresh the display
+            refreshIdCardsDisplay(policyId);
+        } else {
+            console.log('No ID cards found on server for policy:', policyId);
+            // Still refresh display to show localStorage cards if any
+            refreshIdCardsDisplay(policyId);
+        }
+    } catch (error) {
+        console.error('Error loading ID cards from server:', error);
+        // Fallback to localStorage display
+        refreshIdCardsDisplay(policyId);
+    }
+}
+
+// Function to refresh ID cards display
+window.refreshIdCardsDisplay = function(policyId) {
+    // Find the ID cards container for this policy
+    const idCardsContainer = document.getElementById(`idCardsContainer-${policyId}`);
+    if (!idCardsContainer) {
+        console.warn('ID cards container not found for policy:', policyId);
+        return;
+    }
+
+    // Get stored ID cards for this policy
+    const idCards = JSON.parse(localStorage.getItem('id_cards') || '[]');
+    const policyIdCards = idCards.filter(card => card.policyId === policyId);
+
+    if (policyIdCards.length === 0) {
+        // Show empty state
+        idCardsContainer.innerHTML = `
+            <i class="fas fa-id-card" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+            <p style="margin: 0; font-size: 16px;">No ID cards uploaded yet</p>
+            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Upload to add ID cards</p>
+        `;
+    } else {
+        // Show uploaded ID cards
+        idCardsContainer.innerHTML = policyIdCards.map(card => {
+            const uploadDate = new Date(card.uploadDate).toLocaleDateString();
+            const fileIcon = card.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-image';
+            const iconColor = card.type.includes('pdf') ? '#ef4444' : '#10b981';
+
+            return `
+                <div class="id-card-document" style="
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-bottom: 12px;
+                    background: white;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                ">
+                    <div style="display: flex; align-items: center;">
+                        <i class="fas ${fileIcon}" style="color: ${iconColor}; font-size: 24px; margin-right: 12px;"></i>
+                        <div>
+                            <div style="font-weight: 500; color: #111827; margin-bottom: 4px;">
+                                ${card.name}
+                            </div>
+                            <div style="font-size: 12px; color: #6b7280;">
+                                ${uploadDate} • ${card.type}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="viewIdCard('${card.id}')" style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button onclick="downloadIdCard('${card.id}')" style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                        <button onclick="deleteIdCard('${card.id}', '${policyId}')" style="padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+};
+
+// Function to view an ID card
+window.viewIdCard = function(cardId) {
+    const idCards = JSON.parse(localStorage.getItem('id_cards') || '[]');
+    const card = idCards.find(c => c.id === cardId);
+
+    if (!card) {
+        showNotification('ID card not found', 'error');
+        return;
+    }
+
+    // Create a modal to view the ID card
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay active';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 30px; border-radius: 16px; max-width: 95vw; max-height: 95vh; width: 1200px; height: 800px; overflow: auto; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #f3f4f6; padding-bottom: 15px;">
+                <h3 style="margin: 0; color: #111827; font-size: 24px; font-weight: 600;">ID Card: ${card.name}</h3>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background: #f3f4f6; border: none; font-size: 24px; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #6b7280; transition: all 0.2s;">&times;</button>
+            </div>
+            <div style="text-align: center; height: calc(100% - 80px);">
+                ${card.type.includes('pdf')
+                    ? `<iframe src="${card.dataUrl}" style="width: 100%; height: 100%; border: 2px solid #e5e7eb; border-radius: 8px;"></iframe>`
+                    : `<img src="${card.dataUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain; border: 2px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">`
+                }
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+// Function to download an ID card
+window.downloadIdCard = function(cardId) {
+    const idCards = JSON.parse(localStorage.getItem('id_cards') || '[]');
+    const card = idCards.find(c => c.id === cardId);
+
+    if (!card) {
+        showNotification('ID card not found', 'error');
+        return;
+    }
+
+    // Create download link
+    const link = document.createElement('a');
+    link.href = card.dataUrl;
+    link.download = card.name;
+    link.style.display = 'none';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showNotification(`Downloaded ${card.name}`, 'success');
+};
+
+// Function to delete an ID card
+window.deleteIdCard = function(cardId, policyId) {
+    if (!confirm('Are you sure you want to delete this ID card?')) {
+        return;
+    }
+
+    const idCards = JSON.parse(localStorage.getItem('id_cards') || '[]');
+    const filteredCards = idCards.filter(c => c.id !== cardId);
+
+    localStorage.setItem('id_cards', JSON.stringify(filteredCards));
+
+    // Refresh the display
+    refreshIdCardsDisplay(policyId);
+
+    showNotification('ID card deleted successfully', 'success');
 };
 
 // Function to load and display COI files for a policy
@@ -25601,8 +26548,40 @@ window.loadCOIFiles = async function(policyIdentifier) {
         }
     }
 
+    // If policy was found but no COI documents, try loading directly from database
     if (!policy || !policy.coiDocuments || policy.coiDocuments.length === 0) {
-        // No COI documents found, show default message
+        console.log('🔍 No COI documents in policy data, checking database...');
+
+        try {
+            const response = await fetch(`/api/coi-documents?policyId=${encodeURIComponent(policyIdentifier)}`);
+            if (response.ok) {
+                const data = await response.json();
+                const coiDocuments = data.success ? data.coiDocuments : data; // Handle both response formats
+                if (coiDocuments && coiDocuments.length > 0) {
+                    console.log('✅ Found COI documents in database:', coiDocuments.length);
+
+                    // Update policy object with COI documents if we found it
+                    if (policy) {
+                        policy.coiDocuments = coiDocuments;
+                    } else {
+                        // Create a minimal policy object to hold the COI documents
+                        policy = {
+                            id: policyIdentifier,
+                            policyNumber: policyIdentifier,
+                            coiDocuments: coiDocuments
+                        };
+                    }
+                } else {
+                    console.log('📋 No COI documents found in database either');
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Error loading COI documents from database:', error);
+        }
+    }
+
+    if (!policy || !policy.coiDocuments || policy.coiDocuments.length === 0) {
+        // No COI documents found anywhere, show default message
         container.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
                 <i class="fas fa-certificate" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
@@ -25613,9 +26592,10 @@ window.loadCOIFiles = async function(policyIdentifier) {
         return;
     }
 
-    // Display COI documents
+    // Display only the latest COI document
     console.log('✅ Found COI documents:', policy.coiDocuments.length);
-    const coiCardsHTML = policy.coiDocuments.map(coi => `
+    const latestCOI = policy.coiDocuments[policy.coiDocuments.length - 1]; // Get most recent
+    const coiCardsHTML = `
         <div class="coi-document-card" style="
             border: 1px solid #e5e7eb;
             border-radius: 8px;
@@ -25631,47 +26611,147 @@ window.loadCOIFiles = async function(policyIdentifier) {
                 <i class="fas fa-file-pdf" style="color: #ef4444; font-size: 24px; margin-right: 12px;"></i>
                 <div>
                     <div style="font-weight: 500; color: #111827; margin-bottom: 4px;">
-                        ${coi.name || 'ACORD 25 Certificate'}
+                        ${latestCOI.name || 'ACORD 25 Certificate'}
                     </div>
                     <div style="font-size: 12px; color: #6b7280;">
-                        ${coi.uploadDate ? new Date(coi.uploadDate).toLocaleDateString() : 'Recently generated'}
-                        ${coi.type ? ` • ${coi.type}` : ''}
+                        ${latestCOI.uploadDate ? new Date(latestCOI.uploadDate).toLocaleDateString() : 'Recently generated'}
+                        ${latestCOI.type ? ` • ${latestCOI.type}` : ''}
                     </div>
                 </div>
             </div>
             <div style="display: flex; gap: 8px;">
-                <button onclick="viewCOIDocument('${coi.id || coi.name}')"
+                <button onclick="window.viewCurrentCOI('${policy.id || policy.policyNumber || policyIdentifier}')"
                         style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
                     <i class="fas fa-eye"></i> View
                 </button>
-                <button onclick="downloadCOIDocument('${coi.id || coi.name}')"
+                <button onclick="downloadCOIDocument('${latestCOI.id || latestCOI.name}')"
                         style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
                     <i class="fas fa-download"></i> Download
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
 
     container.innerHTML = `
         <div style="padding: 12px 0;">
-            <div style="display: flex; align-items: center; margin-bottom: 16px;">
-                <i class="fas fa-check-circle" style="color: #10b981; margin-right: 8px;"></i>
-                <span style="font-weight: 500; color: #111827;">
-                    ${policy.coiDocuments.length} Certificate${policy.coiDocuments.length === 1 ? '' : 's'} Available
-                </span>
-            </div>
             ${coiCardsHTML}
         </div>
     `;
 };
 
-// Function to view COI document
+// Function to view COI document - delegates to viewCurrentCOI
 window.viewCOIDocument = function(coiId) {
-    console.log('👁️ Viewing COI document:', coiId);
-    // This would open the COI in a modal or new window
-    if (window.showNotification) {
-        window.showNotification('COI viewer opening...', 'info');
+    console.log('👁️ viewCOIDocument called with:', coiId);
+
+    // If it looks like a policy ID, call viewCurrentCOI directly
+    if (coiId && (coiId.includes('POL-') || coiId.match(/^\d+$/))) {
+        console.log('🔄 Delegating to viewCurrentCOI with policy ID:', coiId);
+        window.viewCurrentCOI(coiId);
+        return;
     }
+
+    // For backward compatibility, try to find the policy from COI ID
+    console.warn('⚠️ viewCOIDocument called with COI ID instead of policy ID. Please update to use viewCurrentCOI directly.');
+    if (window.showNotification) {
+        window.showNotification('Please use the "View" button instead', 'info');
+    }
+};
+
+// Function to upload COI document for a policy
+window.uploadCOIForPolicy = function(policyId) {
+    console.log('📤 Uploading COI document for policy:', policyId);
+
+    // Create file input element
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.pdf,.png,.jpg,.jpeg';
+    fileInput.style.display = 'none';
+
+    // Handle file selection
+    fileInput.onchange = async function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        console.log('📄 File selected:', file.name, file.type, file.size);
+
+        try {
+            // Show loading notification
+            if (window.showNotification) {
+                window.showNotification('Uploading COI document...', 'info');
+            }
+
+            // Convert file to base64 for storage
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const dataUrl = e.target.result;
+
+                // Create COI document object
+                const coiDocument = {
+                    id: `coi-${Date.now()}`,
+                    name: file.name,
+                    type: file.type,
+                    uploadDate: new Date().toISOString(),
+                    dataUrl: dataUrl,
+                    policyId: policyId
+                };
+
+                // Save to database (will override existing)
+                try {
+                    const response = await fetch('/api/coi-documents', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            policyId: policyId,
+                            document: coiDocument
+                        })
+                    });
+
+                    if (response.ok) {
+                        console.log('✅ COI document uploaded to database successfully');
+
+                        // Also save to localStorage for immediate display
+                        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                        const policy = policies.find(p => p.id === policyId || p.policyNumber === policyId);
+                        if (policy) {
+                            // Replace existing COI documents with the new one
+                            policy.coiDocuments = [coiDocument];
+                            localStorage.setItem('insurance_policies', JSON.stringify(policies));
+                        }
+
+                        // Refresh the COI display
+                        if (window.loadCOIFiles) {
+                            window.loadCOIFiles(policyId);
+                        }
+
+                        if (window.showNotification) {
+                            window.showNotification('COI document uploaded successfully!', 'success');
+                        }
+                    } else {
+                        throw new Error('Failed to upload to database');
+                    }
+                } catch (dbError) {
+                    console.warn('⚠️ Database upload failed, but saved to localStorage:', dbError);
+                    if (window.showNotification) {
+                        window.showNotification('COI uploaded (local storage)', 'warning');
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+
+        } catch (error) {
+            console.error('❌ Error uploading COI document:', error);
+            if (window.showNotification) {
+                window.showNotification('Failed to upload COI document', 'error');
+            }
+        }
+    };
+
+    // Trigger file selection
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
 };
 
 // Function to download COI document
@@ -25680,6 +26760,73 @@ window.downloadCOIDocument = function(coiId) {
     // This would trigger download of the COI
     if (window.showNotification) {
         window.showNotification('COI download started...', 'success');
+    }
+};
+
+// Function to toggle client status
+window.toggleClientStatus = function(policyId, isActive) {
+    console.log('🔄 Toggling client status for policy:', policyId, 'Active:', isActive);
+
+    const newStatus = isActive ? 'Active' : 'Inactive';
+    const statusClass = isActive ? 'active' : 'inactive';
+
+    // Update the visual feedback of the toggle
+    const toggle = document.getElementById(`clientActiveToggle-${policyId}`);
+    if (toggle) {
+        const slider = toggle.nextElementSibling;
+        const knob = slider.querySelector('span:last-child');
+
+        // Update colors and position
+        slider.style.backgroundColor = isActive ? '#10b981' : '#cbd5e0';
+        knob.style.left = isActive ? '34px' : '4px';
+    }
+
+    // Find and update the policy in localStorage
+    try {
+        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        const policyIndex = policies.findIndex(p => p.id === policyId || p.policyNumber === policyId);
+
+        if (policyIndex !== -1) {
+            policies[policyIndex].status = newStatus;
+            localStorage.setItem('insurance_policies', JSON.stringify(policies));
+            console.log('✅ Policy status updated in localStorage:', newStatus);
+        }
+
+        // Also update in window.allPolicies if it exists
+        if (window.allPolicies && Array.isArray(window.allPolicies)) {
+            const windowPolicyIndex = window.allPolicies.findIndex(p => p.id === policyId || p.policyNumber === policyId);
+            if (windowPolicyIndex !== -1) {
+                window.allPolicies[windowPolicyIndex].status = newStatus;
+                console.log('✅ Policy status updated in window.allPolicies:', newStatus);
+            }
+        }
+
+        // Update database via API
+        fetch('/api/policies', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: policyId,
+                status: newStatus
+            })
+        }).then(response => {
+            if (response.ok) {
+                console.log('✅ Policy status updated in database:', newStatus);
+                showNotification(`Client status updated to ${newStatus}`, 'success');
+            } else {
+                console.warn('⚠️ Failed to update status in database');
+                showNotification('Status updated locally only', 'warning');
+            }
+        }).catch(error => {
+            console.error('❌ Error updating status:', error);
+            showNotification('Status updated locally only', 'warning');
+        });
+
+    } catch (error) {
+        console.error('❌ Error updating client status:', error);
+        showNotification('Error updating client status', 'error');
     }
 };
 

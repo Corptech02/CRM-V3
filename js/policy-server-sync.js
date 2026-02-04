@@ -1,17 +1,16 @@
 // Policy Server Synchronization
 // This file overrides the policy loading and saving functions to use server-side storage
 
-console.log('🚫 Policy Server Sync DISABLED to prevent deletePolicy conflicts');
-return; // DISABLE ENTIRE FILE TO PREVENT CONFLICTS
+console.log('✅ Policy Server Sync ENABLED with delete conflict fixes');
 
 // Load policies from server on page load/refresh
 window.addEventListener('DOMContentLoaded', async () => {
     console.log('DOM loaded, fetching policies from server...');
 
     try {
-        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
+        const API_URL = 'http://162-220-14-239.nip.io:3001';
 
-        const response = await fetch(`${API_URL}/api/policies`);
+        const response = await fetch(`${API_URL}/api/policies?includeInactive=true`);
         if (response.ok) {
             const serverPolicies = await response.json();
 
@@ -40,9 +39,9 @@ window.loadPoliciesView = async function() {
 
     try {
         // Fetch policies from server
-        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
+        const API_URL = 'http://162-220-14-239.nip.io:3001';
 
-        const response = await fetch(`${API_URL}/api/policies`);
+        const response = await fetch(`${API_URL}/api/policies?includeInactive=true`);
         if (response.ok) {
             const serverPolicies = await response.json();
 
@@ -200,10 +199,9 @@ setInterval(async () => {
                 ? 'http://localhost:3001/api'
                 : 'http://162.220.14.239:3001/api';
 
-            const response = await fetch(`${API_URL}/api/policies`);
+            const response = await fetch(`${API_URL}/api/policies?includeInactive=true`);
             if (response.ok) {
-                const data = await response.json();
-                const serverPolicies = data.policies || [];
+                const serverPolicies = await response.json();
 
                 // Check if policies have changed
                 const currentPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
