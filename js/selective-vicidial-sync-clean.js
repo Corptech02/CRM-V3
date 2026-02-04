@@ -580,10 +580,9 @@ async function importSelectedLeads(quickMode = false) {
         if (window.location.hostname === 'localhost') {
             API_URLS = ['http://localhost:3001', '/'];
         } else {
-            // For production, use HTTPS to match the page protocol
-            const protocol = window.location.protocol; // Gets 'https:' or 'http:'
+            // For production, always use HTTP for port 3001 to avoid SSL protocol errors
             API_URLS = [
-                `${protocol}//${window.location.hostname}:3001`,
+                `http://${window.location.hostname}:3001`,
                 '/' // Relative URL (goes through nginx proxy)
             ];
         }
