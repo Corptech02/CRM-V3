@@ -808,7 +808,7 @@ class VanguardViciDialSelectiveSync:
                     "assignedTo": assigned_agent,
                     "created": datetime.now().strftime("%-m/%-d/%Y"),
                     "lastActivity": datetime.now().isoformat(),
-                    "priority": "high",
+                    "priority": "Mid",
                     "notes": f"Imported from ViciDial (List {list_id}) - Quick Import",
                     "source": "ViciDial",
                     "city": lead_info.get('city', ''),

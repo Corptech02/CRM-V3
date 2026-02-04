@@ -4721,7 +4721,11 @@ function generateSimpleLeadRowsWithDividers(leads) {
 
         // Format the header with X/20 pattern (always out of 20) with color coding
         let greenBlueDisplay = '';
-        if (greenBlueCount > 0) {
+
+        // Always show quota for agent dividers (Hunter, Grant, Carson)
+        const isAgentDivider = title.includes("Hunter's") || title.includes("Grant's") || title.includes("Carson's");
+
+        if (isAgentDivider) {
             // Determine color based on progress toward 20
             let progressColor = '#ef4444'; // Red (default for 0-5)
 
