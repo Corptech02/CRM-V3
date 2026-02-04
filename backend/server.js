@@ -4161,6 +4161,65 @@ app.post('/api/save-coi-form', (req, res) => {
     }
 });
 
+// Get COI Form Data endpoint
+app.get('/api/get-coi-form/:policyId', (req, res) => {
+    try {
+        const { policyId } = req.params;
+        console.log('🔍 Retrieving COI form data for policy:', policyId);
+
+        if (!policyId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Policy ID is required'
+            });
+        }
+
+        // Get COI form data from the database
+        const db = new sqlite3.Database('/var/www/vanguard/vanguard.db');
+
+        db.get('SELECT data FROM policies WHERE id = ?', [policyId], (err, row) => {
+            if (err) {
+                console.error('❌ Database error:', err);
+                return res.status(500).json({ success: false, error: 'Database error' });
+            }
+
+            if (!row) {
+                console.log('⚠️ No policy found for ID:', policyId);
+                return res.json({
+                    success: true,
+                    policyId: policyId,
+                    formData: {} // Return empty form data if policy doesn't exist
+                });
+            }
+
+            try {
+                const policyData = JSON.parse(row.data || '{}');
+                const formData = policyData.coiFormData || {};
+
+                console.log('✅ Retrieved COI form data for policy:', policyId, 'Fields:', Object.keys(formData).length);
+                res.json({
+                    success: true,
+                    policyId: policyId,
+                    formData: formData
+                });
+
+            } catch (parseError) {
+                console.error('❌ Error parsing policy data:', parseError);
+                res.status(500).json({ success: false, error: 'Error parsing policy data' });
+            }
+
+            db.close();
+        });
+
+    } catch (error) {
+        console.error('❌ Error retrieving COI form data:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error while retrieving COI form data'
+        });
+    }
+});
+
 // Generate Filled COI endpoint
 app.post('/api/generate-filled-coi', (req, res) => {
     try {
@@ -4320,6 +4379,63 @@ app.post('/api/coi-documents', (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Internal server error while saving COI document'
+        });
+    }
+});
+
+// Get saved COI endpoint for viewing
+app.get('/api/get-saved-coi/:policyId', (req, res) => {
+    try {
+        const { policyId } = req.params;
+        console.log('📄 Loading saved COI for policy:', policyId);
+
+        const db = new sqlite3.Database('/var/www/vanguard/vanguard.db');
+
+        // Get policy data with COI documents
+        db.get('SELECT data FROM policies WHERE id = ?', [policyId], (err, row) => {
+            if (err) {
+                console.error('❌ Database error:', err);
+                return res.status(500).json({ success: false, error: 'Database error' });
+            }
+
+            if (!row) {
+                return res.status(404).json({ success: false, error: 'Policy not found' });
+            }
+
+            let policyData = {};
+            try {
+                policyData = JSON.parse(row.data || '{}');
+            } catch (e) {
+                console.warn('⚠️ Invalid JSON in policy data');
+                return res.status(500).json({ success: false, error: 'Invalid policy data' });
+            }
+
+            // Get the latest COI document
+            const coiDocuments = policyData.coiDocuments || [];
+            if (coiDocuments.length === 0) {
+                return res.status(404).json({ success: false, error: 'No COI document found' });
+            }
+
+            const latestCOI = coiDocuments[0]; // Should be the most recent one
+            if (latestCOI.dataUrl) {
+                // Return the image data directly
+                const imageData = latestCOI.dataUrl.split(',')[1]; // Remove data:image/png;base64,
+                const buffer = Buffer.from(imageData, 'base64');
+
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename="COI_${policyId}.pdf"`);
+                res.send(buffer);
+            } else {
+                return res.status(404).json({ success: false, error: 'No image data found' });
+            }
+        });
+
+        db.close();
+    } catch (error) {
+        console.error('❌ Error loading saved COI:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error while loading COI'
         });
     }
 });

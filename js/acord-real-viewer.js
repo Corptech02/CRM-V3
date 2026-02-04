@@ -1366,20 +1366,69 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
 
         console.log('📋 Created COI document object with formData:', coiDocument.formData);
 
-        // Try to capture the current form as image data if possible
-        if (document.getElementById('realFormOverlay')) {
+        // Generate COI with visual overlays including checkmarks
+        if (document.getElementById('realFormOverlay') && document.getElementById('realPdfCanvas')) {
             try {
-                // Use html2canvas if available to capture the form
-                if (window.html2canvas) {
-                    const canvas = await html2canvas(document.getElementById('realFormOverlay'));
-                    coiDocument.dataUrl = canvas.toDataURL('image/png');
+                console.log('🎨 Generating COI with checkbox overlays for save...');
+
+                // Create a new canvas to render the complete COI with overlays
+                const sourceCanvas = document.getElementById('realPdfCanvas');
+                const overlayCanvas = document.createElement('canvas');
+                const ctx = overlayCanvas.getContext('2d');
+
+                // Set canvas size to match source
+                overlayCanvas.width = sourceCanvas.width;
+                overlayCanvas.height = sourceCanvas.height;
+
+                // Draw the original PDF canvas
+                ctx.drawImage(sourceCanvas, 0, 0);
+
+                // Add checkbox overlays - adjusted Y positions up by 12 pixels
+                const checkboxMapping = {
+                    'glCheck': { x: 47, y: 378 },
+                    'glOccurrence': { x: 150, y: 394 },
+                    'glClaimsMade': { x: 65, y: 394 },
+                    'autoAny': { x: 47, y: 503 },
+                    'autoOwned': { x: 47, y: 518 },
+                    'autoScheduled': { x: 135, y: 518 },
+                    'autoHired': { x: 47, y: 534 },
+                    'autoNonOwned': { x: 135, y: 534 },
+                    'umbrella': { x: 47, y: 565 },
+                    'excess': { x: 47, y: 581 },
+                    'wcStatute': { x: 552, y: 612 },
+                    'wcOther': { x: 618, y: 612 },
+                    'aggPolicy': { x: 47, y: 456 },
+                    'aggProject': { x: 103, y: 456 },
+                    'aggLocation': { x: 159, y: 456 },
+                    'aggOther': { x: 47, y: 472 }
+                };
+
+                // Draw checkmarks for checked boxes
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 14px Arial, sans-serif';
+                let checkmarksDrawn = 0;
+
+                Object.entries(checkboxMapping).forEach(([fieldName, position]) => {
+                    const checkboxElement = document.getElementById(`field_${fieldName}`);
+                    if (checkboxElement && checkboxElement.checked) {
+                        ctx.fillText('✓', position.x + 2, position.y + 12);
+                        console.log(`☑️ Drew save checkmark for ${fieldName} at position ${position.x}, ${position.y}`);
+                        checkmarksDrawn++;
+                    }
+                });
+
+                console.log(`✅ Generated COI with ${checkmarksDrawn} checkmarks for save`);
+                coiDocument.dataUrl = overlayCanvas.toDataURL('image/png');
+
+            } catch (error) {
+                console.warn('Could not generate COI with overlays:', error);
+                // Fallback: use original canvas
+                const sourceCanvas = document.getElementById('realPdfCanvas');
+                if (sourceCanvas) {
+                    coiDocument.dataUrl = sourceCanvas.toDataURL('image/png');
                 } else {
-                    // Fallback: create a simple data URL placeholder
                     coiDocument.dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
                 }
-            } catch (error) {
-                console.warn('Could not capture form image:', error);
-                coiDocument.dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
             }
         }
 

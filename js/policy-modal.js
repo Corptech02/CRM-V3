@@ -907,11 +907,14 @@ function switchTab(tabId) {
     // Remove active class from all tabs and contents
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
+
     // Add active class to selected tab and content
     document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
     document.getElementById(`${tabId}-content`).classList.add('active');
 }
+
+// Make switchTab globally available
+window.switchTab = switchTab;
 
 function addVehicle(leadId) {
     // Check if we're in a policy modal context
@@ -1602,6 +1605,8 @@ async function savePolicy() {
             const savedPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
             console.log('✅ POLICY-MODAL DEBUG: Verified save - total policies now:', savedPolicies.length);
             console.log('✅ POLICY-MODAL DEBUG: Verified policy IDs:', savedPolicies.map(p => p.id));
+            console.log('✅ POLICY-MODAL DEBUG: Saved policy clientId:', policyData.clientId);
+            console.log('✅ POLICY-MODAL DEBUG: Policy data:', policyData);
             showNotification(`Policy ${policyData.policyNumber} saved locally (server sync pending)`, 'warning');
         }
         
@@ -1613,7 +1618,7 @@ async function savePolicy() {
             let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
             const clientIndex = clients.findIndex(c => c.id === policyData.clientId);
             if (clientIndex >= 0) {
-                if (!clients[clientIndex].policies) {
+                if (!clients[clientIndex].policies || !Array.isArray(clients[clientIndex].policies)) {
                     clients[clientIndex].policies = [];
                 }
                 if (!clients[clientIndex].policies.includes(policyData.id)) {
@@ -1654,7 +1659,11 @@ async function savePolicy() {
 
             // Use setTimeout to allow modal to close first
             setTimeout(() => {
-                if (typeof window.viewClient === 'function') {
+                // Try the same approach as fix-policy-server-save.js
+                if (window.loadClientProfile) {
+                    console.log('🔄 Refreshing client profile after policy save...');
+                    window.loadClientProfile(clientId);
+                } else if (typeof window.viewClient === 'function') {
                     window.viewClient(clientId);
                 } else {
                     console.error('viewClient function not found, trying to reload view');

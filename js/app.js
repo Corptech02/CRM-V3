@@ -1592,7 +1592,7 @@ function generateACORD25HTML(policy) {
             <div class="row">
                 <div class="field">
                     <div class="field-label">Name:</div>
-                    <div class="field-value">Vanguard Insurance Agency</div>
+                    <div class="field-value">Vanguard Insurance Group</div>
                 </div>
             </div>
             <div class="row">
@@ -25039,6 +25039,112 @@ window.removeCRMCOIEmailRecipient = function(button) {
     }
 };
 
+// CRM COI overlay function - adds certificate holder and date to COI document
+window.createCRMCOIWithTextOverlay = async function(coiDocument, holderType, policy, certificateHolder) {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+
+        img.onload = function() {
+            canvas.width = img.width;
+            canvas.height = img.height;
+
+            // Draw the original COI image
+            ctx.drawImage(img, 0, 0);
+
+            // Set up text styling
+            ctx.fillStyle = '#000000';
+            ctx.font = '14px Arial, sans-serif';
+            ctx.textAlign = 'left';
+
+            // Certificate holder text position (bottom left area)
+            const startX = 50;
+            const startY = 900;
+
+            if (holderType === 'business') {
+                // Use client information
+                const clientName = policy.clientName || policy.insured_name || 'Unknown Client';
+                ctx.fillText(clientName, startX, startY);
+                console.log('📝 Overlaid business certificate holder:', clientName);
+            } else {
+                // Use third-party information from certificateHolder string
+                const lines = certificateHolder.split('\n');
+                lines.forEach((line, index) => {
+                    if (line.trim()) {
+                        ctx.fillText(line.trim(), startX, startY + (index * 20));
+                    }
+                });
+                console.log('📝 Overlaid third-party certificate holder:', lines[0] || 'Unknown');
+            }
+
+            // Add current date overlay in top right
+            const currentDate = new Date().toLocaleDateString();
+            console.log('🖼️ Canvas dimensions:', canvas.width, 'x', canvas.height);
+
+            // Position for date field (top right area of ACORD form)
+            let dateX = Math.min(canvas.width - 100, 695); // Ensure it fits within canvas
+            const dateY = 57.5;
+
+            // Ensure the date position is within canvas bounds
+            if (dateX + 100 > canvas.width) {
+                dateX = canvas.width - 100;
+            }
+
+            ctx.font = '12px Arial, sans-serif';
+            ctx.fillText(currentDate, dateX, dateY);
+            console.log('📅 Overlaid current date:', currentDate, 'at position:', dateX, dateY);
+            console.log('📅 Date text bounds: X=' + dateX + ', Y=' + dateY + ', within canvas=' + (dateX + 100 <= canvas.width));
+
+            // Add checkmarks for checked boxes based on current form state - adjusted Y positions up by 12 pixels
+            const checkboxMapping = {
+                'glCheck': { x: 47, y: 378 },
+                'glOccurrence': { x: 150, y: 394 },
+                'glClaimsMade': { x: 65, y: 394 },
+                'autoAny': { x: 47, y: 503 },
+                'autoOwned': { x: 47, y: 518 },
+                'autoScheduled': { x: 135, y: 518 },
+                'autoHired': { x: 47, y: 534 },
+                'autoNonOwned': { x: 135, y: 534 },
+                'umbrella': { x: 47, y: 565 },
+                'excess': { x: 47, y: 581 },
+                'wcStatute': { x: 552, y: 612 },
+                'wcOther': { x: 618, y: 612 },
+                'aggPolicy': { x: 47, y: 456 },
+                'aggProject': { x: 103, y: 456 },
+                'aggLocation': { x: 159, y: 456 },
+                'aggOther': { x: 47, y: 472 }
+            };
+
+            // Draw checkmarks for checked boxes
+            Object.entries(checkboxMapping).forEach(([fieldName, position]) => {
+                const checkboxElement = document.getElementById(`field_${fieldName}`);
+                if (checkboxElement && checkboxElement.checked) {
+                    // Draw a checkmark
+                    ctx.fillStyle = '#000000';
+                    ctx.font = 'bold 14px Arial, sans-serif';
+                    ctx.fillText('✓', position.x + 2, position.y + 12);
+                    console.log(`☑️ Drew checkmark for ${fieldName} at position ${position.x}, ${position.y}`);
+                }
+            });
+
+            // Convert canvas to blob
+            canvas.toBlob((blob) => {
+                console.log('✅ Created COI with text overlay, size:', blob.size, 'bytes');
+                resolve(blob);
+            }, 'image/png', 0.95);
+        };
+
+        img.onerror = function(error) {
+            console.error('❌ Error loading COI image for overlay:', error);
+            resolve(null);
+        };
+
+        // Load the COI image
+        img.src = coiDocument.dataUrl;
+    });
+};
+
 window.submitCRMCOIModal = async function() {
     const form = document.getElementById('crmCOIModalForm');
     const submitBtn = document.querySelector('#crmCOIModal .btn-submit');
@@ -25082,6 +25188,43 @@ window.submitCRMCOIModal = async function() {
     const policyText = policyBanner ? policyBanner.nextSibling.textContent.trim() : '';
     const policyId = policyText.split(' - ')[0] || 'Unknown';
 
+    // Find the current policy data for email formatting
+    let currentPolicy = null;
+
+    // Try multiple sources to find the policy
+    try {
+        // First: check window.allPolicies
+        if (window.allPolicies && Array.isArray(window.allPolicies)) {
+            currentPolicy = window.allPolicies.find(p => p.id === policyId || p.policyNumber === policyId || p.policy_number === policyId);
+        }
+
+        // Second: check localStorage
+        if (!currentPolicy) {
+            const storedPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            currentPolicy = storedPolicies.find(p => p.id === policyId || p.policyNumber === policyId || p.policy_number === policyId);
+        }
+
+        // Third: extract from modal text if available
+        if (!currentPolicy && policyText.includes(' - ')) {
+            const parts = policyText.split(' - ');
+            currentPolicy = {
+                policy_number: policyId,
+                clientName: parts[1] || 'N/A',
+                carrier: parts[2] || 'N/A'
+            };
+        }
+
+        console.log('🔍 Found current policy:', currentPolicy);
+    } catch (error) {
+        console.log('⚠️ Error finding policy:', error);
+        // Create minimal fallback policy
+        currentPolicy = {
+            policy_number: policyId,
+            clientName: 'N/A',
+            carrier: 'N/A'
+        };
+    }
+
     try {
         // First, try to get the COI document for this policy
         let coiDocument = null;
@@ -25112,6 +25255,26 @@ window.submitCRMCOIModal = async function() {
             }
         }
 
+        // Apply COI overlay with certificate holder and date (like website does)
+        let finalCoiDocument = null;
+        if (coiDocument && coiDocument.dataUrl) {
+            try {
+                console.log('✅ Using COI overlay function to add certificate holder and date...');
+                finalCoiDocument = await window.createCRMCOIWithTextOverlay(coiDocument, holderType, currentPolicy, certificateHolder);
+                console.log('📎 COI document modified with text overlay, size:', finalCoiDocument.size);
+            } catch (error) {
+                console.error('❌ Error creating COI with overlay:', error);
+                // Fallback to original document
+                try {
+                    const response = await fetch(coiDocument.dataUrl);
+                    finalCoiDocument = await response.blob();
+                    console.log('📎 Fallback: Using original COI document, size:', finalCoiDocument.size);
+                } catch (fallbackError) {
+                    console.error('❌ Error accessing COI document:', fallbackError);
+                }
+            }
+        }
+
         // Prepare the COI request data as FormData (not JSON) to match the API
         const formData = new FormData();
 
@@ -25121,39 +25284,36 @@ window.submitCRMCOIModal = async function() {
         // Set recipient email (first email from the array)
         formData.append('to', emails[0]);
 
-        // Set email subject
-        const subjectText = `Certificate of Insurance Request - Policy ${policyId}`;
+        // Set email subject - match website format exactly
+        const subjectText = `Certificate of Insurance - ${currentPolicy?.clientName || currentPolicy?.insured_name || 'N/A'} - Policy ${policyId}`;
         formData.append('subject', subjectText);
 
         // Set policy ID
         formData.append('policyId', policyId);
 
-        // Build email message body
-        let messageBody = `Dear Valued Client,\n\n`;
-        messageBody += `We are requesting a Certificate of Insurance.\n\n`;
+        // Build email message body - match website format exactly
+        let messageBody = `Dear Certificate Holder,
 
-        if (holderType === 'third-party') {
-            messageBody += `Please ensure the certificate includes the following holder information:\n\n`;
-            messageBody += `${certificateHolder}\n\n`;
-        } else {
-            messageBody += `The certificate should be issued to the policy holder.\n\n`;
-        }
+Please find attached your Certificate of Insurance for ${currentPolicy?.clientName || currentPolicy?.insured_name || 'N/A'}.
 
-        messageBody += `Policy Details:\n`;
-        messageBody += `- Policy Number: ${policyId}\n\n`;
+Policy Number: ${policyId}
+Insured: ${currentPolicy?.clientName || currentPolicy?.insured_name || 'N/A'}
+Carrier: ${currentPolicy?.carrier || 'N/A'}
 
-        messageBody += `Please send the COI at your earliest convenience.\n\n`;
-        messageBody += `Best regards,\n`;
-        messageBody += `VIG Agency Team\n`;
-        messageBody += `contact@vigagency.com\n`;
-        messageBody += `(555) 123-4567`;
+Certificate Holder:
+${certificateHolder}`;
 
         formData.append('message', messageBody);
 
         // Add COI document as attachment if available
-        if (coiDocument) {
+        if (finalCoiDocument) {
+            console.log('📎 Attaching modified COI document with overlays');
+            const fileName = `COI_Certificate_${policyId}_${Date.now()}.png`;
+            formData.append('attachment', finalCoiDocument, fileName);
+            console.log('📎 Modified COI document attached as:', fileName);
+        } else if (coiDocument) {
             try {
-                console.log('📎 Attaching COI document:', coiDocument.name || 'COI Document');
+                console.log('📎 Attaching original COI document:', coiDocument.name || 'COI Document');
 
                 let coiBlob = null;
 
@@ -25428,7 +25588,7 @@ window.sendCOIRequest = function(policyId) {
 console.log('🔧 CRM COI Modal functions loaded and taking priority over existing COI functionality');
 
 // Function to view current COI for a policy
-window.viewCurrentCOI = function(policyId) {
+window.viewCurrentCOI = async function(policyId) {
     console.log('Viewing current COI for policy:', policyId);
 
     // Check for COI documents using the same source as admin dashboard
@@ -25568,47 +25728,35 @@ window.viewCurrentCOI = function(policyId) {
                 console.log('✅ Using cross-reference policy match:', matchingPolicy.policyNumber || matchingPolicy.id);
             }
 
-            // If still no match, try a broad search through all policies looking for any with COI documents
+            // If still no match, try loading from server database
             if (!hasCOIDocuments) {
-                console.log('🔍 Broad search for any policy with COI documents...');
-                const policiesWithCOI = policies.filter(p => p.coiDocuments && p.coiDocuments.length > 0);
-                if (policiesWithCOI.length > 0) {
-                    console.log('📋 Found', policiesWithCOI.length, 'policies with COI documents');
-
-                    // Prioritize COI documents saved in current session (last 5 minutes)
-                    const currentTime = new Date().getTime();
-                    const fiveMinutesAgo = currentTime - (5 * 60 * 1000);
-
-                    let latestPolicyWithCOI = null;
-                    let latestTimestamp = 0;
-                    let isRecentSession = false;
-
-                    policiesWithCOI.forEach(p => {
-                        if (p.coiDocuments && p.coiDocuments.length > 0) {
-                            const latestCOI = p.coiDocuments[p.coiDocuments.length - 1];
-                            const timestamp = new Date(latestCOI.uploadDate || 0).getTime();
-                            const isRecent = timestamp > fiveMinutesAgo;
-
-                            // Prioritize recent session documents over older ones
-                            if (isRecent && (!isRecentSession || timestamp > latestTimestamp)) {
-                                latestTimestamp = timestamp;
-                                latestPolicyWithCOI = p;
-                                isRecentSession = true;
-                                console.log('🕐 Found recent session COI from policy:', p.policyNumber || p.id, 'at', new Date(timestamp).toISOString());
-                            } else if (!isRecentSession && timestamp > latestTimestamp) {
-                                latestTimestamp = timestamp;
-                                latestPolicyWithCOI = p;
-                                console.log('📅 Found older COI from policy:', p.policyNumber || p.id, 'at', new Date(timestamp).toISOString());
-                            }
+                console.log('🔍 No exact policy match found in localStorage, checking server...');
+                try {
+                    const response = await fetch(`/api/coi-documents?policyId=${policyId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.coiDocuments && data.coiDocuments.length > 0) {
+                            // Found COI in server, add to localStorage and display
+                            console.log('✅ Found COI in server database, adding to localStorage');
+                            const serverPolicy = {
+                                id: policyId,
+                                policyNumber: policyId,
+                                coiDocuments: data.coiDocuments
+                            };
+                            policies.push(serverPolicy);
+                            localStorage.setItem('insurance_policies', JSON.stringify(policies));
+                            policy = serverPolicy;
+                            hasCOIDocuments = true;
+                            console.log('✅ COI loaded from server and cached in localStorage');
                         }
-                    });
-
-                    if (latestPolicyWithCOI) {
-                        console.log('✅ Using', isRecentSession ? 'recent session' : 'most recent', 'COI from policy:', latestPolicyWithCOI.policyNumber || latestPolicyWithCOI.id);
-                        matchingPolicy = latestPolicyWithCOI;
-                        hasCOIDocuments = true;
-                        policy = latestPolicyWithCOI;
                     }
+                } catch (error) {
+                    console.log('⚠️ Could not load COI from server:', error);
+                }
+
+                if (!hasCOIDocuments) {
+                    console.log('⚠️ Policy ID requested:', policyId, 'was not found in localStorage or server');
+                    return; // Exit early instead of showing wrong COI
                 }
             }
         }
@@ -26829,4 +26977,7 @@ window.toggleClientStatus = function(policyId, isActive) {
         showNotification('Error updating client status', 'error');
     }
 };
+
+// Ensure viewPolicy is globally available
+window.viewPolicy = viewPolicy;
 

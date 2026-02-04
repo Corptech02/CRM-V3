@@ -1205,6 +1205,15 @@ window.realSaveCOI = async function(policyId) {
             // Show success message
             showSuccessMessage('COI saved successfully!');
 
+            // Close the ACORD modal after successful save
+            setTimeout(() => {
+                const modal = document.getElementById('acordViewerModal');
+                if (modal) {
+                    console.log('🚪 Closing COI modal after successful save');
+                    modal.remove();
+                }
+            }, 1500); // Give user time to see success message
+
             // Refresh the COI display in the policy modal if it exists
             setTimeout(() => {
                 if (window.loadCOIFiles && typeof window.loadCOIFiles === 'function') {
@@ -1909,7 +1918,7 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
 
                         // Set text styling similar to ACORD forms
                         ctx.fillStyle = '#000000';
-                        ctx.font = '12px Arial';
+                        ctx.font = '11px Arial';
                         ctx.textBaseline = 'top';
 
                         const formData = window.realPdfState.formData;
@@ -1950,6 +1959,41 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
 
                         console.log(`📸 ✅ Rendered ${fieldsRendered} form fields onto canvas`);
 
+                        // Add checkmarks for checked boxes - adjusted Y positions up by 12 pixels
+                        const checkboxMapping = {
+                            'glCheck': { x: 47, y: 378 },
+                            'glOccurrence': { x: 150, y: 394 },
+                            'glClaimsMade': { x: 65, y: 394 },
+                            'autoAny': { x: 47, y: 503 },
+                            'autoOwned': { x: 47, y: 518 },
+                            'autoScheduled': { x: 135, y: 518 },
+                            'autoHired': { x: 47, y: 534 },
+                            'autoNonOwned': { x: 135, y: 534 },
+                            'umbrella': { x: 47, y: 565 },
+                            'excess': { x: 47, y: 581 },
+                            'wcStatute': { x: 552, y: 612 },
+                            'wcOther': { x: 618, y: 612 },
+                            'aggPolicy': { x: 47, y: 456 },
+                            'aggProject': { x: 103, y: 456 },
+                            'aggLocation': { x: 159, y: 456 },
+                            'aggOther': { x: 47, y: 472 }
+                        };
+
+                        // Draw checkmarks for checked boxes using formData
+                        ctx.fillStyle = '#000000';
+                        ctx.font = 'bold 14px Arial, sans-serif';
+                        let checkmarksRendered = 0;
+
+                        Object.entries(checkboxMapping).forEach(([fieldName, position]) => {
+                            if (formData[fieldName] === true) {
+                                ctx.fillText('✓', position.x + 2, position.y + 12);
+                                console.log(`📸 ☑️ Drew checkmark for ${fieldName} at position ${position.x}, ${position.y}`);
+                                checkmarksRendered++;
+                            }
+                        });
+
+                        console.log(`📸 ✅ Rendered ${checkmarksRendered} checkmarks onto canvas`);
+
                         // Also add any text inputs that are visible
                         const textInputs = formOverlay.querySelectorAll('input[type="text"], textarea');
                         textInputs.forEach((input, index) => {
@@ -1962,8 +2006,25 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
                                 const y = (rect.top - containerRect.top) * (pdfCanvas.height / containerRect.height);
 
                                 if (x >= 0 && y >= 0 && x < compositeCanvas.width && y < compositeCanvas.height) {
-                                    ctx.fillText(input.value, x, y);
-                                    console.log(`📸 Rendered input field at (${Math.round(x)}, ${Math.round(y)}): ${input.value.substring(0, 20)}...`);
+                                    // Special handling for signature field
+                                    if (input.id === 'field_authRep' || input.style.fontFamily.includes('Dancing Script')) {
+                                        console.log('🖋️ Rendering signature field with handwriting font');
+                                        // Set signature styling for canvas
+                                        ctx.save(); // Save current context
+                                        ctx.font = '600 italic 19px "Dancing Script", "Lucida Handwriting", cursive';
+                                        ctx.fillStyle = '#0066cc';
+                                        ctx.textShadow = '0.5px 0.5px 1px rgba(0,0,0,0.1)';
+                                        ctx.fillText(input.value, x, y);
+                                        ctx.restore(); // Restore previous context
+                                        console.log(`📸 🖋️ Rendered SIGNATURE field at (${Math.round(x)}, ${Math.round(y)}): ${input.value}`);
+                                    } else {
+                                        // Regular field rendering
+                                        ctx.save();
+                                        ctx.font = '12px Arial';
+                                        ctx.fillText(input.value, x, y);
+                                        ctx.restore();
+                                        console.log(`📸 Rendered input field at (${Math.round(x)}, ${Math.round(y)}): ${input.value.substring(0, 20)}...`);
+                                    }
                                 }
                             }
                         });
@@ -2057,7 +2118,8 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
 
         } catch (error) {
             console.error('❌ Error capturing COI image:', error);
-            coiDocument.dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+            // Don't save a placeholder to database - keep null and use form regeneration
+            coiDocument.dataUrl = null;
         }
 
         // Cross-reference mapping for policy relationships
@@ -2091,12 +2153,8 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
                     localPolicy.coiDocuments = [];
                 }
                 // Remove existing COI documents for this policy
-                localPolicy.coiDocuments = localPolicy.coiDocuments.filter(doc =>
-                    doc.policyId !== policyId &&
-                    !searchIds.includes(doc.policyId)
-                );
-                // Add the new COI document
-                localPolicy.coiDocuments.push(coiDocument);
+                // Replace all existing COI documents with just the new one
+                localPolicy.coiDocuments = [coiDocument];
                 console.log('💾 COI document replaced in localStorage policy:', localPolicy.policyNumber || localPolicy.id);
             });
             localStorage.setItem('insurance_policies', JSON.stringify(policies));
@@ -2132,6 +2190,33 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
 
         localStorage.setItem('policy_coi_documents', JSON.stringify(filteredCOIs));
         console.log('✅ COI document replaced in legacy localStorage format');
+
+        // Save COI document to database via API to persist after refresh (only if we have valid image data)
+        if (coiDocument.dataUrl && coiDocument.dataUrl.length > 1000) {
+            try {
+                console.log('💾 Saving COI document to database with valid image data...');
+                const response = await fetch('/api/coi-documents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        policyId: policyId,
+                        document: coiDocument
+                    })
+                });
+
+            if (response.ok) {
+                console.log('✅ COI document saved to database successfully');
+            } else {
+                console.warn('⚠️ Failed to save COI document to database, but preserved in localStorage');
+            }
+            } catch (dbError) {
+                console.warn('⚠️ Database save failed, but COI document preserved in localStorage:', dbError);
+            }
+        } else {
+            console.log('⚠️ COI document has no valid image data, saved to localStorage only (will use form regeneration for display)');
+        }
 
         console.log('✅ COI document saved successfully');
 
