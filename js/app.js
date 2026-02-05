@@ -5851,7 +5851,11 @@ async function loadLeadsView() {
                                     <i class="fas fa-sort"></i>
                                 </span>
                             </th>
-                            <th>Actions</th>
+                            <th>Actions
+                                <button onclick="refreshLeadsTable()" style="margin-left: 10px; padding: 4px 8px; font-size: 12px; background: rgb(0, 102, 204); color: white; border: none; border-radius: 4px; cursor: pointer; vertical-align: middle; transition: 0.2s;" title="Refresh leads table">
+                                    <i class="fas fa-sync-alt" style="color: white;"></i>
+                                </button>
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="leadsTableBody">
