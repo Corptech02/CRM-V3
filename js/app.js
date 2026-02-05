@@ -3006,19 +3006,22 @@ async function saveClient() {
     // Create client object
     const firstName = formData.get('firstName') || '';
     const lastName = formData.get('lastName') || '';
-    const clientName = `${firstName} ${lastName}`.trim();
-    
+    const fullName = `${firstName} ${lastName}`.trim();
+    const businessName = formData.get('businessName') || '';
+
     // Validate required fields
-    if (!clientName || !formData.get('clientEmail') || !formData.get('clientPhone')) {
+    if (!fullName || !formData.get('clientEmail') || !formData.get('clientPhone')) {
         alert('Please fill in all required fields (Name, Email, Phone)');
         return;
     }
-    
+
     // Check if this is an edit or new client
     const isEditing = form.dataset.clientId;
 
     const clientData = {
-        name: clientName,
+        name: businessName || fullName, // Use business name as primary display name, fallback to full name
+        fullName: fullName, // Store full name separately
+        businessName: businessName, // Store business name separately
         email: formData.get('clientEmail'),
         phone: formData.get('clientPhone'),
         address: formData.get('clientAddress') || '',
@@ -3027,8 +3030,7 @@ async function saveClient() {
         zip: formData.get('clientZip') || '',
         type: formData.get('clientType') || 'Personal',
         status: 'Active',
-        assignedTo: formData.get('assignedTo') || '',
-        representative: formData.get('representative') || ''
+        assignedTo: formData.get('assignedTo') || ''
     };
 
     if (isEditing) {
@@ -14503,13 +14505,26 @@ function editClient(id) {
         // Populate form fields
         const form = document.getElementById('newClientForm');
 
-        // Split name into first and last name
-        const nameParts = (client.name || '').split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
+        // Use stored fullName if available, otherwise split the main name
+        const fullName = client.fullName || '';
+        const businessName = client.businessName || '';
+
+        // If we have fullName stored, use it; otherwise split main name
+        let firstName = '', lastName = '';
+        if (fullName) {
+            const nameParts = fullName.split(' ');
+            firstName = nameParts[0] || '';
+            lastName = nameParts.slice(1).join(' ') || '';
+        } else {
+            // Fallback: split main name for older records
+            const nameParts = (client.name || '').split(' ');
+            firstName = nameParts[0] || '';
+            lastName = nameParts.slice(1).join(' ') || '';
+        }
 
         form.querySelector('[name="firstName"]').value = firstName;
         form.querySelector('[name="lastName"]').value = lastName;
+        form.querySelector('[name="businessName"]').value = businessName;
         form.querySelector('[name="clientEmail"]').value = client.email || '';
         form.querySelector('[name="clientPhone"]').value = client.phone || '';
         form.querySelector('[name="clientAddress"]').value = client.address || '';
@@ -14517,7 +14532,6 @@ function editClient(id) {
         console.log('🔍 EXACT VALUE: Setting assignedTo to exact value:', JSON.stringify(assignedToValue));
         console.log('🔍 EXACT VALUE: Length:', assignedToValue.length, 'Type:', typeof assignedToValue);
         form.querySelector('[name="assignedTo"]').value = assignedToValue;
-        form.querySelector('[name="representative"]').value = client.representative || '';
         form.querySelector('[name="clientCity"]').value = client.city || '';
         form.querySelector('[name="clientState"]').value = client.state || '';
         form.querySelector('[name="clientZip"]').value = client.zip || '';
@@ -15172,7 +15186,7 @@ function generateViewTabContent(tabId, policy) {
                             <i class="fas fa-file-alt"></i> Quote Application
                         </button>
                     </div>
-                    <div id="policy-application-submissions-list-${policy.id}">
+                    <div id="application-submissions-container-policy_${policy.id}">
                         ${window.renderPolicyApplicationSubmissions ? window.renderPolicyApplicationSubmissions(policy.id) : `
                             <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
                                 <i class="fas fa-file-signature" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
@@ -24472,24 +24486,63 @@ window.createQuoteApplicationForPolicy = function(policyId) {
                       policy.insuredName ||
                       'Unknown Client';
 
-    // Use the existing quote application function but pass policy context
-    if (window.createQuoteApplicationForClient) {
-        // Create a synthetic client ID based on the policy
-        const syntheticClientId = `policy_${policyId}`;
-        window.createQuoteApplicationForClient(syntheticClientId, {
-            name: clientName,
-            policyId: policyId,
-            existingPolicy: policy
-        });
+    // Create a temporary lead-like object for the policy-based quote application
+    const tempLeadData = {
+        id: `policy_${policyId}`,
+        name: clientName,
+        phone: policy.insured?.['Business Phone'] || policy.phone || '',
+        email: policy.insured?.['Email'] || policy.email || '',
+        usdot: policy.insured?.['US DOT #'] || '',
+        policyId: policyId,
+        isPolicyQuote: true
+    };
+
+    // Temporarily add this to leads storage so the quote application can find it
+    const existingLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const tempLeads = [...existingLeads, tempLeadData];
+    localStorage.setItem('insurance_leads', JSON.stringify(tempLeads));
+
+    // Use the working quote application function from leads tab
+    if (window.createQuoteApplicationSimple) {
+        console.log('Using createQuoteApplicationSimple for policy:', policyId);
+        window.createQuoteApplicationSimple(`policy_${policyId}`);
+
+        // Clean up the temporary lead after a longer delay to allow for saving
+        setTimeout(() => {
+            const currentLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const cleanedLeads = currentLeads.filter(lead => lead.id !== `policy_${policyId}`);
+            localStorage.setItem('insurance_leads', JSON.stringify(cleanedLeads));
+            console.log('Cleaned up temporary policy lead');
+        }, 5000); // Increased delay to 5 seconds
+    } else if (window.createQuoteApplication) {
+        console.log('Using createQuoteApplication for policy:', policyId);
+        window.createQuoteApplication(`policy_${policyId}`);
+
+        // Clean up the temporary lead after a longer delay to allow for saving
+        setTimeout(() => {
+            const currentLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const cleanedLeads = currentLeads.filter(lead => lead.id !== `policy_${policyId}`);
+            localStorage.setItem('insurance_leads', JSON.stringify(cleanedLeads));
+            console.log('Cleaned up temporary policy lead');
+        }, 5000); // Increased delay to 5 seconds
     } else {
-        alert('Quote application functionality not available');
+        alert('Quote application functionality not available. Please check that quote application scripts are loaded.');
+        console.error('Available quote functions:', Object.keys(window).filter(k => k.toLowerCase().includes('quote')));
     }
 };
 
 // Function to render policy application submissions
 window.renderPolicyApplicationSubmissions = function(policyId) {
-    const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-    const policyApplications = applications.filter(app => app.policyId === policyId);
+    console.log('📋 renderPolicyApplicationSubmissions called for policy:', policyId);
+
+    // Look in the correct storage location where applications are actually saved
+    const applications = JSON.parse(localStorage.getItem('appSubmissions') || '[]');
+    console.log('📊 Total applications in storage:', applications.length);
+
+    // Filter for applications that belong to this policy (stored as policy_POLICYID format)
+    const leadId = `policy_${policyId}`;
+    const policyApplications = applications.filter(app => app.leadId === leadId || app.policyId === policyId);
+    console.log('📋 Found', policyApplications.length, 'applications for policy:', policyId);
 
     if (policyApplications.length === 0) {
         return `
@@ -24501,22 +24554,40 @@ window.renderPolicyApplicationSubmissions = function(policyId) {
         `;
     }
 
+    // Use the same format as the showApplicationSubmissions function (VERSION 1003)
     return policyApplications.map(app => `
-        <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                 <div>
-                    <h4 style="margin: 0 0 8px 0; color: #343a40;">${app.type || 'Quote Application'}</h4>
-                    <p style="margin: 0; color: #6c757d; font-size: 14px;">
-                        Created: ${new Date(app.createdAt).toLocaleDateString()}
-                    </p>
+                    <h4 style="margin: 0 0 5px 0; color: #374151; font-size: 14px;">
+                        <i class="fas fa-file-signature" style="color: #10b981; margin-right: 8px;"></i>
+                        Quote Application #${app.id}
+                    </h4>
                 </div>
-                <div style="display: flex; gap: 8px;">
-                    <button onclick="viewApplication('${app.id}')" style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 12px;">
+                <div style="display: flex; gap: 5px;">
+                    <button onclick="viewQuoteApplication('${app.id}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                         <i class="fas fa-eye"></i> View
                     </button>
-                    <button onclick="downloadApplication('${app.id}')" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 12px;">
+                    <button onclick="downloadQuoteApplication('${app.id}')" data-quote-app-pdf="true" style="background: #10b981; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                         <i class="fas fa-download"></i> Download
                     </button>
+                    <button onclick="deleteQuoteApplication('${app.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; font-size: 12px; color: #6b7280;">
+                <div>
+                    <strong style="color: #374151;">Commodities:</strong> ${app.formData?.commodities?.length || app.commodities?.length || 0}
+                </div>
+                <div>
+                    <strong style="color: #374151;">Drivers:</strong> ${app.formData?.drivers?.length || app.drivers?.length || 0}
+                </div>
+                <div>
+                    <strong style="color: #374151;">Trucks:</strong> ${app.formData?.trucks?.length || app.trucks?.length || 0}
+                </div>
+                <div>
+                    <strong style="color: #374151;">Trailers:</strong> ${app.formData?.trailers?.length || app.trailers?.length || 0}
                 </div>
             </div>
         </div>
