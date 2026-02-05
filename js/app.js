@@ -14794,6 +14794,23 @@ function showPolicyDetailsModal(policy) {
             loadIdCardsFromServer(policy.id);
         }
     }, 100);
+
+    // Initialize application submissions display for this policy
+    setTimeout(() => {
+        const leadId = `policy_${policy.id}`;
+        console.log('🔄 Auto-loading application submissions for policy:', policy.id, 'leadId:', leadId);
+
+        if (window.showApplicationSubmissions) {
+            try {
+                window.showApplicationSubmissions(leadId);
+                console.log('✅ Successfully triggered application submissions load');
+            } catch (error) {
+                console.error('❌ Error loading application submissions:', error);
+            }
+        } else {
+            console.log('⚠️ showApplicationSubmissions function not available');
+        }
+    }, 200);
 }
 
 function generateViewTabsForPolicyType(policyType) {
