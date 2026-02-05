@@ -4,6 +4,67 @@
 
 console.log('🎯 LOADED: Simplified TO DO Logic - Callback-Only System');
 
+// AGGRESSIVE OVERRIDE: Run after all other scripts have loaded
+setTimeout(() => {
+    console.log('🚀 AGGRESSIVE OVERRIDE: Installing simplified TO DO logic...');
+    installSimplifiedTodoLogic();
+}, 2000);
+
+// Install on page load as well
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        console.log('🚀 DOM LOADED: Installing simplified TO DO logic...');
+        installSimplifiedTodoLogic();
+    }, 1000);
+});
+
+// Function to install all the overrides
+function installSimplifiedTodoLogic() {
+
+// OVERRIDE ALL getNextAction functions with callback-only logic
+const simplifiedGetNextAction = function(stage, lead) {
+    console.log(`🎯 SIMPLIFIED TODO CHECK: Lead ${lead?.id} - Stage: ${stage}`);
+
+    // Check for overdue scheduled callbacks ONLY
+    if (lead && lead.id) {
+        const isCallbackOverdue = checkSimpleOverdueCallback(lead.id);
+        console.log(`📞 CALLBACK CHECK: Lead ${lead.id} - isOverdue: ${isCallbackOverdue}`);
+
+        if (isCallbackOverdue) {
+            // Create clickable reach out call link for overdue callbacks
+            const phoneNumber = lead?.phone || '';
+            const leadId = lead?.id || '';
+            const clickHandler = `handleReachOutCall('${leadId}', '${phoneNumber}')`;
+            console.log(`🔴 OVERDUE CALLBACK: Showing "Reach out: CALL" for lead ${leadId}`);
+            return `<a href="tel:${phoneNumber}" onclick="${clickHandler}" style="color: #dc2626; font-weight: bold; text-decoration: none; cursor: pointer;">Reach out: CALL</a>`;
+        }
+    }
+
+    // Standard stage-based actions (no reach-out complexity)
+    const actionMap = {
+        'new': 'Assign Stage',
+        'info_received': 'Prepare Quote',
+        'loss_runs_received': 'Prepare app.',
+        'app_prepared': 'Email brokers',
+        'not-interested': 'Archive lead',
+        'closed': 'Process complete'
+    };
+
+    const result = actionMap[stage] || '';
+    console.log(`📋 STANDARD TODO: Lead ${lead?.id} - Stage: ${stage} → "${result}"`);
+    return result;
+};
+
+// Override ALL possible getNextAction functions
+window.getNextAction = simplifiedGetNextAction;
+window.ultimateGetNextAction = simplifiedGetNextAction;
+window.getNextActionFixed = simplifiedGetNextAction;
+window.getNextActionEnhanced = simplifiedGetNextAction;
+window.getNextActionExpiredFix = simplifiedGetNextAction;
+window.getNextActionAppSentOverride = simplifiedGetNextAction;
+
+console.log('✅ OVERRIDDEN ALL getNextAction functions with simplified callback-only logic');
+
 // Override the complex applyReachOutStyling function with simplified version
 window.applyReachOutStyling = function(leadId, hasReachOutTodo) {
     console.log(`🎨 SIMPLIFIED STYLING: Lead ${leadId} - hasReachOutTodo: ${hasReachOutTodo}`);
@@ -88,4 +149,21 @@ function checkSimpleOverdueCallback(leadId) {
     }
 }
 
+} // End installSimplifiedTodoLogic function
+
+// Manual trigger for immediate testing
+window.forceInstallSimplifiedLogic = function() {
+    console.log('🔧 MANUAL TRIGGER: Installing simplified logic now...');
+    installSimplifiedTodoLogic();
+
+    // Also refresh the table to see immediate effects
+    if (typeof refreshLeadsTable === 'function') {
+        setTimeout(() => {
+            console.log('🔄 Refreshing table to show new logic...');
+            refreshLeadsTable();
+        }, 500);
+    }
+};
+
 console.log('✅ SIMPLIFIED TO DO SYSTEM LOADED: Only overdue callbacks trigger red "Reach out: CALL"');
+console.log('💡 To test immediately, run: forceInstallSimplifiedLogic()');
