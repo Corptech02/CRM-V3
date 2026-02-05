@@ -80,43 +80,26 @@
     // Override ALL possible getNextAction variations
     function overrideAllGetNextActionFunctions() {
 
-        // Create the ultimate override function
+        // SIMPLIFIED: Callback-only TO DO logic
         function ultimateGetNextAction(stage, lead) {
-            // ABSOLUTE: App sent always returns empty
-            if (stage === 'app_sent' || stage === 'app sent' || stage === 'App Sent') {
-                return '';
-            }
+            console.log(`🎯 SIMPLIFIED TODO CHECK: Lead ${lead?.id} - Stage: ${stage}`);
 
-            // For other stages, use fallback logic
-            const stagesRequiringReachOut = ['quoted', 'info_requested', 'quote_sent', 'quote-sent-unaware', 'quote-sent-aware', 'interested', 'contact_attempted', 'loss_runs_requested'];
+            // Check for overdue scheduled callbacks ONLY
+            if (lead && lead.id) {
+                const isCallbackOverdue = checkForOverdueCallback(lead.id);
+                console.log(`📞 CALLBACK CHECK: Lead ${lead.id} - isOverdue: ${isCallbackOverdue}`);
 
-            if (stagesRequiringReachOut.includes(stage)) {
-                // Check if reach-out is completed (PROPER completion check with timestamps)
-                if (lead && lead.reachOut) {
-                    const reachOut = lead.reachOut;
-
-                    // Check completion conditions (same as main getNextAction function)
-                    const hasTimestamp = reachOut.completedAt || reachOut.reachOutCompletedAt;
-                    const hasActualCompletion = reachOut.callsConnected > 0 ||
-                                              reachOut.textCount > 0 ||
-                                              reachOut.emailConfirmed === true;
-                    const isActuallyCompleted = hasTimestamp && hasActualCompletion;
-
-                    console.log(`🔍 ULTIMATE CHECK (${stage}): Lead ${lead.id} - hasTimestamp=${hasTimestamp}, hasActualCompletion=${hasActualCompletion}, isActuallyCompleted=${isActuallyCompleted}`);
-
-                    if (isActuallyCompleted) {
-                        console.log(`✅ ULTIMATE COMPLETE: Lead ${lead.id} - returning empty TODO`);
-                        return '';
-                    }
+                if (isCallbackOverdue) {
+                    // Create clickable reach out call link for overdue callbacks
+                    const phoneNumber = lead?.phone || '';
+                    const leadId = lead?.id || '';
+                    const clickHandler = `handleReachOutCall('${leadId}', '${phoneNumber}')`;
+                    console.log(`🔴 OVERDUE CALLBACK: Showing "Reach out: CALL" for lead ${leadId}`);
+                    return `<a href="tel:${phoneNumber}" onclick="${clickHandler}" style="color: #dc2626; font-weight: bold; text-decoration: none; cursor: pointer;">Reach out: CALL</a>`;
                 }
-
-                // Create clickable reach out call link
-                const phoneNumber = lead?.phone || '';
-                const leadId = lead?.id || '';
-                const clickHandler = `handleReachOutCall('${leadId}', '${phoneNumber}')`;
-                return `<a href="tel:${phoneNumber}" onclick="${clickHandler}" style="color: #dc2626; font-weight: bold; text-decoration: none; cursor: pointer;">Reach out: CALL</a>`;
             }
 
+            // Standard stage-based actions (no reach-out complexity)
             const actionMap = {
                 'new': 'Assign Stage',
                 'info_received': 'Prepare Quote',
@@ -125,7 +108,32 @@
                 'not-interested': 'Archive lead',
                 'closed': 'Process complete'
             };
-            return actionMap[stage] || 'Review lead';
+
+            const result = actionMap[stage] || '';
+            console.log(`📋 STANDARD TODO: Lead ${lead?.id} - Stage: ${stage} → "${result}"`);
+            return result;
+        }
+
+        // Helper function to check if lead has overdue callbacks
+        function checkForOverdueCallback(leadId) {
+            try {
+                const callbacks = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+                const leadCallbacks = callbacks[leadId] || [];
+                const now = new Date();
+
+                // Check if any callback is overdue
+                const overdueCallback = leadCallbacks.find(callback => {
+                    if (callback.completed) return false; // Skip completed callbacks
+
+                    const callbackDateTime = new Date(`${callback.date}T${callback.time}`);
+                    return callbackDateTime < now; // Overdue if callback time has passed
+                });
+
+                return !!overdueCallback;
+            } catch (error) {
+                console.error('❌ Error checking overdue callbacks:', error);
+                return false;
+            }
         }
 
         // Override global function

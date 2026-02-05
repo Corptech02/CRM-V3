@@ -1260,13 +1260,13 @@
 
     <!-- New Client Modal -->
     <div id="clientModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 780px; width: 95%;">
             <div class="modal-header">
                 <h2>Add New Client</h2>
                 <button class="close-btn" onclick="closeModal('clientModal')">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="newClientForm">
+                <form id="newClientForm" style="width: 100%; max-width: none;">
                     <div class="form-row">
                         <div class="form-group">
                             <label>First Name</label>
@@ -1275,6 +1275,10 @@
                         <div class="form-group">
                             <label>Last Name</label>
                             <input type="text" name="lastName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Business Name</label>
+                            <input type="text" name="businessName" placeholder="Company/Business Name">
                         </div>
                     </div>
                     <div class="form-row">
@@ -1320,10 +1324,6 @@
                                 <option value="Carson">Carson</option>
                                 <option value="Hunter">Hunter</option>
                             </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Representative</label>
-                            <input type="text" name="representative" placeholder="Sales Representative">
                         </div>
                     </div>
                     <div class="form-actions">
@@ -3508,6 +3508,9 @@
 
     <!-- FIX: Expired highlight table display to show proper call links -->
     <script src="js/fix-expired-highlight-table-display.js?v=1"></script>
+
+    <!-- SIMPLIFIED: Callback-only TO DO logic (overrides complex highlight tracking) -->
+    <script src="js/simplified-todo-logic.js?v=1"></script>
 
     <!-- REMOVED: Scripts moved earlier to ensure loading -->
 </body>
