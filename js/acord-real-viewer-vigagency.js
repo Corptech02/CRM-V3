@@ -2017,6 +2017,24 @@ async function saveCOIDocumentToPolicy(policyId, formData) {
                                         ctx.fillText(input.value, x, y);
                                         ctx.restore(); // Restore previous context
                                         console.log(`📸 🖋️ Rendered SIGNATURE field at (${Math.round(x)}, ${Math.round(y)}): ${input.value}`);
+                                    } else if (input.id === 'field_description' && input.value.includes('\n')) {
+                                        // Multi-line description field rendering
+                                        console.log('📝 Rendering multi-line description field');
+                                        ctx.save();
+                                        ctx.font = '10px Arial';
+                                        ctx.fillStyle = '#000000';
+
+                                        const lines = input.value.split('\n');
+                                        const lineHeight = 12; // Line spacing for 10px font
+
+                                        lines.forEach((line, index) => {
+                                            const lineY = y + (index * lineHeight);
+                                            ctx.fillText(line, x, lineY);
+                                            console.log(`📸 📝 Rendered description line ${index + 1} at (${Math.round(x)}, ${Math.round(lineY)}): ${line}`);
+                                        });
+
+                                        ctx.restore();
+                                        console.log(`📸 📝 Rendered multi-line description with ${lines.length} lines`);
                                     } else {
                                         // Regular field rendering
                                         ctx.save();
