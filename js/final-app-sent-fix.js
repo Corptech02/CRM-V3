@@ -120,6 +120,8 @@
             const actionMap = {
                 'new': 'Assign Stage',
                 'info_received': 'Prepare Quote',
+                'loss_runs_received': 'Prepare app.',
+                'app_prepared': 'Email brokers',
                 'not-interested': 'Archive lead',
                 'closed': 'Process complete'
             };

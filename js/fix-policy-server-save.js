@@ -692,6 +692,17 @@ console.log('Policy Server Save Fix: Loading...');
                 setTimeout(() => loadPoliciesView(), 1000);
             }
 
+            // Also refresh client profile if we're viewing one
+            if (window.currentViewingClientId) {
+                if (window.loadClientProfile) {
+                    console.log('🔄 Refreshing client profile after deletion...');
+                    setTimeout(() => window.loadClientProfile(window.currentViewingClientId), 100);
+                } else if (window.viewClientOriginal) {
+                    console.log('🔄 Refreshing original client profile after deletion...');
+                    setTimeout(() => window.viewClientOriginal(window.currentViewingClientId), 100);
+                }
+            }
+
             // Also trigger any other refresh mechanisms
             if (window.location.hash === '#policy-management') {
                 window.location.hash = '#policy-management'; // Force re-render
@@ -807,7 +818,7 @@ console.log('Policy Server Save Fix: Loading...');
             let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
             const clientIndex = clients.findIndex(c => c.id === clientId);
             if (clientIndex >= 0) {
-                if (!clients[clientIndex].policies) {
+                if (!clients[clientIndex].policies || !Array.isArray(clients[clientIndex].policies)) {
                     clients[clientIndex].policies = [];
                 }
                 if (!clients[clientIndex].policies.includes(policyId)) {

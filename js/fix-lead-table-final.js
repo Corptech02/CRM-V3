@@ -89,7 +89,7 @@ function formatPremiumDisplay(premium) {
             'info_received': 'Prepare Quote',
             'loss_runs_requested': '<span style="color: #dc2626; font-weight: bold;">Reach out</span>',
             'loss_runs_received': 'Prepare app.',
-            'app_prepared': 'Send application',
+            'app_prepared': 'Email brokers',
             'app_sent': '',  // App sent stage should have NO TODO text
             'app sent': '', // Handle both variations
             'quoted': '<span style="color: #dc2626; font-weight: bold;">Reach out</span>',

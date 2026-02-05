@@ -1,13 +1,29 @@
 // Original Simple Client Profile Design
-window.viewClientOriginal = function(id) {
+window.viewClientOriginal = async function(id) {
     console.log('Loading original client profile for:', id);
 
     // Store the client ID globally for refresh after policy deletion
     window.currentViewingClientId = id;
 
-    // Get client data
-    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-    const client = clients.find(c => c.id == id);
+    // Get fresh client data from API to ensure password updates are reflected
+    let client;
+    try {
+        const response = await fetch('/api/clients');
+        const data = await response.json();
+        const clients = data.clients || [];
+        client = clients.find(c => c.id == id);
+
+        if (!client) {
+            // Fallback to localStorage if not found in API
+            const localClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+            client = localClients.find(c => c.id == id);
+        }
+    } catch (error) {
+        console.error('Error fetching client data from API:', error);
+        // Fallback to localStorage on error
+        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        client = clients.find(c => c.id == id);
+    }
 
     if (!client) {
         showNotification('Client not found', 'error');
@@ -16,11 +32,30 @@ window.viewClientOriginal = function(id) {
     }
 
     // Get policies for this client - ALWAYS get fresh data from localStorage
+    // First, try to sync policies from server to get latest data
+    try {
+        console.log('🔄 Attempting to sync from server...');
+        const response = await fetch('https://162-220-14-239.nip.io/api/policies?includeInactive=true', {
+            timeout: 5000  // 5 second timeout
+        });
+        if (response.ok) {
+            const serverPolicies = await response.json();
+            localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
+            console.log(`✅ Synced ${serverPolicies.length} policies from server to localStorage`);
+        } else {
+            console.log(`⚠️ Server returned ${response.status}, using localStorage data`);
+        }
+    } catch (error) {
+        console.log('⚠️ Could not sync from server (timeout/error), using localStorage data:', error.message);
+    }
+
     const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
     console.log('Total policies in storage:', allPolicies.length);
     console.log('Client ID:', id, 'Client Name:', client.name);
 
     const clientPolicies = allPolicies.filter(policy => {
+        console.log('🔍 DEBUG: Checking policy:', policy.policyNumber, 'clientId:', policy.clientId, 'target client:', id);
+        console.log('🔍 DEBUG: Policy status values:', {status: policy.status, policyStatus: policy.policyStatus});
         // Match by clientId
         if (policy.clientId && String(policy.clientId) === String(id)) {
             console.log('Policy matched by clientId:', policy.policyNumber);
@@ -84,7 +119,71 @@ window.viewClientOriginal = function(id) {
                 </div>
             </header>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 0 24px;">
+            <div style="padding: 0 24px;">
+            <!-- Client Portal Box -->
+            <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center;">
+                        <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; margin-right: 12px;">
+                            <i class="fas fa-user-circle" style="font-size: 20px;"></i>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; color: #1f2937; font-size: 20px; font-weight: 600;">Client Portal</h3>
+                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Portal Access & Settings</p>
+                        </div>
+                    </div>
+                    <div>
+                        ${client.portalPassword ?
+                            `<a href="https://vigagency.com/pages/login.html" target="_blank" style="color: #3b82f6; text-decoration: none; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid #3b82f6; border-radius: 6px; transition: all 0.2s; background: transparent;">
+                                <i class="fas fa-external-link-alt" style="font-size: 14px;"></i>
+                                Go to Client Portal
+                            </a>` :
+                            `<span style="color: #9ca3af; text-decoration: none; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; cursor: not-allowed;">
+                                <i class="fas fa-external-link-alt" style="font-size: 14px;"></i>
+                                Go to Client Portal
+                            </span>`
+                        }
+                    </div>
+                </div>
+                <div style="display: grid; gap: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-envelope" style="color: #6b7280; font-size: 16px;"></i>
+                            <div>
+                                <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 2px; text-transform: uppercase;">Portal Email</label>
+                                <p style="margin: 0; font-size: 14px; color: #1f2937;">${client.email || 'No email set'}</p>
+                            </div>
+                        </div>
+                        <button onclick="window.editClientPortalEmail('${client.id}', '${client.email || ''}')" style="padding: 6px 12px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.2s;">
+                            <i class="fas fa-edit" style="font-size: 10px; margin-right: 4px;"></i>Edit
+                        </button>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-lock" style="color: #6b7280; font-size: 16px;"></i>
+                            <div>
+                                <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 2px; text-transform: uppercase;">Portal Password</label>
+                                <p style="margin: 0; font-size: 14px; color: ${client.portalPassword ? '#1f2937' : '#9ca3af'};">
+                                    <span id="password-display-${client.id}" style="font-family: monospace;">${client.portalPassword ? '●●●●●●●●' : 'NOT CREATED'}</span>
+                                    <span style="margin-left: 8px; color: #6b7280; font-size: 12px;">${client.portalPassword ? '(Set)' : ''}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            ${client.portalPassword ? `
+                                <button onclick="window.togglePasswordVisibility('${client.id}', '${client.portalPassword.replace(/'/g, "\\'")}', this)" style="padding: 6px 8px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.2s;" title="Show/Hide Password">
+                                    <i class="fas fa-eye" style="font-size: 10px;"></i>
+                                </button>
+                            ` : ''}
+                            <button onclick="window.${client.portalPassword ? 'changeClientPortalPassword' : 'createClientPortalPassword'}('${client.id}')" style="padding: 6px 12px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.2s;">
+                                <i class="fas fa-${client.portalPassword ? 'edit' : 'plus'}" style="font-size: 10px; margin-right: 4px;"></i>${client.portalPassword ? 'Change' : 'Create'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
                 <!-- Client Information - Left Side -->
                 <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: center; margin-bottom: 28px;">
@@ -184,6 +283,11 @@ window.viewClientOriginal = function(id) {
                             const formattedPremium = typeof premium === 'string' ?
                                 premium : `$${Number(premium).toLocaleString()}`;
 
+                            // Debug the policy status values
+                            const currentStatus = policy.policyStatus || policy.status || 'Active';
+                            const isActive = currentStatus === 'Active';
+                            console.log(`🔍 RENDER DEBUG: Policy ${policy.policyNumber} - status: "${policy.status}", policyStatus: "${policy.policyStatus}", currentStatus: "${currentStatus}", isActive: ${isActive}`);
+
                             return `
                             <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; background: linear-gradient(135deg, #fafafa 0%, #f9fafb 100%); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
                                 <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);"></div>
@@ -207,9 +311,21 @@ window.viewClientOriginal = function(id) {
                                         </p>` : '';
                                         })()}
                                     </div>
-                                    <span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                        ${policy.policyStatus || policy.status || 'Active'}
-                                    </span>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <label style="position: relative; display: inline-block; width: 40px; height: 20px; cursor: pointer;">
+                                            <input type="checkbox"
+                                                   id="policyActiveToggle-${policy.id || policy.policyNumber}"
+                                                   ${isActive ? 'checked' : ''}
+                                                   onchange="window.togglePolicyStatus('${policy.id || policy.policyNumber}', this.checked)"
+                                                   style="opacity: 0; width: 0; height: 0;">
+                                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isActive ? '#10b981' : '#cbd5e0'}; transition: .4s; border-radius: 20px;">
+                                                <span style="position: absolute; content: ''; height: 16px; width: 16px; left: ${isActive ? '22px' : '2px'}; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                                            </span>
+                                        </label>
+                                        <span style="background: ${isActive ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'}; color: white; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            Client Portal ${isActive ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div style="display: grid; gap: 8px; font-size: 14px; color: #4b5563;">
@@ -275,6 +391,7 @@ window.viewClientOriginal = function(id) {
                         ${window.renderClientDocuments(id)}
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     `;
@@ -503,6 +620,396 @@ function formatFileSize(bytes) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// Function to toggle policy status in policy cards
+window.togglePolicyStatus = function(policyId, isActive) {
+    console.log('🔄 [HTTPS VERSION] Toggling policy status for policy:', policyId, 'Active:', isActive);
+
+    const newStatus = isActive ? 'Active' : 'Inactive';
+
+    // Update the visual feedback of the toggle
+    const toggle = document.getElementById(`policyActiveToggle-${policyId}`);
+    if (toggle) {
+        const slider = toggle.nextElementSibling;
+        const knob = slider.querySelector('span:last-child');
+
+        // Update colors and position
+        slider.style.backgroundColor = isActive ? '#10b981' : '#cbd5e0';
+        knob.style.left = isActive ? '22px' : '2px';
+
+        // Update the status badge text and color
+        const statusBadge = slider.parentElement.nextElementSibling;
+        if (statusBadge) {
+            statusBadge.textContent = `Client Portal ${newStatus}`;
+            // Update badge background color based on status
+            statusBadge.style.background = isActive
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)';
+        }
+    }
+
+    // Find and update the policy in localStorage
+    try {
+        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        const policyIndex = policies.findIndex(p => p.id === policyId || p.policyNumber === policyId);
+
+        if (policyIndex !== -1) {
+            policies[policyIndex].status = newStatus;
+            policies[policyIndex].policyStatus = newStatus;
+            localStorage.setItem('insurance_policies', JSON.stringify(policies));
+            console.log('✅ Policy status updated in localStorage:', newStatus);
+        }
+
+        // Also update in window.allPolicies if it exists
+        if (window.allPolicies && Array.isArray(window.allPolicies)) {
+            const windowPolicyIndex = window.allPolicies.findIndex(p => p.id === policyId || p.policyNumber === policyId);
+            if (windowPolicyIndex !== -1) {
+                window.allPolicies[windowPolicyIndex].status = newStatus;
+                window.allPolicies[windowPolicyIndex].policyStatus = newStatus;
+                console.log('✅ Policy status updated in window.allPolicies:', newStatus);
+            }
+        }
+
+        // Update database via API
+        const timestamp = new Date().getTime();
+        const apiUrl = `https://162-220-14-239.nip.io/api/policies?t=${timestamp}`;
+        console.log('🌐 Making API request to:', apiUrl);
+        fetch(apiUrl, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: policyId,
+                status: newStatus,
+                policyStatus: newStatus
+            })
+        }).then(response => {
+            console.log('🔄 Server response status:', response.status);
+            return response.json();
+        }).then(data => {
+            console.log('✅ Server response data:', data);
+            if (data.success) {
+                console.log('✅ Policy status updated in database:', newStatus);
+                if (window.showNotification) {
+                    window.showNotification(`Policy status updated to ${newStatus}`, 'success');
+                }
+
+                // Force refresh the UI to reflect the new status
+                console.log('🔄 Force refreshing UI to reflect new status...');
+                setTimeout(() => {
+                    if (window.currentViewingClientId && window.viewClientOriginal) {
+                        window.viewClientOriginal(window.currentViewingClientId);
+                    } else {
+                        location.reload();
+                    }
+                }, 500);
+
+            } else {
+                console.warn('⚠️ Failed to update status in database:', data.message);
+                if (window.showNotification) {
+                    window.showNotification('Status updated locally only', 'warning');
+                }
+            }
+        }).catch(error => {
+            console.error('❌ Error updating status:', error);
+            if (window.showNotification) {
+                window.showNotification('Status updated locally only', 'warning');
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error updating policy status:', error);
+        if (window.showNotification) {
+            window.showNotification('Error updating policy status', 'error');
+        }
+    }
+};
+
+// Function to toggle client portal access
+window.toggleClientPortalAccess = function(clientId, isEnabled) {
+    console.log('🔄 Toggling client portal access for client:', clientId, 'Enabled:', isEnabled);
+
+    // Update the visual feedback of the toggle
+    const toggle = document.getElementById(`clientPortalToggle-${clientId}`);
+    if (toggle) {
+        const slider = toggle.nextElementSibling;
+        const knob = slider.querySelector('span:last-child');
+
+        // Update colors and position
+        slider.style.backgroundColor = isEnabled ? '#10b981' : '#cbd5e0';
+        knob.style.left = isEnabled ? '24px' : '2px';
+    }
+
+    // Find and update the client in localStorage
+    try {
+        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        const clientIndex = clients.findIndex(c => c.id === clientId);
+
+        if (clientIndex !== -1) {
+            clients[clientIndex].portalAccess = isEnabled;
+            localStorage.setItem('insurance_clients', JSON.stringify(clients));
+            console.log('✅ Client portal access updated in localStorage:', isEnabled);
+        }
+
+        // Update database via API
+        fetch('/api/clients', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: clientId,
+                portalAccess: isEnabled
+            })
+        }).then(response => {
+            if (response.ok) {
+                console.log('✅ Client portal access updated in database:', isEnabled);
+                if (window.showNotification) {
+                    window.showNotification(`Client portal access ${isEnabled ? 'enabled' : 'disabled'}`, 'success');
+                }
+            } else {
+                console.warn('⚠️ Failed to update portal access in database');
+                if (window.showNotification) {
+                    window.showNotification('Portal access updated locally only', 'warning');
+                }
+            }
+        }).catch(error => {
+            console.error('❌ Error updating portal access:', error);
+            if (window.showNotification) {
+                window.showNotification('Portal access updated locally only', 'warning');
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error updating client portal access:', error);
+        if (window.showNotification) {
+            window.showNotification('Error updating portal access', 'error');
+        }
+    }
+};
+
+// Function to edit client portal email
+window.editClientPortalEmail = function(clientId, currentEmail) {
+    console.log('📧 Editing client portal email for client:', clientId);
+
+    const newEmail = prompt('Enter new portal email:', currentEmail || '');
+    if (newEmail === null) return; // User cancelled
+
+    if (newEmail && !newEmail.includes('@')) {
+        alert('Please enter a valid email address');
+        return;
+    }
+
+    try {
+        // Update localStorage
+        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        const clientIndex = clients.findIndex(c => c.id === clientId);
+
+        if (clientIndex !== -1) {
+            clients[clientIndex].email = newEmail;
+            localStorage.setItem('insurance_clients', JSON.stringify(clients));
+            console.log('✅ Client email updated in localStorage:', newEmail);
+        }
+
+        // Update database via API
+        fetch('/api/clients', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: clientId,
+                email: newEmail
+            })
+        }).then(response => {
+            if (response.ok) {
+                console.log('✅ Client email updated in database:', newEmail);
+                if (window.showNotification) {
+                    window.showNotification('Portal email updated successfully', 'success');
+                }
+                // Refresh the client profile to show new email
+                window.viewClient(clientId);
+            } else {
+                console.warn('⚠️ Failed to update email in database');
+                if (window.showNotification) {
+                    window.showNotification('Email updated locally only', 'warning');
+                }
+            }
+        }).catch(error => {
+            console.error('❌ Error updating email:', error);
+            if (window.showNotification) {
+                window.showNotification('Email updated locally only', 'warning');
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error updating client email:', error);
+        if (window.showNotification) {
+            window.showNotification('Error updating email', 'error');
+        }
+    }
+};
+
+// Function to create client portal password
+window.createClientPortalPassword = function(clientId) {
+    console.log('🔒 Creating client portal password for client:', clientId);
+
+    const newPassword = prompt('Enter new portal password (minimum 6 characters):');
+    if (newPassword === null) return; // User cancelled
+
+    if (!newPassword || newPassword.length < 6) {
+        alert('Password must be at least 6 characters long');
+        return;
+    }
+
+    try {
+        // Update localStorage first
+        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        const clientIndex = clients.findIndex(c => c.id === clientId);
+
+        if (clientIndex !== -1) {
+            clients[clientIndex].portalPassword = newPassword;
+            // Also set password field for website integration
+            clients[clientIndex].password = newPassword;
+            localStorage.setItem('insurance_clients', JSON.stringify(clients));
+            console.log('✅ Client password created in localStorage');
+        }
+
+        // Update database via API - sync both portalPassword and password fields
+        fetch('/api/clients', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: clientId,
+                portalPassword: newPassword,
+                password: newPassword  // Add this for website login compatibility
+            })
+        }).then(response => {
+            if (response.ok) {
+                console.log('✅ Client password created in database');
+                if (window.showNotification) {
+                    window.showNotification('Portal password created successfully! Client can now login at vigagency.com', 'success');
+                }
+                // Refresh the client profile to show password is now set
+                window.viewClient(clientId);
+            } else {
+                console.warn('⚠️ Failed to create password in database');
+                if (window.showNotification) {
+                    window.showNotification('Password created locally only', 'warning');
+                }
+            }
+        }).catch(error => {
+            console.error('❌ Error creating password:', error);
+            if (window.showNotification) {
+                window.showNotification('Password created locally only', 'warning');
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error creating client password:', error);
+        if (window.showNotification) {
+            window.showNotification('Error creating password', 'error');
+        }
+    }
+};
+
+// Function to change client portal password
+window.changeClientPortalPassword = function(clientId) {
+    console.log('🔄 Changing client portal password for client:', clientId);
+
+    const newPassword = prompt('Enter new portal password (minimum 6 characters):');
+    if (newPassword === null) return; // User cancelled
+
+    if (!newPassword || newPassword.length < 6) {
+        alert('Password must be at least 6 characters long');
+        return;
+    }
+
+    try {
+        // Update localStorage
+        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        const clientIndex = clients.findIndex(c => c.id === clientId);
+
+        if (clientIndex !== -1) {
+            clients[clientIndex].portalPassword = newPassword;
+            // Also update password field for website integration
+            clients[clientIndex].password = newPassword;
+            localStorage.setItem('insurance_clients', JSON.stringify(clients));
+            console.log('✅ Client password changed in localStorage');
+        }
+
+        // Update database via API - sync both portalPassword and password fields
+        fetch('/api/clients', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: clientId,
+                portalPassword: newPassword,
+                password: newPassword  // Add this for website login compatibility
+            })
+        }).then(response => {
+            if (response.ok) {
+                console.log('✅ Client password changed in database');
+                if (window.showNotification) {
+                    window.showNotification('Portal password changed successfully! Updated on vigagency.com', 'success');
+                }
+                // Refresh the client profile to show updated status
+                window.viewClient(clientId);
+            } else {
+                console.warn('⚠️ Failed to change password in database');
+                if (window.showNotification) {
+                    window.showNotification('Password changed locally only', 'warning');
+                }
+            }
+        }).catch(error => {
+            console.error('❌ Error changing password:', error);
+            if (window.showNotification) {
+                window.showNotification('Password changed locally only', 'warning');
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error changing client password:', error);
+        if (window.showNotification) {
+            window.showNotification('Error changing password', 'error');
+        }
+    }
+};
+
+// Function to toggle password visibility
+window.togglePasswordVisibility = function(clientId, password, buttonElement) {
+    const displayElement = document.getElementById(`password-display-${clientId}`);
+    const icon = buttonElement.querySelector('i');
+
+    if (!displayElement || !icon) return;
+
+    const isHidden = displayElement.textContent === '●●●●●●●●';
+
+    if (isHidden) {
+        // Show password
+        displayElement.textContent = password;
+        displayElement.style.letterSpacing = '1px';
+        icon.className = 'fas fa-eye-slash';
+        buttonElement.title = 'Hide Password';
+        buttonElement.style.background = '#fee2e2';
+        buttonElement.style.color = '#dc2626';
+        buttonElement.style.borderColor = '#fecaca';
+    } else {
+        // Hide password
+        displayElement.textContent = '●●●●●●●●';
+        displayElement.style.letterSpacing = '2px';
+        icon.className = 'fas fa-eye';
+        buttonElement.title = 'Show Password';
+        buttonElement.style.background = '#f3f4f6';
+        buttonElement.style.color = '#374151';
+        buttonElement.style.borderColor = '#d1d5db';
+    }
+};
 
 // Override the current viewClient function with the original simple design
 window.viewClient = window.viewClientOriginal;

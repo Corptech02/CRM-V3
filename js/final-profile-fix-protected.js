@@ -196,6 +196,52 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
+                <!-- Callback Scheduler -->
+                <div class="profile-section" style="background: #e0f2fe; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; font-weight: bold;"><i class="fas fa-calendar-alt"></i> <span style="color: #0277bd;">Schedule Callback</span></h3>
+                        <div id="callback-status-${lead.id}" style="font-weight: bold; font-size: 14px; color: #0277bd;">
+                            <!-- Callback status will be updated here -->
+                        </div>
+                    </div>
+
+                    <!-- Callback Date/Time Input -->
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; gap: 15px; align-items: end;">
+                            <div style="flex: 1;">
+                                <label for="callback-date-${lead.id}" style="font-weight: 600; font-size: 12px; color: #374151;">Date:</label>
+                                <input type="date"
+                                       id="callback-date-${lead.id}"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;"
+                                       min="${new Date().toISOString().split('T')[0]}">
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="callback-time-${lead.id}" style="font-weight: 600; font-size: 12px; color: #374151;">Time:</label>
+                                <input type="time"
+                                       id="callback-time-${lead.id}"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                            </div>
+                            <button onclick="scheduleCallback('${lead.id}')"
+                                    style="background: #0277bd; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap;">
+                                <i class="fas fa-plus"></i> Schedule
+                            </button>
+                        </div>
+
+                        <!-- Notes for callback -->
+                        <div>
+                            <label for="callback-notes-${lead.id}" style="font-weight: 600; font-size: 12px; color: #374151;">Callback Notes:</label>
+                            <textarea id="callback-notes-${lead.id}"
+                                      placeholder="Optional notes for the callback..."
+                                      style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white; resize: vertical; min-height: 60px; font-family: inherit;"></textarea>
+                        </div>
+
+                        <!-- Scheduled Callbacks List -->
+                        <div id="scheduled-callbacks-${lead.id}" style="margin-top: 10px;">
+                            <!-- Scheduled callbacks will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Reach Out Checklist -->
                 <div class="profile-section" style="background: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <!-- Header with TO DO message -->
@@ -724,6 +770,11 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     // Activate DOM protection to prevent hardcoded ID overwrites
     protectedFunctions.protectModalIDs(lead.id, modalContainer);
 
+    // Initialize callback display for this lead
+    setTimeout(() => {
+        displayScheduledCallbacks(lead.id);
+    }, 100);
+
     // Force immediate ID fix in case any hardcoded elements are already present
     setTimeout(() => {
         const badElements = modalContainer.querySelectorAll('[id*="8126662"]');
@@ -785,6 +836,57 @@ protectedFunctions.createEnhancedProfile = function(lead) {
 
         // Load loss runs from server
         protectedFunctions.loadLossRuns(lead.id);
+
+        // AUTO-CHECK CALL CHECKBOX FOR OVERDUE CALLBACKS
+        setTimeout(() => {
+            console.log('🔍 CALLBACK AUTO-CHECK: Checking for overdue callbacks for lead', lead.id);
+
+            const callbacksKey = 'scheduled_callbacks';
+            const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+            const now = new Date();
+
+            console.log('🔍 CALLBACK AUTO-CHECK: Current callbacks data:', callbacks);
+            console.log('🔍 CALLBACK AUTO-CHECK: Looking for leadId:', lead.id);
+
+            if (callbacks[lead.id]) {
+                console.log('📋 CALLBACK AUTO-CHECK: Found callbacks for lead:', callbacks[lead.id]);
+
+                // Check if any callback is overdue AND not completed
+                const overdueCallbacks = callbacks[lead.id].filter(callback => {
+                    const callbackTime = new Date(callback.dateTime);
+                    const isOverdue = callbackTime <= now;
+                    const isCompleted = callback.completed;
+                    console.log('🔍 CALLBACK AUTO-CHECK: Callback', callback.dateTime, 'isOverdue:', isOverdue, 'isCompleted:', isCompleted);
+                    return isOverdue && !isCompleted;
+                });
+
+                console.log('🔍 CALLBACK AUTO-CHECK: Filtered overdue callbacks:', overdueCallbacks);
+
+                if (overdueCallbacks.length > 0) {
+                    console.log('📞 CALLBACK AUTO-CHECK: Found', overdueCallbacks.length, 'overdue callbacks, auto-checking call-made checkbox');
+
+                    const callCheckbox = document.getElementById(`call-made-${lead.id}`);
+                    console.log('🔍 CALLBACK AUTO-CHECK: Found checkbox:', callCheckbox, 'currently checked:', callCheckbox?.checked);
+
+                    if (callCheckbox && !callCheckbox.checked) {
+                        callCheckbox.checked = true;
+                        console.log('✅ CALLBACK AUTO-CHECK: Auto-checked call-made checkbox for lead', lead.id);
+
+                        // Trigger the change event to update the reach out data
+                        const changeEvent = new Event('change', { bubbles: true });
+                        callCheckbox.dispatchEvent(changeEvent);
+                        console.log('🔍 CALLBACK AUTO-CHECK: Triggered change event');
+                    } else if (callCheckbox?.checked) {
+                        console.log('✅ CALLBACK AUTO-CHECK: Checkbox already checked for lead', lead.id);
+                    }
+                } else {
+                    console.log('⏳ CALLBACK AUTO-CHECK: No overdue callbacks for lead', lead.id);
+                }
+            } else {
+                console.log('📋 CALLBACK AUTO-CHECK: No callbacks found for lead', lead.id);
+            }
+        }, 200);
+
     }, 100);
 
     console.log('🔥 Enhanced Profile: Modal created successfully');
@@ -2508,6 +2610,25 @@ function markReachOutComplete(leadId, completedAt) {
     }
 
     console.log(`✅ Marked reach-out as complete for lead ${leadId} at ${completedAt}`);
+
+    // Complete any existing callbacks for this lead since the call was successful
+    console.log('✅ CALLBACK COMPLETION: Completing callbacks after successful reach-out for lead', leadId);
+    if (typeof window.completeCallback === 'function') {
+        window.completeCallback(leadId, true);
+    } else {
+        console.log('⚠️  CALLBACK COMPLETION: completeCallback function not available');
+    }
+
+    // Show next callback scheduling popup
+    console.log('📞 NEXT CALLBACK: About to show popup for completed call, leadId:', leadId);
+    setTimeout(() => {
+        console.log('📞 NEXT CALLBACK: Timeout triggered, calling showNextCallbackPopup');
+        if (typeof showNextCallbackPopup === 'function') {
+            showNextCallbackPopup(leadId);
+        } else {
+            console.error('❌ NEXT CALLBACK: showNextCallbackPopup function not found!');
+        }
+    }, 1000);
 }
 
 // Function to show call logs for a lead
@@ -4314,6 +4435,350 @@ window.setGreenHighlightDuration = function(leadId, days) {
     // Show notification
     showNotification(`Lead will stay green for ${daysNum} ${daysNum === 1 ? 'day' : 'days'}`, 'success');
 };
+
+// Custom modal for Next Callback scheduling
+function showNextCallbackPopup(leadId) {
+    console.log('📞 NEXT CALLBACK: Showing scheduling popup for lead', leadId);
+
+    // Check if there are existing callbacks for this lead
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const leadCallbacks = callbacks[leadId] || [];
+
+    // Create modal overlay
+    const modalOverlay = document.createElement('div');
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 3000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+    `;
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-width: 400px;
+        margin: 0 20px;
+    `;
+
+    modal.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="width: 60px; height: 60px; background: #dcfce7; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-calendar-plus" style="font-size: 24px; color: #10b981;"></i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Call Completed!</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 16px; line-height: 1.5;">
+                Would you like to schedule the next callback for this lead?
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="schedule-next-callback" style="
+                background: #10b981;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 120px;
+                transition: all 0.2s;
+            ">Schedule Next Call</button>
+            <button id="no-callback-needed" style="
+                background: #f3f4f6;
+                color: #374151;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 120px;
+                transition: all 0.2s;
+            ">Not Needed</button>
+        </div>
+    `;
+
+    modalOverlay.appendChild(modal);
+    document.body.appendChild(modalOverlay);
+
+    // Add hover effects
+    const scheduleBtn = modal.querySelector('#schedule-next-callback');
+    const noNeedBtn = modal.querySelector('#no-callback-needed');
+
+    scheduleBtn.addEventListener('mouseenter', () => {
+        scheduleBtn.style.background = '#059669';
+    });
+    scheduleBtn.addEventListener('mouseleave', () => {
+        scheduleBtn.style.background = '#10b981';
+    });
+
+    noNeedBtn.addEventListener('mouseenter', () => {
+        noNeedBtn.style.background = '#e5e7eb';
+    });
+    noNeedBtn.addEventListener('mouseleave', () => {
+        noNeedBtn.style.background = '#f3f4f6';
+    });
+
+    // Handle button clicks
+    scheduleBtn.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        console.log('📞 NEXT CALLBACK: User chose to schedule next callback');
+
+        // Show the callback scheduler (reuse existing function if available)
+        setTimeout(() => {
+            showCallbackScheduler(leadId);
+        }, 200);
+    });
+
+    noNeedBtn.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        console.log('📞 NEXT CALLBACK: User chose no callback needed');
+
+        // Complete/remove any existing callbacks for this lead
+        if (leadCallbacks.length > 0) {
+            completeAllCallbacksForLead(leadId);
+        }
+    });
+
+    // Handle escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            document.body.removeChild(modalOverlay);
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Handle click outside modal
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) {
+            document.body.removeChild(modalOverlay);
+        }
+    });
+}
+
+// Function to complete all callbacks for a lead
+function completeAllCallbacksForLead(leadId) {
+    console.log('✅ COMPLETING ALL CALLBACKS for lead', leadId);
+
+    if (typeof window.completeCallback === 'function') {
+        window.completeCallback(leadId, true);
+    }
+
+    // Also update the table to remove callback messages
+    setTimeout(() => {
+        if (typeof window.emergencyCallbackFix === 'function') {
+            window.emergencyCallbackFix();
+        }
+    }, 500);
+}
+
+// Function to show callback scheduler (reuse existing or create simple one)
+function showCallbackScheduler(leadId) {
+    console.log('📅 CALLBACK SCHEDULER: Opening scheduler for lead', leadId);
+
+    // Get lead data
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.error('Lead not found for callback scheduling:', leadId);
+        return;
+    }
+
+    // Create simple scheduler modal
+    const modalOverlay = document.createElement('div');
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 3000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+    `;
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        max-width: 450px;
+        margin: 0 20px;
+    `;
+
+    // Get current date/time for default
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0); // Default to 10 AM tomorrow
+
+    const dateStr = tomorrow.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM format
+
+    modal.innerHTML = `
+        <div style="margin-bottom: 25px; text-align: center;">
+            <div style="width: 60px; height: 60px; background: #dbeafe; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-calendar-alt" style="font-size: 24px; color: #3b82f6;"></i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Schedule Next Call</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 14px;">
+                Lead: <strong>${lead.name}</strong>
+            </p>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                Callback Date & Time:
+            </label>
+            <input type="datetime-local" id="callback-datetime" value="${dateStr}"
+                   style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;" />
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                Notes (optional):
+            </label>
+            <textarea id="callback-notes" placeholder="Add any notes for the callback..."
+                      style="width: 100%; height: 60px; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="save-callback" style="
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 100px;
+            ">Schedule</button>
+            <button id="cancel-callback" style="
+                background: #f3f4f6;
+                color: #374151;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 100px;
+            ">Cancel</button>
+        </div>
+    `;
+
+    modalOverlay.appendChild(modal);
+    document.body.appendChild(modalOverlay);
+
+    // Handle save callback
+    modal.querySelector('#save-callback').addEventListener('click', () => {
+        const dateTime = modal.querySelector('#callback-datetime').value;
+        const notes = modal.querySelector('#callback-notes').value;
+
+        if (!dateTime) {
+            alert('Please select a date and time for the callback');
+            return;
+        }
+
+        // Save the callback
+        saveCallback(leadId, dateTime, notes);
+        document.body.removeChild(modalOverlay);
+    });
+
+    // Handle cancel
+    modal.querySelector('#cancel-callback').addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+    });
+}
+
+// Function to save callback
+async function saveCallback(leadId, dateTime, notes) {
+    console.log('💾 SAVING CALLBACK:', { leadId, dateTime, notes });
+
+    // Save to localStorage
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (!callbacks[leadId]) {
+        callbacks[leadId] = [];
+    }
+
+    const callbackId = Date.now(); // Simple ID
+    const newCallback = {
+        id: callbackId,
+        leadId: leadId,
+        dateTime: dateTime,
+        notes: notes || '',
+        completed: false,
+        createdAt: new Date().toISOString()
+    };
+
+    callbacks[leadId].push(newCallback);
+    localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+
+    // Save to server
+    try {
+        const urls = [
+            'http://162-220-14-239.nip.io:3001/api/callbacks',
+            'http://localhost:3001/api/callbacks'
+        ];
+
+        for (const url of urls) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newCallback)
+                });
+
+                if (response.ok) {
+                    console.log('✅ CALLBACK SAVED: Successfully saved to server');
+                    break;
+                }
+            } catch (error) {
+                console.log('❌ CALLBACK SAVE: Server error:', error.message);
+            }
+        }
+    } catch (error) {
+        console.error('Error saving callback to server:', error);
+    }
+
+    // Show notification
+    const callbackDate = new Date(dateTime);
+    const formattedDate = callbackDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    alert(`✅ Callback scheduled for ${formattedDate}`);
+
+    console.log('📅 CALLBACK SCHEDULED: New callback set for', formattedDate);
+}
 
 // Custom modal for Contact Attempted confirmation
 function showContactAttemptedModal(leadId, callback) {
@@ -6461,6 +6926,14 @@ window.handleContactAttemptedCompletion = async function(leadId) {
             }, 1000);
         }
 
+        // CALLBACK COMPLETION: Complete any active callbacks for this lead
+        if (typeof window.completeCallback === 'function') {
+            console.log('✅ CALLBACK COMPLETION: Completing scheduled callbacks for lead', leadId);
+            window.completeCallback(leadId, true);
+        } else {
+            console.log('⚠️  CALLBACK COMPLETION: completeCallback function not available');
+        }
+
     } catch (error) {
         console.error('Error completing Contact Attempted reach-out:', error);
         if (window.showNotification) {
@@ -8050,6 +8523,125 @@ window.updateNameFieldColor = function(inputElement) {
         // Empty - red tinting
         inputElement.style.border = '1px solid #ef4444';
         inputElement.style.backgroundColor = '#fef2f2';
+    }
+};
+
+// Callback Scheduler Functions
+window.scheduleCallback = function(leadId) {
+    const dateInput = document.getElementById(`callback-date-${leadId}`);
+    const timeInput = document.getElementById(`callback-time-${leadId}`);
+    const notesInput = document.getElementById(`callback-notes-${leadId}`);
+
+    const date = dateInput.value;
+    const time = timeInput.value;
+    const notes = notesInput.value.trim();
+
+    if (!date || !time) {
+        alert('Please select both date and time for the callback.');
+        return;
+    }
+
+    // Combine date and time
+    const callbackDateTime = new Date(`${date}T${time}`);
+    const now = new Date();
+
+    if (callbackDateTime <= now) {
+        alert('Please select a future date and time for the callback.');
+        return;
+    }
+
+    // Get existing callbacks from localStorage
+    const callbacksKey = 'scheduled_callbacks';
+    let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (!callbacks[leadId]) {
+        callbacks[leadId] = [];
+    }
+
+    // Create new callback object
+    const newCallback = {
+        id: Date.now(),
+        leadId: leadId,
+        date: date,
+        time: time,
+        dateTime: callbackDateTime.toISOString(),
+        notes: notes,
+        completed: false,
+        created: new Date().toISOString()
+    };
+
+    // Add to callbacks
+    callbacks[leadId].push(newCallback);
+    callbacks[leadId].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+
+    // Save to localStorage
+    localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+
+    // Clear inputs
+    dateInput.value = '';
+    timeInput.value = '';
+    notesInput.value = '';
+
+    // Refresh display
+    displayScheduledCallbacks(leadId);
+
+    console.log('✅ Callback scheduled for:', callbackDateTime);
+};
+
+window.displayScheduledCallbacks = function(leadId) {
+    const container = document.getElementById(`scheduled-callbacks-${leadId}`);
+    if (!container) return;
+
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const leadCallbacks = callbacks[leadId] || [];
+
+    if (leadCallbacks.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const now = new Date();
+    let html = '<div style="border-top: 1px solid #0277bd; padding-top: 15px;"><h4 style="margin: 0 0 10px 0; color: #0277bd; font-size: 14px;"><i class="fas fa-clock"></i> Scheduled Callbacks</h4>';
+
+    leadCallbacks.forEach(callback => {
+        const callbackTime = new Date(callback.dateTime);
+        const isPast = callbackTime <= now;
+        const isToday = callbackTime.toDateString() === now.toDateString();
+
+        const timeStr = callbackTime.toLocaleDateString() + ' at ' + callbackTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        html += `
+            <div style="background: ${isPast ? '#fee2e2' : isToday ? '#fef3c7' : '#f0f9ff'}; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid ${isPast ? '#dc2626' : isToday ? '#f59e0b' : '#0277bd'};">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: ${isPast ? '#dc2626' : isToday ? '#f59e0b' : '#0277bd'}; font-size: 13px;">
+                            ${isPast ? '🔴 OVERDUE' : isToday ? '⚡ TODAY' : '📅'} ${timeStr}
+                        </div>
+                        ${callback.notes ? `<div style="font-size: 12px; color: #6b7280; margin-top: 5px;">${callback.notes}</div>` : ''}
+                    </div>
+                    <button onclick="completeCallback('${leadId}', ${callback.id})"
+                            style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-check"></i> Done
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+};
+
+window.completeCallback = function(leadId, callbackId) {
+    const callbacksKey = 'scheduled_callbacks';
+    let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (callbacks[leadId]) {
+        callbacks[leadId] = callbacks[leadId].filter(cb => cb.id !== callbackId);
+        localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+        displayScheduledCallbacks(leadId);
+        console.log('✅ Callback completed and removed');
     }
 };
 

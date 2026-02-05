@@ -94,7 +94,7 @@ console.log('🔧 REACH OUT TABLE TEXT FIX: Loading fix for expired highlight re
             'info_received': 'Prepare Quote',
             'loss_runs_requested': '<span style="color: #dc2626; font-weight: bold;">Reach Out</span>',
             'loss_runs_received': 'Prepare app.',
-            'app_prepared': 'Send application',
+            'app_prepared': 'Email brokers',
             'app_sent': '',
             'quoted': '<span style="color: #dc2626; font-weight: bold;">Reach Out</span>',
             'quote_sent': '<span style="color: #dc2626; font-weight: bold;">Reach Out</span>',

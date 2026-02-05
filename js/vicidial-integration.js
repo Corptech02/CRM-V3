@@ -250,12 +250,29 @@ class ViciDialIntegration {
             
             // Notes
             notes: viciLead.comments || '',
-            
+
             // Follow-up
             needsFollowUp: true,
             followUpDate: this.calculateFollowUpDate(),
             assignedAgent: ''
         };
+
+        // Auto-create callback from ViciDial comments if scheduled callback exists
+        if (viciLead.comments && typeof window.createCallbackFromVicidialImport === 'function') {
+            try {
+                const callbackCreated = window.createCallbackFromVicidialImport(
+                    viciLead.lead_id,
+                    viciLead.first_name + ' ' + viciLead.last_name,
+                    viciLead.comments
+                );
+                if (callbackCreated) {
+                    console.log('📅 VICIDIAL INTEGRATION: Auto-created callback for lead', viciLead.lead_id);
+                    profile.hasScheduledCallback = true;
+                }
+            } catch (error) {
+                console.error('❌ VICIDIAL INTEGRATION: Error creating callback:', error);
+            }
+        }
 
         return profile;
     }
