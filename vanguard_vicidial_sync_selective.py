@@ -587,8 +587,8 @@ class VanguardViciDialSelectiveSync:
                     # Parse the combined datetime string
                     callback_datetime = datetime.strptime(callback_datetime_str, "%m/%d/%Y %I:%M %p")
 
-                    # Convert to ISO format for storage
-                    parsed_info['callback_datetime_iso'] = callback_datetime.isoformat() + 'Z'
+                    # Convert to ISO format for storage (local time, not UTC)
+                    parsed_info['callback_datetime_iso'] = callback_datetime.isoformat()
                     parsed_info['has_callback'] = True
 
                     logger.info(f"✅ Callback datetime computed: {parsed_info['callback_datetime_iso']}")
@@ -603,6 +603,57 @@ class VanguardViciDialSelectiveSync:
             logger.warning(f"⚠️ Error parsing enhanced comments: {e}")
 
         return parsed_info
+
+    def create_callback_record(self, lead_id, enhanced_info, lead_name):
+        """Create a callback record in the database for ViciDial scheduled callbacks"""
+        try:
+            callback_datetime = enhanced_info.get('callback_datetime_iso')
+            callback_date = enhanced_info.get('callback_date')
+            callback_time = enhanced_info.get('callback_time')
+
+            if not callback_datetime:
+                logger.warning(f"⚠️ Cannot create callback record for {lead_name}: missing callback datetime")
+                return False
+
+            # Generate unique callback ID
+            import time, random
+            callback_id = str(int(time.time() * 1000) + random.randint(1, 999))
+
+            # Create callback data
+            callback_data = {
+                'id': callback_id,
+                'dateTime': callback_datetime,
+                'notes': f'Scheduled callback imported from ViciDial - {lead_name} (Original: {callback_date} at {callback_time})',
+                'completed': False,
+                'importedFromVicidial': True,
+                'originalComments': f'Date: {callback_date} Time: {callback_time}',
+                'leadId': lead_id,
+                'leadName': lead_name,
+                'createdAt': datetime.now().isoformat() + 'Z'
+            }
+
+            # Insert callback into database
+            cursor = self.db.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO scheduled_callbacks (
+                    callback_id, lead_id, date_time, notes, completed, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                callback_id,
+                lead_id,
+                callback_datetime,
+                callback_data['notes'],
+                0,  # completed = False
+                callback_data['createdAt']
+            ))
+
+            self.db.commit()
+            logger.info(f"📅 VICIDIAL CALLBACK: Created callback record {callback_id} for {lead_name} at {callback_datetime}")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Error creating callback record for {lead_name}: {e}")
+            return False
 
     def format_phone(self, phone):
         """Format phone number consistently"""
@@ -857,6 +908,9 @@ class VanguardViciDialSelectiveSync:
                     lead_data['reachOut']['completedAt'] = datetime.now().isoformat() + 'Z'
                     lead_data['reachOut']['emailConfirmed'] = True  # Mark as email confirmed since callback was scheduled
                     lead_data['reachOut']['contacted'] = True
+
+                    # CREATE ACTUAL CALLBACK RECORD for the CRM system
+                    self.create_callback_record(lead_id, enhanced_info, lead_data['name'])
 
                     logger.info(f"✅ Callback-based setup complete: highlight until {enhanced_info['callback_datetime_iso']}, marked as completed")
                 else:

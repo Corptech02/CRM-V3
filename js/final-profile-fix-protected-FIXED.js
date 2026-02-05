@@ -772,13 +772,13 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     protectedFunctions.protectModalIDs(lead.id, modalContainer);
 
     // Initialize callback display for this lead
-    setTimeout(() => {
-        displayScheduledCallbacks(lead.id);
+    setTimeout(async () => {
+        await displayScheduledCallbacks(lead.id);
 
         // Also try to load from server in case it wasn't loaded yet
-        loadCallbacksFromServer().then(() => {
-            setTimeout(() => {
-                displayScheduledCallbacks(lead.id);
+        loadCallbacksFromServer().then(async () => {
+            setTimeout(async () => {
+                await displayScheduledCallbacks(lead.id);
             }, 500);
         });
     }, 100);
@@ -4587,7 +4587,7 @@ function completeAllCallbacksForLead(leadId) {
 
         // Still refresh the display and table
         if (typeof displayScheduledCallbacks === 'function') {
-            displayScheduledCallbacks(leadId);
+            displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
         }
 
         if (typeof updateTableAfterCallbackComplete === 'function') {
@@ -4828,7 +4828,7 @@ async function saveCallbackToLocalStorageAndServer(leadId, dateTime, notes) {
 
     // Refresh the callback display to show the new callback and remove any old ones
     if (typeof displayScheduledCallbacks === 'function') {
-        displayScheduledCallbacks(leadId);
+        displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
         console.log('🔄 DISPLAY REFRESHED: Updated callback display after scheduling');
     }
 }
@@ -8183,7 +8183,7 @@ window.scheduleCallback = async function(leadId) {
         notesInput.value = '';
 
         // Refresh display
-        displayScheduledCallbacks(leadId);
+        displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
 
         console.log('✅ Callback scheduled for:', callbackDateTime);
     } catch (error) {
@@ -8192,17 +8192,58 @@ window.scheduleCallback = async function(leadId) {
     }
 };
 
-window.displayScheduledCallbacks = function(leadId) {
+window.displayScheduledCallbacks = async function(leadId) {
     const container = document.getElementById(`scheduled-callbacks-${leadId}`);
     if (!container) return;
 
+    console.log('📅 CALLBACK DISPLAY: Loading callbacks for lead', leadId, 'from localStorage and server...');
+
+    // Load from localStorage first (legacy storage)
     const callbacksKey = 'scheduled_callbacks';
-    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
-    const leadCallbacks = callbacks[leadId] || [];
+    const localCallbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+    const localLeadCallbacks = localCallbacks[leadId] || [];
+
+    // Load from server/database
+    let serverCallbacks = [];
+    try {
+        const baseUrl = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001'
+            : `${window.location.protocol}//${window.location.hostname}:3001`;
+
+        const response = await fetch(`${baseUrl}/api/callbacks?leadId=${leadId}`);
+        if (response.ok) {
+            const data = await response.json();
+            serverCallbacks = data.callbacks || [];
+            console.log('📋 SERVER CALLBACKS: Loaded', serverCallbacks.length, 'callbacks from server for lead', leadId);
+        } else {
+            console.warn('⚠️ Failed to load callbacks from server:', response.status);
+        }
+    } catch (error) {
+        console.warn('⚠️ Failed to fetch callbacks from server:', error.message);
+    }
+
+    // Convert server callback format to match local format
+    const convertedServerCallbacks = serverCallbacks.map(callback => ({
+        id: callback.callback_id || callback.id,
+        dateTime: callback.date_time,
+        notes: callback.notes,
+        completed: callback.completed === 1,
+        importedFromVicidial: callback.notes && callback.notes.includes('imported from ViciDial')
+    }));
+
+    // Combine local and server callbacks, avoiding duplicates
+    const allCallbacks = [...localLeadCallbacks];
+    convertedServerCallbacks.forEach(serverCallback => {
+        const exists = allCallbacks.find(local => local.id === serverCallback.id);
+        if (!exists) {
+            allCallbacks.push(serverCallback);
+        }
+    });
 
     // FILTER OUT COMPLETED CALLBACKS - only show active ones
-    const activeCallbacks = leadCallbacks.filter(callback => !callback.completed);
-    console.log('📋 CALLBACK DISPLAY: Lead', leadId, 'has', leadCallbacks.length, 'total callbacks,', activeCallbacks.length, 'active (incomplete)');
+    const activeCallbacks = allCallbacks.filter(callback => !callback.completed);
+    console.log('📋 CALLBACK DISPLAY: Lead', leadId, 'has', allCallbacks.length, 'total callbacks,', activeCallbacks.length, 'active (incomplete)');
+    console.log('📋 CALLBACK DETAILS:', activeCallbacks.map(cb => ({ id: cb.id, dateTime: cb.dateTime, notes: cb.notes?.substring(0, 50) })));
 
     if (activeCallbacks.length === 0) {
         container.innerHTML = '';
@@ -8213,23 +8254,28 @@ window.displayScheduledCallbacks = function(leadId) {
     const now = new Date();
     let html = '<div style="border-top: 1px solid #0277bd; padding-top: 15px;"><h4 style="margin: 0 0 10px 0; color: #0277bd; font-size: 14px;"><i class="fas fa-clock"></i> Scheduled Callbacks</h4>';
 
+    // Sort callbacks by date/time
+    activeCallbacks.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+
     activeCallbacks.forEach(callback => {
         const callbackTime = new Date(callback.dateTime);
         const isPast = callbackTime <= now;
         const isToday = callbackTime.toDateString() === now.toDateString();
 
         const timeStr = callbackTime.toLocaleDateString() + ' at ' + callbackTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const sourceIcon = callback.importedFromVicidial ? '📞' : '📅';
+        const sourceText = callback.importedFromVicidial ? ' (ViciDial Import)' : '';
 
         html += `
             <div style="background: ${isPast ? '#fee2e2' : isToday ? '#fef3c7' : '#f0f9ff'}; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid ${isPast ? '#dc2626' : isToday ? '#f59e0b' : '#0277bd'};">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
                         <div style="font-weight: 600; color: ${isPast ? '#dc2626' : isToday ? '#f59e0b' : '#0277bd'}; font-size: 13px;">
-                            ${isPast ? '🔴 OVERDUE' : isToday ? '⚡ TODAY' : '📅'} ${timeStr}
+                            ${isPast ? '🔴 OVERDUE' : isToday ? '⚡ TODAY' : sourceIcon} ${timeStr}${sourceText}
                         </div>
                         ${callback.notes ? `<div style="font-size: 12px; color: #6b7280; margin-top: 5px;">${callback.notes}</div>` : ''}
                     </div>
-                    <button onclick="completeCallback('${leadId}', ${callback.id})"
+                    <button onclick="completeCallback('${leadId}', '${callback.id}')"
                             style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
                         <i class="fas fa-check"></i> Done
                     </button>
@@ -8257,7 +8303,7 @@ window.completeCallback = async function(leadId, callbackId) {
     }
 
     // Always refresh display immediately
-    displayScheduledCallbacks(leadId);
+    displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
     console.log('✅ DISPLAY REFRESHED: Callback display updated for lead', leadId);
 
     // Update the table cell to remove the "Reach out: CALL" message
@@ -8840,7 +8886,7 @@ async function loadCallbacksFromServer() {
                 // Also refresh displays for all leads with callbacks
                 Object.keys(mergedCallbacks).forEach(leadId => {
                     console.log(`🎨 SERVER SYNC: Refreshing display for lead ${leadId}`);
-                    displayScheduledCallbacks(leadId);
+                    displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
                 });
             }, 1000);
 
@@ -9097,6 +9143,183 @@ console.log('🔍 Current functions on window:', {
     createEnhancedProfile: typeof window.createEnhancedProfile,
     getReachOutStatus: typeof window.getReachOutStatus
 });
+
+// ================================
+// VICIDIAL CALLBACK PARSING SYSTEM
+// ================================
+
+// Function to parse scheduled callbacks from ViciDial comments
+function parseVicidialCallbackFromComments(comments, leadId, leadName) {
+    if (!comments) return null;
+
+    console.log('📋 VICIDIAL CALLBACK PARSE: Checking comments for lead', leadName, ':', comments);
+
+    // Look for the scheduled call section pattern
+    const scheduledCallPattern = /--scheduled next call-+\s*\n?\s*Date:\s*([0-9]{2}\/[0-9]{2}\/[0-9]{4})\s*Time:\s*([0-9]{1,2}:[0-9]{2}[AP]M)/i;
+    const match = comments.match(scheduledCallPattern);
+
+    if (!match) {
+        console.log('❌ VICIDIAL CALLBACK PARSE: No scheduled callback found in comments for', leadName);
+        return null;
+    }
+
+    const dateStr = match[1]; // MM/DD/YYYY
+    const timeStr = match[2]; // HH:MMAM/PM
+
+    console.log('📅 VICIDIAL CALLBACK PARSE: Found scheduled callback - Date:', dateStr, 'Time:', timeStr);
+
+    try {
+        // Parse the date and time
+        const [month, day, year] = dateStr.split('/');
+        const monthNum = parseInt(month);
+        const dayNum = parseInt(day);
+        const yearNum = parseInt(year);
+
+        // Validate date components
+        if (monthNum < 1 || monthNum > 12) {
+            console.error(`❌ VICIDIAL CALLBACK PARSE: Invalid month ${monthNum} for ${leadName}`);
+            return null;
+        }
+
+        if (dayNum < 1 || dayNum > 31) {
+            console.error(`❌ VICIDIAL CALLBACK PARSE: Invalid day ${dayNum} for ${leadName}`);
+            return null;
+        }
+
+        // Create date and validate it's the same as input (catches invalid dates like Feb 30)
+        const date = new Date(yearNum, monthNum - 1, dayNum); // month is 0-indexed
+
+        // Check if the date rolled over to a different month/day (invalid date)
+        if (date.getMonth() !== (monthNum - 1) || date.getDate() !== dayNum || date.getFullYear() !== yearNum) {
+            console.error(`❌ VICIDIAL CALLBACK PARSE: Invalid date ${dateStr} for ${leadName} - date rolled over to ${date.toDateString()}`);
+            return null;
+        }
+
+        // Parse time (12-hour format)
+        const time12Hour = timeStr.toUpperCase();
+        let [hours, minutes] = time12Hour.replace(/[AP]M/, '').split(':');
+        hours = parseInt(hours);
+        minutes = parseInt(minutes);
+
+        // Validate time components
+        if (hours < 1 || hours > 12) {
+            console.error(`❌ VICIDIAL CALLBACK PARSE: Invalid hours ${hours} for ${leadName}`);
+            return null;
+        }
+
+        if (minutes < 0 || minutes > 59) {
+            console.error(`❌ VICIDIAL CALLBACK PARSE: Invalid minutes ${minutes} for ${leadName}`);
+            return null;
+        }
+
+        // Convert to 24-hour format
+        if (time12Hour.includes('PM') && hours !== 12) {
+            hours += 12;
+        } else if (time12Hour.includes('AM') && hours === 12) {
+            hours = 0;
+        }
+
+        // Set the time on the date
+        date.setHours(hours, minutes, 0, 0);
+
+        const callbackDateTime = date.toISOString();
+
+        console.log('✅ VICIDIAL CALLBACK PARSE: Successfully parsed callback for', leadName, 'at', callbackDateTime);
+
+        return {
+            id: Date.now() + Math.random(), // Unique ID
+            dateTime: callbackDateTime,
+            notes: `Scheduled callback imported from ViciDial - ${leadName}`,
+            completed: false,
+            importedFromVicidial: true,
+            originalComments: comments
+        };
+
+    } catch (error) {
+        console.error('❌ VICIDIAL CALLBACK PARSE: Error parsing date/time for', leadName, ':', error);
+        return null;
+    }
+}
+
+// Function to automatically create callback from ViciDial import
+window.createCallbackFromVicidialImport = function(leadId, leadName, comments) {
+    console.log('🎯 VICIDIAL IMPORT CALLBACK: Processing lead', leadName, 'for automatic callback creation');
+
+    const callbackData = parseVicidialCallbackFromComments(comments, leadId, leadName);
+
+    if (!callbackData) {
+        console.log('⏭️ VICIDIAL IMPORT CALLBACK: No callback found in comments for', leadName);
+        return false;
+    }
+
+    // Check if callback is in the future
+    const callbackTime = new Date(callbackData.dateTime);
+    const now = new Date();
+
+    if (callbackTime <= now) {
+        console.log('⚠️ VICIDIAL IMPORT CALLBACK: Callback time is in the past for', leadName, '- skipping');
+        return false;
+    }
+
+    // Save the callback
+    const callbacksKey = 'scheduled_callbacks';
+    let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (!callbacks[leadId]) {
+        callbacks[leadId] = [];
+    }
+
+    // Check for duplicate callbacks (same time)
+    const existingCallback = callbacks[leadId].find(cb => cb.dateTime === callbackData.dateTime);
+    if (existingCallback) {
+        console.log('⚠️ VICIDIAL IMPORT CALLBACK: Duplicate callback already exists for', leadName, 'at', callbackData.dateTime);
+        return false;
+    }
+
+    // Add the callback
+    callbacks[leadId].push(callbackData);
+    localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+
+    console.log('✅ VICIDIAL IMPORT CALLBACK: Created callback for', leadName, 'scheduled at', callbackTime.toLocaleString());
+
+    // Also save to server
+    saveCallbackToServer(leadId, callbackData);
+
+    return true;
+};
+
+// Function to save callback to server (extracted from scheduleCallback)
+async function saveCallbackToServer(leadId, callbackData) {
+    try {
+        console.log('💾 Saving ViciDial callback to server for lead:', leadId);
+
+        const response = await fetch(`http://${window.location.hostname}:3001/api/callbacks`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                callback_id: callbackData.id.toString(),
+                lead_id: leadId,
+                date_time: callbackData.dateTime,
+                notes: callbackData.notes
+            })
+        });
+
+        if (response.ok) {
+            console.log('✅ ViciDial callback saved to server successfully');
+            return true;
+        } else {
+            console.error('❌ Failed to save ViciDial callback to server:', response.status);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Error saving ViciDial callback to server:', error);
+        return false;
+    }
+}
+
+console.log('📋 ViciDial Callback Parser: Functions loaded - createCallbackFromVicidialImport() and saveCallbackToServer() available');
 
 // ULTIMATE PROTECTION: Use Object.defineProperty to make functions non-configurable and non-writable
 function lockFunctions() {

@@ -705,8 +705,11 @@ async function importSelectedLeads(quickMode = false) {
                     window.showTranscriptionComplete(result.imported || selectedLeads.length);
                 }
 
-                // Refresh leads view
+                // Refresh leads after import - callbacks are processed server-side during import
                 setTimeout(async () => {
+                    console.log('📅 VICIDIAL IMPORT: Callbacks processed server-side during import - now reloading leads...');
+
+                    // Try to reload leads (this may fail due to SSL errors but callbacks were already processed server-side)
                     console.log('🔄 Reloading leads after Quick Import...');
                     try {
                         const baseUrl = window.location.hostname === 'localhost'
@@ -729,11 +732,14 @@ async function importSelectedLeads(quickMode = false) {
 
                             console.log('✅ Leads reloaded after Quick Import');
                             console.log(`🧹 Cleared ${deletedLeads.length - updatedDeletedLeads.length} ViciDial leads from deleted list`);
+                        } else {
+                            console.warn('⚠️ Failed to reload leads after import - but callbacks were already processed');
                         }
                     } catch (error) {
-                        console.warn('Failed to reload leads:', error);
+                        console.warn('⚠️ Failed to reload leads after import (SSL/fetch error) - but callbacks were already processed:', error.message);
                     }
 
+                    // Always try to refresh the UI regardless of fetch success
                     if (typeof loadLeadsView === 'function') {
                         loadLeadsView();
                     }
