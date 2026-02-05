@@ -2421,12 +2421,14 @@ function applyReachOutStyling(leadId, hasReachOutTodo) {
                             isCompleted = false;
                         } else {
                             // COMPLETED REACH-OUT and NOT EXPIRED - Show green completion status
-                            markReachOutComplete(leadId, completedTime, lead);
+                            // FIXED: Only display completion styling, don't trigger popup
+                            displayReachOutComplete(leadId, completedTime, lead);
                             isCompleted = true;
                         }
                     } else {
                         // COMPLETED REACH-OUT but no expiry timestamp to check - Show green completion status
-                        markReachOutComplete(leadId, completedTime, lead);
+                        // FIXED: Only display completion styling, don't trigger popup
+                        displayReachOutComplete(leadId, completedTime, lead);
                         isCompleted = true;
                     }
                 }
@@ -2533,6 +2535,77 @@ function removeGreenHighlightFromTableRow(leadId) {
     } else {
         console.log(`ℹ️ Lead ${leadId} table row had no green highlighting to remove`);
     }
+}
+
+// Function to display reach-out completion styling (for profile loading - no popup)
+function displayReachOutComplete(leadId, completedAt, lead) {
+    console.log(`🎨 DISPLAY ONLY: Showing reach-out completion styling for lead ${leadId} (no popup)`);
+
+    // Update the TO DO text to show COMPLETED
+    const todoDiv = document.getElementById(`reach-out-todo-${leadId}`);
+    if (todoDiv) {
+        todoDiv.innerHTML = `<span style="color: #10b981; font-weight: bold; font-size: 18px;">COMPLETED</span>`;
+    }
+
+    // Change "Reach Out" title to green
+    const headerTitle = document.getElementById(`reach-out-header-title-${leadId}`);
+    if (headerTitle) {
+        headerTitle.innerHTML = '<i class="fas fa-tasks"></i> <span style="color: #10b981;">Reach Out</span>';
+    }
+
+    // Change separator line to green
+    const separator = document.getElementById(`reach-out-separator-${leadId}`);
+    if (separator) {
+        separator.style.borderBottom = '2px solid #10b981';
+    }
+
+    // Show completion timestamp
+    const completionDiv = document.getElementById(`reach-out-completion-${leadId}`);
+    const timestampSpan = document.getElementById(`completion-timestamp-${leadId}`);
+    const countdownSpan = document.getElementById(`highlight-countdown-${leadId}`);
+
+    if (completionDiv && timestampSpan) {
+        const completedDate = new Date(completedAt);
+        timestampSpan.textContent = completedDate.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+
+        // Add highlight duration countdown
+        if (countdownSpan && lead) {
+            const highlightUntil = lead.greenHighlightUntil || lead.reachOut?.greenHighlightUntil;
+            if (highlightUntil) {
+                const highlightExpiry = new Date(highlightUntil);
+                const now = new Date();
+                const timeLeft = highlightExpiry - now;
+
+                if (timeLeft > 0) {
+                    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+
+                    let countdownText = 'Highlight expires in: ';
+                    if (days > 0) {
+                        countdownText += `${days}d ${hours}h`;
+                    } else if (hours > 0) {
+                        countdownText += `${hours}h ${minutes}m`;
+                    } else {
+                        countdownText += `${minutes}m`;
+                    }
+                    countdownSpan.textContent = countdownText;
+                } else {
+                    countdownSpan.textContent = 'Highlight expired';
+                }
+            }
+        }
+
+        completionDiv.style.display = 'block';
+    }
+
+    console.log(`🎨 DISPLAY COMPLETE: Styled reach-out completion for lead ${leadId} at ${completedAt} (no popup triggered)`);
 }
 
 // Function to mark reach-out as complete
