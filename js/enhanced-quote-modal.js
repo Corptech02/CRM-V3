@@ -341,11 +341,30 @@ window.closeQuoteApplicationModal = function() {
     window.editingApplicationData = null;
     console.log('🧹 Closed modal and cleared editing state');
 
-    // Restore lead profile modal
-    const leadProfileModal = document.getElementById('lead-profile-modal');
-    if (leadProfileModal) {
-        leadProfileModal.style.display = 'block';
+    // Restore the appropriate modal based on the context
+    const applicationContext = window.applicationViewContext || 'leads';
+    console.log('📍 Restoring context:', applicationContext);
+
+    if (applicationContext === 'clients') {
+        // We're in the clients context, restore the client profile modal if it exists
+        const clientProfileModal = document.getElementById('client-profile-modal');
+        if (clientProfileModal) {
+            clientProfileModal.style.display = 'block';
+            console.log('✅ Restored client profile modal');
+        } else {
+            console.log('📍 No client profile modal to restore, staying in clients view');
+        }
+    } else {
+        // Default leads context
+        const leadProfileModal = document.getElementById('lead-profile-modal');
+        if (leadProfileModal) {
+            leadProfileModal.style.display = 'block';
+            console.log('✅ Restored lead profile modal');
+        }
     }
+
+    // Clear the context after use
+    window.applicationViewContext = null;
 
     // Refresh Application Submissions to restore any hidden cards
     if (currentLeadId && window.showApplicationSubmissions) {
@@ -1750,10 +1769,20 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
         existingModal.remove();
     }
 
-    // Hide lead profile modal while quote app is open
+    // Hide lead profile modal while quote app is open (or detect if we're in clients context)
     const leadProfileModal = document.getElementById('lead-profile-modal');
+    const clientProfileModal = document.getElementById('client-profile-modal');
+    const isInClientsContext = window.location.hash === '#clients' || clientProfileModal;
+
+    // Store the context for when we close the modal
+    window.applicationViewContext = isInClientsContext ? 'clients' : 'leads';
+    console.log('📍 Application view context detected:', window.applicationViewContext);
+
     if (leadProfileModal) {
         leadProfileModal.style.display = 'none';
+    }
+    if (clientProfileModal) {
+        clientProfileModal.style.display = 'none';
     }
 
     // Get saved form data
@@ -2216,10 +2245,19 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
     } catch (error) {
         console.error('❌ Error in showEnhancedQuoteApplicationWithData:', error);
         alert('Error loading application details: ' + error.message);
-        // Show the lead profile modal if it was hidden
-        const leadProfileModal = document.getElementById('lead-profile-modal');
-        if (leadProfileModal) {
-            leadProfileModal.style.display = 'block';
+
+        // Restore the appropriate modal based on the context
+        const applicationContext = window.applicationViewContext || 'leads';
+        if (applicationContext === 'clients') {
+            const clientProfileModal = document.getElementById('client-profile-modal');
+            if (clientProfileModal) {
+                clientProfileModal.style.display = 'block';
+            }
+        } else {
+            const leadProfileModal = document.getElementById('lead-profile-modal');
+            if (leadProfileModal) {
+                leadProfileModal.style.display = 'block';
+            }
         }
     }
 };
