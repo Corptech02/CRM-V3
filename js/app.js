@@ -333,7 +333,13 @@ async function loadMoreClients() {
                 // Refresh the table
                 const tbody = document.getElementById('clientsTableBody');
                 if (tbody) {
-                    tbody.innerHTML = generateClientRows(1);
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing clients...</td></tr>';
+                    generateClientRows(1).then(content => {
+                        tbody.innerHTML = content;
+                    }).catch(error => {
+                        console.error('Error generating client rows:', error);
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc2626;">Error loading clients</td></tr>';
+                    });
                 }
 
                 // Update footer info
@@ -7915,25 +7921,30 @@ function updateSortArrows(field, direction) {
 let currentClientPage = 1;
 const clientsPerPage = 10;
 
-function generateClientRows(page = 1) {
-    console.log('🚨 GENERATECLIENTROWS - Loading from localStorage');
-    // Load clients from localStorage immediately
+async function generateClientRows(page = 1) {
+    console.log('🚨 GENERATECLIENTROWS - Syncing with server first...');
+
+    // ALWAYS sync with server first to get latest data
+    try {
+        const serverClients = await loadClientsFromServer();
+        console.log(`🔄 Server sync: Retrieved ${serverClients.length} clients from API`);
+    } catch (error) {
+        console.error('⚠️ Server sync failed, proceeding with localStorage:', error);
+    }
+
+    // Now load from localStorage (which should now have fresh data)
     let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-    console.log(`✅ Loaded ${clients.length} clients from localStorage`);
+    console.log(`✅ Loaded ${clients.length} clients from localStorage (post-server-sync)`);
 
-    // If no clients in localStorage, this is likely because localStorage was cleared
+    // If still no clients after server sync, show proper empty state
     if (clients.length === 0) {
-        console.log('⚠️ No clients in localStorage - this may be normal if localStorage was cleared');
-        console.log('⚠️ This suggests localStorage was cleared but server reload may not have completed');
-        console.log('⚠️ The system should automatically reload from server when the Clients tab is accessed');
-
-        // Return a loading state instead of "no clients found" if localStorage is truly empty
+        console.log('⚠️ No clients found even after server sync');
         return `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 16px;"></i>
-                    <p style="font-size: 16px; margin: 0;">Loading clients from server...</p>
-                    <p style="font-size: 14px; margin-top: 8px;">Please wait while we fetch your client data</p>
+                    <i class="fas fa-users" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                    <p style="font-size: 16px; margin: 0;">No clients found</p>
+                    <p style="font-size: 14px; margin-top: 8px;">Add clients to get started</p>
                 </td>
             </tr>
         `;
@@ -8189,7 +8200,13 @@ async function loadClientsView() {
                 </tr>
             `;
         } else {
-            tbody.innerHTML = generateClientRows(currentClientPage);
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing clients...</td></tr>';
+            generateClientRows(currentClientPage).then(content => {
+                tbody.innerHTML = content;
+            }).catch(error => {
+                console.error('Error generating client rows:', error);
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc2626;">Error loading clients</td></tr>';
+            });
         }
     }
 
@@ -8209,7 +8226,13 @@ async function loadClientsView() {
                 console.log(`✅ Retry successful: Found ${retryClients.length} clients`);
                 const tbody = document.getElementById('clientsTableBody');
                 if (tbody) {
-                    tbody.innerHTML = generateClientRows(currentClientPage);
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing clients...</td></tr>';
+                    generateClientRows(currentClientPage).then(content => {
+                        tbody.innerHTML = content;
+                    }).catch(error => {
+                        console.error('Error generating client rows:', error);
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc2626;">Error loading clients</td></tr>';
+                    });
                 }
                 updateClientsPagination();
                 updateClientsFooterInfo();
@@ -8398,7 +8421,13 @@ window.goToClientPage = function(page) {
     currentClientPage = page;
     const tbody = document.getElementById('clientsTableBody');
     if (tbody) {
-        tbody.innerHTML = generateClientRows(page);
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing clients...</td></tr>';
+        generateClientRows(page).then(content => {
+            tbody.innerHTML = content;
+        }).catch(error => {
+            console.error('Error generating client rows:', error);
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc2626;">Error loading clients</td></tr>';
+        });
     }
     updateClientsPagination();
 
@@ -8590,12 +8619,26 @@ function loadPoliciesView() {
                         </tr>
                     </thead>
                     <tbody id="policyTableBody">
-                        ${generatePolicyRows()}
+                        <tr><td colspan="9" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing policies...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     `;
+
+    // Load policy rows asynchronously after page setup
+    setTimeout(async () => {
+        const tbody = document.getElementById('policyTableBody');
+        if (tbody) {
+            try {
+                const policyRows = await generatePolicyRows();
+                tbody.innerHTML = policyRows;
+            } catch (error) {
+                console.error('Error generating policy rows:', error);
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #dc2626;">Error loading policies</td></tr>';
+            }
+        }
+    }, 100);
 }
 
 // Global variable to store current renewal view
@@ -15406,8 +15449,22 @@ function showDirectTabbedPolicyForm() {
 // Policy modal functions have been moved to policy-modal.js
 // The new implementation includes tabbed organization and enhanced vehicle/trailer fields
 
-function generatePolicyRows() {
+async function generatePolicyRows() {
+    console.log('🚨 GENERATEPOLICYROWS - Syncing with server first...');
+
+    // ALWAYS sync with server first to get latest data
+    if (window.loadPoliciesFromServer) {
+        try {
+            const serverPolicies = await window.loadPoliciesFromServer();
+            console.log(`🔄 Policy server sync: Retrieved ${serverPolicies ? serverPolicies.length : 0} policies from API`);
+        } catch (error) {
+            console.error('⚠️ Policy server sync failed, proceeding with localStorage:', error);
+        }
+    }
+
+    // Now load from localStorage (which should now have fresh data)
     let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    console.log(`✅ Loaded ${policies.length} policies from localStorage (post-server-sync)`);
 
     // Get current user and check if they are admin
     const sessionData = sessionStorage.getItem('vanguard_user');
