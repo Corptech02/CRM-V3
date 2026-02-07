@@ -874,8 +874,8 @@ app.get('/api/coi/:policyId', (req, res) => {
             if (!row) {
                 console.log('🔍 COI API: No valid COI document found in coi_documents table, checking policies table...');
 
-                // Fallback: Check policies table for COI documents
-                db.get(`SELECT id, data FROM policies WHERE id = ?`, [policyId], (err, policyRow) => {
+                // Fallback: Check policies table for COI documents by policy ID or policy number
+                db.get(`SELECT id, data FROM policies WHERE id = ? OR json_extract(data, '$.policies[0].policyNumber') = ?`, [policyId, policyId], (err, policyRow) => {
                     if (err) {
                         console.error('Error querying policies table:', err);
                         res.status(500).json({ error: 'Database error' });
@@ -3552,13 +3552,17 @@ app.post('/api/coi/send-request', (req, res, next) => {
         });
     }
 
-    // Basic email format validation
+    // Basic email format validation for single or multiple emails
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(to.trim())) {
-        return res.status(400).json({
-            success: false,
-            error: 'Invalid recipient email address format'
-        });
+    const emails = to.split(',').map(email => email.trim()).filter(email => email);
+
+    for (const email of emails) {
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid recipient email address format: ${email}`
+            });
+        }
     }
 
     if (!subject || subject.trim() === '') {

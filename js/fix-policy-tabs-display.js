@@ -201,7 +201,11 @@ if (typeof MutationObserver !== 'undefined') {
                     if (node.nodeType === Node.ELEMENT_NODE &&
                         (node.id && node.id.includes('policy') ||
                          node.className && node.className.includes('modal'))) {
-                        setTimeout(fixPolicyTabStructure, 200);
+                        setTimeout(() => {
+                            if (window.fixPolicyTabStructure) {
+                                window.fixPolicyTabStructure();
+                            }
+                        }, 200);
                     }
                 });
             }

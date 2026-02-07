@@ -25052,9 +25052,19 @@ window.sendCOIForPolicy = function(policyId) {
                     <div class="form-group" style="margin-bottom: 25px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <label style="font-weight: 600; color: #374151;"><strong>Email Recipients</strong></label>
-                            <button type="button" onclick="addCRMCOIEmailRecipient()" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                + Add Recipient
-                            </button>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 4px; color: #666; font-size: 11px;">
+                                    <input type="checkbox" id="addInsuredCheck" style="margin: 0; transform: scale(0.9);" onchange="handleCheckboxChange('insured')">
+                                    <label for="addInsuredCheck" style="margin: 0; cursor: pointer;">Add Insured</label>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 4px; color: #666; font-size: 11px;">
+                                    <input type="checkbox" id="addAgentCheck" style="margin: 0; transform: scale(0.9);" onchange="handleCheckboxChange('agent')">
+                                    <label for="addAgentCheck" style="margin: 0; cursor: pointer;">Add Agent</label>
+                                </div>
+                                <button type="button" onclick="addCRMCOIEmailRecipientWithOptions()" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: 0.2s;">
+                                    + Add Recipient
+                                </button>
+                            </div>
                         </div>
                         <div id="crmCoiEmailRecipientsContainer">
                             <div class="crm-coi-email-recipient-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
@@ -25121,6 +25131,104 @@ window.addCRMCOIEmailRecipient = function() {
     `;
 
     container.appendChild(newRow);
+};
+
+window.addCRMCOIEmailRecipientWithOptions = function() {
+    const addInsuredCheck = document.getElementById('addInsuredCheck');
+    const addAgentCheck = document.getElementById('addAgentCheck');
+
+    // Get current policy data
+    const currentPolicy = window.currentPolicy || {};
+
+    let recipientsAdded = 0;
+
+    // Add insured email if checkbox is checked
+    if (addInsuredCheck.checked) {
+        const insuredEmail = currentPolicy.contact?.['Email Address'] ||
+                           currentPolicy.contact?.Email ||
+                           currentPolicy.contact?.['Email'] ||
+                           currentPolicy.insured?.Email ||
+                           currentPolicy.policies?.[0]?.contact?.['Email Address'] ||
+                           currentPolicy.policies?.[0]?.contact?.Email || '';
+
+        if (insuredEmail) {
+            addCRMCOIEmailRecipient();
+            const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
+            const lastRow = newRows[newRows.length - 1];
+            const emailInput = lastRow.querySelector('.crm-coi-email-recipient');
+            emailInput.value = insuredEmail;
+            emailInput.placeholder = `${currentPolicy.clientName || currentPolicy.insured_name || 'Insured'} (Insured)`;
+            recipientsAdded++;
+        }
+        addInsuredCheck.checked = false; // Uncheck after use
+    }
+
+    // Add agent email if checkbox is checked
+    if (addAgentCheck.checked) {
+        // Try to get agent email from policy or use default
+        const agentEmail = currentPolicy.agentEmail || 'hunter@vigagency.com'; // Default agent email
+
+        addCRMCOIEmailRecipient();
+        const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
+        const lastRow = newRows[newRows.length - 1];
+        const emailInput = lastRow.querySelector('.crm-coi-email-recipient');
+        emailInput.value = agentEmail;
+        emailInput.placeholder = `${currentPolicy.agent || 'Agent'} (Agent)`;
+        recipientsAdded++;
+        addAgentCheck.checked = false; // Uncheck after use
+    }
+
+    // If neither checkbox is checked, add a blank recipient
+    if (recipientsAdded === 0) {
+        addCRMCOIEmailRecipient();
+    }
+};
+
+window.handleCheckboxChange = function(type) {
+    const checkbox = document.getElementById(type === 'insured' ? 'addInsuredCheck' : 'addAgentCheck');
+
+    if (checkbox.checked) {
+        // Auto-trigger add recipient when checkbox is checked
+        const currentPolicy = window.currentPolicy || {};
+
+        if (type === 'insured') {
+            // Extract email from Contact Information section
+            const insuredEmail = currentPolicy.contact?.['Email Address'] ||
+                               currentPolicy.contact?.Email ||
+                               currentPolicy.contact?.['Email'] ||
+                               currentPolicy.insured?.Email ||
+                               currentPolicy.policies?.[0]?.contact?.['Email Address'] ||
+                               currentPolicy.policies?.[0]?.contact?.Email || '';
+
+            console.log('🔍 Debug insured email extraction:', {
+                currentPolicy: currentPolicy,
+                contact: currentPolicy.contact,
+                extractedEmail: insuredEmail
+            });
+
+            if (insuredEmail) {
+                addCRMCOIEmailRecipient();
+                const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
+                const lastRow = newRows[newRows.length - 1];
+                const emailInput = lastRow.querySelector('.crm-coi-email-recipient');
+                emailInput.value = insuredEmail;
+                emailInput.placeholder = `${currentPolicy.clientName || currentPolicy.insured_name || 'Insured'} (Insured)`;
+            } else {
+                alert('No email address found in Contact Information for this policy.');
+            }
+        } else if (type === 'agent') {
+            const agentEmail = currentPolicy.agentEmail || 'hunter@vigagency.com';
+
+            addCRMCOIEmailRecipient();
+            const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
+            const lastRow = newRows[newRows.length - 1];
+            const emailInput = lastRow.querySelector('.crm-coi-email-recipient');
+            emailInput.value = agentEmail;
+            emailInput.placeholder = `${currentPolicy.agent || 'Agent'} (Agent)`;
+        }
+
+        // Keep the checkbox checked to show it was used
+    }
 };
 
 window.removeCRMCOIEmailRecipient = function(button) {
@@ -25252,6 +25360,9 @@ window.submitCRMCOIModal = async function() {
     const emailInputs = document.querySelectorAll('.crm-coi-email-recipient');
     const emails = Array.from(emailInputs).map(input => input.value.trim()).filter(email => email);
 
+    console.log(`📧 Found ${emailInputs.length} email input fields`);
+    console.log(`📧 Collected ${emails.length} valid email addresses:`, emails);
+
     if (emails.length === 0) {
         alert('Please enter at least one email address');
         return;
@@ -25353,11 +25464,13 @@ window.submitCRMCOIModal = async function() {
 
         // Apply COI overlay with certificate holder and date (like website does)
         let finalCoiDocument = null;
+        console.log('🔍 Debug coiDocument check:', coiDocument ? 'exists' : 'null', coiDocument?.dataUrl ? 'has dataUrl' : 'no dataUrl');
         if (coiDocument && coiDocument.dataUrl) {
             try {
                 console.log('✅ Using COI overlay function to add certificate holder and date...');
                 finalCoiDocument = await window.createCRMCOIWithTextOverlay(coiDocument, holderType, currentPolicy, certificateHolder);
-                console.log('📎 COI document modified with text overlay, size:', finalCoiDocument.size);
+                console.log('📎 COI document modified with text overlay, size:', finalCoiDocument ? finalCoiDocument.size : 'null/undefined');
+                console.log('🔍 Debug finalCoiDocument after creation:', finalCoiDocument);
             } catch (error) {
                 console.error('❌ Error creating COI with overlay:', error);
                 // Fallback to original document
@@ -25377,8 +25490,8 @@ window.submitCRMCOIModal = async function() {
         // Set sender email
         formData.append('from', 'contact@vigagency.com');
 
-        // Set recipient email (first email from the array)
-        formData.append('to', emails[0]);
+        // Set recipient emails (all emails from the array)
+        formData.append('to', emails.join(', '));
 
         // Set email subject - match website format exactly
         const subjectText = `Certificate of Insurance - ${currentPolicy?.clientName || currentPolicy?.insured_name || 'N/A'} - Policy ${policyId}`;
@@ -25402,6 +25515,7 @@ ${certificateHolder}`;
         formData.append('message', messageBody);
 
         // Add COI document as attachment if available
+        console.log('🔍 Debug finalCoiDocument before attachment:', finalCoiDocument ? finalCoiDocument.size + ' bytes' : 'null/undefined');
         if (finalCoiDocument) {
             console.log('📎 Attaching modified COI document with overlays');
             const fileName = `COI_Certificate_${policyId}_${Date.now()}.png`;
@@ -25410,6 +25524,7 @@ ${certificateHolder}`;
         } else if (coiDocument) {
             try {
                 console.log('📎 Attaching original COI document:', coiDocument.name || 'COI Document');
+                console.log('🔍 Debug coiDocument for fallback:', coiDocument);
 
                 let coiBlob = null;
 
@@ -25442,16 +25557,18 @@ ${certificateHolder}`;
             }
         } else {
             console.log('⚠️ No COI document found to attach');
+            console.log('🔍 Debug: finalCoiDocument is null and coiDocument is:', coiDocument ? 'exists but no valid data' : 'null');
         }
 
         console.log('Submitting COI request via FormData to:', 'https://162-220-14-239.nip.io/api/coi/send-request');
         console.log('FormData contents:', {
             from: 'contact@vigagency.com',
-            to: emails[0],
+            to: emails.join(', '),
             subject: subjectText,
             policyId: policyId,
             messagePreview: messageBody.substring(0, 200) + '...',
-            hasAttachment: !!coiDocument
+            hasAttachment: !!coiDocument,
+            totalRecipients: emails.length
         });
 
         // Send to the same endpoint as client portal using FormData
@@ -25484,31 +25601,49 @@ window.showCRMSavedCertificateHolders = function() {
     // Use the same data as the client portal but adapted for CRM
     const globalHolders = [
         {
-            name: 'US Department of Transportation',
-            address: '1200 New Jersey Ave SE, Washington, DC 20590',
-            email: 'compliance@dot.gov'
+            name: 'Highway App, Inc.',
+            address: '5931 Greenville Ave #5620',
+            city: 'Dallas, TX 75206',
+            email: 'coi@highway.com'
         },
         {
-            name: 'Federal Motor Carrier Safety Administration',
-            address: '1200 New Jersey Ave SE, Washington, DC 20590',
-            email: 'safety@fmcsa.dot.gov'
+            name: 'Descartes MyCarrierPortal',
+            address: '543 Country Club Dr., Unit B338',
+            city: 'Simi Valley, CA 93065',
+            email: 'mcp-coi@descartes.com'
+        },
+        {
+            name: 'DAT Solutions',
+            address: '8405 SW Nimbus Ave',
+            city: 'Beaverton, OR 97008',
+            email: 'certs@dat.com'
+        },
+        {
+            name: 'Registry Monitoring Insurance Services, Inc',
+            address: '2261 Market Street, PMB 85402',
+            city: 'San Francisco, CA 94114',
+            email: 'transportation@rmis.com',
+            phone: '(216) 316-1565'
         }
     ];
 
     const savedHolders = [
         {
             name: 'ABC Construction Co.',
-            address: '123 Main St, City, ST 12345',
+            address: '123 Main St',
+            city: 'City, ST 12345',
             email: 'admin@abcconstruction.com'
         },
         {
             name: 'XYZ Logistics Inc.',
-            address: '456 Oak Ave, City, ST 67890',
+            address: '456 Oak Ave',
+            city: 'City, ST 67890',
             email: 'certificates@xyzlogistics.com'
         },
         {
             name: 'DEF Contractors LLC',
-            address: '789 Pine Rd, City, ST 54321',
+            address: '789 Pine Rd',
+            city: 'City, ST 54321',
             email: 'office@defcontractors.com'
         }
     ];
@@ -25516,14 +25651,14 @@ window.showCRMSavedCertificateHolders = function() {
     // Generate global holders HTML
     let globalHoldersHTML = globalHolders.map((holder, index) => `
         <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s ease; position: relative;"
-             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.email}')"
+             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.city || ''}', '${holder.email}')"
              onmouseover="this.style.backgroundColor='#f8f9fa'; this.style.borderColor='#007bff'"
              onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#ddd'">
             <div style="position: absolute; top: 8px; right: 8px; background: linear-gradient(135deg, #dc3545, #c82333); color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase; box-shadow: 0 1px 3px rgba(220, 53, 69, 0.3);">
                 GLOBAL
             </div>
             <div style="font-weight: bold; margin-bottom: 5px; padding-right: 60px;">${holder.name}</div>
-            <div style="color: #666; font-size: 14px; margin-bottom: 3px;">${holder.address}</div>
+            <div style="color: #666; font-size: 14px; margin-bottom: 3px;">${holder.address}<br>${holder.city || ''}</div>
             <div style="color: #007bff; font-size: 12px; font-weight: 500;">
                 <i class="fas fa-envelope" style="margin-right: 4px;"></i>${holder.email}
             </div>
@@ -25533,11 +25668,11 @@ window.showCRMSavedCertificateHolders = function() {
     // Generate saved holders HTML
     let savedHoldersHTML = savedHolders.map((holder, index) => `
         <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s ease;"
-             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.email}')"
+             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.city || ''}', '${holder.email}')"
              onmouseover="this.style.backgroundColor='#f8f9fa'; this.style.borderColor='#007bff'"
              onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#ddd'">
             <div style="font-weight: bold; margin-bottom: 5px;">${holder.name}</div>
-            <div style="color: #666; font-size: 14px; margin-bottom: 3px;">${holder.address}</div>
+            <div style="color: #666; font-size: 14px; margin-bottom: 3px;">${holder.address}<br>${holder.city || ''}</div>
             <div style="color: #007bff; font-size: 12px; font-weight: 500;">
                 <i class="fas fa-envelope" style="margin-right: 4px;"></i>${holder.email}
             </div>
@@ -25599,16 +25734,33 @@ window.showCRMSavedCertificateHolders = function() {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 };
 
-window.selectCRMSavedHolder = function(name, address, email) {
+window.selectCRMSavedHolder = function(name, address, city, email) {
     // Fill in the certificate holder fields in CRM modal
     document.getElementById('crmHolderName').value = name;
-    document.getElementById('crmHolderAddress').value = address.split(',')[0]; // Just the street address
-    document.getElementById('crmHolderCity').value = address.split(',').slice(1).join(',').trim(); // City, state, zip
+    document.getElementById('crmHolderAddress').value = address; // Street address only
+    document.getElementById('crmHolderCity').value = city || ''; // City, state, zip
 
-    // Add the email to the first recipient field
-    const firstEmailInput = document.querySelector('.crm-coi-email-recipient');
-    if (firstEmailInput && email) {
-        firstEmailInput.value = email;
+    // Add the email to the first empty recipient field, or first field if all are filled
+    if (email) {
+        const emailInputs = document.querySelectorAll('.crm-coi-email-recipient');
+        let targetInput = null;
+
+        // First, try to find an empty email field
+        for (let input of emailInputs) {
+            if (!input.value.trim()) {
+                targetInput = input;
+                break;
+            }
+        }
+
+        // If no empty field found, use the first one
+        if (!targetInput && emailInputs.length > 0) {
+            targetInput = emailInputs[0];
+        }
+
+        if (targetInput) {
+            targetInput.value = email;
+        }
     }
 
     // Switch to third-party radio button
