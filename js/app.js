@@ -1814,14 +1814,20 @@ function formatPremiumValue(value) {
 function formatDate(dateInput) {
     if (!dateInput) return 'N/A';
     try {
-        // Handle both Date objects and date strings
+        // Handle YYYY-MM-DD string format directly to avoid timezone conversion
+        if (typeof dateInput === 'string' && dateInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [year, month, day] = dateInput.split('-');
+            return `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year}`;
+        }
+
+        // Handle Date objects and other date strings
         let date;
         if (dateInput instanceof Date) {
             date = dateInput;
         } else {
             date = new Date(dateInput);
         }
-        
+
         if (isNaN(date.getTime())) return 'N/A';
         return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
     } catch (e) {
@@ -5436,7 +5442,7 @@ async function loadLeadsView() {
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #374151;">Skip First N Days</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #374151;">Skip Days</label>
                         <input type="number" id="filterSkipDays" onchange="applyAdvancedFilters()" placeholder="0" min="0" max="365" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         <small style="color: #6b7280; font-size: 12px;">Skip leads renewing within this many days from today</small>
                     </div>
@@ -8467,6 +8473,22 @@ function loadPoliciesView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 
+    // Get current user and check if they are admin
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            console.log(`🔍 Policies view - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
     // Load policies from localStorage first, then update from server in background
     let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
     console.log('📊 Loading policies from localStorage:', policies.length);
@@ -8565,10 +8587,10 @@ function loadPoliciesView() {
                     <span class="mini-stat-value">${pendingRenewal}</span>
                     <span class="mini-stat-label">Pending Renewal</span>
                 </div>
-                <div class="mini-stat">
+                ${isAdmin ? `<div class="mini-stat">
                     <span class="mini-stat-value">${formattedPremium}</span>
                     <span class="mini-stat-label">Total Premium</span>
-                </div>
+                </div>` : ''}
             </div>
             
             <div class="filters-bar">
@@ -8607,19 +8629,20 @@ function loadPoliciesView() {
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th style="width: 11%; padding-left: 20px;">Policy #</th>
-                            <th style="width: 16%;">Client</th>
-                            <th style="width: 13%;">Carrier</th>
-                            <th style="width: 11%;">Effective Date</th>
-                            <th style="width: 11%;">Expiration</th>
-                            <th style="width: 9%;">Premium</th>
-                            <th style="width: 12%;">Assigned to</th>
-                            <th style="width: 8%;">Status</th>
-                            <th style="width: 9%;">Actions</th>
+                            <th style="width: 10%; padding-left: 20px;">Policy #</th>
+                            <th style="width: 12%;">Type</th>
+                            <th style="width: 15%;">Client</th>
+                            <th style="width: 12%;">Carrier</th>
+                            <th style="width: 10%;">Effective Date</th>
+                            <th style="width: 10%;">Expiration</th>
+                            <th style="width: 8%;">Premium</th>
+                            <th style="width: 11%;">Assigned to</th>
+                            <th style="width: 7%;">Status</th>
+                            <th style="width: 5%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="policyTableBody">
-                        <tr><td colspan="9" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing policies...</td></tr>
+                        <tr><td colspan="10" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing policies...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -8650,9 +8673,51 @@ function loadRenewalsView() {
     if (!dashboardContent) return;
 
     // Get real policy data from localStorage
-    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-    
+    let allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+
+    // Get current user and check if they are admin
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            console.log(`🔍 Renewals filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
+    // Filter policies and clients based on user role (same as other pages)
+    if (!isAdmin && currentUser) {
+        const originalPolicyCount = allPolicies.length;
+        const originalClientCount = clients.length;
+
+        // Filter policies by assigned user
+        allPolicies = allPolicies.filter(policy => {
+            const assignedTo = policy.assignedTo ||
+                              policy.agent ||
+                              policy.assignedAgent ||
+                              policy.producer ||
+                              'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+
+        // Filter clients by assigned user
+        clients = clients.filter(client => {
+            const assignedTo = client.assignedTo || client.agent || 'Grant';
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+
+        console.log(`🔒 Renewals filtered: Policies ${originalPolicyCount} -> ${allPolicies.length}, Clients ${originalClientCount} -> ${clients.length} (showing only ${currentUser}'s)`);
+    } else if (isAdmin) {
+        console.log(`👑 Renewals: Admin user - showing all ${allPolicies.length} policies and ${clients.length} clients`);
+    }
+
     // Process policies for renewals
     const renewalPolicies = getRealRenewalPolicies(allPolicies, clients);
     
@@ -8685,20 +8750,20 @@ function loadRenewalsView() {
                 <div class="stat-card">
                     <h4>Due This Month</h4>
                     <span class="stat-value">${stats.dueThisMonth.count}</span>
-                    <span class="stat-label">${stats.dueThisMonth.premium} Premium</span>
+                    ${isAdmin ? `<span class="stat-label">${stats.dueThisMonth.premium} Premium</span>` : '<span class="stat-label">Policies</span>'}
                 </div>
                 <div class="stat-card">
                     <h4>Due Next Month</h4>
                     <span class="stat-value">${stats.dueNextMonth.count}</span>
-                    <span class="stat-label">${stats.dueNextMonth.premium} Premium</span>
+                    ${isAdmin ? `<span class="stat-label">${stats.dueNextMonth.premium} Premium</span>` : '<span class="stat-label">Policies</span>'}
                 </div>
             </div>
             
             <div class="renewal-content">
                 <div id="renewalListContainer" class="renewal-list-container">
-                    ${currentRenewalView === 'month' ? renderMonthView(renewalPolicies) :
-                      currentRenewalView === '3month' ? renderThreeMonthView(renewalPolicies) :
-                      renderYearView(renewalPolicies)}
+                    ${currentRenewalView === 'month' ? renderMonthView(renewalPolicies, isAdmin) :
+                      currentRenewalView === '3month' ? renderThreeMonthView(renewalPolicies, isAdmin) :
+                      renderYearView(renewalPolicies, isAdmin)}
                 </div>
                 
                 <div id="renewalProfile" class="renewal-profile" style="display: none;">
@@ -8858,7 +8923,7 @@ function getStatusFromDate(date) {
     return 'future';
 }
 
-function renderMonthView(policies) {
+function renderMonthView(policies, isAdmin = false) {
     const today = new Date();
     const sixtyDaysFromNow = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
     // Show only policies expiring within 60 days (exclude overdue policies as requested)
@@ -8894,7 +8959,7 @@ function renderMonthView(policies) {
                             </div>
                         </div>
                         <div class="renewal-footer">
-                            <span class="premium">$${(policy.premium || 0).toLocaleString()}/yr</span>
+                            ${isAdmin ? `<span class="premium">$${(policy.premium || 0).toLocaleString()}/yr</span>` : ''}
                             <span class="status-badge ${policy.status || ''}">${(policy.status || 'pending').replace('-', ' ')}</span>
                         </div>
                     </div>
@@ -8904,7 +8969,7 @@ function renderMonthView(policies) {
     `;
 }
 
-function renderThreeMonthView(policies) {
+function renderThreeMonthView(policies, isAdmin = false) {
     const today = new Date();
     // Show policies expiring within 90 days (3 months)
     const threeMonthPolicies = policies.filter(p => {
@@ -8938,7 +9003,7 @@ function renderThreeMonthView(policies) {
                             </div>
                         </div>
                         <div class="renewal-footer">
-                            <span class="premium">$${(policy.premium || 0).toLocaleString()}/yr</span>
+                            ${isAdmin ? `<span class="premium">$${(policy.premium || 0).toLocaleString()}/yr</span>` : ''}
                             <span class="status-badge ${policy.status || ''}">${(policy.status || 'pending').replace('-', ' ')}</span>
                         </div>
                     </div>
@@ -8948,7 +9013,7 @@ function renderThreeMonthView(policies) {
     `;
 }
 
-function renderYearView(policies) {
+function renderYearView(policies, isAdmin = false) {
     const months = {};
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                        'July', 'August', 'September', 'October', 'November', 'December'];
@@ -8976,7 +9041,7 @@ function renderYearView(policies) {
                         <h4>${months[key].name}</h4>
                         <div class="month-stats">
                             <span class="policy-count">${months[key].policies.length} Policies</span>
-                            <span class="month-premium">$${months[key].totalPremium.toLocaleString()}</span>
+                            ${isAdmin ? `<span class="month-premium">$${months[key].totalPremium.toLocaleString()}</span>` : ''}
                         </div>
                         <div class="month-policies">
                             ${months[key].policies.slice(0, 3).map(p => `
@@ -13555,12 +13620,13 @@ function importExistingPolicyForClient(clientId) {
                             <table class="data-table" style="width: 100%; border-collapse: collapse;">
                                 <thead>
                                     <tr style="background: #f8f9fa;">
-                                        <th style="width: 18%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Policy #</th>
-                                        <th style="width: 25%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Client</th>
-                                        <th style="width: 15%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Carrier</th>
-                                        <th style="width: 12%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Effective Date</th>
-                                        <th style="width: 12%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Expiration</th>
-                                        <th style="width: 10%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Premium</th>
+                                        <th style="width: 15%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Policy #</th>
+                                        <th style="width: 12%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Type</th>
+                                        <th style="width: 23%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Client</th>
+                                        <th style="width: 13%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Carrier</th>
+                                        <th style="width: 10%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Effective Date</th>
+                                        <th style="width: 10%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Expiration</th>
+                                        <th style="width: 9%; padding: 15px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Premium</th>
                                         <th style="width: 8%; padding: 15px; text-align: center; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Action</th>
                                     </tr>
                                 </thead>
@@ -13582,7 +13648,7 @@ function generatePolicyImportRows(policies, targetClientId) {
     if (!policies || policies.length === 0) {
         return `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280; font-style: italic;">
+                <td colspan="8" style="text-align: center; padding: 40px; color: #6b7280; font-style: italic;">
                     No policies found to import
                 </td>
             </tr>
@@ -13612,16 +13678,17 @@ function generatePolicyImportRows(policies, targetClientId) {
             <tr style="border-bottom: 1px solid #f3f4f6;">
                 <td style="padding: 15px;">
                     <span class="policy-number" style="font-weight: 600; color: #1f2937;">${policy.policyNumber || 'N/A'}</span>
-                    <div class="policy-type-badge ${badgeClass}" style="
+                </td>
+                <td style="padding: 15px;">
+                    <span class="policy-type-badge ${badgeClass}" style="
                         display: inline-block;
-                        margin-top: 4px;
                         padding: 2px 8px;
                         border-radius: 12px;
                         font-size: 11px;
                         font-weight: 500;
                         background: ${badgeClass === 'badge-orange' ? '#fed7aa' : '#dbeafe'};
                         color: ${badgeClass === 'badge-orange' ? '#ea580c' : '#2563eb'};
-                    ">${policy.policyType || 'Commercial Auto'}</div>
+                    ">${policy.policyType || 'Commercial Auto'}</span>
                 </td>
                 <td style="padding: 15px;">
                     <span class="client-name" style="font-weight: 500; color: #1f2937; word-break: break-word;">${clientName}</span>
@@ -15585,6 +15652,7 @@ async function generatePolicyRows() {
         return `
             <tr>
                 <td class="policy-number" style="padding-left: 20px;">${policy.policyNumber}</td>
+                <td><span class="policy-type-badge ${badgeClass}">${typeLabel}</span></td>
                 <td>${clientName}</td>
                 <td>${policy.carrier}</td>
                 <td>${formatDate(policy.effectiveDate)}</td>
@@ -21030,18 +21098,22 @@ function getGenerateLeadsContent() {
                         </label>
                     </div>
                     <div class="form-actions" style="margin-top: 1rem;">
-                        <button class="btn-primary" onclick="generateLeadsFromForm()" style="padding: 10px 24px; font-size: 1rem;">
-                            <i class="fas fa-magic"></i> Generate Leads Now
-                        </button>
-                        <button class="btn-success" onclick="uploadToVicidialWithCriteria()" style="padding: 10px 24px; font-size: 1rem;">
-                            <i class="fas fa-upload"></i> Upload to Vicidial
-                        </button>
-                        <button class="btn-warning" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem;">
-                            <i class="fas fa-sms"></i> SMS Blast
-                        </button>
-                        <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 20px;">
-                            <i class="fas fa-redo"></i> Reset Form
-                        </button>
+                        <div class="button-row">
+                            <button class="btn-primary" onclick="generateLeadsFromForm()" style="padding: 10px 24px; font-size: 1rem;">
+                                <i class="fas fa-magic"></i> Generate Leads Now
+                            </button>
+                            <button class="btn-success" onclick="uploadToVicidialWithCriteria()" style="padding: 10px 24px; font-size: 1rem;">
+                                <i class="fas fa-upload"></i> Upload to Vicidial
+                            </button>
+                        </div>
+                        <div class="button-row">
+                            <button class="btn-warning" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem;">
+                                <i class="fas fa-sms"></i> SMS Blast
+                            </button>
+                            <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 20px;">
+                                <i class="fas fa-redo"></i> Reset Form
+                            </button>
+                        </div>
                     </div>
                 </div>
         </div>
@@ -25147,12 +25219,12 @@ window.sendCOIForPolicy = function(policyId) {
 
     document.body.appendChild(modal);
 
-    // Close modal when clicking outside
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            closeCRMCOIModal();
-        }
-    });
+    // Close modal when clicking outside - DISABLED per user request
+    // modal.addEventListener('click', function(e) {
+    //     if (e.target === modal) {
+    //         closeCRMCOIModal();
+    //     }
+    // });
 };
 
 // Supporting functions for CRM COI Modal
@@ -25661,7 +25733,7 @@ window.showCRMSavedCertificateHolders = function() {
             name: 'Highway App, Inc.',
             address: '5931 Greenville Ave #5620',
             city: 'Dallas, TX 75206',
-            email: 'coi@highway.com'
+            emails: ['insurance@certs.highway.com', 'insurance@certs.gohighway.com']
         },
         {
             name: 'Descartes MyCarrierPortal',
@@ -25706,9 +25778,16 @@ window.showCRMSavedCertificateHolders = function() {
     ];
 
     // Generate global holders HTML
-    let globalHoldersHTML = globalHolders.map((holder, index) => `
+    let globalHoldersHTML = globalHolders.map((holder, index) => {
+        const emails = holder.emails || [holder.email];
+        const emailsJson = JSON.stringify(emails).replace(/"/g, '&quot;');
+        const emailDisplay = emails.map(email =>
+            `<div><i class="fas fa-envelope" style="margin-right: 4px;"></i>${email}</div>`
+        ).join('');
+
+        return `
         <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s ease; position: relative;"
-             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.city || ''}', '${holder.email}')"
+             onclick="selectCRMSavedHolder('${holder.name}', '${holder.address}', '${holder.city || ''}', '${emailsJson}')"
              onmouseover="this.style.backgroundColor='#f8f9fa'; this.style.borderColor='#007bff'"
              onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#ddd'">
             <div style="position: absolute; top: 8px; right: 8px; background: linear-gradient(135deg, #dc3545, #c82333); color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase; box-shadow: 0 1px 3px rgba(220, 53, 69, 0.3);">
@@ -25717,10 +25796,11 @@ window.showCRMSavedCertificateHolders = function() {
             <div style="font-weight: bold; margin-bottom: 5px; padding-right: 60px;">${holder.name}</div>
             <div style="color: #666; font-size: 14px; margin-bottom: 3px;">${holder.address}<br>${holder.city || ''}</div>
             <div style="color: #007bff; font-size: 12px; font-weight: 500;">
-                <i class="fas fa-envelope" style="margin-right: 4px;"></i>${holder.email}
+                ${emailDisplay}
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     // Generate saved holders HTML
     let savedHoldersHTML = savedHolders.map((holder, index) => `
@@ -25791,32 +25871,72 @@ window.showCRMSavedCertificateHolders = function() {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 };
 
-window.selectCRMSavedHolder = function(name, address, city, email) {
+window.selectCRMSavedHolder = function(name, address, city, emailData) {
     // Fill in the certificate holder fields in CRM modal
     document.getElementById('crmHolderName').value = name;
     document.getElementById('crmHolderAddress').value = address; // Street address only
     document.getElementById('crmHolderCity').value = city || ''; // City, state, zip
 
-    // Add the email to the first empty recipient field, or first field if all are filled
-    if (email) {
-        const emailInputs = document.querySelectorAll('.crm-coi-email-recipient');
-        let targetInput = null;
+    // Parse email data - could be a single email string or JSON array
+    let emails = [];
+    try {
+        if (emailData.startsWith('[')) {
+            // It's a JSON array
+            emails = JSON.parse(emailData.replace(/&quot;/g, '"'));
+        } else {
+            // It's a single email
+            emails = [emailData];
+        }
+    } catch (e) {
+        // Fallback to treating as single email
+        emails = [emailData];
+    }
 
-        // First, try to find an empty email field
-        for (let input of emailInputs) {
-            if (!input.value.trim()) {
-                targetInput = input;
-                break;
+    // Add emails to recipient fields
+    if (emails.length > 0) {
+        const container = document.getElementById('crmCoiEmailRecipientsContainer');
+
+        // Clear existing recipients first
+        container.innerHTML = '';
+
+        // Add each email as a separate recipient
+        emails.forEach((email, index) => {
+            if (email && email.trim()) {
+                const recipientRow = document.createElement('div');
+                recipientRow.className = 'crm-coi-email-recipient-row';
+                recipientRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+
+                recipientRow.innerHTML = `
+                    <input type="email" class="crm-coi-email-recipient" required
+                           style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
+                           placeholder="recipient@example.com" value="${email.trim()}">
+                    <button type="button" onclick="removeCRMCOIEmailRecipient(this)"
+                            style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        Remove
+                    </button>
+                `;
+
+                container.appendChild(recipientRow);
             }
-        }
+        });
 
-        // If no empty field found, use the first one
-        if (!targetInput && emailInputs.length > 0) {
-            targetInput = emailInputs[0];
-        }
+        // If no recipients were added, add a default empty one
+        if (container.children.length === 0) {
+            const recipientRow = document.createElement('div');
+            recipientRow.className = 'crm-coi-email-recipient-row';
+            recipientRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
 
-        if (targetInput) {
-            targetInput.value = email;
+            recipientRow.innerHTML = `
+                <input type="email" class="crm-coi-email-recipient" required
+                       style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
+                       placeholder="recipient@example.com" value="">
+                <button type="button" onclick="removeCRMCOIEmailRecipient(this)"
+                        style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                    Remove
+                </button>
+            `;
+
+            container.appendChild(recipientRow);
         }
     }
 

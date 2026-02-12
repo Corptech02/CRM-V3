@@ -339,11 +339,11 @@ window.viewClientOriginal = async function(id) {
                                     </div>
                                     <div style="display: flex; justify-content: space-between;">
                                         <span>Effective:</span>
-                                        <span style="color: #1f2937;">${policy.effectiveDate ? new Date(policy.effectiveDate).toLocaleDateString() : 'N/A'}</span>
+                                        <span style="color: #1f2937;">${policy.effectiveDate ? formatDate(policy.effectiveDate) : 'N/A'}</span>
                                     </div>
                                     <div style="display: flex; justify-content: space-between;">
                                         <span>Expires:</span>
-                                        <span style="color: #1f2937;">${policy.expirationDate ? new Date(policy.expirationDate).toLocaleDateString() : 'N/A'}</span>
+                                        <span style="color: #1f2937;">${policy.expirationDate ? formatDate(policy.expirationDate) : 'N/A'}</span>
                                     </div>
                                 </div>
 
