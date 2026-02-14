@@ -23,6 +23,33 @@ window.realPdfState = {
     formData: {}
 };
 
+// Helper function to determine signature based on agent
+function getSignatureForAgent(agent) {
+    console.log('🖋️ ACORD VIEWER SIGNATURE SELECTION:');
+    console.log('  - Agent value:', agent);
+
+    if (agent) {
+        const lowerAgent = agent.toLowerCase();
+
+        if (lowerAgent.includes('grant')) {
+            console.log('✅ SIGNATURE: Using Grant Corp signature for Grant agent');
+            return 'Grant Corp';
+        } else if (lowerAgent.includes('hunter')) {
+            console.log('✅ SIGNATURE: Using Hunter Brooks signature for Hunter agent');
+            return 'Hunter Brooks';
+        } else if (lowerAgent.includes('carson')) {
+            console.log('✅ SIGNATURE: Using Carson Sweitzer signature for Carson agent');
+            return 'Carson Sweitzer';
+        } else if (lowerAgent.includes('maureen')) {
+            console.log('✅ SIGNATURE: Using Maureen Corp signature for Maureen agent');
+            return 'Maureen Corp';
+        }
+    }
+
+    console.log('✅ SIGNATURE: Using Grant Corp signature (default)');
+    return 'Grant Corp';
+}
+
 // Check if there's a saved COI for this policy
 window.checkSavedCOI = async function(policyId) {
     try {
@@ -292,9 +319,9 @@ function createRealFormFields(policyId, policyData) {
         { id: 'contactName', x: 450, y: 156, width: 317, height: 16,
           value: '' },
         { id: 'phone', x: 459, y: 172, width: 164, height: 16,
-          value: '(330) 460-8072' },
+          value: '(866) 628-9441' },
         { id: 'fax', x: 673, y: 172, width: 94, height: 16,
-          value: '(330) 460-8073' },
+          value: '(330) 779-1097' },
         { id: 'email', x: 450, y: 187, width: 317, height: 16,
           value: 'contact@vigagency.com' },
 
@@ -304,7 +331,24 @@ function createRealFormFields(policyId, policyData) {
         { id: 'insuredAddress1', x: 94, y: 265, width: 299, height: 16,
           value: policyData?.contact?.['Mailing Address'] || '' },
         { id: 'insuredAddress2', x: 94, y: 281, width: 299, height: 16,
-          value: '' },
+          value: (() => {
+            // Get city, state, zip from separate fields in policy data
+            const city = policyData?.city || policyData?.contact?.City || '';
+            const state = policyData?.state || policyData?.contact?.State || '';
+            const zip = policyData?.zip || policyData?.zipCode || policyData?.contact?.['ZIP Code'] || '';
+
+            console.log('🏙️ ACORD Viewer - Building insuredAddress2:');
+            console.log('  - City:', city);
+            console.log('  - State:', state);
+            console.log('  - ZIP:', zip);
+
+            // Format: "CITY STATE ZIP"
+            const parts = [city, state, zip].filter(Boolean);
+            const result = parts.join(' ');
+            console.log('  - Final insuredAddress2:', result);
+
+            return result || '';
+          })() },
         { id: 'insuredCity', x: 94, y: 296, width: 216, height: 16,
           value: policyData?.contact?.['City'] || '' },
         { id: 'insuredState', x: 309, y: 296, width: 23, height: 16,
@@ -572,7 +616,7 @@ function createRealFormFields(policyId, policyData) {
 
         // === AUTHORIZED REPRESENTATIVE (signature area) ===
         { id: 'authRep', x: 403, y: 936, width: 364, height: 31,
-          value: 'Grant Corp', bold: true, size: 16, signature: true }
+          value: getSignatureForAgent(policyData?.agent), bold: true, size: 16, signature: true }
     ];
 
     // Create each field
@@ -785,7 +829,7 @@ window.realDownloadCOI = async function(policyId) {
         <div class="section-title">PRODUCER</div>
         <div><strong>Vanguard Insurance Group LLC</strong></div>
         <div>2888 Nationwide Pkwy, Brunswick, OH 44242</div>
-        <div>Phone: (330) 460-8072 | Fax: (330) 460-8073 | Email: contact@vigagency.com</div>
+        <div>Phone: (866) 628-9441 | Fax: (330) 779-1097 | Email: contact@vigagency.com</div>
     </div>
 
     <div class="section">
@@ -1244,8 +1288,8 @@ window.selectSignature = function(signatureName) {
         updateCompanyInfo({
             producer: 'Vanguard Insurance Group LLC',
             email: 'contact@vigagency.com',
-            phone: '(330) 460-8072',
-            fax: '(330) 460-8073'
+            phone: '(866) 628-9441',
+            fax: '(330) 779-1097'
         });
     }
 

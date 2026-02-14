@@ -130,22 +130,23 @@ window.generateClientRows = async function() {
                         </div>
                     </div>
                 </td>
-                <td>${client.phone || 'N/A'}</td>
-                <td>${client.email || 'N/A'}</td>
+                <td>${client.phone && client.phone !== 'N/A' ?
+                        `<span class="clickable-wrapper"><span class="clickable-phone" data-phone="${client.phone}" title="Double-click to dial ${client.phone}" style="cursor: pointer; text-decoration: underline dotted rgb(0, 102, 204);">${client.phone}</span></span>` :
+                        'N/A'
+                    }</td>
+                <td>${client.email && client.email !== 'N/A' ?
+                        `<span class="clickable-wrapper"><span class="clickable-email" data-email="${client.email}" title="Double-click to compose email to ${client.email}" style="cursor: pointer; text-decoration: underline dotted rgb(0, 102, 204);">${client.email}</span></span>` :
+                        'N/A'
+                    }</td>
                 <td><span class="policy-count">${policyCount}</span></td>
                 <td>${formattedPremium}</td>
                 <td>${assignedTo}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-icon" onclick="viewClient('${client.id}')" title="View Profile">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon" onclick="editClient('${client.id}')" title="Edit Client">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-icon" onclick="deleteClient('${client.id}')" title="Delete Client">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <button class="btn-icon" onclick="console.log('🔍 Eye button clicked for client:', '${client.id}'); viewClient('${client.id}')" title="View Client"><i class="fas fa-eye"></i></button>
+                        <button class="btn-icon" onclick="editClient('${client.id}')" title="Edit Client"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon" onclick="emailClient('${client.id}')" title="Email Client"><i class="fas fa-envelope"></i></button>
+                        <button class="btn-icon" onclick="deleteClient('${client.id}')" title="Delete Client" style="color: #dc2626;"><i class="fas fa-trash"></i></button>
                     </div>
                 </td>
             </tr>

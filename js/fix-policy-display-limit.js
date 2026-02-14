@@ -20,23 +20,30 @@ window.generatePolicyRows = function() {
             console.log(`🔍 Policy Display Fix - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
         } catch (error) {
             console.error('Error parsing session data:', error);
-            // Default to admin view if session parsing fails
-            isAdmin = true;
         }
-    } else {
-        // Default to admin view if no session data
-        isAdmin = true;
-        console.log('🔍 Policy Display Fix - No session data, defaulting to admin view');
     }
 
-    // For debugging: always show all policies for now
-    console.log(`📊 Policy Display Fix: Showing all ${policies.length} policies (debug mode)`);
+    // Filter policies based on user role (same as client filtering logic)
+    if (!isAdmin && currentUser) {
+        const originalCount = policies.length;
+        policies = policies.filter(policy => {
+            const assignedTo = policy.assignedTo ||
+                              policy.agent ||
+                              policy.assignedAgent ||
+                              policy.producer ||
+                              'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+        console.log(`🔒 Policy Display Fix: Filtered policies: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
+    } else if (isAdmin) {
+        console.log(`👑 Policy Display Fix: Admin user - showing all ${policies.length} policies`);
+    }
 
     if (policies.length === 0) {
         // Show message when no policies exist
         return `
             <tr>
-                <td colspan="8" style="text-align: center; padding: 40px; color: #6b7280;">
+                <td colspan="10" style="text-align: center; padding: 40px; color: #6b7280;">
                     <i class="fas fa-file-contract" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
                     <p style="font-size: 16px; margin: 0;">No policies found</p>
                     <p style="font-size: 14px; margin-top: 8px;">Click "New Policy" to create your first policy</p>
@@ -50,8 +57,38 @@ window.generatePolicyRows = function() {
         // Ensure policy type is available - check multiple possible locations
         const policyType = policy.policyType || policy.type || (policy.overview && policy.overview['Policy Type'] ?
             policy.overview['Policy Type'].toLowerCase().replace(/\s+/g, '-') : 'unknown');
-        const typeLabel = window.getPolicyTypeLabel ? window.getPolicyTypeLabel(policyType) : policyType;
-        const badgeClass = window.getBadgeClass ? window.getBadgeClass(policyType) : 'badge-secondary';
+
+        // Helper functions for policy type labels and badges
+        function getPolicyTypeLabel(type) {
+            if (!type || type === 'unknown') return 'Unknown';
+            const normalizedType = type.toString().toLowerCase();
+            const labels = {
+                'personal-auto': 'Personal Auto',
+                'commercial-auto': 'Commercial Auto',
+                'homeowners': 'Homeowners',
+                'commercial-property': 'Commercial Property',
+                'general-liability': 'General Liability',
+                'professional-liability': 'Professional Liability',
+                'workers-comp': 'Workers Compensation',
+                'umbrella': 'Umbrella',
+                'life': 'Life',
+                'health': 'Health'
+            };
+            return labels[normalizedType] || type;
+        }
+
+        function getBadgeClass(type) {
+            if (!type) return 'badge-gray';
+            const typeStr = type.toString().toLowerCase();
+            if (typeStr.includes('commercial')) return 'badge-orange';
+            if (typeStr.includes('auto')) return 'badge-blue';
+            if (typeStr.includes('home')) return 'badge-green';
+            if (typeStr.includes('liability')) return 'badge-purple';
+            return 'badge-gray';
+        }
+
+        const typeLabel = getPolicyTypeLabel(policyType);
+        const badgeClass = getBadgeClass(policyType);
 
         // Check if policy is expired based on expiration date
         let statusClass = window.getStatusClass ? window.getStatusClass(policy.policyStatus || policy.status) : 'badge-secondary';
@@ -123,30 +160,32 @@ window.generatePolicyRows = function() {
 
         return `
             <tr data-policy-id="${policy.id}">
-                <td style="padding-left: 20px;">
-                    <span class="policy-number">${policyNumber}</span>
-                    <div class="policy-type-badge ${badgeClass}">${typeLabel}</div>
+                <td class="policy-number" style="padding-left: 20px;">
+                    ${policyNumber}
                 </td>
                 <td>
-                    <span class="client-name">${clientName}</span>
+                    <span class="policy-type-badge ${badgeClass}">${typeLabel}</span>
                 </td>
                 <td>
-                    <span class="carrier-name">${carrier}</span>
+                    ${clientName}
                 </td>
                 <td>
-                    <span class="effective-date">${effectiveDate}</span>
+                    ${carrier}
                 </td>
                 <td>
-                    <span class="expiration-date">${expirationDate}</span>
+                    ${effectiveDate}
                 </td>
                 <td>
-                    <span class="premium-amount">${premium}</span>
+                    ${expirationDate}
                 </td>
                 <td>
-                    <span class="assigned-agent">${assignedTo}</span>
+                    ${premium}/yr
                 </td>
                 <td>
-                    <span class="badge ${statusClass}">${displayStatus}</span>
+                    ${assignedTo}
+                </td>
+                <td>
+                    <span class="status-badge ${statusClass}">${displayStatus}</span>
                 </td>
                 <td>
                     <div class="action-buttons">

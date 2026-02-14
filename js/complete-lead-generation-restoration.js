@@ -71,41 +71,10 @@ window.loadLeadGenerationView = function loadLeadGenerationView(activeTab = 'loo
                     </div>
                 </div>
 
-                <!-- Results Section -->
-                <div class="lead-results-section" id="leadResults">
-                    <div class="results-header">
-                        <h3>Search Results</h3>
-                        <span class="results-count">0 leads found</span>
-                    </div>
-
-                    <div class="lead-results-table">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th><input type="checkbox" onclick="selectAllLeads(this)"></th>
-                                    <th>USDOT #</th>
-                                    <th>Company Name</th>
-                                    <th>Location</th>
-                                    <th>Fleet Size</th>
-                                    <th>Insurance Status</th>
-                                    <th>Expiry Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="leadResultsBody">
-                                <tr>
-                                    <td colspan="8" class="text-center">No results. Use the search form above to find leads.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="results-pagination">
-                        <button class="btn-small" disabled><i class="fas fa-chevron-left"></i> Previous</button>
-                        <span class="page-info">Page 1 of 1</span>
-                        <button class="btn-small" disabled>Next <i class="fas fa-chevron-right"></i></button>
-                    </div>
-                    </div>
+                <!-- Carrier Profile Display -->
+                <div id="carrierProfileDisplay" class="carrier-profile-display-container">
+                    <!-- Carrier profiles will be displayed here -->
+                </div>
                 </div>
 
                 <!-- Generate Leads Section -->
@@ -149,7 +118,7 @@ function getSimpleGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Days Until Insurance Expiry</label>
+                            <label>Expiration</label>
                             <select class="form-control" id="genExpiry">
                                 <option value="7">Next 7 Days</option>
                                 <option value="14">Next 14 Days</option>
@@ -160,11 +129,11 @@ function getSimpleGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Skip First N Days</label>
+                            <label>Skip Days</label>
                             <input type="number" class="form-control" id="genSkipDays" value="0" min="0" max="90" placeholder="0">
                         </div>
                         <div class="form-group">
-                            <label>Fleet filter</label>
+                            <label>Fleet Size</label>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <input type="number" class="form-control" id="genMinFleet" value="1" min="1" style="flex: 1; text-align: center;">
                                 <span style="font-weight: bold; color: #374151; user-select: none;">-</span>
@@ -282,7 +251,7 @@ function getCompleteGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Days Until Insurance Expiry</label>
+                            <label>Expiration</label>
                             <select class="form-control" id="genExpiry">
                                 <option value="7">Next 7 Days</option>
                                 <option value="14">Next 14 Days</option>
@@ -293,11 +262,11 @@ function getCompleteGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Skip First N Days</label>
+                            <label>Skip Days</label>
                             <input type="number" class="form-control" id="genSkipDays" value="0" min="0" max="90" placeholder="0">
                         </div>
                         <div class="form-group">
-                            <label>Fleet filter</label>
+                            <label>Fleet Size</label>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <input type="number" class="form-control" id="genMinFleet" value="1" min="1" style="flex: 1; text-align: center;">
                                 <span style="font-weight: bold; color: #374151; user-select: none;">-</span>
@@ -441,24 +410,28 @@ function getCompleteGenerateLeadsContent() {
                         </label>
                     </div>
                     <div class="form-actions" style="margin-top: 1rem;">
-                        <button class="btn-primary" onclick="generateLeadsFromForm()" style="padding: 10px 24px; font-size: 1rem;">
-                            <i class="fas fa-magic"></i> Generate Leads Now
-                        </button>
-                        <button class="btn-success" onclick="uploadToVicidialWithCriteria()" style="padding: 10px 24px; font-size: 1rem;">
-                            <i class="fas fa-upload"></i> Upload to Vicidial
-                        </button>
-                        <button class="btn-primary" onclick="sendEmailBlast()" style="padding: 10px 24px; font-size: 1rem; margin-left: 10px;">
-                            <i class="fas fa-envelope"></i> Email Blast
-                        </button>
-                        <button class="btn-warning" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem; margin-left: 10px;">
-                            <i class="fas fa-sms"></i> SMS Blast
-                        </button>
-                        <button class="btn-info" onclick="openLeadSplitPopup()" style="padding: 10px 24px; font-size: 1rem; margin-left: 10px;" id="leadSplitBtn">
-                            <i class="fas fa-cut"></i> Lead Split
-                        </button>
-                        <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 20px;">
-                            <i class="fas fa-redo"></i> Reset Form
-                        </button>
+                        <div class="button-row">
+                            <button class="btn-primary" onclick="generateLeadsFromForm()" style="padding: 10px 24px; font-size: 1rem;">
+                                <i class="fas fa-magic"></i> Generate Leads Now
+                            </button>
+                            <button class="btn-success" onclick="uploadToVicidialWithCriteria()" style="padding: 10px 24px; font-size: 1rem;">
+                                <i class="fas fa-upload"></i> Upload to Vicidial
+                            </button>
+                            <button class="btn-info" onclick="openLeadSplitPopup()" style="padding: 10px 24px; font-size: 1rem;" id="leadSplitBtn">
+                                <i class="fas fa-cut"></i> Lead Split
+                            </button>
+                        </div>
+                        <div class="button-row">
+                            <button class="btn-primary" onclick="sendEmailBlast()" style="padding: 10px 24px; font-size: 1rem;">
+                                <i class="fas fa-envelope"></i> Email Blast
+                            </button>
+                            <button class="btn-warning" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem;">
+                                <i class="fas fa-sms"></i> SMS Blast
+                            </button>
+                            <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 20px;">
+                                <i class="fas fa-redo"></i> Reset Form
+                            </button>
+                        </div>
                     </div>
                 </div>
 

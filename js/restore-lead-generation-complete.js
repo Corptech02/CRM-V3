@@ -10,12 +10,13 @@ window.performLeadSearch = function performLeadSearch() {
 
     console.log('Performing lead search:', { usdot, mc, company, state });
 
-    // Show loading state
-    const resultsBody = document.getElementById('searchResults') || document.getElementById('leadResultsBody');
-    if (resultsBody) {
-        resultsBody.innerHTML = `
-            <div style="text-align: center; padding: 20px;">
-                <i class="fas fa-spinner fa-spin"></i> Searching 2.2M carrier database...
+    // Show loading state in carrier profile display container
+    const carrierProfileDisplay = document.getElementById('carrierProfileDisplay');
+    if (carrierProfileDisplay) {
+        carrierProfileDisplay.innerHTML = `
+            <div class="loading-message" style="text-align: center; padding: 40px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3498db;"></i>
+                <p style="margin-top: 15px; color: #6c757d;">Searching 2.2M carrier database...</p>
             </div>
         `;
     }
@@ -27,17 +28,36 @@ window.performLeadSearch = function performLeadSearch() {
     if (company) criteria.company_name = company;
     if (state) criteria.state = state;
 
-    // Use API service to search carriers
+    // Use the comprehensive carrier search like database-connector.js
     if (window.apiService && window.apiService.searchCarriers) {
         window.apiService.searchCarriers(criteria).then(result => {
             console.log('Search results:', result);
-            displaySearchResults(result.carriers || result.data || []);
+
+            // Display carrier profile directly if we found a carrier
+            if (result.carriers && result.carriers.length > 0) {
+                const carrier = result.carriers[0];
+                // Always call the comprehensive profile display function directly
+                displayFullCarrierProfile(carrier.usdot_number);
+            } else {
+                // No results
+                if (carrierProfileDisplay) {
+                    carrierProfileDisplay.innerHTML = `
+                        <div class="no-results" style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                            <i class="fas fa-search" style="font-size: 48px; color: #6c757d; margin-bottom: 15px;"></i>
+                            <h3 style="color: #495057; margin-bottom: 10px;">No carriers found</h3>
+                            <p style="color: #6c757d;">No carriers found matching your search criteria.</p>
+                        </div>
+                    `;
+                }
+            }
         }).catch(error => {
             console.error('Search error:', error);
-            if (resultsBody) {
-                resultsBody.innerHTML = `
-                    <div style="color: red; padding: 20px;">
-                        Error: ${error.message}
+            if (carrierProfileDisplay) {
+                carrierProfileDisplay.innerHTML = `
+                    <div class="error-message" style="text-align: center; padding: 40px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #721c24; margin-bottom: 15px;"></i>
+                        <h3 style="color: #721c24; margin-bottom: 10px;">Search Error</h3>
+                        <p style="color: #721c24;">Error: ${error.message}</p>
                     </div>
                 `;
             }
@@ -580,6 +600,441 @@ window.resetGenerateForm = function() {
     document.getElementById('generateResults').innerHTML = '';
     document.getElementById('successMessage').style.display = 'none';
 };
+
+// Comprehensive function to display full carrier profile with all data
+async function displayFullCarrierProfile(usdotNumber) {
+    const carrierProfileDisplay = document.getElementById('carrierProfileDisplay');
+    if (!carrierProfileDisplay) return;
+
+    try {
+        console.log('Loading comprehensive carrier profile for USDOT:', usdotNumber);
+
+        // Show loading state
+        carrierProfileDisplay.innerHTML = `
+            <div class="loading-message" style="text-align: center; padding: 40px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3498db;"></i>
+                <p style="margin-top: 15px; color: #6c757d;">Loading comprehensive carrier profile...</p>
+            </div>
+        `;
+
+        // Fetch full carrier profile data from the API
+        const response = await fetch(`/api/carrier/profile/${usdotNumber}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch carrier profile');
+        }
+
+        const data = await response.json();
+        const carrier = data.carrier;
+
+        console.log('Loaded comprehensive carrier profile:', carrier);
+
+        // Display the full profile with all data
+        carrierProfileDisplay.innerHTML = createComprehensiveCarrierHTML(carrier);
+
+    } catch (error) {
+        console.error('Error loading comprehensive carrier profile:', error);
+        carrierProfileDisplay.innerHTML = `
+            <div class="carrier-profile-error" style="text-align: center; padding: 40px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
+                <h3 style="color: #721c24;">Error Loading Carrier Profile</h3>
+                <p style="color: #721c24;">Unable to load carrier information. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+// Function to create comprehensive carrier profile HTML
+function createComprehensiveCarrierHTML(carrier) {
+    const inspections = carrier.inspections || [];
+    const safetyData = carrier.safety_summary;
+    const address = carrier.address || {};
+
+    // Calculate safety metrics using correct field names
+    const totalInspections = inspections.length;
+    const oosInspections = inspections.filter(i => (i.OOS_Total && i.OOS_Total > 0) || i.out_of_service === 'Y' || i.out_of_service === 'YES').length;
+    const oosPercentage = totalInspections > 0 ? ((oosInspections / totalInspections) * 100).toFixed(1) : '0.0';
+
+    // Determine OOS Rate background color based on safety thresholds
+    const oosRate = parseFloat(oosPercentage);
+    let oosBackgroundColor = '#ffffff'; // white (default)
+    let oosTextColor = '#2c3e50'; // dark text for white background
+
+    if (oosRate >= 50) {
+        oosBackgroundColor = '#dc3545'; // red
+        oosTextColor = '#ffffff'; // white text for red background
+    } else if (oosRate >= 22) {
+        oosBackgroundColor = '#fd7e14'; // orange
+        oosTextColor = '#ffffff'; // white text for orange background
+    } else if (oosRate >= 15) {
+        oosBackgroundColor = '#ffc107'; // yellow
+        oosTextColor = '#212529'; // dark text for yellow background
+    }
+
+    // Get contact information using correct API field names
+    const email = carrier.email || carrier.carrier_details?.EMAIL_ADDRESS || 'Not available';
+    const phone = carrier.phone || carrier.carrier_details?.PHONE || 'Not available';
+    const contact = carrier.carrier_details?.COMPANY_OFFICER_1 || carrier.contact_name || 'Not available';
+
+    return `
+        <div class="carrier-profile-display">
+            <div class="company-header">
+                <h1 class="company-name">${carrier.LEGAL_NAME || carrier.legal_name || carrier.DBA_NAME || carrier.dba_name || 'Unknown Company'}</h1>
+                <div class="company-details">
+                    <span class="usdot-number">USDOT: ${carrier.DOT_NUMBER || carrier.usdot_number}</span>
+                    <span class="operating-status ${carrier.operating_status === 'ACTIVE' ? 'status-active' : 'status-inactive'}">
+                        ${carrier.operating_status || 'Active'}
+                    </span>
+                    <span class="operation-type">${carrier.CARRIER_OPERATION || carrier.carrier_operation || 'Interstate'}</span>
+                </div>
+            </div>
+
+            <!-- Safety Metrics - Now displayed horizontally above profile grid -->
+            <div class="safety-metrics-section" style="margin-bottom: 32px;">
+                <div class="safety-metrics" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; background: #f8f9fa; padding: 20px; border-radius: 12px;">
+                    <div class="metric">
+                        <div class="metric-value">${totalInspections}</div>
+                        <div class="metric-label">Total Inspections</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">${oosInspections}</div>
+                        <div class="metric-label">OOS Inspections</div>
+                    </div>
+                    <div class="metric" style="background: ${oosBackgroundColor}; color: ${oosTextColor}; border: 2px solid ${oosBackgroundColor === '#ffffff' ? '#dee2e6' : oosBackgroundColor};">
+                        <div class="metric-value">${oosPercentage}%</div>
+                        <div class="metric-label">OOS Rate</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">${carrier.drivers || carrier.carrier_details?.TOTAL_DRIVERS || 'N/A'}</div>
+                        <div class="metric-label">Total Drivers</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" style="font-size: 14px; text-align: center;">${carrier.COMMODITIES_HAULED || carrier.commodities_hauled || 'General Freight'}</div>
+                        <div class="metric-label">Commodities Hauled</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-grid">
+                <!-- Company Information -->
+                <div class="profile-section">
+                    <h3>Company Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Legal Name:</label>
+                            <span>${carrier.LEGAL_NAME || carrier.legal_name || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>DBA Name:</label>
+                            <span>${carrier.DBA_NAME || carrier.dba_name || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>MC Number:</label>
+                            <span>${carrier.MC_NUMBER || carrier.mc_number || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Operation Type:</label>
+                            <span>${carrier.CARRIER_OPERATION || carrier.carrier_operation || 'Interstate'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Hazmat:</label>
+                            <span>${carrier.HAZMAT || carrier.hazmat || 'No'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact Information -->
+                <div class="profile-section">
+                    <h3>Contact Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Contact Name:</label>
+                            <span>${contact}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Email:</label>
+                            <span>${email}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Phone:</label>
+                            <span>${phone}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Address:</label>
+                            <span>${carrier.CARRIER_MAILING_STREET || address.street || carrier.mailing_street || 'Not available'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>City, State:</label>
+                            <span>${carrier.CARRIER_MAILING_CITY || address.city || carrier.mailing_city || 'N/A'}, ${carrier.CARRIER_MAILING_STATE || address.state || carrier.mailing_state || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fleet Information -->
+                <div class="profile-section">
+                    <h3>Fleet Information</h3>
+                    ${(() => {
+                        const uniqueVehicles = extractUniqueVehicles(inspections);
+                        if (uniqueVehicles.length > 0) {
+                            return `
+                                <div style="margin-top: 0px;">
+                                    <h4 style="color: #2c3e50; font-size: 16px; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #dee2e6; padding-bottom: 6px;">
+                                        Vehicle Inventory (${uniqueVehicles.length} vehicles)
+                                    </h4>
+                                    <div class="vehicles-list" style="display: grid; gap: 8px;">
+                                        ${uniqueVehicles.map(vehicle => `
+                                            <div class="vehicle-item" style="background: #cce7ff; border-radius: 6px; padding: 12px; border: 1px solid #99d6ff;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                                    <strong style="color: #2c3e50;">${vehicle.year} ${vehicle.make}</strong>
+                                                    <span style="background: #0066cc; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                                                        ${vehicle.type}
+                                                    </span>
+                                                </div>
+                                                <div style="font-size: 13px; color: #495057;">
+                                                    <span style="font-family: monospace; background: #fff; padding: 2px 6px; border-radius: 3px; margin-right: 8px; border: 1px solid #ddd;">
+                                                        VIN: ${vehicle.vin}
+                                                    </span>
+                                                    ${vehicle.license !== 'N/A' ? `<span>License: ${vehicle.license} (${vehicle.state})</span>` : ''}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            return '<div style="margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 6px; color: #6c757d; font-style: italic; text-align: center;">No detailed vehicle information available from inspections</div>';
+                        }
+                    })()}
+                </div>
+
+                <!-- Trailer Inventory -->
+                <div class="profile-section">
+                    <h3>Trailer Inventory</h3>
+                    ${(() => {
+                        const uniqueTrailers = extractUniqueTrailers(inspections);
+                        if (uniqueTrailers.length > 0) {
+                            return `
+                                <div style="margin-top: 0px;">
+                                    <h4 style="color: #2c3e50; font-size: 16px; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #dee2e6; padding-bottom: 6px;">
+                                        Trailer Fleet (${uniqueTrailers.length} trailers)
+                                    </h4>
+                                    <div class="trailers-list" style="display: grid; gap: 8px;">
+                                        ${uniqueTrailers.map(trailer => `
+                                            <div class="trailer-item" style="background: #fff3cd; border-radius: 6px; padding: 12px; border: 1px solid #ffeaa7;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                                    <strong style="color: #2c3e50;">${trailer.year} ${trailer.make}</strong>
+                                                    <span style="background: #e17055; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                                                        ${trailer.type}
+                                                    </span>
+                                                </div>
+                                                <div style="font-size: 13px; color: #495057;">
+                                                    <span style="font-family: monospace; background: #fff; padding: 2px 6px; border-radius: 3px; margin-right: 8px; border: 1px solid #ddd;">
+                                                        VIN: ${trailer.vin}
+                                                    </span>
+                                                    ${trailer.license !== 'N/A' ? `<span>License: ${trailer.license} (${trailer.state})</span>` : ''}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            return '<div style="margin-top: 0px; padding: 12px; background: #f8f9fa; border-radius: 6px; color: #6c757d; font-style: italic; text-align: center;">No trailer information available from inspections</div>';
+                        }
+                    })()}
+                </div>
+            </div>
+
+            ${totalInspections > 0 ? `
+            <div class="inspections-section">
+                <h3>Recent Inspections</h3>
+                <div class="inspections-list">
+                    ${inspections.slice(0, 10).map(inspection => `
+                        <div class="inspection-item">
+                            <div class="inspection-header">
+                                <span class="inspection-date">${inspection.Insp_Date || inspection.inspection_date || 'Unknown Date'}</span>
+                                <span class="inspection-state">${inspection.Report_State || inspection.state || 'N/A'}</span>
+                                <span class="inspection-oos ${(inspection.OOS_Total > 0) ? 'oos-yes' : 'oos-no'}">
+                                    ${(inspection.OOS_Total > 0) ? 'OOS' : 'No OOS'}
+                                </span>
+                            </div>
+                            <div class="inspection-details">
+                                <span class="vehicle-info">Vehicle: ${inspection.Unit_Make || inspection.vehicle_make || 'N/A'}</span>
+                                ${inspection.VIN || inspection.vin ? `<span class="vin">VIN: ${inspection.VIN || inspection.vin}</span>` : ''}
+                                ${inspection.violations ? `<span class="violations">${inspection.violations} violations</span>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${inspections.length > 10 ? `
+                        <div class="inspections-more">
+                            ... and ${inspections.length - 10} more inspections
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+// VIN Decoder function
+function decodeVIN(vin) {
+    if (!vin || vin.length !== 17) return { year: 'Unknown', make: 'Unknown', model: 'Unknown' };
+
+    // VIN position 10 determines year
+    const yearCode = vin.charAt(9);
+    const yearMap = {
+        'A': 1980, 'B': 1981, 'C': 1982, 'D': 1983, 'E': 1984, 'F': 1985, 'G': 1986, 'H': 1987,
+        'J': 1988, 'K': 1989, 'L': 1990, 'M': 1991, 'N': 1992, 'P': 1993, 'R': 1994, 'S': 1995,
+        'T': 1996, 'V': 1997, 'W': 1998, 'X': 1999, 'Y': 2000, '1': 2001, '2': 2002, '3': 2003,
+        '4': 2004, '5': 2005, '6': 2006, '7': 2007, '8': 2008, '9': 2009, 'A': 2010, 'B': 2011,
+        'C': 2012, 'D': 2013, 'E': 2014, 'F': 2015, 'G': 2016, 'H': 2017, 'J': 2018, 'K': 2019,
+        'L': 2020, 'M': 2021, 'N': 2022, 'P': 2023, 'R': 2024, 'S': 2025, 'T': 2026, 'V': 2027
+    };
+
+    // For years 2010+, use different mapping
+    let year = yearMap[yearCode];
+    if (yearCode >= 'A' && yearCode <= 'Z' && year < 2010) {
+        year += 30; // 2010-2039 cycle
+    }
+
+    // WMI (World Manufacturer Identifier) - first 3 characters
+    const wmi = vin.substring(0, 3);
+    let make = 'Unknown';
+
+    // Common WMI codes for commercial vehicles
+    const wmiMap = {
+        '1FU': 'Freightliner', '1FT': 'Ford', '1FJ': 'Freightliner',
+        '3AK': 'Freightliner', '3HM': 'International', '3HT': 'International',
+        '4V4': 'Volvo', '4V1': 'Volvo', '4VL': 'Volvo', '4VM': 'Volvo',
+        '1XK': 'Kenworth', '1XN': 'Kenworth', '1XP': 'Kenworth',
+        '1NX': 'PACCAR', '1NP': 'PACCAR', '2NP': 'PACCAR',
+        'YV1': 'Volvo', 'YV2': 'Volvo', 'YV3': 'Volvo',
+        '2FZ': 'Sterling', '2FU': 'Freightliner', '2FV': 'Freightliner',
+        'WBA': 'BMW', 'WBS': 'BMW', 'WBX': 'BMW'
+    };
+
+    // Check direct WMI match
+    if (wmiMap[wmi]) {
+        make = wmiMap[wmi];
+    } else {
+        // Check partial matches
+        const wmi2 = vin.substring(0, 2);
+        if (wmi2 === '1F') make = 'Ford/Freightliner';
+        else if (wmi2 === '3A' || wmi2 === '3H') make = 'Freightliner/International';
+        else if (wmi2 === '4V') make = 'Volvo';
+        else if (wmi2 === '1X') make = 'Kenworth';
+        else if (vin.charAt(0) === '1') make = 'USA Manufacturer';
+        else if (vin.charAt(0) === '2') make = 'Canada Manufacturer';
+        else if (vin.charAt(0) === '3') make = 'Mexico Manufacturer';
+        else if (vin.charAt(0) === '4' || vin.charAt(0) === '5') make = 'USA Manufacturer';
+    }
+
+    return {
+        year: year || 'Unknown',
+        make: make,
+        model: 'Commercial Vehicle',
+        vin: vin
+    };
+}
+
+// Function to extract unique vehicles from inspections
+function extractUniqueVehicles(inspections) {
+    const vehicleMap = new Map();
+
+    inspections.forEach(inspection => {
+        const vin = inspection.VIN || inspection.vin;
+        const make = inspection.Unit_Make || inspection.vehicle_make || '';
+
+        if (vin && vin.length === 17) {
+            if (!vehicleMap.has(vin)) {
+                const decoded = decodeVIN(vin);
+                vehicleMap.set(vin, {
+                    vin: vin,
+                    make: make || decoded.make,
+                    model: decoded.model,
+                    year: decoded.year,
+                    type: inspection.Unit_Type_Desc || inspection.vehicle_type || 'Unknown',
+                    license: inspection.Unit_License || inspection.license || 'N/A',
+                    state: inspection.Unit_License_State || inspection.license_state || 'N/A'
+                });
+            }
+        }
+    });
+
+    return Array.from(vehicleMap.values());
+}
+
+// Function to extract unique trailers from inspections
+function extractUniqueTrailers(inspections) {
+    const trailerMap = new Map();
+
+    inspections.forEach(inspection => {
+        const vin = inspection.VIN2 || inspection.vin2;
+        const make = inspection.Unit_Make2 || inspection.vehicle_make2 || '';
+
+        if (vin && vin.length === 17) {
+            if (!trailerMap.has(vin)) {
+                const decoded = decodeVIN(vin);
+                trailerMap.set(vin, {
+                    vin: vin,
+                    make: make || decoded.make,
+                    model: decoded.model,
+                    year: decoded.year,
+                    type: inspection.Unit_Type_Desc2 || inspection.vehicle_type2 || 'Trailer',
+                    license: inspection.Unit_License2 || inspection.license2 || 'N/A',
+                    state: inspection.Unit_License_State2 || inspection.license_state2 || 'N/A'
+                });
+            }
+        }
+    });
+
+    return Array.from(trailerMap.values());
+}
+
+// Fallback function to display basic carrier info
+function displayCarrierInfo(carrier) {
+    const carrierProfileDisplay = document.getElementById('carrierProfileDisplay');
+    if (!carrierProfileDisplay) return;
+
+    const companyName = carrier.legal_name || carrier.dba_name || 'Unknown Company';
+    const usdot = carrier.usdot_number || 'N/A';
+
+    carrierProfileDisplay.innerHTML = `
+        <div class="carrier-profile-display">
+            <div class="company-header">
+                <h1 class="company-name">${companyName}</h1>
+                <div class="company-details">
+                    <span class="usdot-number">USDOT: ${usdot}</span>
+                    <span class="operating-status status-active">Active</span>
+                </div>
+            </div>
+            <div class="profile-grid">
+                <div class="profile-section">
+                    <h3>Basic Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Company Name:</label>
+                            <span>${companyName}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>USDOT Number:</label>
+                            <span>${usdot}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>MC Number:</label>
+                            <span>${carrier.mc_number || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 console.log('✅ Lead Generation fully restored with all functions:');
 console.log('  - performLeadSearch / searchCarriers');

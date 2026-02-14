@@ -1,15 +1,46 @@
 // Fix Premium Display in Clients Management
 console.log('Fixing premium display in clients management...');
 
-// Override loadClientsView to use the proper implementation
+// Override loadClientsView to use the proper implementation with fresh data loading
 window.loadClientsView = function() {
     console.log('Loading clients view with proper premium calculation...');
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 
-    // Get all policies first for premium calculation
-    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    console.log('Total policies in storage:', allPolicies.length);
+    // Force refresh policies from server to ensure we have the latest data
+    fetch('/api/policies')
+        .then(response => response.json())
+        .then(serverPolicies => {
+            console.log('Loaded fresh policies from server:', serverPolicies.length);
+            // Update localStorage with fresh server data
+            localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
+            // Now render the clients view with fresh data
+            renderClientsViewWithFreshData(serverPolicies);
+        })
+        .catch(error => {
+            console.warn('Failed to load fresh policies from server, using localStorage:', error);
+            // Fallback to localStorage if server request fails
+            const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            console.log('Total policies in storage:', allPolicies.length);
+            renderClientsViewWithFreshData(allPolicies);
+        });
+};
+
+// Separate function to render clients view with provided policy data
+function renderClientsViewWithFreshData(allPolicies) {
+    const dashboardContent = document.querySelector('.dashboard-content');
+
+    // Get current user and check if they are admin for template rendering
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let isAdmin = false;
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase());
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
 
     dashboardContent.innerHTML = `
         <div class="clients-view">
@@ -38,12 +69,12 @@ window.loadClientsView = function() {
                         <option>Commercial Auto</option>
                         <option>Life & Health</option>
                     </select>
-                    <select class="filter-select">
-                        <option>All Status</option>
-                        <option>Active</option>
-                        <option>Prospect</option>
-                        <option>Inactive</option>
-                    </select>
+                    ${isAdmin ? `<select class="filter-select" id="clientAgentFilter" onchange="filterClients()">
+                        <option value="">All Agents</option>
+                        <option value="Grant">Grant</option>
+                        <option value="Carson">Carson</option>
+                        <option value="Hunter">Hunter</option>
+                    </select>` : ''}
                     <button class="btn-filter">
                         <i class="fas fa-filter"></i> More Filters
                     </button>
@@ -64,7 +95,7 @@ window.loadClientsView = function() {
                         </tr>
                     </thead>
                     <tbody id="clientsTableBody">
-                        ${generateClientRowsWithPremium()}
+                        ${generateClientRowsWithPremium(allPolicies)}
                     </tbody>
                 </table>
             </div>
@@ -73,7 +104,7 @@ window.loadClientsView = function() {
 };
 
 // Generate client rows with proper premium calculation
-function generateClientRowsWithPremium() {
+function generateClientRowsWithPremium(allPolicies) {
     // Get clients from localStorage
     let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
 
@@ -136,8 +167,8 @@ function generateClientRowsWithPremium() {
         `;
     }
 
-    // Get all policies for premium calculation
-    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    // Use the policies passed as parameter (already fresh from server or localStorage)
+    console.log('Using provided policies for premium calculation:', allPolicies.length);
 
     // Generate rows for each client
     return clients.map(client => {
@@ -163,24 +194,72 @@ function generateClientRowsWithPremium() {
         const nameParts = (client.name || 'Unknown').split(' ').filter(n => n);
         const initials = nameParts.map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'UN';
 
-        // Find all policies for this client - ONLY use fresh data
-        const clientPolicies = allPolicies.filter(policy => {
-            // Check if policy belongs to this client by clientId
-            if (policy.clientId && String(policy.clientId) === String(client.id)) {
-                console.log(`Policy ${policy.policyNumber} matched by clientId for ${client.name}`);
-                return true;
+        // Find all policies for this client - ONLY use fresh data with enhanced nested search
+        const clientPolicies = [];
+
+        allPolicies.forEach(policyRecord => {
+            // Helper function to check if a policy matches this client
+            const matchesClient = (policy) => {
+                // Check by clientId
+                if (policy.clientId && String(policy.clientId) === String(client.id)) {
+                    console.log(`Policy ${policy.policyNumber || policy.id} matched by clientId for ${client.name}`);
+                    return true;
+                }
+
+                // Check by insured name
+                const insuredName = policy.insured?.['Name/Business Name'] ||
+                                   policy.insured?.['Primary Named Insured'] ||
+                                   policy.insuredName ||
+                                   policy.clientName;
+                if (insuredName && client.name && insuredName.toLowerCase().includes(client.name.toLowerCase())) {
+                    console.log(`Policy ${policy.policyNumber || policy.id} matched by insured name for ${client.name}`);
+                    return true;
+                }
+
+                // Check by business name variations
+                const businessNames = [
+                    client.name,
+                    client.businessName,
+                    client.companyName,
+                    client.fullName
+                ].filter(name => name);
+
+                for (const businessName of businessNames) {
+                    if (insuredName && businessName &&
+                        (insuredName.toLowerCase().includes(businessName.toLowerCase()) ||
+                         businessName.toLowerCase().includes(insuredName.toLowerCase()))) {
+                        console.log(`Policy ${policy.policyNumber || policy.id} matched by business name variation for ${client.name}`);
+                        return true;
+                    }
+                }
+
+                return false;
+            };
+
+            // Check direct policy structure
+            if (matchesClient(policyRecord)) {
+                clientPolicies.push(policyRecord);
+                return;
             }
 
-            // Check if the insured name matches
-            const insuredName = policy.insured?.['Name/Business Name'] ||
-                               policy.insured?.['Primary Named Insured'] ||
-                               policy.insuredName;
-            if (insuredName && client.name && insuredName.toLowerCase() === client.name.toLowerCase()) {
-                console.log(`Policy ${policy.policyNumber} matched by name for ${client.name}`);
-                return true;
-            }
+            // Check nested policies array (Level 1: policies[])
+            if (policyRecord.policies && Array.isArray(policyRecord.policies)) {
+                policyRecord.policies.forEach(nestedPolicy => {
+                    if (matchesClient(nestedPolicy)) {
+                        clientPolicies.push(nestedPolicy);
+                        return;
+                    }
 
-            return false;
+                    // Check deeper nesting (Level 2: policies[].policies[])
+                    if (nestedPolicy.policies && Array.isArray(nestedPolicy.policies)) {
+                        nestedPolicy.policies.forEach(deepNestedPolicy => {
+                            if (matchesClient(deepNestedPolicy)) {
+                                clientPolicies.push(deepNestedPolicy);
+                            }
+                        });
+                    }
+                });
+            }
         });
 
         const policyCount = clientPolicies.length;
@@ -189,7 +268,7 @@ function generateClientRowsWithPremium() {
         // Calculate total premium from policies
         let totalPremium = 0;
         clientPolicies.forEach(policy => {
-            // Check ALL possible premium field locations
+            // Check ALL possible premium field locations with enhanced search
             let premiumValue = 0;
 
             // Check financial object
@@ -199,7 +278,7 @@ function generateClientRowsWithPremium() {
                               policy.financial.annualPremium ||
                               policy.financial.premium ||
                               0;
-                console.log(`  Policy ${policy.policyNumber}: financial.* = ${premiumValue}`);
+                console.log(`  Policy ${policy.policyNumber || policy.id}: financial.* = ${premiumValue}`);
             }
 
             // Check top-level fields if not found in financial
@@ -209,15 +288,21 @@ function generateClientRowsWithPremium() {
                               policy.premium ||
                               policy.annualPremium ||
                               0;
-                console.log(`  Policy ${policy.policyNumber}: top-level = ${premiumValue}`);
+                console.log(`  Policy ${policy.policyNumber || policy.id}: top-level = ${premiumValue}`);
             }
 
-            // Convert to number
-            const numericPremium = typeof premiumValue === 'string' ?
-                parseFloat(premiumValue.replace(/[$,]/g, '')) || 0 :
-                parseFloat(premiumValue) || 0;
+            // Convert to number and handle various formats
+            let numericPremium = 0;
+            if (premiumValue) {
+                // Handle string formats like "$17,423.00" or "17423"
+                const cleanValue = typeof premiumValue === 'string' ?
+                    premiumValue.replace(/[$,\s]/g, '') :
+                    String(premiumValue);
 
-            console.log(`  Policy ${policy.policyNumber}: Final premium = ${numericPremium}`);
+                numericPremium = parseFloat(cleanValue) || 0;
+                console.log(`  Policy ${policy.policyNumber || policy.id}: Raw value "${premiumValue}" -> Clean "${cleanValue}" -> Final premium = ${numericPremium}`);
+            }
+
             totalPremium += numericPremium;
         });
 

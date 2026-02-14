@@ -8116,6 +8116,18 @@ async function loadClientsView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 
+    // Get current user and check if they are admin for template rendering
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let isAdmin = false;
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase());
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
     dashboardContent.innerHTML = `
         <div class="clients-view">
             <header class="content-header">
@@ -8143,12 +8155,12 @@ async function loadClientsView() {
                         <option>Commercial Auto</option>
                         <option>Life & Health</option>
                     </select>
-                    <select class="filter-select">
-                        <option>All Status</option>
-                        <option>Active</option>
-                        <option>Prospect</option>
-                        <option>Inactive</option>
-                    </select>
+                    ${isAdmin ? `<select class="filter-select" id="clientAgentFilter" onchange="filterClients()">
+                        <option value="">All Agents</option>
+                        <option value="Grant">Grant</option>
+                        <option value="Carson">Carson</option>
+                        <option value="Hunter">Hunter</option>
+                    </select>` : ''}
                     <button class="btn-filter">
                         <i class="fas fa-filter"></i> More Filters
                     </button>
@@ -8599,28 +8611,30 @@ function loadPoliciesView() {
                     <input type="text" placeholder="Search by policy number, client name...">
                 </div>
                 <div class="filter-group">
-                    <select class="filter-select">
-                        <option>All Lines</option>
-                        <option>Auto</option>
-                        <option>Homeowners</option>
-                        <option>Commercial Auto</option>
-                        <option>Commercial Property</option>
-                        <option>General Liability</option>
-                        <option>Life</option>
+                    <select class="filter-select" id="policyTypeFilter" onchange="filterPolicies()">
+                        <option value="">All Lines</option>
+                        <option value="auto">Personal Auto</option>
+                        <option value="homeowners">Homeowners</option>
+                        <option value="commercial-auto">Commercial Auto</option>
+                        <option value="commercial-property">Commercial Property</option>
+                        <option value="general-liability">General Liability</option>
+                        <option value="life">Life</option>
                     </select>
-                    <select class="filter-select">
-                        <option>All Carriers</option>
-                        <option>Progressive</option>
-                        <option>State Farm</option>
-                        <option>Allstate</option>
-                        <option>Liberty Mutual</option>
+                    <select class="filter-select" id="policyCarrierFilter" onchange="filterPolicies()">
+                        <option value="">All Carriers</option>
+                        <option value="progressive">Progressive</option>
+                        <option value="geico">GEICO</option>
+                        <option value="state farm">State Farm</option>
+                        <option value="allstate">Allstate</option>
+                        <option value="liberty mutual">Liberty Mutual</option>
+                        <option value="farmers">Farmers</option>
                     </select>
-                    <select class="filter-select">
-                        <option>All Status</option>
-                        <option>Active</option>
-                        <option>Pending</option>
-                        <option>Cancelled</option>
-                        <option>Expired</option>
+                    <select class="filter-select" id="policyStatusFilter" onchange="filterPolicies()">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="pending">Pending</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="expired">Expired</option>
                     </select>
                 </div>
             </div>
@@ -8656,6 +8670,11 @@ function loadPoliciesView() {
             try {
                 const policyRows = await generatePolicyRows();
                 tbody.innerHTML = policyRows;
+
+                // Initialize policy filters after rows are loaded
+                if (window.initializePolicyFilters) {
+                    window.initializePolicyFilters();
+                }
             } catch (error) {
                 console.error('Error generating policy rows:', error);
                 tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #dc2626;">Error loading policies</td></tr>';
@@ -10865,42 +10884,11 @@ window.loadLeadGenerationView = function loadLeadGenerationView(activeTab = 'loo
                         </button>
                     </div>
                 </div>
-                
-                <!-- Results Section -->
-                <div class="lead-results-section" id="leadResults">
-                    <div class="results-header">
-                        <h3>Search Results</h3>
-                        <span class="results-count">0 leads found</span>
-                    </div>
-                    
-                    <div class="lead-results-table">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th><input type="checkbox" onclick="selectAllLeads(this)"></th>
-                                    <th>USDOT #</th>
-                                    <th>Company Name</th>
-                                    <th>Location</th>
-                                    <th>Fleet Size</th>
-                                    <th>Insurance Status</th>
-                                    <th>Expiry Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="leadResultsBody">
-                                <tr>
-                                    <td colspan="8" class="text-center">No results. Use the search form above to find leads.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="results-pagination">
-                        <button class="btn-small" disabled><i class="fas fa-chevron-left"></i> Previous</button>
-                        <span class="page-info">Page 1 of 1</span>
-                        <button class="btn-small" disabled>Next <i class="fas fa-chevron-right"></i></button>
-                    </div>
-                    </div>
+
+                <!-- Carrier Profile Display -->
+                <div id="carrierProfileDisplay" class="carrier-profile-display-container">
+                    <!-- Carrier profiles will be displayed here -->
+                </div>
                 </div>
                 
                 <!-- Generate Leads Section -->
@@ -14775,11 +14763,28 @@ function importClients() {
 
 function filterClients() {
     const searchValue = document.getElementById('clientSearch').value.toLowerCase();
+    const agentFilter = document.getElementById('clientAgentFilter');
+    const selectedAgent = agentFilter ? agentFilter.value : '';
     const rows = document.querySelectorAll('#clientsTableBody tr');
-    
+
     rows.forEach(row => {
+        // Skip rows that don't have the expected structure
+        if (row.cells.length < 6) {
+            row.style.display = 'none';
+            return;
+        }
+
+        // Get text for search filtering
         const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(searchValue) ? '' : 'none';
+        const matchesSearch = !searchValue || text.includes(searchValue);
+
+        // Get assigned agent for agent filtering (6th column, index 5)
+        const assignedAgentCell = row.cells[5]; // "Assigned to" column
+        const assignedAgent = assignedAgentCell ? assignedAgentCell.textContent.trim() : '';
+        const matchesAgent = !selectedAgent || assignedAgent === selectedAgent;
+
+        // Show row only if it matches both search and agent filters
+        row.style.display = (matchesSearch && matchesAgent) ? '' : 'none';
     });
 }
 

@@ -1,16 +1,21 @@
 /* Policy Modal Styles with Improved Spacing */
 
 .policy-type-badge {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
     padding: 6px 12px;
     border-radius: 20px;
     font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
     white-space: nowrap;
+    display: inline-block;
+}
+
+/* Default badge styling for cases without specific color classes */
+.policy-type-badge:not(.badge-blue):not(.badge-orange):not(.badge-purple):not(.badge-green):not(.badge-gray) {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .modal-overlay {

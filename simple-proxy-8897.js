@@ -11,7 +11,14 @@ const url = require('url');
 console.log('🔄 Starting simple proxy server 8897 → 8898...');
 
 const server = http.createServer((req, res) => {
-    const targetUrl = `http://localhost:8898${req.url}`;
+    // Route carrier profile and search endpoints to port 3001 (vanguard-backend)
+    let targetUrl;
+    if (req.url.includes('/api/carrier/profile/') || req.url.includes('/api/search')) {
+        targetUrl = `http://localhost:3001${req.url}`;
+        console.log(`🔄 ROUTING TO VANGUARD BACKEND: ${req.method} ${req.url} → ${targetUrl}`);
+    } else {
+        targetUrl = `http://localhost:8898${req.url}`;
+    }
 
     // Log to file for COI requests
     if (req.url.includes('/api/coi/send-request')) {

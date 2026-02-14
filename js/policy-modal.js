@@ -1,5 +1,20 @@
 // Policy Modal Functions
 
+// Function to format date for storage without timezone issues
+function formatDateForStorage(dateValue) {
+    if (!dateValue) return '';
+    // If it's already in YYYY-MM-DD format, return as-is
+    if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateValue;
+    }
+    // Convert MM/DD/YYYY to YYYY-MM-DD if needed
+    if (typeof dateValue === 'string' && dateValue.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+        const [month, day, year] = dateValue.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    return dateValue;
+}
+
 // Global variable to store policy data
 let currentPolicyData = {};
 
@@ -1436,8 +1451,8 @@ async function savePolicy() {
                             policyData.carrier = input.value;
                         }
                         if (input.id === 'overview-status') policyData.policyStatus = input.value;
-                        if (input.id === 'overview-effective-date') policyData.effectiveDate = input.value;
-                        if (input.id === 'overview-expiration-date') policyData.expirationDate = input.value;
+                        if (input.id === 'overview-effective-date') policyData.effectiveDate = formatDateForStorage(input.value);
+                        if (input.id === 'overview-expiration-date') policyData.expirationDate = formatDateForStorage(input.value);
                         if (input.id === 'overview-premium') {
                             console.log('Setting premium from overview-premium field:', input.value);
                             policyData.premium = input.value;
@@ -1795,8 +1810,8 @@ function savePolicyDraft() {
                             policyData.carrier = input.value;
                         }
                         if (input.id === 'overview-status') policyData.policyStatus = input.value;
-                        if (input.id === 'overview-effective-date') policyData.effectiveDate = input.value;
-                        if (input.id === 'overview-expiration-date') policyData.expirationDate = input.value;
+                        if (input.id === 'overview-effective-date') policyData.effectiveDate = formatDateForStorage(input.value);
+                        if (input.id === 'overview-expiration-date') policyData.expirationDate = formatDateForStorage(input.value);
                         if (input.id === 'overview-premium') {
                             console.log('Setting premium from overview-premium field:', input.value);
                             policyData.premium = input.value;

@@ -83,13 +83,45 @@ window.loadPoliciesView = async function() {
 // Also fix generatePolicyRows to handle the data correctly
 const originalGeneratePolicyRows = window.generatePolicyRows;
 window.generatePolicyRows = function() {
-    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
     console.log(`Policy Fix: Generating rows for ${policies.length} policies`);
+
+    // Get current user and check if they are admin
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            currentUser = user.username;
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            console.log(`🔍 Policy Fix - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+        }
+    }
+
+    // Filter policies based on user role (same as client filtering logic)
+    if (!isAdmin && currentUser) {
+        const originalCount = policies.length;
+        policies = policies.filter(policy => {
+            const assignedTo = policy.assignedTo ||
+                              policy.agent ||
+                              policy.assignedAgent ||
+                              policy.producer ||
+                              'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+        });
+        console.log(`🔒 Policy Fix: Filtered policies: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
+    } else if (isAdmin) {
+        console.log(`👑 Policy Fix: Admin user - showing all ${policies.length} policies`);
+    }
 
     if (policies.length === 0) {
         return `
             <tr>
-                <td colspan="8" style="text-align: center; padding: 40px;">
+                <td colspan="10" style="text-align: center; padding: 40px;">
                     <div style="color: #9ca3af;">
                         <i class="fas fa-file-contract" style="font-size: 48px; margin-bottom: 16px;"></i>
                         <p>No policies found</p>
@@ -146,25 +178,79 @@ window.generatePolicyRows = function() {
             maximumFractionDigits: 0
         }).format(premium);
 
+        // Get policy type and badge styling
+        const policyType = policy.policyType || policy.type || 'unknown';
+
+        // Helper functions for policy type labels and badges
+        function getPolicyTypeLabel(type) {
+            if (!type || type === 'unknown') return 'Unknown';
+            const normalizedType = type.toString().toLowerCase();
+            const labels = {
+                'personal-auto': 'Personal Auto',
+                'commercial-auto': 'Commercial Auto',
+                'homeowners': 'Homeowners',
+                'commercial-property': 'Commercial Property',
+                'general-liability': 'General Liability',
+                'professional-liability': 'Professional Liability',
+                'workers-comp': 'Workers Compensation',
+                'umbrella': 'Umbrella',
+                'life': 'Life',
+                'health': 'Health'
+            };
+            return labels[normalizedType] || type;
+        }
+
+        function getBadgeClass(type) {
+            if (!type) return 'badge-gray';
+            const typeStr = type.toString().toLowerCase();
+            if (typeStr.includes('commercial')) return 'badge-orange';
+            if (typeStr.includes('auto')) return 'badge-blue';
+            if (typeStr.includes('home')) return 'badge-green';
+            if (typeStr.includes('liability')) return 'badge-purple';
+            return 'badge-gray';
+        }
+
+        const typeLabel = getPolicyTypeLabel(policyType);
+        const badgeClass = getBadgeClass(policyType);
+
+        // Get client name with same logic as main function
+        let clientName = 'N/A';
+        if (policy.insured?.['Name/Business Name']) {
+            clientName = policy.insured['Name/Business Name'];
+        } else if (policy.insured?.['Primary Named Insured']) {
+            clientName = policy.insured['Primary Named Insured'];
+        } else if (policy.namedInsured?.name) {
+            clientName = policy.namedInsured.name;
+        } else if (policy.clientName && policy.clientName !== 'N/A' && policy.clientName !== 'Unknown' && policy.clientName !== 'unknown') {
+            clientName = policy.clientName;
+        }
+
+        // Get assigned agent
+        const assignedTo = policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || 'Grant';
+
         return `
             <tr>
-                <td style="padding-left: 20px;">${policy.policyNumber || 'N/A'}</td>
-                <td>${policy.clientName || policy.client || 'N/A'}</td>
+                <td class="policy-number" style="padding-left: 20px;">${policy.policyNumber || 'N/A'}</td>
+                <td><span class="policy-type-badge ${badgeClass}">${typeLabel}</span></td>
+                <td>${clientName}</td>
                 <td>${policy.carrier || 'N/A'}</td>
                 <td>${effectiveDate}</td>
                 <td>${expirationDate}</td>
-                <td>${formattedPremium}</td>
-                <td><span class="badge ${statusClass}">${status}</span></td>
+                <td>${formattedPremium}/yr</td>
+                <td>${assignedTo}</td>
+                <td><span class="status-badge ${statusClass}">${status}</span></td>
                 <td>
-                    <button class="btn-icon" onclick="viewPolicyDetails('${policy.id}')" title="View Details">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn-icon" onclick="editPolicy('${policy.id}')" title="Edit Policy">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn-icon" onclick="deletePolicy('${policy.id}')" title="Delete Policy">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div class="action-buttons">
+                        <button class="btn-icon" onclick="viewPolicy('${policy.id}')" title="View Policy">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn-icon" onclick="editPolicy('${policy.id}')" title="Edit Policy">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon btn-danger" onclick="deletePolicy('${policy.id}')" title="Delete Policy">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;

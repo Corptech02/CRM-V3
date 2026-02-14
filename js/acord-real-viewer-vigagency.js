@@ -30,30 +30,42 @@ window.realPdfState = {
     formData: {}
 };
 
-// Helper function to determine signature based on agency
-function getSignatureForAgency(agency) {
+// Helper function to determine signature based on agent
+function getSignatureForAgent(agent) {
     console.log('🖋️ DEBUGGING SIGNATURE SELECTION:');
-    console.log('  - Raw agency value:', agency);
-    console.log('  - Agency type:', typeof agency);
-    console.log('  - Agency truthy?', !!agency);
+    console.log('  - Raw agent value:', agent);
+    console.log('  - Agent type:', typeof agent);
+    console.log('  - Agent truthy?', !!agent);
 
-    if (agency) {
-        const lowerAgency = agency.toLowerCase();
-        console.log('  - Lowercase agency:', lowerAgency);
-        console.log('  - Contains "united"?', lowerAgency.includes('united'));
-        console.log('  - Contains "vanguard"?', lowerAgency.includes('vanguard'));
+    if (agent) {
+        const lowerAgent = agent.toLowerCase();
+        console.log('  - Lowercase agent:', lowerAgent);
+        console.log('  - Agent name matches:', lowerAgent);
 
-        if (lowerAgency.includes('united')) {
-            console.log('✅ SIGNATURE: Using Maureen Corp signature for United agency');
-            return 'Maureen Corp';
-        } else if (lowerAgency.includes('vanguard')) {
-            console.log('✅ SIGNATURE: Using Grant Corp signature for Vanguard agency');
+        if (lowerAgent.includes('grant')) {
+            console.log('✅ SIGNATURE: Using Grant Corp signature for Grant agent');
             return 'Grant Corp';
+        } else if (lowerAgent.includes('hunter')) {
+            console.log('✅ SIGNATURE: Using Hunter Brooks signature for Hunter agent');
+            return 'Hunter Brooks';
+        } else if (lowerAgent.includes('carson')) {
+            console.log('✅ SIGNATURE: Using Carson Sweitzer signature for Carson agent');
+            return 'Carson Sweitzer';
+        } else if (lowerAgent.includes('maureen')) {
+            console.log('✅ SIGNATURE: Using Maureen Corp signature for Maureen agent');
+            return 'Maureen Corp';
         }
     }
 
-    console.log('✅ SIGNATURE: Using Grant Corp signature (default - no agency specified)');
+    console.log('✅ SIGNATURE: Using Grant Corp signature (default - no agent specified)');
     return 'Grant Corp';
+}
+
+// Legacy function name for backwards compatibility
+function getSignatureForAgency(agency) {
+    // For backwards compatibility, check both agency and agent logic
+    console.log('🔄 Legacy getSignatureForAgency called with:', agency);
+    return getSignatureForAgent(agency);
 }
 
 // Helper function to get company information based on agency
@@ -72,8 +84,8 @@ function getCompanyInfoForAgency(agency) {
         return {
             producer: 'Vanguard Insurance Group LLC',
             email: 'contact@vigagency.com',
-            phone: '(330) 460-8072',
-            fax: '(330) 460-8073'
+            phone: '(866) 628-9441',
+            fax: '(330) 779-1097'
         };
     }
 }
@@ -95,7 +107,19 @@ window.checkSavedCOI = async function(policyId) {
 function formatDateForACORD(dateStr) {
     if (!dateStr || dateStr === '') return '';
     try {
-        const date = new Date(dateStr);
+        // Handle YYYY-MM-DD format manually to avoid timezone issues
+        if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [year, month, day] = dateStr.split('-');
+            return `${month}/${day}/${year}`;
+        }
+
+        // Handle MM/DD/YYYY format (already correct)
+        if (typeof dateStr === 'string' && dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+            return dateStr;
+        }
+
+        // For other formats, create date with explicit local timezone
+        const date = new Date(dateStr + 'T00:00:00'); // Force local timezone
         if (isNaN(date)) return '';
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
@@ -592,22 +616,22 @@ function createRealFormFields(policyId, policyData) {
           })() },
         { id: 'insuredAddress2', x: 94, y: 281, width: 299, height: 16,
           value: (() => {
-            const fullAddress = policyData?.address || policyData?.contact?.['Mailing Address'] || '';
-            if (fullAddress && typeof fullAddress === 'string') {
-              // Extract city, state, zip from full address
-              const parts = fullAddress.split(',');
-              if (parts.length >= 2) {
-                // Join everything after the first part (city, state, zip)
-                return parts.slice(1).join(',').trim();
-              }
-            } else if (fullAddress && typeof fullAddress === 'object') {
-              // Handle object address format
-              const city = fullAddress.city || '';
-              const state = fullAddress.state || '';
-              const zip = fullAddress.zip || fullAddress.postalCode || '';
-              return [city, state, zip].filter(Boolean).join(', ');
-            }
-            return '';
+            // Get city, state, zip from separate fields in policy data
+            const city = policyData?.city || policyData?.contact?.City || '';
+            const state = policyData?.state || policyData?.contact?.State || '';
+            const zip = policyData?.zip || policyData?.zipCode || policyData?.contact?.['ZIP Code'] || '';
+
+            console.log('🏙️ Building insuredAddress2 from separate fields:');
+            console.log('  - City:', city);
+            console.log('  - State:', state);
+            console.log('  - ZIP:', zip);
+
+            // Format: "CITY STATE ZIP"
+            const parts = [city, state, zip].filter(Boolean);
+            const result = parts.join(' ');
+            console.log('  - Final insuredAddress2:', result);
+
+            return result || '';
           })() },
         { id: 'insuredCity', x: 94, y: 296, width: 216, height: 16,
           value: '' }, // Remove city field
@@ -1052,7 +1076,7 @@ function createRealFormFields(policyId, policyData) {
 
         // === AUTHORIZED REPRESENTATIVE (signature area) ===
         { id: 'authRep', x: 403, y: 936, width: 364, height: 31,
-          value: getSignatureForAgency(policyData?.agency), bold: true, size: 16, signature: true }
+          value: getSignatureForAgent(policyData?.agent), bold: true, size: 16, signature: true }
     ];
 
     // Create each field
@@ -1279,7 +1303,7 @@ window.realDownloadCOI = async function(policyId) {
         <div class="section-title">PRODUCER</div>
         <div><strong>Vanguard Insurance Group LLC</strong></div>
         <div>2888 Nationwide Pkwy, Brunswick, OH 44242</div>
-        <div>Phone: (330) 460-8072 | Fax: (330) 460-8073 | Email: contact@vigagency.com</div>
+        <div>Phone: (866) 628-9441 | Fax: (330) 779-1097 | Email: contact@vigagency.com</div>
     </div>
 
     <div class="section">
@@ -1680,6 +1704,10 @@ window.showSignAsModal = function(policyId) {
             <div class="sig-option-3" style="padding: 15px; border: 2px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;">
                 <div style="font-family: 'Dancing Script', 'Lucida Handwriting', cursive; font-size: 24px; color: #0066cc; font-weight: 600; font-style: italic; letter-spacing: 0.5px; text-shadow: 0.5px 0.5px 1px rgba(0,0,0,0.1);">Hunter Brooks</div>
             </div>
+
+            <div class="sig-option-4" style="padding: 15px; border: 2px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;">
+                <div style="font-family: 'Dancing Script', 'Lucida Handwriting', cursive; font-size: 24px; color: #0066cc; font-weight: 600; font-style: italic; letter-spacing: 0.5px; text-shadow: 0.5px 0.5px 1px rgba(0,0,0,0.1);">Carson Sweitzer</div>
+            </div>
         </div>
 
         <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
@@ -1722,6 +1750,16 @@ window.showSignAsModal = function(policyId) {
                 e.stopPropagation();
                 console.log('Hunter Brooks clicked');
                 selectSignature('Hunter Brooks');
+            });
+        }
+
+        const option4 = modal.querySelector('.sig-option-4');
+        if (option4) {
+            option4.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Carson Sweitzer clicked');
+                selectSignature('Carson Sweitzer');
             });
         }
 
@@ -1792,8 +1830,8 @@ window.selectSignature = function(signatureName) {
         updateCompanyInfo({
             producer: 'Vanguard Insurance Group LLC',
             email: 'contact@vigagency.com',
-            phone: '(330) 460-8072',
-            fax: '(330) 460-8073'
+            phone: '(866) 628-9441',
+            fax: '(330) 779-1097'
         });
     }
 

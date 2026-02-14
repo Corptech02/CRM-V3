@@ -1,0 +1,314 @@
+/* Carrier Profile Display Styles */
+.carrier-profile-display {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    margin: 20px 0;
+}
+
+/* Company Header */
+.company-header {
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+}
+
+.company-name {
+    color: #2c3e50;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+}
+
+.company-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+}
+
+.usdot-number {
+    background: #3498db;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.operating-status {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.status-active {
+    background: #27ae60;
+    color: white;
+}
+
+.status-inactive {
+    background: #e74c3c;
+    color: white;
+}
+
+.operation-type {
+    background: #95a5a6;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+/* Profile Grid */
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.profile-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.profile-section h3 {
+    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 8px;
+}
+
+.info-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.info-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid #dee2e6;
+    gap: 8px;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: #495057;
+    min-width: fit-content;
+}
+
+.info-item span {
+    color: #212529;
+    word-break: break-word;
+}
+
+/* Safety Metrics */
+.safety-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px;
+}
+
+.metric {
+    text-align: center;
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.metric-label {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Inspections Section */
+.inspections-section {
+    margin-top: 32px;
+}
+
+.inspections-section h3 {
+    color: #2c3e50;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    border-bottom: 2px solid #e74c3c;
+    padding-bottom: 8px;
+}
+
+.inspections-list {
+    display: grid;
+    gap: 16px;
+}
+
+.inspection-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    border-left: 4px solid #3498db;
+}
+
+.inspection-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.inspection-date {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.inspection-state {
+    background: #6c757d;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.inspection-oos {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.oos-yes {
+    background: #e74c3c;
+    color: white;
+}
+
+.oos-no {
+    background: #27ae60;
+    color: white;
+}
+
+.inspection-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 14px;
+    color: #495057;
+}
+
+.vehicle-info {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.vin {
+    font-family: monospace;
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.violations {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.inspections-more {
+    text-align: center;
+    padding: 16px;
+    background: #e9ecef;
+    border-radius: 8px;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.no-inspections {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+    font-style: italic;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.carrier-profile-error {
+    text-align: center;
+    padding: 40px;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 8px;
+    color: #721c24;
+}
+
+.carrier-profile-error h3 {
+    margin: 0 0 12px 0;
+    color: #721c24;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .carrier-profile-display {
+        padding: 16px;
+    }
+
+    .company-name {
+        font-size: 24px;
+    }
+
+    .company-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .profile-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .safety-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .info-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .info-item span {
+        text-align: left;
+    }
+
+    .inspection-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .inspection-details {
+        flex-direction: column;
+        gap: 8px;
+    }
+}

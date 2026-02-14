@@ -430,12 +430,21 @@ app.post('/api/clients', (req, res) => {
 // Delete client
 app.delete('/api/clients/:id', (req, res) => {
     const id = req.params.id;
+    console.log(`Attempting to delete client by ID: ${id}`);
 
-    db.run('DELETE FROM clients WHERE id = ?', [id], function(err) {
+    // Try multiple approaches to find and delete the client
+    const deleteQuery = `DELETE FROM clients WHERE
+        id = ? OR
+        json_extract(data, "$.id") = ? OR
+        json_extract(data, "$.clientId") = ?`;
+
+    db.run(deleteQuery, [id, id, id], function(err) {
         if (err) {
+            console.error('Error deleting client:', err);
             res.status(500).json({ error: err.message });
             return;
         }
+        console.log(`Deleted ${this.changes} client(s) with ID ${id}`);
         res.json({ success: true, deleted: this.changes });
     });
 });
@@ -702,7 +711,15 @@ app.delete('/api/policies/by-number/:policyNumber', (req, res) => {
     const policyNumber = req.params.policyNumber;
     console.log(`Attempting to delete policy by number: ${policyNumber}`);
 
-    db.run('DELETE FROM policies WHERE json_extract(data, "$.policyNumber") = ?', [policyNumber], function(err) {
+    // Try multiple JSON paths where policy number might be stored
+    const deleteQuery = `DELETE FROM policies WHERE
+        json_extract(data, "$.policyNumber") = ? OR
+        json_extract(data, "$.policies[0].policyNumber") = ? OR
+        json_extract(data, "$.policies[0].policies[0].policyNumber") = ? OR
+        json_extract(data, "$.policy_number") = ? OR
+        json_extract(data, "$.policies[0].policy_number") = ?`;
+
+    db.run(deleteQuery, [policyNumber, policyNumber, policyNumber, policyNumber, policyNumber], function(err) {
         if (err) {
             console.error('Error deleting policy by number:', err);
             res.status(500).json({ error: err.message });
@@ -3082,6 +3099,266 @@ app.get('/api/matched-carriers-leads', async (req, res) => {
             success: false
         });
     }
+});
+
+// Carrier Search API - DB-V3 Database
+app.post('/api/search', (req, res) => {
+    const sqlite3 = require('sqlite3').verbose();
+    const dbPath = '/var/www/vanguard/DB-V3.db';
+
+    console.log('🔍 Carrier search request:', req.body);
+
+    // Handle both new format (searchType/searchValue) and legacy format (usdot_number, etc.)
+    let searchType, searchValue;
+
+    if (req.body.searchType && req.body.searchValue) {
+        searchType = req.body.searchType;
+        searchValue = req.body.searchValue;
+    } else if (req.body.usdot_number) {
+        searchType = 'usdot';
+        searchValue = req.body.usdot_number;
+    } else if (req.body.mc_number) {
+        searchType = 'mc';
+        searchValue = req.body.mc_number;
+    } else if (req.body.legal_name) {
+        searchType = 'company';
+        searchValue = req.body.legal_name;
+    } else if (req.body.state) {
+        searchType = 'state';
+        searchValue = req.body.state;
+    } else {
+        return res.status(400).json({ error: 'Search parameters required (usdot_number, mc_number, legal_name, or state)' });
+    }
+
+    const db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+            console.error('❌ Error opening DB-V3 database:', err);
+            return res.status(500).json({ error: 'Database connection error' });
+        }
+    });
+
+    let query, params;
+
+    // Build query based on search type
+    switch (searchType) {
+        case 'usdot':
+            query = 'SELECT * FROM carriers WHERE DOT_NUMBER = ?';
+            params = [parseInt(searchValue)];
+            break;
+        case 'mc':
+            query = `SELECT c.* FROM carriers c
+                    INNER JOIN insurance_policies ip ON c.DOT_NUMBER = ip.DOT_NUMBER
+                    WHERE ip.MC_NUMBER = ?`;
+            params = [searchValue];
+            break;
+        case 'company':
+            query = 'SELECT * FROM carriers WHERE LEGAL_NAME LIKE ? OR DBA_NAME LIKE ?';
+            params = [`%${searchValue}%`, `%${searchValue}%`];
+            break;
+        case 'state':
+            query = 'SELECT * FROM carriers WHERE PHY_STATE = ?';
+            params = [searchValue.toUpperCase()];
+            break;
+        default:
+            db.close();
+            return res.status(400).json({ error: 'Invalid search type' });
+    }
+
+    // Execute main query
+    db.get(query, params, (err, carrier) => {
+        if (err) {
+            console.error('❌ Database query error:', err);
+            db.close();
+            return res.status(500).json({ error: 'Database query error' });
+        }
+
+        if (!carrier) {
+            db.close();
+            return res.json({
+                success: false,
+                carriers: [],
+                message: 'No carrier found',
+                total: 0,
+                page: 1,
+                per_page: 100
+            });
+        }
+
+        console.log('✅ Found carrier:', carrier.DOT_NUMBER, carrier.LEGAL_NAME);
+
+        // Get insurance policies for this carrier
+        const insuranceQuery = 'SELECT * FROM insurance_policies WHERE DOT_NUMBER = ?';
+        db.all(insuranceQuery, [carrier.DOT_NUMBER], (err, policies) => {
+            if (err) {
+                console.error('❌ Insurance policies query error:', err);
+                policies = [];
+            }
+
+            // Get inspection records for this carrier
+            const inspectionQuery = 'SELECT * FROM inspections WHERE DOT_Number = ? ORDER BY Insp_Date DESC';
+            db.all(inspectionQuery, [carrier.DOT_NUMBER], (err, inspections) => {
+                if (err) {
+                    console.error('❌ Inspections query error:', err);
+                    inspections = [];
+                }
+
+                // Close database
+                db.close();
+
+                // Calculate safety metrics
+                const totalInspections = inspections.length;
+                const oosInspections = inspections.filter(i => i.OOS_Total > 0).length;
+                const oosRate = totalInspections > 0 ? ((oosInspections / totalInspections) * 100).toFixed(1) : '0.0';
+                const hazmatInspections = inspections.filter(i => i.HM_Insp === 'Y').length;
+
+                // Send comprehensive response in format expected by frontend
+                res.json({
+                    success: true,
+                    carriers: [{
+                        ...carrier,
+                        usdot_number: carrier.DOT_NUMBER,
+                        legal_name: carrier.LEGAL_NAME,
+                        dba_name: carrier.DBA_NAME,
+                        location: `${carrier.PHY_CITY || ''}, ${carrier.PHY_STATE || ''}`.replace(', ,', '').trim(),
+                        fleet: carrier.POWER_UNITS || '0',
+                        status: carrier.STATUS_CODE === 'A' ? 'Active' : 'Inactive',
+                        insurance_carrier: policies[0]?.INSURANCE_COMPANY || 'N/A',
+                        expiry: policies[0]?.POLICY_END_DATE || 'N/A'
+                    }],
+                    carrier: carrier,
+                    insurance_policies: policies,
+                    inspections: inspections,
+                    summary: {
+                        total_inspections: totalInspections,
+                        oos_inspections: oosInspections,
+                        oos_rate: oosRate + '%',
+                        hazmat_inspections: hazmatInspections,
+                        recent_inspection: inspections[0]?.Insp_Date || 'None'
+                    },
+                    total: 1,
+                    page: 1,
+                    per_page: 100
+                });
+            });
+        });
+    });
+});
+
+// Carrier Profile API - DB-V3 Database
+app.get('/api/carrier/profile/:dotNumber', (req, res) => {
+    const sqlite3 = require('sqlite3').verbose();
+    const dbPath = '/var/www/vanguard/DB-V3.db';
+    const dotNumber = parseInt(req.params.dotNumber);
+
+    console.log('🔍 Carrier profile request for DOT:', dotNumber);
+
+    if (!dotNumber || isNaN(dotNumber)) {
+        return res.status(400).json({ error: 'Valid DOT number required' });
+    }
+
+    const db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+            console.error('❌ Error opening DB-V3 database:', err);
+            return res.status(500).json({ error: 'Database connection error' });
+        }
+    });
+
+    // Get carrier by DOT number
+    const query = 'SELECT * FROM carriers WHERE DOT_NUMBER = ?';
+    db.get(query, [dotNumber], (err, carrier) => {
+        if (err) {
+            console.error('❌ Database query error:', err);
+            db.close();
+            return res.status(500).json({ error: 'Database query error' });
+        }
+
+        if (!carrier) {
+            db.close();
+            return res.status(404).json({ error: 'Carrier not found' });
+        }
+
+        console.log('✅ Found carrier profile:', carrier.DOT_NUMBER, carrier.LEGAL_NAME);
+
+        // Get insurance policies
+        const insuranceQuery = 'SELECT * FROM insurance_policies WHERE DOT_NUMBER = ? ORDER BY POLICY_EFFECTIVE_DATE DESC';
+        db.all(insuranceQuery, [carrier.DOT_NUMBER], (err, policies) => {
+            if (err) {
+                console.error('❌ Insurance policies query error:', err);
+                policies = [];
+            }
+
+            // Get inspection records
+            const inspectionQuery = 'SELECT * FROM inspections WHERE DOT_Number = ? ORDER BY Insp_Date DESC';
+            db.all(inspectionQuery, [carrier.DOT_NUMBER], (err, inspections) => {
+                if (err) {
+                    console.error('❌ Inspections query error:', err);
+                    inspections = [];
+                }
+
+                db.close();
+
+                // Calculate safety metrics
+                const totalInspections = inspections.length;
+                const oosInspections = inspections.filter(i => i.OOS_Total > 0).length;
+                const oosRate = totalInspections > 0 ? ((oosInspections / totalInspections) * 100).toFixed(1) : '0.0';
+                const hazmatInspections = inspections.filter(i => i.HM_Insp === 'Y').length;
+
+                // Format carrier profile response
+                const profile = {
+                    // Basic Info
+                    usdot_number: carrier.DOT_NUMBER,
+                    legal_name: carrier.LEGAL_NAME,
+                    dba_name: carrier.DBA_NAME,
+                    operating_status: carrier.STATUS_CODE === 'A' ? 'Active' : 'Inactive',
+
+                    // Contact Information
+                    phone: carrier.PHONE,
+                    email: carrier.EMAIL_ADDRESS,
+
+                    // Address
+                    address: {
+                        street: carrier.PHY_STREET,
+                        city: carrier.PHY_CITY,
+                        state: carrier.PHY_STATE,
+                        zip: carrier.PHY_ZIP,
+                        country: carrier.PHY_COUNTRY
+                    },
+
+                    // Fleet Information
+                    power_units: parseInt(carrier.POWER_UNITS) || 0,
+                    truck_units: parseInt(carrier.TRUCK_UNITS) || 0,
+                    drivers: parseInt(carrier.TOTAL_DRIVERS) || 0,
+
+                    // Business Information
+                    business_type: carrier.CLASSDEF,
+                    safety_rating: carrier.SAFETY_RATING,
+                    mcs150_date: carrier.MCS150_DATE,
+
+                    // Raw carrier data
+                    carrier_details: carrier,
+
+                    // Insurance policies
+                    insurance_policies: policies,
+
+                    // Inspections and safety
+                    inspections: inspections,
+                    safety_summary: {
+                        total_inspections: totalInspections,
+                        oos_inspections: oosInspections,
+                        oos_rate: oosRate + '%',
+                        hazmat_inspections: hazmatInspections,
+                        recent_inspection: inspections[0]?.Insp_Date || 'None',
+                        safety_rating: carrier.SAFETY_RATING || 'Not Rated'
+                    }
+                };
+
+                res.json({
+                    success: true,
+                    carrier: profile
+                });
+            });
+        });
+    });
 });
 
 // Get all data endpoint

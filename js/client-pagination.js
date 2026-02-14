@@ -11,17 +11,29 @@
         currentPage = page;
         const dashboardContent = document.querySelector('.dashboard-content');
         if (!dashboardContent) return;
-        
+
+        // Get current user and check if they are admin for template rendering
+        const sessionData = sessionStorage.getItem('vanguard_user');
+        let isAdmin = false;
+        if (sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase());
+            } catch (error) {
+                console.error('Error parsing session data:', error);
+            }
+        }
+
         // Get all clients
         const allClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
         const totalClients = allClients.length;
         const totalPages = Math.ceil(totalClients / CLIENTS_PER_PAGE);
-        
+
         // Calculate pagination
         const startIndex = (currentPage - 1) * CLIENTS_PER_PAGE;
         const endIndex = Math.min(startIndex + CLIENTS_PER_PAGE, totalClients);
         const clientsToShow = allClients.slice(startIndex, endIndex);
-        
+
         dashboardContent.innerHTML = `
             <div class="clients-view">
                 <header class="content-header">
@@ -49,12 +61,12 @@
                             <option>Commercial Auto</option>
                             <option>Life & Health</option>
                         </select>
-                        <select class="filter-select">
-                            <option>All Status</option>
-                            <option>Active</option>
-                            <option>Prospect</option>
-                            <option>Inactive</option>
-                        </select>
+                        ${isAdmin ? `<select class="filter-select" id="clientAgentFilter" onchange="filterClients()">
+                            <option value="">All Agents</option>
+                            <option value="Grant">Grant</option>
+                            <option value="Carson">Carson</option>
+                            <option value="Hunter">Hunter</option>
+                        </select>` : ''}
                         <button class="btn-filter">
                             <i class="fas fa-filter"></i> More Filters
                         </button>
@@ -120,8 +132,55 @@
             // Determine badge color based on type
             const typeColor = client.type === 'Commercial' ? 'purple' : 'blue';
             
-            // Count policies
-            const policyCount = client.policies ? client.policies.length : 0;
+            // Count policies with enhanced matching
+            let policyCount = 0;
+            if (client.policies && Array.isArray(client.policies)) {
+                policyCount = client.policies.length;
+            } else {
+                // If no client.policies array, get from localStorage and match
+                const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                const matchedPolicies = [];
+
+                allPolicies.forEach(policyRecord => {
+                    const matchesClient = (policy) => {
+                        if (policy.clientId && String(policy.clientId) === String(client.id)) {
+                            return true;
+                        }
+                        const insuredName = policy.insured?.['Name/Business Name'] ||
+                                           policy.insured?.['Primary Named Insured'] ||
+                                           policy.insuredName ||
+                                           policy.clientName;
+                        if (insuredName && client.name &&
+                            insuredName.toLowerCase().includes(client.name.toLowerCase())) {
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    if (matchesClient(policyRecord)) {
+                        matchedPolicies.push(policyRecord);
+                        return;
+                    }
+
+                    if (policyRecord.policies && Array.isArray(policyRecord.policies)) {
+                        policyRecord.policies.forEach(nestedPolicy => {
+                            if (matchesClient(nestedPolicy)) {
+                                matchedPolicies.push(nestedPolicy);
+                                return;
+                            }
+                            if (nestedPolicy.policies && Array.isArray(nestedPolicy.policies)) {
+                                nestedPolicy.policies.forEach(deepNestedPolicy => {
+                                    if (matchesClient(deepNestedPolicy)) {
+                                        matchedPolicies.push(deepNestedPolicy);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+
+                policyCount = matchedPolicies.length;
+            }
             
             // Format premium
             const premium = client.totalPremium || 0;

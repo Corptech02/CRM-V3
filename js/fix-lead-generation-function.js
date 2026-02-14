@@ -115,40 +115,9 @@ if (typeof window.loadLeadGenerationView !== 'function' && !window.completeLeadG
                             </div>
                         </div>
 
-                        <!-- Results Section -->
-                        <div class="lead-results-section" id="leadResults" style="margin-top: 20px;">
-                            <div class="results-header">
-                                <h3>Search Results</h3>
-                                <span class="results-count">0 leads found</span>
-                            </div>
-
-                            <div class="lead-results-table">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th><input type="checkbox" onclick="selectAllLeads(this)"></th>
-                                            <th>USDOT #</th>
-                                            <th>Company Name</th>
-                                            <th>Location</th>
-                                            <th>Fleet Size</th>
-                                            <th>Insurance Status</th>
-                                            <th>Expiry Date</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="searchResults">
-                                        <tr>
-                                            <td colspan="8" class="text-center">No results. Use the search form above to find leads.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="results-pagination">
-                                <button class="btn-small" disabled><i class="fas fa-chevron-left"></i> Previous</button>
-                                <span class="page-info">Page 1 of 1</span>
-                                <button class="btn-small" disabled>Next <i class="fas fa-chevron-right"></i></button>
-                            </div>
+                        <!-- Carrier Profile Display -->
+                        <div id="carrierProfileDisplay" class="carrier-profile-display-container">
+                            <!-- Carrier profiles will be displayed here -->
                         </div>
                     </div>
 

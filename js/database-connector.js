@@ -18,18 +18,16 @@ window.addEventListener('DOMContentLoaded', function() {
         const state = document.getElementById('stateSearch')?.value || '';
         
         console.log('Search params:', { usdot, mc, company, state });
-        
-        // Show loading
-        const resultsBody = document.getElementById('leadResultsBody');
-        const resultsCount = document.querySelector('.results-count');
-        
-        if (resultsBody) {
-            resultsBody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="text-center">
-                        <i class="fas fa-spinner fa-spin"></i> Searching 2.2M carrier database...
-                    </td>
-                </tr>
+
+        // Show loading in carrier profile display container
+        const carrierProfileDisplay = document.getElementById('carrierProfileDisplay');
+
+        if (carrierProfileDisplay) {
+            carrierProfileDisplay.innerHTML = `
+                <div class="loading-message" style="text-align: center; padding: 40px;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3498db;"></i>
+                    <p style="margin-top: 15px; color: #6c757d;">Searching 2.2M carrier database...</p>
+                </div>
             `;
         }
         
@@ -101,68 +99,38 @@ window.addEventListener('DOMContentLoaded', function() {
                 console.log(`API returned ${data.carriers?.length || 0} carriers out of ${data.total}`);
             }
             
-            // Display results
+            // Display carrier profile directly instead of results table
             if (data.carriers && data.carriers.length > 0) {
-                if (resultsCount) {
-                    resultsCount.textContent = `${data.carriers.length} carriers found (Total in database: ${data.total.toLocaleString()})`;
-                }
-                
-                if (resultsBody) {
-                    resultsBody.innerHTML = data.carriers.map(carrier => `
-                        <tr>
-                            <td><input type="checkbox" class="lead-checkbox" value="${carrier.usdot_number}"></td>
-                            <td class="font-mono">${carrier.usdot_number || 'N/A'}</td>
-                            <td><strong>${carrier.legal_name || carrier.dba_name || 'Unknown'}</strong></td>
-                            <td>${carrier.location || `${carrier.city || ''}, ${carrier.state || ''}`}</td>
-                            <td>${carrier.power_units || carrier.fleet || '0'} vehicles</td>
-                            <td>
-                                <span class="status-badge ${carrier.status === 'Active' ? 'status-active' : carrier.status === 'Has Carrier' ? 'status-warning' : 'status-inactive'}">
-                                    ${carrier.status || 'Unknown'}
-                                </span>
-                            </td>
-                            <td>${carrier.expiry || 'N/A'}</td>
-                            <td>
-                                <button class="btn-small btn-icon" onclick="event.preventDefault(); viewCarrierFromLookup('${carrier.usdot_number}'); return false;" title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-small btn-icon" onclick="event.preventDefault(); contactLead('${carrier.usdot_number}'); return false;" title="Contact">
-                                    <i class="fas fa-envelope"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
+                const carrier = data.carriers[0]; // Get first carrier
+
+                // Get additional data from the backend
+                displayCarrierProfile(carrier.usdot_number);
+            }
             } else {
                 // No results
-                if (resultsCount) {
-                    resultsCount.textContent = '0 carriers found';
-                }
-                if (resultsBody) {
-                    resultsBody.innerHTML = `
-                        <tr>
-                            <td colspan="8" class="text-center">
-                                No carriers found matching your search criteria.
-                                <br>Try searching by state (e.g., OH) or leave all fields empty to see all carriers.
-                            </td>
-                        </tr>
+                if (carrierProfileDisplay) {
+                    carrierProfileDisplay.innerHTML = `
+                        <div class="no-results" style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                            <i class="fas fa-search" style="font-size: 48px; color: #6c757d; margin-bottom: 15px;"></i>
+                            <h3 style="color: #495057; margin-bottom: 10px;">No carriers found</h3>
+                            <p style="color: #6c757d;">No carriers found matching your search criteria.</p>
+                            <p style="color: #6c757d; margin-top: 10px;">Try searching by state (e.g., OH) or leave all fields empty to see all carriers.</p>
+                        </div>
                     `;
                 }
             }
             
         } catch (error) {
             console.error('Search failed:', error);
-            
-            if (resultsCount) {
-                resultsCount.textContent = 'Search failed';
-            }
-            if (resultsBody) {
-                resultsBody.innerHTML = `
-                    <tr>
-                        <td colspan="8" class="text-center text-danger">
-                            Error: ${error.message}
-                            <br>Please check that the API server is running on port 8001
-                        </td>
-                    </tr>
+
+            if (carrierProfileDisplay) {
+                carrierProfileDisplay.innerHTML = `
+                    <div class="error-message" style="text-align: center; padding: 40px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #721c24; margin-bottom: 15px;"></i>
+                        <h3 style="color: #721c24; margin-bottom: 10px;">Search Error</h3>
+                        <p style="color: #721c24;">Error: ${error.message}</p>
+                        <p style="color: #721c24; margin-top: 10px;">Please check that the API server is running on port 8001</p>
+                    </div>
                 `;
             }
         }
@@ -347,6 +315,179 @@ function generateMockCarrierData(usdot, mc, company, state) {
         per_page: 100
     };
 }
+
+// Display carrier profile directly on the page
+// Expose displayCarrierProfile globally
+window.displayCarrierProfile = async function displayCarrierProfile(usdotNumber) {
+    try {
+        console.log('Loading carrier profile for USDOT:', usdotNumber);
+
+        // Fetch full carrier profile data
+        const response = await window.fetch(`/api/carrier/profile/${usdotNumber}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch carrier profile');
+        }
+
+        const data = await response.json();
+        const carrier = data.carrier;
+
+        console.log('Loaded carrier profile:', carrier);
+
+        // Display the carrier profile in the profile display container
+        const carrierProfileDisplay = document.getElementById('carrierProfileDisplay');
+        if (carrierProfileDisplay) {
+            carrierProfileDisplay.innerHTML = createCarrierProfileHTML(carrier);
+        }
+
+    } catch (error) {
+        console.error('Error loading carrier profile:', error);
+        const carrierProfileDisplay = document.getElementById('carrierProfileDisplay');
+        if (carrierProfileDisplay) {
+            carrierProfileDisplay.innerHTML = `
+                <div class="carrier-profile-error">
+                    <h3>Error Loading Carrier Profile</h3>
+                    <p>Unable to load carrier information. Please try again.</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// Create HTML for carrier profile display - expose globally
+window.createCarrierProfileHTML = function createCarrierProfileHTML(carrier) {
+    const inspections = carrier.inspections || [];
+    const safetyData = carrier.safety_summary;
+    const address = carrier.address || {};
+
+    return `
+        <div class="carrier-profile-display">
+            <!-- Company Header -->
+            <div class="company-header">
+                <div class="company-main-info">
+                    <h2 class="company-name">${carrier.legal_name || 'Unknown Company'}</h2>
+                    <div class="company-details">
+                        <span class="usdot-number">USDOT: ${carrier.usdot_number}</span>
+                        <span class="operating-status status-${carrier.operating_status === 'Active' ? 'active' : 'inactive'}">
+                            ${carrier.operating_status || 'Unknown'}
+                        </span>
+                        <span class="operation-type">${carrier.business_type || 'N/A'}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact & Fleet Info -->
+            <div class="profile-grid">
+                <div class="profile-section contact-info">
+                    <h3>Contact Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Company Officer:</label>
+                            <span>${carrier.carrier_details?.COMPANY_OFFICER_1 || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Phone:</label>
+                            <span>${carrier.phone || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Email:</label>
+                            <span>${carrier.email || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Address:</label>
+                            <span>${address.street || ''}, ${address.city || ''}, ${address.state || ''} ${address.zip || ''}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-section fleet-info">
+                    <h3>Fleet Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Fleet Size:</label>
+                            <span>${carrier.power_units || 0} vehicles</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Drivers:</label>
+                            <span>${carrier.drivers || 0}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Hazmat:</label>
+                            <span>${carrier.carrier_details?.HM_Ind === 'Y' ? 'Yes' : 'No'}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Safety Rating:</label>
+                            <span>${carrier.safety_rating || 'Not Rated'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-section safety-summary">
+                    <h3>Safety Summary</h3>
+                    <div class="safety-metrics">
+                        <div class="metric">
+                            <div class="metric-value">${safetyData?.total_inspections || 0}</div>
+                            <div class="metric-label">Total Inspections</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${safetyData?.oos_inspections || 0}</div>
+                            <div class="metric-label">OOS Events</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${safetyData?.oos_rate || '0%'}</div>
+                            <div class="metric-label">OOS Rate</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${safetyData?.hazmat_inspections || 0}</div>
+                            <div class="metric-label">Hazmat Inspections</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inspections List -->
+            <div class="inspections-section">
+                <h3>Vehicle Inspections</h3>
+                ${inspections.length > 0 ? `
+                    <div class="inspections-list">
+                        ${inspections.slice(0, 10).map(inspection => `
+                            <div class="inspection-item">
+                                <div class="inspection-header">
+                                    <span class="inspection-date">${inspection.Insp_Date}</span>
+                                    <span class="inspection-state">${inspection.Report_State}</span>
+                                    <span class="inspection-oos ${inspection.OOS_Total > 0 ? 'oos-yes' : 'oos-no'}">
+                                        ${inspection.OOS_Total > 0 ? 'OOS' : 'No OOS'}
+                                    </span>
+                                </div>
+                                <div class="inspection-details">
+                                    <span class="vehicle-info">${inspection.Unit_Make} ${inspection.Unit_Type_Desc}</span>
+                                    <span class="vin">VIN: ${inspection.VIN || 'N/A'}</span>
+                                    <span class="violations">Violations: ${inspection.BASIC_Viol || 0}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${inspections.length > 10 ? `
+                            <div class="inspections-more">
+                                <p>Showing 10 of ${inspections.length} inspections</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : '<p class="no-inspections">No inspection records found.</p>'}
+            </div>
+        </div>
+    `;
+}
+
+// Update the viewCarrierFromLookup function to use the new display
+window.viewCarrierFromLookup = function(usdot) {
+    console.log('Viewing carrier from lookup:', usdot);
+    displayCarrierProfile(usdot);
+};
 
 // Also handle Enter key on search fields
 document.addEventListener('keypress', function(e) {

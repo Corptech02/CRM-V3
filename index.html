@@ -6,17 +6,20 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- Cache buster: 2025-01-26-COMPREHENSIVE-POLICY-FIX -->
+    <!-- Cache buster: 2026-02-12-MOBILE-OPTIMIZATIONS-V6 -->
     <title>Vanguard Insurance Software - All-in-One Agency Management Platform</title>
     <link rel="icon" type="image/png" href="images/V-Logo.png">
-    <link rel="stylesheet" href="css/styles.css?v=35">
+    <link rel="stylesheet" href="css/styles.css?v=36_BADGE_FIX">
     <link rel="stylesheet" href="css/carrier-profile.css?v=2">
-    <link rel="stylesheet" href="css/policy-modal.css?v=3">
+    <link rel="stylesheet" href="css/carrier-profile-display.css?v=1">
+    <link rel="stylesheet" href="css/policy-modal.css?v=4_BADGE_FIX">
     <link rel="stylesheet" href="css/coi-upload-styles.css?v=1">
-    <link rel="stylesheet" href="css/mobile.css?v=5">
+    <link rel="stylesheet" href="css/mobile.css?v=5_COI_FULLSCREEN">
     <link rel="stylesheet" href="css/fix-sidebar-text.css?v=1">
     <!-- Enhanced Lead Management Action Button Fixes -->
     <link rel="stylesheet" href="css/enhanced-lead-actions.css?v=1">
+    <!-- Enhanced Client Management Styles -->
+    <link rel="stylesheet" href="css/enhanced-clients.css?v=2025021001">
     <!-- Market Page Styles -->
     <link rel="stylesheet" href="css/market-styles.css?v=1">
     <!-- Sticky Table Header -->
@@ -851,7 +854,7 @@
                 <span>Tools</span>
             </li>
             <li class="mobile-nav-item">
-                <a href="#lead-gen" class="mobile-nav-link" onclick="setActiveTab('lead-gen'); closeMobileMenu();">
+                <a href="#lead-generation" class="mobile-nav-link" onclick="setActiveTab('lead-generation'); closeMobileMenu();">
                     <i class="fas fa-bullseye"></i>
                     Lead Gen
                 </a>
@@ -911,6 +914,26 @@
 
     <!-- Mobile Overlay -->
     <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
+
+    <!-- Notification Sidebar -->
+    <div class="notification-sidebar" id="notificationSidebar">
+        <div class="notification-sidebar-header">
+            <h3>Notifications</h3>
+            <button class="close-sidebar-btn" onclick="closeNotificationSidebar()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="notification-sidebar-content">
+            <div class="notification-empty-state">
+                <i class="fas fa-bell-slash"></i>
+                <p>No notifications yet</p>
+                <small>You'll see important updates here</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Sidebar Overlay -->
+    <div class="notification-overlay" id="notificationOverlay" onclick="closeNotificationSidebar()"></div>
 
     <!-- Main Dashboard -->
     <main class="main-content">
@@ -1471,7 +1494,7 @@
     <script src="js/vanguard-softphone.js?v=9"></script>
     <script src="js/sip-integration-bridge.js?v=1"></script>
     <script src="js/force-policies-refresh.js?v=1"></script>
-    <script src="js/app.js?v=DEBUG_ACORD_FUNCTION"></script>
+    <script src="js/app.js?v=2026021402_CARRIER_PROFILE_FIX"></script>
 
     <!-- Vicidial Stage Sync - Bidirectional synchronization -->
     <script src="js/vicidial-stage-sync.js?v=1"></script>
@@ -1670,7 +1693,7 @@
     <script src="js/universal-coi-upload.js?v=1"></script>
     <script src="js/fix-policy-types.js"></script>
     <!-- Removed carrier-profile-fixed.js to avoid conflicts -->
-    <script src="js/database-connector.js?v=22"></script>
+    <script src="js/database-connector.js?v=24_GLOBAL_FUNCTIONS"></script>
     <script src="vicidial-config.js"></script>
     <script src="js/vicidial-integration.js"></script>
     <script src="js/vicidial-uploader.js?v=6"></script>
@@ -1699,7 +1722,7 @@
     <script src="js/debug-script-loading.js?v=1"></script>
     <script src="js/add-test-button.js"></script>
     <!-- Fixed with role-based filtering and assigned column -->
-    <script src="js/fix-clients-view.js?v=1733252400_CLIENTS_FIXED"></script>
+    <script src="js/fix-clients-view.js?v=1733252400_NO_CONFLICTS"></script>
     <!-- DISABLED: Conflicts with original-client-profile.js
     <script src="js/fix-client-profile-policies.js"></script> -->
     <!-- TEMPORARILY DISABLED - This was blocking Vicidial lead imports -->
@@ -1808,7 +1831,7 @@
     
     <!-- Client Pagination System - 12 clients per page -->
     <!-- DISABLED: Uses outdated client.policies array and wrong premium field
-    <script src="js/client-pagination.js?v=2"></script> -->
+    <script src="js/client-pagination.js?v=2026021302_POLICY_MATCH_FIX"></script> -->
     
     <!-- Fix stuck leads -->
     <!-- <script src="js/fix-stuck-leads.js?v=1"></script> DISABLED - May load leads -->
@@ -1856,13 +1879,25 @@
     <script src="js/test-script-execution.js?v=1"></script>
 
     <!-- FIX PREMIUM DISPLAY -->
-    <script src="js/fix-premium-display.js?v=1733252400_FIX_CLIENT_IDS"></script>
+    <script src="js/fix-premium-display.js?v=2026021302_FRESH_DATA_FIX"></script>
+
+    <!-- CLEAR TEST CLIENTS -->
+    <script src="js/clear-test-clients.js?v=1"></script>
+
+    <!-- POLICY FILTERS FUNCTIONALITY -->
+    <script src="js/policy-filters.js?v=2_PERSONAL_AUTO"></script>
 
     <!-- EMERGENCY CALLBACK FIX - DISABLED for callback-only logic -->
     <!-- <script src="js/emergency-callback-fix.js?v=IMMEDIATE_FIX"></script> -->
 
     <!-- FINAL PROFILE FIX PROTECTED - MUST BE ABSOLUTELY LAST - Cannot be overridden -->
     <script src="js/final-profile-fix-protected-FIXED.js?v=VICIDIAL_CALLBACK_FIXED_v18"></script>
+
+    <!-- CONTINUOUS CALLBACK MONITOR - Maintains "Reach out: CALL" buttons independently -->
+    <script src="js/continuous-callback-monitor.js?v=3"></script>
+
+    <!-- GREEN HIGHLIGHT REMOVER - Removes green highlights when TODO has content -->
+    <script src="js/green-highlight-remover.js?v=1"></script>
 
     <!-- Test ReachOut Consistency -->
     <script src="js/test-reachout-consistency.js?v=20250112_163215"></script>
@@ -1980,7 +2015,7 @@
     <!-- Save to Profile functionality - MUST load before ACORD viewers -->
     <script src="js/save-to-profile.js?v=14"></script>
     <!-- Load ACORD Real Viewer for PDF with fillable fields overlay -->
-    <script src="js/acord-real-viewer-vigagency.js?v=WORKING_VIG_COPY"></script>
+    <script src="js/acord-real-viewer-vigagency.js?v=2026021302_DATE_FIX"></script>
     <!-- Load the ACORD 25 Display with download/print functions -->
     <!-- Disabled because it conflicts with real viewer -->
     <!-- <script src="js/acord-25-display.js?v=2"></script> -->
@@ -2107,11 +2142,11 @@
 
     <!-- RESTORE Complete Lead Generation Functionality - MUST BE LAST -->
     <!-- Enabled lead generation scripts for full functionality -->
-    <script src="js/restore-lead-generation-complete.js?v=1"></script>
+    <script src="js/restore-lead-generation-complete.js?v=11_OOS_COLORS"></script>
     <!-- <script src="js/counts-only-lead-generation.js?v=3"></script> -->
 
     <!-- Complete Lead Generation with Day Skip feature -->
-    <script src="js/complete-lead-generation-restoration.js?v=11"></script>
+    <script src="js/complete-lead-generation-restoration.js?v=12_CARRIER_PROFILE_FIX"></script>
 
     <!-- Fix Lead Generation to use Matched Carriers CSV Database - MUST LOAD AFTER COMPLETE RESTORATION -->
     <script src="js/fix-lead-generation-matched-carriers.js?v=10"></script>
@@ -3444,6 +3479,9 @@
     <!-- DIRECT HIGHLIGHT BUTTON CLICK INTERCEPTOR -->
     <script src="js/highlight-button-interceptor.js?v=2"></script>
 
+    <!-- NOTIFICATION SIDEBAR -->
+    <script src="js/notification-sidebar.js?v=1"></script>
+
     <!-- APP SENT TODO OVERRIDE - Force empty TODO for app sent stage -->
     <script src="js/app-sent-todo-override.js?v=2"></script>
 
@@ -3514,6 +3552,15 @@
 
     <!-- ULTIMATE OVERRIDE: Nuclear option to disable ALL competing TO DO systems -->
     <script src="js/ultimate-callback-only-override.js?v=1"></script>
+
+    <!-- ENHANCED CLIENT MANAGEMENT: Search, filtering, and bulk operations -->
+    <script src="js/enhanced-client-management.js?v=2026021302_AGENT_FILTER_WORKING"></script>
+    <script src="js/client-bulk-operations.js?v=2025021001"></script>
+    <script src="js/validate-client-enhancements.js?v=2025021001"></script>
+    <!-- Mobile Navigation JavaScript -->
+    <script src="js/mobile.js?v=1"></script>
+    <!-- Fix for clickable phone/email elements - DISABLED: Conflicts with fix-clients-view.js -->
+    <!-- <script src="js/fix-clickable-elements.js?v=1"></script> -->
 
     <!-- REMOVED: Scripts moved earlier to ensure loading -->
 </body>

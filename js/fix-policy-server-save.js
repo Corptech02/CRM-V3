@@ -1,6 +1,21 @@
 // Fix Policy Server Save - Ensure ALL policy operations save to server, not localStorage
 console.log('Policy Server Save Fix: Loading...');
 
+// Function to format date for storage without timezone issues
+function formatDateForStorage(dateValue) {
+    if (!dateValue) return '';
+    // If it's already in YYYY-MM-DD format, return as-is
+    if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateValue;
+    }
+    // Convert MM/DD/YYYY to YYYY-MM-DD if needed
+    if (typeof dateValue === 'string' && dateValue.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+        const [month, day, year] = dateValue.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    return dateValue;
+}
+
 (function() {
     // API endpoint configuration - handle both with and without /api suffix
     let API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
@@ -199,8 +214,8 @@ console.log('Policy Server Save Fix: Loading...');
                     policyNumber: document.getElementById('overview-policy-number')?.value || `POL-${Date.now()}`,
                     carrier: document.getElementById('overview-carrier')?.value || '',
                     policyStatus: document.getElementById('overview-status')?.value || 'Active',
-                    effectiveDate: document.getElementById('overview-effective-date')?.value || '',
-                    expirationDate: document.getElementById('overview-expiration-date')?.value || '',
+                    effectiveDate: formatDateForStorage(document.getElementById('overview-effective-date')?.value) || '',
+                    expirationDate: formatDateForStorage(document.getElementById('overview-expiration-date')?.value) || '',
                     premium: document.getElementById('overview-premium')?.value || '',
                     agent: document.getElementById('overview-agent')?.value || '',
                     dotNumber: document.getElementById('overview-dot-number')?.value || '',
