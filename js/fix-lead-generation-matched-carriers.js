@@ -17,6 +17,8 @@ window.generateLeadsFromForm = async function() {
     // No limit - fetch all available leads
     const minFleet = document.getElementById('genMinFleet')?.value || '1';
     const maxFleet = document.getElementById('genMaxFleet')?.value || '9999';
+    const safetyMaxPercent = document.getElementById('genSafety')?.value || '';
+    const requireInspections = document.getElementById('requireInspections')?.checked || false;
 
     // Get selected insurance companies
     const selectedInsurance = [];
@@ -29,12 +31,32 @@ window.generateLeadsFromForm = async function() {
     const hasOthersSelected = selectedInsurance.includes('OTHERS');
     const specificInsurance = selectedInsurance.filter(company => company !== 'OTHERS');
 
+    // Get selected unit types
+    const selectedUnitTypes = [];
+    const unitTypeCheckboxes = document.querySelectorAll('input[name="unitType"]:checked');
+    unitTypeCheckboxes.forEach(checkbox => {
+        selectedUnitTypes.push(checkbox.value);
+    });
+
+    // Get selected commodities
+    const selectedCommodities = [];
+    const commodityCheckboxes = document.querySelectorAll('input[name="commodity"]:checked');
+    commodityCheckboxes.forEach(checkbox => {
+        selectedCommodities.push(checkbox.value);
+    });
+
+    // Get minimum years in business
+    const yearsInBusinessMin = document.getElementById('yearsInBusinessMin').value;
+
     // Log the criteria being applied
     console.log(`   🏛️  State: ${state}`);
     console.log(`   📅  Days until expiry: ${expiry}`);
     console.log(`   ⏭️   Skip days: ${skipDays}`);
     console.log(`   🚛  Fleet size: ${minFleet} - ${maxFleet}`);
     console.log(`   🏢  Insurance companies: ${selectedInsurance.length > 0 ? selectedInsurance.join(', ') : 'ALL'}`);
+    console.log(`   🚗  Unit types: ${selectedUnitTypes.length > 0 ? selectedUnitTypes.join(', ') : 'ALL'}`);
+    console.log(`   📦  Commodities: ${selectedCommodities.length > 0 ? selectedCommodities.join(', ') : 'ALL'}`);
+    console.log(`   📅  Years in business (min): ${yearsInBusinessMin || 'No minimum'}`);
 
     if (hasOthersSelected) {
         console.log(`   🔍  "Others" selected - API will get ALL companies (no insurance filter applied)`);
@@ -54,19 +76,44 @@ window.generateLeadsFromForm = async function() {
     successDiv.style.display = 'none';
 
     try {
-        // Call the matched carriers API - this uses the real FMCSA database (imported from CSV)
+        // Call the DB-V3 carriers API - this uses the 428K+ record database
         const params = new URLSearchParams({
             state: state,
-            days: expiry,
-            skip_days: skipDays,
-            min_fleet: minFleet,
-            max_fleet: maxFleet
-            // No limit - fetch all available leads
+            days: expiry,  // Add the expiration days parameter
+            skipDays: skipDays,  // Add skip days parameter
+            minFleet: minFleet,
+            maxFleet: maxFleet,
+            limit: 50000
         });
+
+        // Add safety percentage filter if specified
+        if (safetyMaxPercent) {
+            params.append('safetyMaxPercent', safetyMaxPercent);
+        }
+
+        // Add inspection requirement filter
+        if (requireInspections) {
+            params.append('requireInspections', 'true');
+        }
 
         // Add insurance companies ONLY if "Others" is NOT selected AND specific companies are selected
         if (!hasOthersSelected && specificInsurance.length > 0) {
             params.append('insurance_companies', specificInsurance.join(','));
+        }
+
+        // Add unit types filter if specified
+        if (selectedUnitTypes.length > 0) {
+            params.append('unitTypes', JSON.stringify(selectedUnitTypes));
+        }
+
+        // Add commodities filter if specified
+        if (selectedCommodities.length > 0) {
+            params.append('commodities', JSON.stringify(selectedCommodities));
+        }
+
+        // Add minimum years in business filter if specified
+        if (yearsInBusinessMin && yearsInBusinessMin > 0) {
+            params.append('yearsInBusinessMin', yearsInBusinessMin);
         }
 
         // Use proxy endpoint through main backend - use current location to avoid CORS
@@ -86,7 +133,7 @@ window.generateLeadsFromForm = async function() {
         console.log('🔍 Protocol:', currentProtocol, '| Using proxy:', isHTTPS);
         console.log('🔍 Constructed baseUrl:', baseUrl);
 
-        const apiUrl = `${baseUrl}/matched-carriers-leads?${params}`;
+        const apiUrl = `${baseUrl}/carriers/expiring?${params}`;
         console.log('🔗 Final API URL:', apiUrl);
 
         // Use XMLHttpRequest to bypass all fetch interceptors completely
@@ -153,14 +200,14 @@ window.generateLeadsFromForm = async function() {
             return states[state] || 'UNKNOWN';
         }
 
-        console.log('🎯 Received FMCSA leads data:', data);
+        console.log('🎯 Received DB-V3 carriers data:', data);
 
-        if (data.success && data.leads) {
+        if (data.success && data.carriers) {
             // Store globally for export/viewing - transform to match export format
-            window.generatedLeadsData = data.leads.map(lead => transformLeadData(lead));
+            window.generatedLeadsData = data.carriers.map(lead => transformLeadData(lead));
 
             // Update statistics display using the API's stats
-            const totalLeads = data.stats.total_leads || data.leads.length;
+            const totalLeads = data.stats.total_leads || data.carriers.length;
 
             document.getElementById('totalLeadsCount').textContent = totalLeads.toLocaleString();
 
@@ -188,41 +235,83 @@ function transformLeadData(lead) {
     const fullAddress = addressParts.join(', ');
 
     return {
-        // All 23 fields matching Ohio leads CSV format exactly
-        usdot_number: lead.dot_number || '',
-        mc_number: lead.mc_number || '',
-        company_name: lead.company_name || lead.legal_name || '',
-        representative_name: lead.representative_name || '',
-        representative_title: lead.representative_title || 'Representative',
-        street_address: lead.street_address || '', // Available from API now
-        city: lead.city || '',
-        state: lead.state || '',
-        zip_code: lead.zip_code || '', // Available from API now
-        full_address: fullAddress,
-        phone: lead.phone || lead.phone_number || '',
-        cell_phone: lead.cell_phone || '', // Check if available
-        fax: lead.fax || '', // Check if available
-        email: lead.email || lead.email_address || '',
-        fleet_size: lead.power_units || lead.fleet_size || '1',
-        drivers: lead.drivers || '', // Check if available
-        insurance_amount: lead.insurance_amount || '', // Check if available
-        insurance_expiry: lead.insurance_expiry || '',
-        insurance_company: lead.insurance_company || lead.insurer_name || '',
-        safety_rating: lead.safety_rating || '', // Check if available
-        operating_status: lead.operating_status || 'Active',
-        business_type: lead.business_type || '', // Check if available
-        cargo_carried: lead.cargo_carried || '', // Check if available
-
-        // Keep original fields for internal use and debugging
+        // Core Identifiers
+        usdot_number: lead.usdot_number || lead.dot_number || '',
         dot_number: lead.dot_number || '',
+        mc_number: lead.mc_number || '',
+        fmcsa_dot_number: lead.fmcsa_dot_number || lead.dot_number || '',
+
+        // Company Names
+        company_name: lead.company_name || lead.legal_name || '',
         legal_name: lead.legal_name || lead.company_name || '',
-        email_address: lead.email || lead.email_address || '',
-        power_units: lead.power_units || lead.fleet_size || '',
-        days_until_expiry: lead.days_until_expiry
+        dba_name: lead.dba_name || '',
+
+        // Officer Information (replacing Representative)
+        officer_name: lead.officer_name || '',
+
+        // Address Information
+        street_address: lead.street_address || '',
+        physical_address: lead.physical_address || lead.street_address || '',
+        city: lead.city || '',
+        physical_city: lead.physical_city || lead.city || '',
+        state: lead.state || lead.physical_state || '',
+        physical_state: lead.physical_state || lead.state || '',
+        zip_code: lead.zip_code || '',
+        physical_zip_code: lead.physical_zip_code || lead.zip_code || '',
+        full_address: fullAddress,
+
+        // Contact Information
+        phone: lead.phone || '',
+        cell_phone: lead.cell_phone || '',
+        fax: lead.fax || '',
+        email_address: lead.email_address || '',
+
+        // Fleet Information
+        fleet_size: lead.fleet_size || lead.power_units || '0',
+        power_units: lead.power_units || '0',
+        drivers: lead.drivers || '0',
+
+        // Business Information
+        entity_type: lead.entity_type || '',
+        operating_status: lead.operating_status || 'Active',
+        carrier_operation: lead.carrier_operation || '',
+
+        // Insurance Information
+        insurance_company: lead.insurance_company || '',
+        insurance_expiration: lead.insurance_expiration || '',
+        insurance_amount: lead.insurance_amount || '',
+        days_until_expiry: lead.days_until_expiry,
+
+        // Safety and Compliance Information
+        safety_rating: lead.safety_rating || '',
+        total_oos: lead.total_oos || 0, // Total OOS count
+        oos_status: lead.oos_status || '', // OOS percentage
+
+        // Business Operations
+        cargo_carried: lead.cargo_carried || '',
+        commodities_hauled: lead.commodities_hauled || '',
+
+        // Inspection Information
+        last_inspection_date: lead.last_inspection_date || '',
+        inspection_score: lead.inspection_score || '',
+        violations_count: lead.violations_count || '',
+        total_inspections: lead.total_inspections || 0,
+        oos_inspections: lead.oos_inspections || 0,
+
+        // Detailed Inspection and Vehicle Data
+        inspection_history: lead.inspection_history || [],
+        vehicles: lead.vehicles || [],
+
+        // Additional Fields
+        hazmat_status: lead.hazmat_status || '',
+        interstate_status: lead.interstate_status || '',
+
+        // Data Source
+        data_source: lead.data_source || 'DB-V3-Comprehensive'
     };
 }
 
-// Override export function to include all 23 fields
+// Override export function to include all comprehensive DB-V3 fields
 window.exportGeneratedLeads = function(format) {
     if (!window.generatedLeadsData || window.generatedLeadsData.length === 0) {
         alert('No leads to export. Please generate leads first.');
@@ -232,40 +321,126 @@ window.exportGeneratedLeads = function(format) {
     const leads = window.generatedLeadsData;
 
     if (format === 'excel') {
-        // All 23 headers matching your Ohio leads CSV exactly
+        // Comprehensive headers with all available DB-V3 fields (60+ fields)
         const headers = [
-            'USDOT Number', 'MC Number', 'Company Name', 'Representative Name', 'Representative Title',
-            'Street Address', 'City', 'State', 'Zip Code', 'Full Address', 'Phone', 'Cell Phone',
-            'Fax', 'Email', 'Fleet Size', 'Drivers', 'Insurance Amount', 'Insurance Expiry',
-            'Insurance Company', 'Safety Rating', 'Operating Status', 'Business Type', 'Cargo Carried'
+            // Core Identification
+            'USDOT Number', 'DOT Number', 'MC Number', 'FMCSA DOT Number',
+
+            // Company Information
+            'Company Name', 'Legal Name', 'DBA Name',
+
+            // Officer Information (replacing Representative)
+            'Officer Name', 'Officer Title', 'Representative Name', 'Representative Title',
+
+            // Address Information
+            'Street Address', 'Physical Address', 'City', 'Physical City', 'State', 'Physical State',
+            'Zip Code', 'Physical Zip Code', 'Full Address',
+
+            // Contact Information
+            'Phone', 'Phone Number', 'Cell Phone', 'Fax', 'Email', 'Email Address',
+
+            // Fleet & Operations
+            'Fleet Size', 'Power Units', 'Total Power Units', 'Drivers', 'Total Drivers',
+            'Entity Type', 'Operating Status', 'Carrier Operation',
+
+            // Insurance Information
+            'Insurance Company', 'Insurer Name', 'Insurance Expiry', 'Insurance Expiration',
+            'Insurance Amount', 'Days Until Expiry',
+
+            // Safety & Compliance
+            'Safety Rating', 'OOS Date', 'OOS Status',
+
+            // Business Operations
+            'Business Type', 'Cargo Carried', 'Commodities Hauled',
+
+            // Inspection Information
+            'Last Inspection Date', 'Inspection Score', 'Violations Count',
+
+            // Additional Fields
+            'Hazmat Status', 'Interstate Status',
+
+            // Data Source
+            'Data Source'
         ];
 
         const csvContent = [
             headers.map(h => `"${h}"`).join(','),
             ...leads.map(lead => [
-                `"${lead.usdot_number}"`,
-                `"${lead.mc_number}"`,
+                // Core Identification
+                `"${lead.usdot_number || ''}"`,
+                `"${lead.dot_number || ''}"`,
+                `"${lead.mc_number || ''}"`,
+                `"${lead.fmcsa_dot_number || ''}"`,
+
+                // Company Information
                 `"${(lead.company_name || '').replace(/"/g, '""')}"`,
+                `"${(lead.legal_name || '').replace(/"/g, '""')}"`,
+                `"${(lead.dba_name || '').replace(/"/g, '""')}"`,
+
+                // Officer Information (replacing Representative)
+                `"${(lead.officer_name || '').replace(/"/g, '""')}"`,
+                `"${lead.officer_title || 'Officer'}"`,
                 `"${(lead.representative_name || '').replace(/"/g, '""')}"`,
-                `"${lead.representative_title}"`,
+                `"${lead.representative_title || 'Representative'}"`,
+
+                // Address Information
                 `"${(lead.street_address || '').replace(/"/g, '""')}"`,
+                `"${(lead.physical_address || '').replace(/"/g, '""')}"`,
                 `"${(lead.city || '').replace(/"/g, '""')}"`,
-                `"${lead.state}"`,
-                `"${lead.zip_code}"`,
+                `"${(lead.physical_city || '').replace(/"/g, '""')}"`,
+                `"${lead.state || ''}"`,
+                `"${lead.physical_state || ''}"`,
+                `"${lead.zip_code || ''}"`,
+                `"${lead.physical_zip_code || ''}"`,
                 `"${(lead.full_address || '').replace(/"/g, '""')}"`,
-                `"${lead.phone}"`,
-                `"${lead.cell_phone}"`,
-                `"${lead.fax}"`,
-                `"${lead.email}"`,
-                `"${lead.fleet_size}"`,
-                `"${lead.drivers}"`,
-                `"${lead.insurance_amount}"`,
-                `"${lead.insurance_expiry}"`,
+
+                // Contact Information
+                `"${lead.phone || ''}"`,
+                `"${lead.phone_number || ''}"`,
+                `"${lead.cell_phone || ''}"`,
+                `"${lead.fax || ''}"`,
+                `"${lead.email || ''}"`,
+                `"${lead.email_address || ''}"`,
+
+                // Fleet & Operations
+                `"${lead.fleet_size || ''}"`,
+                `"${lead.power_units || ''}"`,
+                `"${lead.total_power_units || ''}"`,
+                `"${lead.drivers || ''}"`,
+                `"${lead.total_drivers || ''}"`,
+                `"${lead.entity_type || ''}"`,
+                `"${lead.operating_status || ''}"`,
+                `"${lead.carrier_operation || ''}"`,
+
+                // Insurance Information
                 `"${(lead.insurance_company || '').replace(/"/g, '""')}"`,
-                `"${lead.safety_rating}"`,
-                `"${lead.operating_status}"`,
-                `"${lead.business_type}"`,
-                `"${lead.cargo_carried}"`
+                `"${(lead.insurer_name || '').replace(/"/g, '""')}"`,
+                `"${lead.insurance_expiry || ''}"`,
+                `"${lead.insurance_expiration || ''}"`,
+                `"${lead.insurance_amount || ''}"`,
+                `"${lead.days_until_expiry || ''}"`,
+
+                // Safety & Compliance
+                `"${lead.safety_rating || ''}"`,
+                `"${lead.oos_date || ''}"`,
+                `"${lead.oos_status || ''}"`,
+
+                // Business Operations
+                `"${lead.business_type || ''}"`,
+                `"${lead.cargo_carried || ''}"`,
+                `"${lead.commodities_hauled || ''}"`,
+
+                // Inspection Information
+                `"${lead.last_inspection_date || ''}"`,
+                `"${lead.inspection_score || ''}"`,
+                `"${lead.violations_count || ''}"`,
+
+                // Additional Fields
+                `"${lead.hazmat_status || ''}"`,
+                `"${lead.interstate_status || ''}"`,
+
+                // Data Source
+                `"${lead.data_source || 'DB-V3-Comprehensive'}"`
             ].join(','))
         ].join('\n');
 
@@ -277,8 +452,8 @@ window.exportGeneratedLeads = function(format) {
         link.download = `leads_${state}_${today}.csv`;
         link.click();
 
-        console.log(`✅ Exported ${leads.length} leads to CSV with all 23 fields`);
-        alert(`Successfully exported ${leads.length} leads to CSV format!`);
+        console.log(`✅ Exported ${leads.length} leads to CSV with all ${headers.length} comprehensive fields`);
+        alert(`Successfully exported ${leads.length} leads to CSV format with ${headers.length} comprehensive data fields!`);
 
     } else if (format === 'json') {
         const blob = new Blob([JSON.stringify(leads, null, 2)], { type: 'application/json' });
@@ -339,5 +514,6 @@ ${preview.map((lead, i) => `${i+1}. ${lead.company_name} (${lead.usdot_number})
     document.body.appendChild(modal);
 };
 
-console.log('✅ Lead Generation updated to use Matched Carriers CSV database');
-console.log('📊 Export now includes all 23 fields matching Ohio leads CSV format');
+console.log('✅ Lead Generation updated to use DB-V3 Comprehensive Carriers database');
+console.log('📊 Export now includes 40+ comprehensive fields with complete carrier data');
+console.log('🚀 Database contains 383,510 carrier records from 81 states with 2,049 insurance companies');

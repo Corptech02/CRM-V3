@@ -3101,6 +3101,723 @@ app.get('/api/matched-carriers-leads', async (req, res) => {
     }
 });
 
+// Lead Generation API - DB-V3 Database with full filtering support
+app.get('/api/carriers/expiring', async (req, res) => {
+    const sqlite3 = require('sqlite3').verbose();
+    const dbPath = '/var/www/vanguard/DB-V3.db';
+
+    try {
+        console.log('🚀 DB-V3 Lead Generation Request:', req.query);
+
+        const {
+            state,
+            startDate,
+            endDate,
+            days,
+            skipDays = 0,
+            minFleet = 1,
+            maxFleet = 9999,
+            status,
+            safety,
+            hazmat,
+            commoditiesHauled,
+            unitTypes,
+            insuranceCompanies,
+            insurance_companies,
+            commodities,
+            safetyMaxPercent,
+            requireInspections,
+            limit = 50000
+        } = req.query;
+
+        if (!state) {
+            return res.status(400).json({
+                success: false,
+                error: 'State parameter is required'
+            });
+        }
+
+        const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
+            if (err) {
+                console.error('❌ Error opening DB-V3:', err);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Database connection failed'
+                });
+            }
+        });
+
+        // First get basic carrier and insurance data
+        let query = `
+            SELECT DISTINCT
+                c.DOT_NUMBER as usdot_number,
+                c.DOT_NUMBER as dot_number,
+                c.DOT_NUMBER as fmcsa_dot_number,
+                c.LEGAL_NAME as company_name,
+                c.LEGAL_NAME as legal_name,
+                c.DBA_NAME as dba_name,
+                COALESCE(c.COMPANY_OFFICER_1, '') as officer_name,
+                COALESCE(c.COMPANY_OFFICER_2, '') as officer_2,
+                c.PHY_STREET as street_address,
+                c.PHY_STREET as physical_address,
+                c.PHY_CITY as city,
+                c.PHY_CITY as physical_city,
+                c.PHY_STATE as state,
+                c.PHY_STATE as physical_state,
+                c.PHY_ZIP as zip_code,
+                c.PHY_ZIP as physical_zip_code,
+                c.PHONE as phone,
+                c.CELL_PHONE as cell_phone,
+                c.FAX as fax,
+                c.EMAIL_ADDRESS as email,
+                c.POWER_UNITS as power_units,
+                c.POWER_UNITS as total_power_units,
+                c.POWER_UNITS as fleet_size,
+                c.TOTAL_DRIVERS as drivers,
+                c.TOTAL_DRIVERS as total_drivers,
+                c.CARRIER_OPERATION as carrier_operation,
+                c.STATUS_CODE as operating_status,
+                c.BUSINESS_ORG_DESC as entity_type,
+                c.ADD_DATE,
+                c.SAFETY_RATING as safety_rating,
+                c.REVIEW_DATE as safety_review_date,
+                -- Cargo information from CRGO fields (simplified)
+                (COALESCE(c.CRGO_GENFREIGHT, '') || ',' ||
+                 COALESCE(c.CRGO_HOUSEHOLD, '') || ',' ||
+                 COALESCE(c.CRGO_METALSHEET, '') || ',' ||
+                 COALESCE(c.CRGO_MOTOVEH, '') || ',' ||
+                 COALESCE(c.CRGO_DRIVETOW, '') || ',' ||
+                 COALESCE(c.CRGO_LOGPOLE, '') || ',' ||
+                 COALESCE(c.CRGO_BLDGMAT, '') || ',' ||
+                 COALESCE(c.CRGO_MOBILEHOME, '') || ',' ||
+                 COALESCE(c.CRGO_MACHLRG, '') || ',' ||
+                 COALESCE(c.CRGO_PRODUCE, '') || ',' ||
+                 COALESCE(c.CRGO_LIQGAS, '') || ',' ||
+                 COALESCE(c.CRGO_INTERMODAL, '') || ',' ||
+                 COALESCE(c.CRGO_PASSENGERS, '') || ',' ||
+                 COALESCE(c.CRGO_OILFIELD, '') || ',' ||
+                 COALESCE(c.CRGO_LIVESTOCK, '') || ',' ||
+                 COALESCE(c.CRGO_GRAINFEED, '') || ',' ||
+                 COALESCE(c.CRGO_COALCOKE, '') || ',' ||
+                 COALESCE(c.CRGO_MEAT, '') || ',' ||
+                 COALESCE(c.CRGO_GARBAGE, '') || ',' ||
+                 COALESCE(c.CRGO_USMAIL, '') || ',' ||
+                 COALESCE(c.CRGO_CHEM, '') || ',' ||
+                 COALESCE(c.CRGO_DRYBULK, '') || ',' ||
+                 COALESCE(c.CRGO_COLDFOOD, '') || ',' ||
+                 COALESCE(c.CRGO_BEVERAGES, '') || ',' ||
+                 COALESCE(c.CRGO_PAPERPROD, '') || ',' ||
+                 COALESCE(c.CRGO_UTILITY, '') || ',' ||
+                 COALESCE(c.CRGO_FARMSUPP, '') || ',' ||
+                 COALESCE(c.CRGO_CONSTRUCT, '') || ',' ||
+                 COALESCE(c.CRGO_WATERWELL, '') || ',' ||
+                 COALESCE(c.CRGO_CARGOOTHR, '')) as cargo_carried,
+                c.CRGO_CARGOOTHR_DESC as commodities_hauled,
+                c.HM_Ind as hazmat_status,
+                ip.INSURANCE_COMPANY as insurance_company,
+                ip.POLICY_END_DATE as insurance_expiry,
+                -- Inspection summary data
+                (SELECT COUNT(*) FROM inspections i WHERE i.DOT_Number = c.DOT_NUMBER) as total_inspections,
+                (SELECT COUNT(*) FROM inspections i WHERE i.DOT_Number = c.DOT_NUMBER AND i.OOS_Total > 0) as oos_inspections,
+                (SELECT SUM(i.OOS_Total) FROM inspections i WHERE i.DOT_Number = c.DOT_NUMBER) as total_oos,
+                (SELECT MAX(i.Insp_Date) FROM inspections i WHERE i.DOT_Number = c.DOT_NUMBER) as last_inspection_date,
+                'DB-V3-Comprehensive' as data_source
+            FROM carriers c
+            LEFT JOIN insurance_policies ip ON c.DOT_NUMBER = ip.DOT_NUMBER
+            WHERE 1=1
+        `;
+
+        let params = [];
+
+        // Add state filter
+        if (state) {
+            query += ' AND c.PHY_STATE = ?';
+            params.push(state);
+        }
+
+        // Add fleet size filtering
+        if (minFleet && maxFleet) {
+            query += ' AND CAST(c.POWER_UNITS as INTEGER) BETWEEN ? AND ?';
+            params.push(parseInt(minFleet), parseInt(maxFleet));
+        }
+
+        // Add insurance company filter with partial matching
+        const insuranceFilter = insurance_companies || insuranceCompanies;
+        if (insuranceFilter && insuranceFilter.length > 0) {
+            // Split comma-separated insurance companies
+            const companies = insuranceFilter.split(',').map(c => c.trim()).filter(c => c);
+            if (companies.length > 0) {
+                // Use LIKE for partial matching since database has full company names
+                // but frontend sends simplified names (e.g., "PROGRESSIVE" vs "PROGRESSIVE MOUNTAIN INSURANCE COMPANY")
+                const likeConditions = companies.map(() => 'UPPER(TRIM(ip.INSURANCE_COMPANY)) LIKE ?').join(' OR ');
+                query += ` AND (${likeConditions})`;
+
+                // Create LIKE patterns with % wildcards for partial matching
+                companies.forEach(company => {
+                    const pattern = `%${company.toUpperCase()}%`;
+                    params.push(pattern);
+                });
+
+                console.log(`🏢 Insurance filter applied (partial matching): ${companies.join(', ')}`);
+            }
+        }
+
+        // Add commodities filter
+        if (commodities && commodities !== '[]') {
+            try {
+                const selectedCommodities = JSON.parse(commodities);
+                if (selectedCommodities && selectedCommodities.length > 0) {
+                    // Map frontend commodity values to database cargo fields
+                    const commodityConditions = [];
+                    selectedCommodities.forEach(commodity => {
+                        switch (commodity) {
+                            case 'GENERAL_FREIGHT':
+                                commodityConditions.push("c.CRGO_GENFREIGHT = 'X'");
+                                break;
+                            case 'REEFER':
+                                // Group all refrigerated/temperature-controlled freight
+                                commodityConditions.push("(c.CRGO_PRODUCE = 'X' OR c.CRGO_COLDFOOD = 'X' OR c.CRGO_BEVERAGES = 'X' OR c.CRGO_MEAT = 'X')");
+                                break;
+                            case 'HOUSEHOLD_GOODS':
+                                commodityConditions.push("c.CRGO_HOUSEHOLD = 'X'");
+                                break;
+                            case 'METAL_SHEETS_COILS_ROLLS':
+                                commodityConditions.push("c.CRGO_METALSHEET = 'X'");
+                                break;
+                            case 'MOTOR_VEHICLES':
+                                commodityConditions.push("c.CRGO_MOTOVEH = 'X'");
+                                break;
+                            case 'LOGS_POLES_BEAMS_LUMBER':
+                                commodityConditions.push("c.CRGO_LOGPOLE = 'X'");
+                                break;
+                            case 'BUILDING_MATERIALS':
+                                commodityConditions.push("c.CRGO_BLDGMAT = 'X'");
+                                break;
+                            case 'FRESH_PRODUCE':
+                                commodityConditions.push("c.CRGO_PRODUCE = 'X'");
+                                break;
+                            case 'LIQUIDS_GASES':
+                                commodityConditions.push("c.CRGO_LIQGAS = 'X'");
+                                break;
+                            case 'CHEMICALS':
+                                commodityConditions.push("c.CRGO_CHEM = 'X'");
+                                break;
+                            case 'REFRIGERATED_FOOD':
+                                commodityConditions.push("c.CRGO_COLDFOOD = 'X'");
+                                break;
+                            case 'BEVERAGES':
+                                commodityConditions.push("c.CRGO_BEVERAGES = 'X'");
+                                break;
+                            case 'GRAIN_FEED_HAY':
+                                commodityConditions.push("c.CRGO_GRAINFEED = 'X'");
+                                break;
+                            case 'LIVESTOCK':
+                                commodityConditions.push("c.CRGO_LIVESTOCK = 'X'");
+                                break;
+                            case 'OILFIELD_EQUIPMENT':
+                                commodityConditions.push("c.CRGO_OILFIELD = 'X'");
+                                break;
+                            case 'INTERMODAL_CONTAINERS':
+                                commodityConditions.push("c.CRGO_INTERMODAL = 'X'");
+                                break;
+                            case 'PAPER_PRODUCTS':
+                                commodityConditions.push("c.CRGO_PAPERPROD = 'X'");
+                                break;
+                            case 'CONSTRUCTION':
+                                commodityConditions.push("c.CRGO_CONSTRUCT = 'X'");
+                                break;
+                            case 'OTHER':
+                                commodityConditions.push("c.CRGO_CARGOOTHR = 'X'");
+                                break;
+                        }
+                    });
+
+                    if (commodityConditions.length > 0) {
+                        // Use OR logic - carrier must haul at least one of the selected commodities
+                        query += ` AND (${commodityConditions.join(' OR ')})`;
+                        console.log(`📦 Commodities filter applied: ${selectedCommodities.join(', ')} (${commodityConditions.length} conditions)`);
+                    }
+                }
+            } catch (error) {
+                console.error('🚨 Error parsing commodities:', error);
+            }
+        }
+
+        // Add minimum years in business filter
+        const yearsInBusinessMin = req.query.yearsInBusinessMin;
+        if (yearsInBusinessMin && !isNaN(yearsInBusinessMin)) {
+            const minYears = parseInt(yearsInBusinessMin);
+            const currentYear = new Date().getFullYear();
+
+            // Filter for carriers with at least minYears in business
+            query += ` AND c.ADD_DATE IS NOT NULL AND c.ADD_DATE != '' AND LENGTH(c.ADD_DATE) >= 4 AND (${currentYear} - CAST(SUBSTR(c.ADD_DATE, 1, 4) AS INTEGER)) >= ${minYears}`;
+            console.log(`📅 Minimum years in business filter applied: ${minYears}+ years`);
+        }
+
+        // Add operating status filter (Note: DB-V3 uses STATUS_CODE)
+        if (status && status !== 'ACTIVE') {
+            query += ' AND c.STATUS_CODE = ?';
+            params.push(status);
+        }
+
+        // Add safety percentage filter (OOS rate filter)
+        if (safetyMaxPercent) {
+            const maxPercent = parseInt(safetyMaxPercent);
+            if (maxPercent >= 0 && maxPercent <= 100) {
+                // Only include carriers with OOS rate <= maxPercent
+                // We'll calculate this using inspection data later in processing since it requires subquery
+                console.log(`🛡️ Safety filter: Max OOS rate ${maxPercent}%`);
+            }
+        }
+
+        // Add inspection requirement filter
+        if (requireInspections === 'true') {
+            // Only include carriers that have at least one inspection
+            query += ' AND EXISTS (SELECT 1 FROM inspections i WHERE i.DOT_Number = c.DOT_NUMBER)';
+            console.log(`🔍 Inspection filter: Requiring at least 1 inspection`);
+        }
+
+        // Add insurance expiry filtering
+        if (startDate && endDate) {
+            query += ' AND ip.POLICY_END_DATE BETWEEN ? AND ?';
+            params.push(startDate, endDate);
+        } else if (days) {
+            // Insurance renewal logic: ignore year, only consider month/day
+            // A policy dated 08/01/2024 renews on 08/01 every year
+            const daysFilter = parseInt(days);
+            const skipDaysFilter = parseInt(skipDays);
+
+            if (skipDaysFilter > 0) {
+                console.log(`🗓️ Insurance renewal filter: finding policies renewing between day ${skipDaysFilter + 1} and day ${daysFilter} (skipping first ${skipDaysFilter} days)`);
+            } else {
+                console.log(`🗓️ Insurance renewal filter: finding policies renewing in next ${daysFilter} days (ignoring year)`);
+            }
+
+            // Use SQL to calculate days until next renewal for each policy
+            // We'll filter using a more complex query that handles month/day renewal logic
+            const renewalDaysCalc = `
+                -- Calculate days until next renewal, ignoring year (MM/DD/YYYY format)
+                CASE
+                    -- Extract month and day from POLICY_END_DATE (MM/DD/YYYY format)
+                    WHEN SUBSTR(ip.POLICY_END_DATE, 1, 2) || SUBSTR(ip.POLICY_END_DATE, 4, 2) >=
+                         SUBSTR(DATE('now'), 6, 2) || SUBSTR(DATE('now'), 9, 2)
+                    THEN -- Renewal is later this year
+                        julianday('2026-' || SUBSTR(ip.POLICY_END_DATE, 1, 2) || '-' || SUBSTR(ip.POLICY_END_DATE, 4, 2)) -
+                        julianday(DATE('now'))
+                    ELSE -- Renewal is next year
+                        julianday('2027-' || SUBSTR(ip.POLICY_END_DATE, 1, 2) || '-' || SUBSTR(ip.POLICY_END_DATE, 4, 2)) -
+                        julianday(DATE('now'))
+                END`;
+
+            if (skipDaysFilter > 0) {
+                // Skip first X days, then show next Y days
+                query += `
+                    AND (${renewalDaysCalc}) > ?
+                    AND (${renewalDaysCalc}) <= ?
+                    AND ip.POLICY_END_DATE IS NOT NULL
+                    AND LENGTH(ip.POLICY_END_DATE) >= 8
+                `;
+                params.push(skipDaysFilter, daysFilter);
+                console.log(`🎯 Using skip days logic: > ${skipDaysFilter} AND <= ${daysFilter} days`);
+            } else {
+                // Normal logic - show next X days
+                query += `
+                    AND (${renewalDaysCalc}) <= ?
+                    AND ip.POLICY_END_DATE IS NOT NULL
+                    AND LENGTH(ip.POLICY_END_DATE) >= 8
+                `;
+                params.push(daysFilter);
+                console.log('🎯 Using month/day renewal logic - year ignored');
+            }
+        }
+
+        // Add hazmat filter - need to check available columns
+        if (hazmat) {
+            // For now, we'll implement this once we find the hazmat column
+            console.log('Hazmat filter requested but column mapping needed:', hazmat);
+        }
+
+        // Add commodities filter - need to check available columns
+        if (commoditiesHauled) {
+            // For now, we'll implement this once we find the cargo columns
+            console.log('Commodities filter requested but column mapping needed:', commoditiesHauled);
+        }
+
+        // Add unit types filter (this would need to be mapped to appropriate DB fields)
+        if (unitTypes && Array.isArray(unitTypes)) {
+            // This would require mapping unit types to database fields
+            console.log('Unit types filter requested:', unitTypes);
+            // For now, we'll log it but not filter as the DB structure needs to be examined
+        }
+
+        query += ` ORDER BY CAST(c.POWER_UNITS as INTEGER) DESC LIMIT ?`;
+        params.push(parseInt(limit));
+
+        console.log('🔍 DB-V3 Query:', query);
+        console.log('🎯 Parameters:', params);
+
+        // Set a longer timeout for complex queries
+        const startTime = Date.now();
+
+        db.all(query, params, async (err, rows) => {
+            if (err) {
+                console.error('❌ Query error:', err);
+                db.close();
+                return res.status(500).json({
+                    success: false,
+                    error: 'Query failed',
+                    details: err.message
+                });
+            }
+
+            console.log(`✅ Found ${rows.length} carriers in DB-V3`);
+
+            // Always include VIN data but skip complex decoding
+            console.log(`🔍 VIN data: ENABLED for all ${rows.length} carriers (no decoding processing)`);
+
+            // Function to get detailed inspection data for a carrier
+            const getInspectionDetails = (dotNumber) => {
+                return new Promise((resolve, reject) => {
+                    const inspectionQuery = `
+                        SELECT
+                            Insp_Date,
+                            OOS_Total,
+                            VIN,
+                            Unit_Make,
+                            Unit_Type_Desc,
+                            VIN2,
+                            Unit_Make2,
+                            Unit_Type_Desc2,
+                            Driver_OOS_Total,
+                            Vehicle_OOS_Total,
+                            BASIC_Viol
+                        FROM inspections
+                        WHERE DOT_Number = ?
+                        ORDER BY Insp_Date DESC
+                        LIMIT 10
+                    `;
+
+                    db.all(inspectionQuery, [dotNumber], (err, inspectionRows) => {
+                        if (err) {
+                            console.error('❌ Inspection query error:', err);
+                            resolve([]);
+                        } else {
+                            resolve(inspectionRows || []);
+                        }
+                    });
+                });
+            };
+
+            // Function to decode cargo types into readable names
+            const decodeCargo = (cargoString) => {
+                if (!cargoString) return '';
+
+                const cargoTypes = [
+                    'General Freight', 'Household Goods', 'Metal Sheets/Coils/Rolls',
+                    'Motor Vehicles', 'Drive/Tow Away', 'Logs/Poles/Beams/Lumber',
+                    'Building Materials', 'Mobile Homes', 'Machinery/Large Objects',
+                    'Fresh Produce', 'Liquids/Gases', 'Intermodal Containers',
+                    'Passengers', 'Oilfield Equipment', 'Livestock', 'Grain/Feed/Hay',
+                    'Coal/Coke', 'Meat', 'Garbage/Refuse', 'US Mail',
+                    'Chemicals', 'Dry Bulk', 'Refrigerated Food', 'Beverages',
+                    'Paper Products', 'Utility', 'Farm Supplies', 'Construction',
+                    'Water Well', 'Other'
+                ];
+
+                const cargoArray = cargoString.split(',');
+                const activeCargo = [];
+
+                cargoArray.forEach((cargo, index) => {
+                    if (cargo.trim() === 'X' && cargoTypes[index]) {
+                        activeCargo.push(cargoTypes[index]);
+                    }
+                });
+
+                return activeCargo.join(', ');
+            };
+
+            // No VIN decoding needed - just use inspection data directly
+
+            // Transform the data from real DB-V3 with comprehensive fields
+            const processCarriers = async () => {
+                const carriers = await Promise.all(rows.map(async (row) => {
+                    // Get detailed inspection data for this carrier
+                    const inspectionDetails = await getInspectionDetails(row.dot_number);
+
+                    // Process VINs and get vehicle details (no complex decoding)
+                    const vehicles = [];
+                    inspectionDetails.forEach(inspection => {
+                        if (inspection.VIN) {
+                            vehicles.push({
+                                vin: inspection.VIN,
+                                make: inspection.Unit_Make || 'UNKNOWN',
+                                type: inspection.Unit_Type_Desc || 'UNKNOWN',
+                                inspection_date: inspection.Insp_Date,
+                                oos_total: inspection.OOS_Total
+                            });
+                        }
+                        if (inspection.VIN2) {
+                            vehicles.push({
+                                vin: inspection.VIN2,
+                                make: inspection.Unit_Make2 || 'UNKNOWN',
+                                type: inspection.Unit_Type_Desc2 || 'UNKNOWN',
+                                inspection_date: inspection.Insp_Date,
+                                oos_total: inspection.OOS_Total
+                            });
+                        }
+                    });
+
+                    // Remove duplicates based on VIN
+                    const uniqueVehicles = vehicles.filter((vehicle, index, self) =>
+                        index === self.findIndex(v => v.vin === vehicle.vin)
+                    );
+                // Calculate days until next renewal (ignoring year) for insurance_expiry field
+                const daysUntilExpiry = row.insurance_expiry ? (() => {
+                    try {
+                        // Handle YYYY-MM-DD format from policy_renewal_date
+                        let dateStr = row.insurance_expiry;
+                        let month, day;
+
+                        if (dateStr.includes('-')) {
+                            // YYYY-MM-DD format
+                            const parts = dateStr.split('-');
+                            month = parts[1];
+                            day = parts[2];
+                        } else if (dateStr.includes('/')) {
+                            // MM/DD/YYYY format
+                            const parts = dateStr.split('/');
+                            month = parts[0];
+                            day = parts[1];
+                        } else {
+                            return null;
+                        }
+
+                        if (!month || !day) return null;
+                        const today = new Date();
+                        const currentYear = today.getFullYear();
+                        let renewalDate = new Date(currentYear, parseInt(month) - 1, parseInt(day));
+                        if (renewalDate <= today) {
+                            renewalDate = new Date(currentYear + 1, parseInt(month) - 1, parseInt(day));
+                        }
+                        return Math.ceil((renewalDate - today) / (1000 * 60 * 60 * 24));
+                    } catch (e) {
+                        return null;
+                    }
+                })() : null;
+
+                return {
+                    // Core Identifiers
+                    usdot_number: row.dot_number || row.usdot_number,
+                    dot_number: row.dot_number,
+                    mc_number: row.mc_number,
+                    fmcsa_dot_number: row.fmcsa_dot_number || row.dot_number,
+
+                    // Company Names
+                    company_name: row.company_name || row.legal_name || `Carrier ${row.dot_number}`,
+                    legal_name: row.company_name || row.legal_name,
+                    dba_name: row.dba_name || '',
+
+                    // Officer Information (replacing Representative)
+                    officer_name: row.officer_name || row.officer_2 || '',
+
+                    // Address Information
+                    street_address: row.street || row.street_address || '',
+                    physical_address: row.street || row.street_address || '',
+                    city: row.city,
+                    physical_city: row.city,
+                    state: row.state || row.physical_state,
+                    physical_state: row.state || row.physical_state,
+                    zip_code: row.zip_code,
+                    physical_zip_code: row.zip_code,
+                    full_address: `${row.city || ''}, ${row.state || ''}`.trim(),
+
+                    // Contact Information
+                    phone: row.phone || '',
+                    cell_phone: '', // Not available in current data
+                    fax: '', // Not available in current data
+                    email_address: row.email_address || row.email || '',
+
+                    // Fleet Information
+                    fleet_size: row.power_units || row.total_power_units || '0',
+                    power_units: row.power_units || row.total_power_units || '0',
+                    drivers: row.drivers || row.total_drivers || '0',
+
+                    // Business Information
+                    entity_type: row.entity_type || '',
+                    operating_status: row.operating_status || 'Active',
+                    carrier_operation: row.carrier_operation || '',
+                    add_date: row.ADD_DATE || '',
+                    years_in_business: row.ADD_DATE && row.ADD_DATE.length >= 4 ?
+                        new Date().getFullYear() - parseInt(row.ADD_DATE.substring(0, 4)) : null,
+
+                    // Insurance Information
+                    insurance_company: row.insurance_company || '',
+                    insurance_expiration: row.insurance_expiry || row.insurance_expiration || '',
+                    insurance_amount: '', // Not available in current data
+                    days_until_expiry: daysUntilExpiry,
+
+                    // Safety and Compliance Information
+                    safety_rating: row.safety_rating || '',
+                    total_oos: row.total_oos || 0,
+                    oos_status: row.total_inspections > 0 ?
+                        `${Math.round((row.oos_inspections / row.total_inspections) * 100)}% OOS Rate (${row.oos_inspections}/${row.total_inspections})` :
+                        'No Inspections',
+
+                    // Business Operations
+                    cargo_carried: row.cargo_carried || '',
+                    commodities_hauled: decodeCargo(row.cargo_carried) || row.commodities_hauled || '',
+
+                    // Inspection Information
+                    last_inspection_date: row.last_inspection_date || '',
+                    inspection_score: '', // Would need score calculation
+                    violations_count: row.total_inspections || 0,
+                    total_inspections: row.total_inspections || 0,
+                    oos_inspections: row.oos_inspections || 0,
+
+                    // Additional Fields
+                    hazmat_status: row.hazmat_status || '',
+                    interstate_status: row.carrier_operation || '',
+
+                    // Detailed Inspection Data
+                    inspection_history: inspectionDetails.map(inspection => ({
+                        date: inspection.Insp_Date,
+                        oos_total: inspection.OOS_Total,
+                        driver_oos: inspection.Driver_OOS_Total,
+                        vehicle_oos: inspection.Vehicle_OOS_Total,
+                        violations: inspection.BASIC_Viol
+                    })),
+
+                    // Vehicle Information (VINs decoded)
+                    vehicles: uniqueVehicles,
+
+                    // Data Source
+                    data_source: 'DB-V3-Comprehensive'
+                };
+            }));
+
+                return carriers;
+            };
+
+            // Process carriers and return response
+            let carriers = await processCarriers();
+
+            // Apply safety percentage filter if specified (post-processing since it needs calculated OOS rates)
+            if (safetyMaxPercent) {
+                const maxPercent = parseInt(safetyMaxPercent);
+                if (maxPercent >= 0 && maxPercent <= 100) {
+                    const beforeCount = carriers.length;
+                    carriers = carriers.filter(carrier => {
+                        if (carrier.total_inspections === 0) {
+                            // If no inspections, consider as 0% OOS rate (safest assumption)
+                            return 0 <= maxPercent;
+                        }
+                        const oosRate = Math.round((carrier.oos_inspections / carrier.total_inspections) * 100);
+                        return oosRate <= maxPercent;
+                    });
+                    console.log(`🛡️ Safety filter applied: ${beforeCount} → ${carriers.length} carriers (removed ${beforeCount - carriers.length} with OOS > ${maxPercent}%)`);
+                }
+            }
+
+            // Apply unit type filtering if specified (ALL vehicles must match selected types)
+            if (unitTypes && unitTypes !== '[]') {
+                try {
+                    const selectedUnitTypes = JSON.parse(unitTypes);
+                    if (selectedUnitTypes && selectedUnitTypes.length > 0) {
+                        const beforeCount = carriers.length;
+                        console.log(`🚛 Unit type filter: Checking POWER UNITS against types: ${selectedUnitTypes.join(', ')} (ignoring trailers)`);
+
+                        carriers = carriers.filter(carrier => {
+                            // If no vehicles/inspections, consider as "UNKNOWN" type
+                            if (!carrier.vehicles || carrier.vehicles.length === 0) {
+                                return selectedUnitTypes.includes('UNKNOWN');
+                            }
+
+                            // Get all unique POWER UNIT types for this carrier (ignore trailers)
+                            const carrierVehicleTypes = [...new Set(carrier.vehicles
+                                .filter(vehicle => {
+                                    const type = vehicle.type ? vehicle.type.toUpperCase() : '';
+                                    // IGNORE all trailer types - only consider power units
+                                    return !type.includes('TRAILER') && !type.includes('SEMI-TRAILER');
+                                })
+                                .map(vehicle => {
+                                    const vehicleType = vehicle.type;
+                                    if (!vehicleType || vehicleType === 'UNKNOWN' || vehicleType === '') {
+                                        return 'UNKNOWN';
+                                    }
+
+                                    // Map inspection data vehicle types to our filter values (POWER UNITS ONLY)
+                                    const type = vehicleType.toUpperCase();
+                                    if (type.includes('STRAIGHT') || type.includes('STRAIGHT TRUCK')) return 'STRAIGHT_TRUCK';
+                                    if (type.includes('TRUCK TRACTOR') || type.includes('TRACTOR')) return 'TRUCK_TRACTOR';
+                                    if (type.includes('VAN') && !type.includes('CARGO')) return 'VAN';
+                                    if (type.includes('CARGO VAN')) return 'CARGO_VAN';
+                                    if (type.includes('PICKUP') || type.includes('PICKUP TRUCK')) return 'PICKUP_TRUCK';
+                                    if (type.includes('BUS') && !type.includes('SCHOOL') && !type.includes('MINI')) return 'BUS';
+                                    if (type.includes('SCHOOL BUS')) return 'SCHOOL_BUS';
+                                    if (type.includes('LIMOUSINE') || type.includes('LIMO')) return 'LIMOUSINE';
+                                    if (type.includes('MINIBUS') || type.includes('MINI BUS')) return 'MINIBUS';
+                                    if (type.includes('MOTORCOACH') || type.includes('COACH')) return 'MOTORCOACH';
+                                    if (type.includes('9') && type.includes('15') && type.includes('PASS')) return 'VAN_9_15_PASS';
+                                    if (type.includes('16') && type.includes('PASS')) return 'VAN_16_PASS';
+                                    if (type.includes('TAXI')) return 'TAXI';
+                                    if (type.includes('AMBULANCE')) return 'AMBULANCE';
+                                    if (type.includes('HEARSE')) return 'HEARSE';
+                                    return 'OTHER';
+                                }))];
+
+                            // If no power units found (only trailers), consider as UNKNOWN
+                            if (carrierVehicleTypes.length === 0) {
+                                carrierVehicleTypes.push('UNKNOWN');
+                            }
+
+                            // ALL vehicle types for this carrier must be in the selected filter types
+                            return carrierVehicleTypes.every(vehicleType => selectedUnitTypes.includes(vehicleType));
+                        });
+
+                        console.log(`🚛 Unit type filter applied: ${beforeCount} → ${carriers.length} carriers (removed ${beforeCount - carriers.length} carriers with non-matching vehicle types)`);
+                    }
+                } catch (error) {
+                    console.error('🚨 Error parsing unitTypes:', error);
+                }
+            }
+
+            const processingTime = Date.now() - startTime;
+            console.log(`⏱️ Total processing time: ${processingTime}ms for ${carriers.length} carriers`);
+
+            db.close((err) => {
+                if (err) console.error('Error closing DB-V3:', err);
+            });
+
+            res.json({
+                success: true,
+                carriers: carriers,
+                stats: {
+                    total_leads: carriers.length,
+                    database: 'DB-V3',
+                    query_time: new Date().toISOString(),
+                    filters_applied: {
+                        state,
+                        fleet_range: `${minFleet}-${maxFleet}`,
+                        safety_rating: safety || 'all',
+                        hazmat: hazmat || 'include_all',
+                        commodities: commoditiesHauled || 'all',
+                        operating_status: status || 'active_only'
+                    }
+                },
+                note: `Generated from DB-V3 database with ${rows.length} records`
+            });
+        });
+
+    } catch (error) {
+        console.error('❌ DB-V3 Lead Generation Error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Server error',
+            message: error.message
+        });
+    }
+});
+
 // Carrier Search API - DB-V3 Database
 app.post('/api/search', (req, res) => {
     const sqlite3 = require('sqlite3').verbose();
@@ -3223,9 +3940,17 @@ app.post('/api/search', (req, res) => {
                         fleet: carrier.POWER_UNITS || '0',
                         status: carrier.STATUS_CODE === 'A' ? 'Active' : 'Inactive',
                         insurance_carrier: policies[0]?.INSURANCE_COMPANY || 'N/A',
-                        expiry: policies[0]?.POLICY_END_DATE || 'N/A'
+                        expiry: policies[0]?.POLICY_END_DATE || 'N/A',
+                        add_date: carrier.ADD_DATE || '',
+                        years_in_business: carrier.ADD_DATE && carrier.ADD_DATE.length >= 4 ?
+                            new Date().getFullYear() - parseInt(carrier.ADD_DATE.substring(0, 4)) : null
                     }],
-                    carrier: carrier,
+                    carrier: {
+                        ...carrier,
+                        add_date: carrier.ADD_DATE || '',
+                        years_in_business: carrier.ADD_DATE && carrier.ADD_DATE.length >= 4 ?
+                            new Date().getFullYear() - parseInt(carrier.ADD_DATE.substring(0, 4)) : null
+                    },
                     insurance_policies: policies,
                     inspections: inspections,
                     summary: {
@@ -3333,6 +4058,9 @@ app.get('/api/carrier/profile/:dotNumber', (req, res) => {
                     business_type: carrier.CLASSDEF,
                     safety_rating: carrier.SAFETY_RATING,
                     mcs150_date: carrier.MCS150_DATE,
+                    add_date: carrier.ADD_DATE || '',
+                    years_in_business: carrier.ADD_DATE && carrier.ADD_DATE.length >= 4 ?
+                        new Date().getFullYear() - parseInt(carrier.ADD_DATE.substring(0, 4)) : null,
 
                     // Raw carrier data
                     carrier_details: carrier,

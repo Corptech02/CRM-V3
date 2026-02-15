@@ -709,8 +709,8 @@ function createComprehensiveCarrierHTML(carrier) {
                         <div class="metric-label">OOS Rate</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value">${carrier.drivers || carrier.carrier_details?.TOTAL_DRIVERS || 'N/A'}</div>
-                        <div class="metric-label">Total Drivers</div>
+                        <div class="metric-value">${carrier.add_date ? carrier.add_date.substring(0,4) || 'N/A' : 'N/A'}</div>
+                        <div class="metric-label">Authority Granted</div>
                     </div>
                     <div class="metric">
                         <div class="metric-value" style="font-size: 14px; text-align: center;">${carrier.COMMODITIES_HAULED || carrier.commodities_hauled || 'General Freight'}</div>
@@ -782,6 +782,9 @@ function createComprehensiveCarrierHTML(carrier) {
                         if (uniqueVehicles.length > 0) {
                             return `
                                 <div style="margin-top: 0px;">
+                                    <p style="color: #6c757d; margin-bottom: 8px; font-size: 14px;">
+                                        Total Drivers: ${carrier.drivers || carrier.carrier_details?.TOTAL_DRIVERS || 'N/A'}
+                                    </p>
                                     <h4 style="color: #2c3e50; font-size: 16px; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid #dee2e6; padding-bottom: 6px;">
                                         Vehicle Inventory (${uniqueVehicles.length} vehicles)
                                     </h4>

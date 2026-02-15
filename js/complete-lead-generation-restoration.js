@@ -192,7 +192,17 @@ function getCompleteGenerateLeadsContent() {
                 </div>
 
                 <div class="filter-section">
-                    <h3>Select Lead Criteria</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Select Lead Criteria</h3>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="button" class="btn-secondary" onclick="openSavePresetPopup()" style="padding: 8px 16px; font-size: 0.9rem;">
+                                <i class="fas fa-save"></i> Save Preset
+                            </button>
+                            <button type="button" class="btn-info" onclick="openSelectPresetPopup()" style="padding: 8px 16px; font-size: 0.9rem;">
+                                <i class="fas fa-list"></i> Select Preset
+                            </button>
+                        </div>
+                    </div>
                     <div class="form-grid">
                         <div class="form-group">
                             <label>State <span class="required">*</span></label>
@@ -283,13 +293,159 @@ function getCompleteGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Safety Rating</label>
-                            <select class="form-control" id="genSafety">
-                                <option value="">All Ratings</option>
-                                <option value="SATISFACTORY">Satisfactory</option>
-                                <option value="CONDITIONAL">Conditional</option>
-                                <option value="UNSATISFACTORY">Unsatisfactory</option>
+                            <label>Safety Rating Max %</label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="number" class="form-control" id="genSafety" placeholder="Enter max % (0-100)" min="0" max="100" step="1" style="flex: 1;">
+                                <label style="display: flex; align-items: center; gap: 5px; margin: 0; white-space: nowrap;">
+                                    <input type="checkbox" id="requireInspections" style="margin: 0;">
+                                    <span>Require Inspections</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Hazmat</label>
+                            <select class="form-control" id="genHazmat">
+                                <option value="">Include All</option>
+                                <option value="include">Include</option>
+                                <option value="exclude">Exclude</option>
+                                <option value="only">Only</option>
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Years in Business (Minimum)</label>
+                            <input type="number" class="form-control" id="yearsInBusinessMin" placeholder="Enter minimum years" min="0" max="100">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Unit Types</label>
+                            <div class="unit-type-checkbox-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; padding: 0.75rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; max-height: 120px; overflow-y: auto;">
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="UNKNOWN" checked=""> Unknown
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="STRAIGHT_TRUCK" checked=""> Straight Truck
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="TRUCK_TRACTOR" checked=""> Truck Tractor
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="TRAILER" checked=""> Trailer
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="TRAVEL_TRAILER" checked=""> Travel Trailer
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="VAN" checked=""> Van
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="CARGO_VAN" checked=""> Cargo Van
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="PICKUP_TRUCK" checked=""> Pickup Truck
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="BUS" checked=""> Bus
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="LIMOUSINE" checked=""> Limousine
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="MINIBUS" checked=""> Minibus
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="MOTORCOACH" checked=""> Motorcoach
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="SCHOOL_BUS" checked=""> School Bus
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="VAN_9_15_PASS" checked=""> Van (9-15 passengers)
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="VAN_16_PASS" checked=""> Van (16+ passengers)
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="TAXI" checked=""> Taxi
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="AMBULANCE" checked=""> Ambulance
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="HEARSE" checked=""> Hearse
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="unitType" value="OTHER" checked=""> Other
+                            </label>
+                            </div>
+                            <div style="margin-top: 0.5rem; display: flex; gap: 0.75rem;">
+                                <button type="button" class="btn-small" onclick="selectAllUnitTypes()" style="padding: 4px 10px; font-size: 0.8rem;">Select All</button>
+                                <button type="button" class="btn-small" onclick="clearAllUnitTypes()" style="padding: 4px 10px; font-size: 0.8rem;">Clear All</button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Commodities Hauled</label>
+                            <div class="commodities-checkbox-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; padding: 0.75rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; max-height: 120px; overflow-y: auto;">
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="GENERAL_FREIGHT" checked> General Freight
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="REEFER" checked> Reefer
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="HOUSEHOLD_GOODS" checked> Household Goods
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="METAL_SHEETS_COILS_ROLLS" checked> Metal Sheets/Coils/Rolls
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="MOTOR_VEHICLES" checked> Motor Vehicles
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="LOGS_POLES_BEAMS_LUMBER" checked> Logs/Poles/Beams/Lumber
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="BUILDING_MATERIALS" checked> Building Materials
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="FRESH_PRODUCE" checked> Fresh Produce
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="LIQUIDS_GASES" checked> Liquids/Gases
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="CHEMICALS" checked> Chemicals
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="REFRIGERATED_FOOD" checked> Refrigerated Food
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="BEVERAGES" checked> Beverages
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="GRAIN_FEED_HAY" checked> Grain/Feed/Hay
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="LIVESTOCK" checked> Livestock
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="OILFIELD_EQUIPMENT" checked> Oilfield Equipment
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="INTERMODAL_CONTAINERS" checked> Intermodal Containers
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="PAPER_PRODUCTS" checked> Paper Products
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="CONSTRUCTION" checked> Construction
+                            </label>
+                            <label class="checkbox-item" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="commodity" value="OTHER" checked> Other
+                            </label>
+                            </div>
+                            <div style="margin-top: 0.5rem; display: flex; gap: 0.75rem;">
+                                <button type="button" class="btn-small" onclick="selectAllCommodities()" style="padding: 4px 10px; font-size: 0.8rem;">Select All</button>
+                                <button type="button" class="btn-small" onclick="clearAllCommodities()" style="padding: 4px 10px; font-size: 0.8rem;">Clear All</button>
+                            </div>
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Insurance Companies</label>
@@ -403,12 +559,6 @@ function getCompleteGenerateLeadsContent() {
                             </div>
                         </div>
                     </div>
-
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="genHazmat"> Hazmat Only
-                        </label>
-                    </div>
                     <div class="form-actions" style="margin-top: 1rem;">
                         <div class="button-row">
                             <button class="btn-primary" onclick="generateLeadsFromForm()" style="padding: 10px 24px; font-size: 1rem;">
@@ -431,6 +581,33 @@ function getCompleteGenerateLeadsContent() {
                             <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 20px;">
                                 <i class="fas fa-redo"></i> Reset Form
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preset Popups -->
+                <div id="savePresetModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000;">
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%;">
+                        <h3 style="margin-bottom: 15px;">Save Lead Generation Preset</h3>
+                        <div class="form-group">
+                            <label>Preset Name</label>
+                            <input type="text" class="form-control" id="presetName" placeholder="Enter preset name" maxlength="50">
+                        </div>
+                        <div style="text-align: right; margin-top: 15px;">
+                            <button type="button" class="btn-secondary" onclick="closeSavePresetPopup()" style="margin-right: 10px;">Cancel</button>
+                            <button type="button" class="btn-primary" onclick="savePreset()">Save Preset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="selectPresetModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000;">
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
+                        <h3 style="margin-bottom: 15px;">Select Lead Generation Preset</h3>
+                        <div id="presetList" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Preset list will be populated here -->
+                        </div>
+                        <div style="text-align: right; margin-top: 15px;">
+                            <button type="button" class="btn-secondary" onclick="closeSelectPresetPopup()">Close</button>
                         </div>
                     </div>
                 </div>
@@ -605,6 +782,225 @@ window.clearAllInsurance = function() {
     document.querySelectorAll('input[name="insurance"]').forEach(cb => cb.checked = false);
 }
 
+window.selectAllUnitTypes = function() {
+    document.querySelectorAll('input[name="unitType"]').forEach(cb => cb.checked = true);
+}
+
+window.clearAllUnitTypes = function() {
+    document.querySelectorAll('input[name="unitType"]').forEach(cb => cb.checked = false);
+}
+
+window.selectAllCommodities = function() {
+    document.querySelectorAll('input[name="commodity"]').forEach(cb => cb.checked = true);
+}
+
+window.clearAllCommodities = function() {
+    document.querySelectorAll('input[name="commodity"]').forEach(cb => cb.checked = false);
+}
+
+
+// Preset Management Functions
+window.openSavePresetPopup = function() {
+    document.getElementById('savePresetModal').style.display = 'block';
+    document.getElementById('presetName').value = '';
+    document.getElementById('presetName').focus();
+}
+
+window.closeSavePresetPopup = function() {
+    document.getElementById('savePresetModal').style.display = 'none';
+}
+
+window.openSelectPresetPopup = function() {
+    loadPresetList();
+    document.getElementById('selectPresetModal').style.display = 'block';
+}
+
+window.closeSelectPresetPopup = function() {
+    document.getElementById('selectPresetModal').style.display = 'none';
+}
+
+window.savePreset = function() {
+    const presetName = document.getElementById('presetName').value.trim();
+
+    if (!presetName) {
+        alert('Please enter a preset name');
+        return;
+    }
+
+    // Get current form values
+    const preset = getCurrentFormValues();
+    preset.name = presetName;
+    preset.createdAt = new Date().toISOString();
+
+    // Get existing presets
+    let presets = JSON.parse(localStorage.getItem('leadGenPresets') || '[]');
+
+    // Check if preset name already exists
+    const existingIndex = presets.findIndex(p => p.name === presetName);
+    if (existingIndex !== -1) {
+        if (!confirm(`A preset named "${presetName}" already exists. Do you want to overwrite it?`)) {
+            return;
+        }
+        presets[existingIndex] = preset;
+    } else {
+        // Check max limit (10 presets)
+        if (presets.length >= 10) {
+            alert('Maximum of 10 presets allowed. Please delete a preset before adding a new one.');
+            return;
+        }
+        presets.push(preset);
+    }
+
+    // Save to localStorage
+    localStorage.setItem('leadGenPresets', JSON.stringify(presets));
+
+    alert(`Preset "${presetName}" saved successfully!`);
+    closeSavePresetPopup();
+}
+
+window.getCurrentFormValues = function() {
+    // Get selected insurance companies
+    const insuranceCompanies = [];
+    document.querySelectorAll('input[name="insurance"]:checked').forEach(cb => {
+        insuranceCompanies.push(cb.value);
+    });
+
+    // Get selected unit types
+    const unitTypes = [];
+    document.querySelectorAll('input[name="unitType"]:checked').forEach(cb => {
+        unitTypes.push(cb.value);
+    });
+
+    // Get selected commodities
+    const commodities = [];
+    document.querySelectorAll('input[name="commodity"]:checked').forEach(cb => {
+        commodities.push(cb.value);
+    });
+
+    return {
+        state: document.getElementById('genState')?.value || '',
+        expiry: document.getElementById('genExpiry')?.value || '30',
+        skipDays: document.getElementById('genSkipDays')?.value || '0',
+        minFleet: document.getElementById('genMinFleet')?.value || '1',
+        maxFleet: document.getElementById('genMaxFleet')?.value || '9999',
+        status: document.getElementById('genStatus')?.value || '',
+        safety: document.getElementById('genSafety')?.value || '',
+        hazmat: document.getElementById('genHazmat')?.value || '',
+        commoditiesHauled: document.getElementById('commoditiesHauled')?.value || '',
+        insuranceCompanies: insuranceCompanies,
+        unitTypes: unitTypes,
+        commodities: commodities
+    };
+}
+
+window.loadPresetList = function() {
+    const presets = JSON.parse(localStorage.getItem('leadGenPresets') || '[]');
+    const presetList = document.getElementById('presetList');
+
+    if (presets.length === 0) {
+        presetList.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #6b7280;">
+                <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 10px;"></i>
+                <p>No presets saved yet</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    presets.forEach((preset, index) => {
+        const createdDate = new Date(preset.createdAt).toLocaleDateString();
+        html += `
+            <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin-bottom: 10px; background: #f9fafb;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0;">${preset.name}</h4>
+                        <p style="margin: 0; font-size: 0.9rem; color: #6b7280;">
+                            Created: ${createdDate} | State: ${preset.state || 'Any'} |
+                            Insurance: ${preset.insuranceCompanies.length} selected |
+                            Unit Types: ${preset.unitTypes.length} selected |
+                            Commodities: ${preset.commodities ? preset.commodities.length : 0} selected
+                        </p>
+                    </div>
+                    <div>
+                        <button type="button" class="btn-primary" onclick="applyPreset(${index})" style="margin-right: 5px; padding: 5px 10px; font-size: 0.8rem;">
+                            Apply
+                        </button>
+                        <button type="button" class="btn-danger" onclick="deletePreset(${index})" style="padding: 5px 10px; font-size: 0.8rem;">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    presetList.innerHTML = html;
+}
+
+window.applyPreset = function(index) {
+    const presets = JSON.parse(localStorage.getItem('leadGenPresets') || '[]');
+    const preset = presets[index];
+
+    if (!preset) {
+        alert('Preset not found');
+        return;
+    }
+
+    // Apply form values
+    if (document.getElementById('genState')) document.getElementById('genState').value = preset.state || '';
+    if (document.getElementById('genExpiry')) document.getElementById('genExpiry').value = preset.expiry || '30';
+    if (document.getElementById('genSkipDays')) document.getElementById('genSkipDays').value = preset.skipDays || '0';
+    if (document.getElementById('genMinFleet')) document.getElementById('genMinFleet').value = preset.minFleet || '1';
+    if (document.getElementById('genMaxFleet')) document.getElementById('genMaxFleet').value = preset.maxFleet || '9999';
+    if (document.getElementById('genStatus')) document.getElementById('genStatus').value = preset.status || '';
+    if (document.getElementById('genSafety')) document.getElementById('genSafety').value = preset.safety || '';
+    if (document.getElementById('genHazmat')) document.getElementById('genHazmat').value = preset.hazmat || '';
+    if (document.getElementById('commoditiesHauled')) document.getElementById('commoditiesHauled').value = preset.commoditiesHauled || '';
+
+    // Apply insurance companies
+    document.querySelectorAll('input[name="insurance"]').forEach(cb => {
+        cb.checked = preset.insuranceCompanies.includes(cb.value);
+    });
+
+    // Apply unit types
+    document.querySelectorAll('input[name="unitType"]').forEach(cb => {
+        cb.checked = preset.unitTypes.includes(cb.value);
+    });
+
+    // Apply commodities (with backward compatibility)
+    if (preset.commodities) {
+        document.querySelectorAll('input[name="commodity"]').forEach(cb => {
+            cb.checked = preset.commodities.includes(cb.value);
+        });
+    }
+
+    closeSelectPresetPopup();
+    alert(`Preset "${preset.name}" applied successfully!`);
+}
+
+window.deletePreset = function(index) {
+    const presets = JSON.parse(localStorage.getItem('leadGenPresets') || '[]');
+    const preset = presets[index];
+
+    if (!preset) {
+        alert('Preset not found');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to delete the preset "${preset.name}"?`)) {
+        return;
+    }
+
+    presets.splice(index, 1);
+    localStorage.setItem('leadGenPresets', JSON.stringify(presets));
+
+    // Reload the preset list
+    loadPresetList();
+
+    alert(`Preset "${preset.name}" deleted successfully!`);
+}
+
 window.selectAllGeneratedLeads = function(checkbox) {
     document.querySelectorAll('#generatedLeadsTableBody input[type="checkbox"]').forEach(cb => cb.checked = checkbox.checked);
 }
@@ -617,7 +1013,9 @@ window.resetGenerateForm = function() {
     document.getElementById('genMaxFleet').value = '9999';
     document.getElementById('genStatus').value = '';
     document.getElementById('genSafety').value = '';
-    document.getElementById('genHazmat').checked = false;
+    document.getElementById('genHazmat').value = '';
+    document.getElementById('commoditiesHauled').value = '';
+    clearAllUnitTypes();
     clearAllInsurance();
 }
 
@@ -633,7 +1031,14 @@ window.generateLeadsFromForm = function() {
     const maxFleet = document.getElementById('genMaxFleet')?.value || '9999';
     const status = document.getElementById('genStatus')?.value;
     const safety = document.getElementById('genSafety')?.value;
-    const hazmat = document.getElementById('genHazmat')?.checked;
+    const hazmat = document.getElementById('genHazmat')?.value;
+    const commoditiesHauled = document.getElementById('commoditiesHauled')?.value;
+
+    // Get selected unit types
+    const unitTypes = [];
+    document.querySelectorAll('input[name="unitType"]:checked').forEach(cb => {
+        unitTypes.push(cb.value);
+    });
 
     // Get selected insurance companies
     const insuranceCompanies = [];
@@ -664,6 +1069,14 @@ async function generateLeadsNow() {
     // No limit - fetch all available leads
     const minFleet = document.getElementById('genMinFleet')?.value || '1';
     const maxFleet = document.getElementById('genMaxFleet')?.value || '9999';
+    const hazmat = document.getElementById('genHazmat')?.value;
+    const commoditiesHauled = document.getElementById('commoditiesHauled')?.value;
+
+    // Get selected unit types
+    const unitTypes = [];
+    document.querySelectorAll('input[name="unitType"]:checked').forEach(cb => {
+        unitTypes.push(cb.value);
+    });
 
     if (!state) {
         alert('Please select a state');
@@ -685,17 +1098,26 @@ async function generateLeadsNow() {
     console.log(`  Expected: ${skipDays > 0 ? 'FEWER leads due to skip days' : 'Normal lead count'}`);
 
     try {
-        const response = await fetch('/api/carriers/expiring', {
-            method: 'POST',
+        // Build query parameters for the new DB-V3 endpoint
+        const params = new URLSearchParams({
+            state: state,
+            minFleet: minFleet,
+            maxFleet: maxFleet,
+            limit: 50000
+        });
+
+        // Add optional filters
+        if (status) params.append('status', status);
+        if (safety) params.append('safety', safety);
+        if (hazmat) params.append('hazmat', hazmat);
+        if (commoditiesHauled) params.append('commoditiesHauled', commoditiesHauled);
+        if (unitTypes.length > 0) params.append('unitTypes', JSON.stringify(unitTypes));
+
+        const response = await fetch(`/api/carriers/expiring?${params}`, {
+            method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                state: state,
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0],
-                limit: limit
-            })
+            }
         });
 
         if (!response.ok) {
@@ -703,6 +1125,8 @@ async function generateLeadsNow() {
         }
 
         const data = await response.json();
+
+        console.log('🎯 DB-V3 Response:', data);
 
         if (data.success && data.carriers) {
             // Store globally for export/viewing
@@ -726,9 +1150,11 @@ async function generateLeadsNow() {
 
             // No popup alert needed - stats show in UI
 
-            console.log(`✅ Generated ${totalLeads} leads`);
+            console.log(`✅ DB-V3: Generated ${totalLeads} leads from database with 428K+ records`);
+            console.log(`📊 Database: ${data.stats?.database || 'DB-V3'}`);
+            console.log(`🎯 Filters Applied:`, data.stats?.filters_applied);
         } else {
-            throw new Error('Invalid response from server');
+            throw new Error('Invalid response from DB-V3 server');
         }
     } catch (error) {
         console.error('Error generating leads:', error);
