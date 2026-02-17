@@ -2417,6 +2417,60 @@ app.get('/api/vicidial/overwrite', async (req, res) => {
     }
 });
 
+// Helper function to process large uploads in background
+async function processLargeUpload(targetListId, leads) {
+    console.log(`🔄 Background processing started for ${leads.length} leads in list ${targetListId}`);
+
+    try {
+        // Create temporary JSON file with leads data
+        const fs = require('fs');
+        const { spawn } = require('child_process');
+
+        const tempFile = `/tmp/vicidial_upload_${Date.now()}.json`;
+        const leadsData = { leads: leads };
+
+        fs.writeFileSync(tempFile, JSON.stringify(leadsData, null, 2));
+        console.log(`📦 Created temp file: ${tempFile} with ${leads.length} leads`);
+
+        // Call Python uploader script
+        console.log(`🔄 Starting actual ViciDial upload for list ${targetListId}...`);
+
+        const pythonScript = '/var/www/vanguard/backend/vicidial-lead-uploader.py';
+        const python = spawn('python3', [pythonScript, targetListId, tempFile]);
+
+        let output = '';
+        let errorOutput = '';
+
+        python.stdout.on('data', (data) => {
+            output += data.toString();
+            console.log('📦 Upload progress:', data.toString().trim());
+        });
+
+        python.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+            console.error('📦 Upload error:', data.toString());
+        });
+
+        python.on('close', (code) => {
+            // Clean up temp file
+            try {
+                fs.unlinkSync(tempFile);
+            } catch (e) {
+                console.warn('Could not delete temp file:', tempFile);
+            }
+
+            if (code === 0) {
+                console.log(`✅ Background upload completed successfully for list ${targetListId}`);
+            } else {
+                console.error(`❌ Background upload failed for list ${targetListId}, exit code: ${code}`);
+            }
+        });
+
+    } catch (error) {
+        console.error(`❌ Background processing error for list ${targetListId}:`, error);
+    }
+}
+
 // Overwrite Vicidial list endpoint (POST version with body data)
 app.post('/api/vicidial/overwrite', async (req, res) => {
     try {
@@ -2438,6 +2492,28 @@ app.post('/api/vicidial/overwrite', async (req, res) => {
                 error: 'No leads provided for upload',
                 message: 'Request must include leads array in body'
             });
+        }
+
+        // For large uploads (>50 leads), respond immediately and process in background
+        if (leads.length > 50) {
+            console.log(`📦 Large upload detected (${leads.length} leads), starting background processing...`);
+
+            // Respond immediately to prevent timeout
+            res.json({
+                success: true,
+                message: `Processing ${leads.length} leads in background...`,
+                list_id: targetListId,
+                status: 'processing',
+                total_leads: leads.length,
+                note: 'Upload started in background. Check Vicidial list in a few minutes.'
+            });
+
+            // Process in background (don't await)
+            setImmediate(() => {
+                processLargeUpload(targetListId, leads);
+            });
+
+            return; // Exit early since we already sent the response
         }
 
         // Create temporary JSON file with leads data
@@ -2805,8 +2881,13 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
             const comments = lead.comments || '';
 
             if (comments) {
-                // Fleet size extraction patterns
+                // Fleet size extraction patterns - updated for new format
                 const fleetPatterns = [
+                    // NEW FORMAT: "Fl: 2" pattern (highest priority)
+                    /Fl:\s*(\d+)/i,
+                    /Dr:\s*\d+\s*\|\s*Fl:\s*(\d+)/i,
+                    // OLD FORMAT: "Size:" patterns
+                    /Size:\s*(\d+)/i,
                     /Insurance Expires:.*?\|\s*Fleet Size:?\s*(\d+)/i,
                     /Fleet Size:?\s*(\d+)/i,
                     /Fleet\s*Size\s*:\s*(\d+)/i,
@@ -3343,15 +3424,31 @@ app.get('/api/carriers/expiring', async (req, res) => {
             }
         }
 
-        // Add minimum years in business filter
+        // Add years in business range filter
         const yearsInBusinessMin = req.query.yearsInBusinessMin;
-        if (yearsInBusinessMin && !isNaN(yearsInBusinessMin)) {
-            const minYears = parseInt(yearsInBusinessMin);
-            const currentYear = new Date().getFullYear();
+        const yearsInBusinessMax = req.query.yearsInBusinessMax;
+        const currentYear = new Date().getFullYear();
 
-            // Filter for carriers with at least minYears in business
-            query += ` AND c.ADD_DATE IS NOT NULL AND c.ADD_DATE != '' AND LENGTH(c.ADD_DATE) >= 4 AND (${currentYear} - CAST(SUBSTR(c.ADD_DATE, 1, 4) AS INTEGER)) >= ${minYears}`;
-            console.log(`📅 Minimum years in business filter applied: ${minYears}+ years`);
+        if ((yearsInBusinessMin && !isNaN(yearsInBusinessMin)) || (yearsInBusinessMax && !isNaN(yearsInBusinessMax))) {
+            const minYears = yearsInBusinessMin ? parseInt(yearsInBusinessMin) : 0;
+            const maxYears = yearsInBusinessMax ? parseInt(yearsInBusinessMax) : 100;
+
+            // Filter for carriers within the years range
+            query += ` AND c.ADD_DATE IS NOT NULL AND c.ADD_DATE != '' AND LENGTH(c.ADD_DATE) >= 4`;
+
+            if (minYears > 0 && maxYears < 100) {
+                // Both min and max specified
+                query += ` AND (${currentYear} - CAST(SUBSTR(c.ADD_DATE, 1, 4) AS INTEGER)) BETWEEN ${minYears} AND ${maxYears}`;
+                console.log(`📅 Years in business range filter applied: ${minYears}-${maxYears} years`);
+            } else if (minYears > 0) {
+                // Only minimum specified
+                query += ` AND (${currentYear} - CAST(SUBSTR(c.ADD_DATE, 1, 4) AS INTEGER)) >= ${minYears}`;
+                console.log(`📅 Minimum years in business filter applied: ${minYears}+ years`);
+            } else if (maxYears < 100) {
+                // Only maximum specified
+                query += ` AND (${currentYear} - CAST(SUBSTR(c.ADD_DATE, 1, 4) AS INTEGER)) <= ${maxYears}`;
+                console.log(`📅 Maximum years in business filter applied: ${maxYears} years or less`);
+            }
         }
 
         // Add operating status filter (Note: DB-V3 uses STATUS_CODE)

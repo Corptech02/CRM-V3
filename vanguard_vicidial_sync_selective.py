@@ -481,8 +481,12 @@ class VanguardViciDialSelectiveSync:
 
         # Extract fleet size from multiple possible patterns
         fleet_patterns = [
+            # NEW FORMAT: "Fl: 2" pattern (highest priority)
+            r'Fl:\s*(\d+)',  # NEW: "Fl: 2" pattern for newest ViciDial format
+            r'Dr:\s*\d+\s*\|\s*Fl:\s*(\d+)',  # NEW: "Dr: 2 | Fl: 2" combined pattern
+            # OLD FORMAT: "Size:" patterns
+            r'Size:\s*(\d+)',  # "Size: 10" pattern for previous ViciDial format
             r'Insurance Expires:.*?\|\s*Fleet Size:?\s*(\d+)',  # Original pattern
-            r'Size:\s*(\d+)',  # NEW: "Size: 10" pattern for new ViciDial format
             r'Fleet Size:?\s*(\d+)',  # Simple "Fleet Size: x" pattern
             r'Fleet\s*Size\s*:\s*(\d+)',  # "Fleet Size : x" with spaces
             r'(\d+)\s*vehicles?',  # "9 vehicles" pattern
@@ -550,12 +554,17 @@ class VanguardViciDialSelectiveSync:
                 parsed_info['owner_name'] = name_match.group(1).strip()
                 logger.info(f"✅ Owner name extracted: '{parsed_info['owner_name']}'")
 
-            # Extract stage selections and determine current stage
+            # Extract stage selections and determine current stage - updated for new format
             stage_patterns = [
+                # Try new format first
                 ('new', r'New:\s*([Xx])', 'new'),
-                ('info_requested', r'Info Requested:\s*([Xx])', 'info_requested'),
-                ('loss_runs_requested', r'Loss Runs Requested:\s*([Xx])', 'loss_runs_requested'),
-                ('loss_runs_received', r'Loss Runs Received:\s*([Xx])', 'loss_runs_received')
+                ('info_requested', r'LR Req:\s*([Xx])', 'info_requested'),
+                ('loss_runs_requested', r'LR Req:\s*([Xx])', 'loss_runs_requested'),  # Same as info_requested in new format
+                ('loss_runs_received', r'LR Rec:\s*([Xx])', 'loss_runs_received'),
+                # Fallback to old format
+                ('info_requested_old', r'Info Requested:\s*([Xx])', 'info_requested'),
+                ('loss_runs_requested_old', r'Loss Runs Requested:\s*([Xx])', 'loss_runs_requested'),
+                ('loss_runs_received_old', r'Loss Runs Received:\s*([Xx])', 'loss_runs_received')
             ]
 
             for stage_key, pattern, stage_value in stage_patterns:
@@ -564,8 +573,13 @@ class VanguardViciDialSelectiveSync:
                     parsed_info['lead_stage'] = stage_value
                     logger.info(f"✅ Stage detected: {stage_value}")
 
-            # Extract callback information
-            callback_match = re.search(r'--scheduled next call-+\s*\n\s*Date:\s*([^\s]+)\s+Time:\s*([^\n\r]+)', comments, re.IGNORECASE | re.MULTILINE)
+            # Extract callback information - updated for new format
+            # Try new format first: "NEXT CALL\nDate: MM/DD/YYYY Time: HH:MMAM/PM"
+            callback_match = re.search(r'NEXT CALL\s*\n\s*Date:\s*([^\s]+)\s+Time:\s*([^\n\r]+)', comments, re.IGNORECASE | re.MULTILINE)
+
+            # Fallback to old format: "--scheduled next call---------\nDate: MM/DD/YYYY Time: HH:MMAM/PM"
+            if not callback_match:
+                callback_match = re.search(r'--scheduled next call-+\s*\n\s*Date:\s*([^\s]+)\s+Time:\s*([^\n\r]+)', comments, re.IGNORECASE | re.MULTILINE)
             if callback_match:
                 parsed_info['callback_date'] = callback_match.group(1).strip()
                 parsed_info['callback_time'] = callback_match.group(2).strip()

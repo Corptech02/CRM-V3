@@ -170,21 +170,23 @@ function buildVicidialComments(lead, selectedStage, fieldUpdates = {}) {
     const fleetSize = lead.fleetSize || '';
     const ownerName = fieldUpdates.ownerName !== undefined ? fieldUpdates.ownerName : (lead.ownerName || '');
 
-    // Build basic info line
-    const basicInfo = `Exp: ${expiry} | Size: ${fleetSize}`;
+    // Build basic info line - updated for new format
+    const drivers = lead.drivers || fleetSize; // Default drivers to fleet size if not specified
+    const basicInfo = `Dr: ${drivers} | Fl: ${fleetSize}`;
 
-    // Build stage selection section with X marks
-    const stages = ['New', 'Info Requested', 'Loss Runs Requested', 'Loss Runs Received'];
-    let stageSection = '---------Lead Select----------\n';
+    // Build stage selection section with X marks - updated for new format
+    const stages = [
+        { display: 'New', key: 'new' },
+        { display: 'LR Req', key: 'info_requested' },  // New format combines info_requested and loss_runs_requested
+        { display: 'LR Rec', key: 'loss_runs_received' }
+    ];
+    let stageSection = 'SELECT\n';
 
     stages.forEach(stage => {
-        const isSelected = stage === selectedStage ||
-                          (stage === 'New' && selectedStage === 'new') ||
-                          (stage === 'Info Requested' && selectedStage === 'info_requested') ||
-                          (stage === 'Loss Runs Requested' && selectedStage === 'loss_runs_requested') ||
-                          (stage === 'Loss Runs Received' && selectedStage === 'loss_runs_received');
+        const isSelected = selectedStage === stage.key ||
+                          (stage.key === 'info_requested' && selectedStage === 'loss_runs_requested'); // Handle both as same in new format
 
-        stageSection += `${stage}: ${isSelected ? 'X' : ''}\n`;
+        stageSection += `${stage.display}: ${isSelected ? 'X' : ''}\n`;
     });
 
     // Build the complete comment structure
@@ -193,9 +195,14 @@ function buildVicidialComments(lead, selectedStage, fieldUpdates = {}) {
 ${ownerName}
 
 ${stageSection}
---scheduled next call---------
+NEXT CALL
 Date: MM/DD/2026 Time: 00:00AM
-------------------------------`;
+
+UNITS
+[Unit information will be added here]
+
+TRAILERS
+[Trailer information will be added here]`;
 
     return comments;
 }
