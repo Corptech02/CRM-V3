@@ -341,30 +341,11 @@ window.closeQuoteApplicationModal = function() {
     window.editingApplicationData = null;
     console.log('🧹 Closed modal and cleared editing state');
 
-    // Restore the appropriate modal based on the context
-    const applicationContext = window.applicationViewContext || 'leads';
-    console.log('📍 Restoring context:', applicationContext);
-
-    if (applicationContext === 'clients') {
-        // We're in the clients context, restore the client profile modal if it exists
-        const clientProfileModal = document.getElementById('client-profile-modal');
-        if (clientProfileModal) {
-            clientProfileModal.style.display = 'block';
-            console.log('✅ Restored client profile modal');
-        } else {
-            console.log('📍 No client profile modal to restore, staying in clients view');
-        }
-    } else {
-        // Default leads context
-        const leadProfileModal = document.getElementById('lead-profile-modal');
-        if (leadProfileModal) {
-            leadProfileModal.style.display = 'block';
-            console.log('✅ Restored lead profile modal');
-        }
+    // Restore lead profile modal
+    const leadProfileModal = document.getElementById('lead-profile-modal');
+    if (leadProfileModal) {
+        leadProfileModal.style.display = 'block';
     }
-
-    // Clear the context after use
-    window.applicationViewContext = null;
 
     // Refresh Application Submissions to restore any hidden cards
     if (currentLeadId && window.showApplicationSubmissions) {
@@ -376,32 +357,14 @@ window.closeQuoteApplicationModal = function() {
 };
 
 // Override createQuoteApplicationSimple with enhanced version
-window.createQuoteApplicationSimple = async function(leadId) {
+window.createQuoteApplicationSimple = function(leadId) {
     console.log('Enhanced quote application for lead:', leadId);
 
     // Get the lead data from both possible sources
-    let leads = JSON.parse(localStorage.getItem('leads') || '[]');
-    let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    let allLeads = [...leads, ...insuranceLeads];
-    let lead = allLeads.find(l => l.id == leadId);
-
-    if (!lead) {
-        console.log('⚡ Lead not found locally, refreshing from server...');
-        try {
-            // Refresh leads from server if lead not found locally
-            if (typeof loadLeadsFromServerAndRefresh === 'function') {
-                await loadLeadsFromServerAndRefresh();
-            }
-
-            // Try again after refresh
-            leads = JSON.parse(localStorage.getItem('leads') || '[]');
-            insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-            allLeads = [...leads, ...insuranceLeads];
-            lead = allLeads.find(l => l.id == leadId);
-        } catch (error) {
-            console.error('❌ Error refreshing leads from server:', error);
-        }
-    }
+    const leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const allLeads = [...leads, ...insuranceLeads];
+    const lead = allLeads.find(l => l.id == leadId);
 
     if (!lead) {
         console.error('Lead not found with ID:', leadId);
@@ -483,7 +446,7 @@ window.createQuoteApplicationSimple = async function(leadId) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Effective Date:</label>
-                        <input type="date" value="${calculateEffectiveDate(lead)}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <input type="date" value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Insured's Name (including DBA):</label>
@@ -519,7 +482,7 @@ window.createQuoteApplicationSimple = async function(leadId) {
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Years in Business:</label>
-                        <input type="text" value="" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <input type="text" value="${lead.yearsInBusiness || ''}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                     </div>
                 </div>
             </div>
@@ -572,13 +535,6 @@ window.createQuoteApplicationSimple = async function(leadId) {
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dumptruck:</label>
-                        <div style="display: flex; align-items: center;">
-                            <input type="text" value="" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
-                            <span style="margin-left: 3px;">%</span>
-                        </div>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Intermodal:</label>
                         <div style="display: flex; align-items: center;">
                             <input type="text" value="" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
                             <span style="margin-left: 3px;">%</span>
@@ -763,13 +719,9 @@ window.createQuoteApplicationSimple = async function(leadId) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured/Underinsured Bodily Injury:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="$100,000" selected>$100,000</option>
-                            <option value="$150,000">$150,000</option>
-                            <option value="$200,000">$200,000</option>
-                            <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
                             <option value="$750,000">$750,000</option>
-                            <option value="$1,000,000">$1,000,000</option>
+                            <option value="$1,000,000" selected>$1,000,000</option>
                             <option value="$1,500,000">$1,500,000</option>
                             <option value="$2,000,000">$2,000,000</option>
                         </select>
@@ -784,20 +736,6 @@ window.createQuoteApplicationSimple = async function(leadId) {
                             <option value="$250,000">$250,000</option>
                             <option value="$500,000">$500,000</option>
                             <option value="$1,000,000">$1,000,000</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Hired Auto Liability:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="Not Included" selected>Not Included</option>
-                            <option value="Matching Bodily and Property Limits">Matching Bodily and Property Limits</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Employer Non-Owned Auto Liability:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="Not Included" selected>Not Included</option>
-                            <option value="Matching Bodily and Property Limits">Matching Bodily and Property Limits</option>
                         </select>
                     </div>
                     <div>
@@ -827,44 +765,29 @@ window.createQuoteApplicationSimple = async function(leadId) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Non-Owned Trailer Phys Dam:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="$25,000/$1,000">$25,000/$1,000</option>
-                            <option value="$25,000/$2,000">$25,000/$2,000</option>
-                            <option value="$50,000/$1,000">$50,000/$1,000</option>
-                            <option value="$50,000/$2,000">$50,000/$2,000</option>
-                            <option value="$75,000/$1,000">$75,000/$1,000</option>
-                            <option value="$75,000/$2,000">$75,000/$2,000</option>
-                            <option value="$100,000/$1,000">$100,000/$1,000</option>
-                            <option value="$100,000/$2,000">$100,000/$2,000</option>
-                            <option value="$150,000/$1,000">$150,000/$1,000</option>
-                            <option value="$150,000/$2,000">$150,000/$2,000</option>
-                            <option value="$250,000/$1,000">$250,000/$1,000</option>
-                            <option value="$250,000/$2,000">$250,000/$2,000</option>
-                            <option value="Not Included" selected>Not Included</option>
+                            <option value="$25,000">$25,000</option>
+                            <option value="$50,000" selected>$50,000</option>
+                            <option value="$75,000">$75,000</option>
+                            <option value="$100,000">$100,000</option>
+                            <option value="$150,000">$150,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="$25,000/$1,000">$25,000/$1,000</option>
-                            <option value="$25,000/$2,000">$25,000/$2,000</option>
-                            <option value="$50,000/$1,000">$50,000/$1,000</option>
-                            <option value="$50,000/$2,000">$50,000/$2,000</option>
-                            <option value="$60,000/$1,000">$60,000/$1,000</option>
-                            <option value="$60,000/$2,000">$60,000/$2,000</option>
-                            <option value="$75,000/$1,000">$75,000/$1,000</option>
-                            <option value="$75,000/$2,000">$75,000/$2,000</option>
-                            <option value="$100,000/$1,000">$100,000/$1,000</option>
-                            <option value="$100,000/$2,000">$100,000/$2,000</option>
-                            <option value="$150,000/$1,000">$150,000/$1,000</option>
-                            <option value="$150,000/$2,000">$150,000/$2,000</option>
-                            <option value="Not Included" selected>Not Included</option>
+                            <option value="$25,000">$25,000</option>
+                            <option value="$50,000" selected>$50,000</option>
+                            <option value="$75,000">$75,000</option>
+                            <option value="$100,000">$100,000</option>
+                            <option value="$150,000">$150,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="Included">Included</option>
-                            <option value="Selected w/ 250" selected>Selected w/ 250</option>
                             <option value="Not Included">Not Included</option>
                         </select>
                     </div>
@@ -907,32 +830,12 @@ window.createQuoteApplicationSimple = async function(leadId) {
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="$5,000">$5,000</option>
                             <option value="$10,000">$10,000</option>
-                            <option value="$15,000">$15,000</option>
+                            <option value="$15,000" selected>$15,000</option>
                             <option value="$25,000">$25,000</option>
                             <option value="$50,000">$50,000</option>
                             <option value="Included DED. $2500">Included DED. $2500</option>
-                            <option value="Not Included" selected>Not Included</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Aggregate:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            <option value="$1,000,000" selected>$1,000,000</option>
-                            <option value="$2,000,000">$2,000,000</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental Reimbursement:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="Not Included">Not Included</option>
-                            <option value="$40 per day/$1200 max">$40 per day/$1200 max</option>
-                            <option value="$70 per day/$2100 max">$70 per day/$2100 max</option>
-                            <option value="$80 per day/$2400 max">$80 per day/$2400 max</option>
                         </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental with Downtime:</label>
-                        <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter downtime details">
                     </div>
                 </div>
             </div>
@@ -958,6 +861,130 @@ window.createQuoteApplicationSimple = async function(leadId) {
     modal.appendChild(content);
     document.body.appendChild(modal);
     console.log('Enhanced modal created and added to DOM');
+
+    // AUTO-POPULATE from lead profile data
+    setTimeout(() => {
+        console.log('🚛 AUTO-POPULATING vehicles, trailers, drivers, and Class of Risk from lead profile...');
+
+        // Populate vehicles from lead profile
+        if (lead.vehicles && lead.vehicles.length > 0) {
+            console.log(`🚛 Found ${lead.vehicles.length} vehicles to populate`);
+            lead.vehicles.forEach((vehicle, index) => {
+                if (index > 0) {
+                    // Add extra truck rows if needed
+                    const addButton = modal.querySelector('button[onclick*="addTruckRow"]');
+                    if (addButton) addButton.click();
+                }
+
+                setTimeout(() => {
+                    const truckRows = modal.querySelectorAll('#trucks-container .truck-row');
+                    if (truckRows[index]) {
+                        const inputs = truckRows[index].querySelectorAll('input');
+                        if (inputs[0]) inputs[0].value = vehicle.year || '';
+                        if (inputs[1]) inputs[1].value = `${vehicle.make || ''} ${vehicle.model || ''}`.trim();
+                        if (inputs[2]) inputs[2].value = vehicle.type || 'Semi Truck';
+                        if (inputs[3]) inputs[3].value = vehicle.vin || '';
+                        if (inputs[4]) inputs[4].value = vehicle.value || '';
+                        if (inputs[5]) inputs[5].value = lead.radiusOfOperation || '';
+                        console.log(`🚛 Populated truck row ${index + 1}: ${vehicle.make} ${vehicle.model}`);
+                    }
+                }, 100 * (index + 1));
+            });
+        }
+
+        // Populate trailers from lead profile
+        if (lead.trailers && lead.trailers.length > 0) {
+            console.log(`🚚 Found ${lead.trailers.length} trailers to populate`);
+            lead.trailers.forEach((trailer, index) => {
+                if (index > 0) {
+                    // Add extra trailer rows if needed
+                    const addButton = modal.querySelector('button[onclick*="addTrailerRow"]');
+                    if (addButton) addButton.click();
+                }
+
+                setTimeout(() => {
+                    const trailerRows = modal.querySelectorAll('#trailers-container .trailer-row');
+                    if (trailerRows[index]) {
+                        const inputs = trailerRows[index].querySelectorAll('input');
+                        if (inputs[0]) inputs[0].value = trailer.year || '';
+                        if (inputs[1]) inputs[1].value = `${trailer.make || ''} ${trailer.model || ''}`.trim();
+                        if (inputs[2]) inputs[2].value = trailer.type || '';
+                        if (inputs[3]) inputs[3].value = trailer.vin || '';
+                        if (inputs[4]) inputs[4].value = trailer.value || '';
+                        if (inputs[5]) inputs[5].value = lead.radiusOfOperation || '';
+                        console.log(`🚚 Populated trailer row ${index + 1}: ${trailer.make} ${trailer.model}`);
+                    }
+                }, 150 * (index + 1));
+            });
+        }
+
+        // Populate drivers from lead profile
+        if (lead.drivers && lead.drivers.length > 0) {
+            console.log(`👥 Found ${lead.drivers.length} drivers to populate`);
+            lead.drivers.forEach((driver, index) => {
+                if (index > 0) {
+                    // Add extra driver rows if needed
+                    const addButton = modal.querySelector('button[onclick*="addDriverRow"]');
+                    if (addButton) addButton.click();
+                }
+
+                setTimeout(() => {
+                    const driverRows = modal.querySelectorAll('#drivers-container .driver-row');
+                    if (driverRows[index]) {
+                        const inputs = driverRows[index].querySelectorAll('input');
+                        if (inputs[0]) inputs[0].value = driver.name || '';
+                        if (inputs[1]) inputs[1].value = driver.dateOfBirth || '';
+                        if (inputs[2]) inputs[2].value = driver.licenseNumber || driver.dlNumber || '';
+                        if (inputs[3]) inputs[3].value = driver.state || driver.licenseState || '';
+                        if (inputs[4]) inputs[4].value = driver.yearsExperience || driver.cdlExperience || '';
+                        if (inputs[5]) inputs[5].value = driver.dateOfHire || '';
+                        if (inputs[6]) inputs[6].value = driver.accidents || driver.violations || '';
+                        console.log(`👥 Populated driver row ${index + 1}: ${driver.name}`);
+                    }
+                }, 200 * (index + 1));
+            });
+        }
+
+        // Auto-populate commodities and Class of Risk
+        if (lead.commodityHauled && lead.commodityHauled.trim().length > 0) {
+            console.log('📦 Found commodities to populate:', lead.commodityHauled);
+            const commodityString = lead.commodityHauled;
+            const commodities = commodityString.split(',').map(c => c.trim()).filter(c => c.length > 0);
+
+            if (commodities.length > 0) {
+                // Calculate percentage for each commodity (distribute evenly)
+                const percentage = Math.floor(100 / commodities.length);
+                let remainingPercentage = 100 - (percentage * commodities.length);
+
+                commodities.forEach((commodity, index) => {
+                    if (index > 0) {
+                        // Add extra commodity rows if needed
+                        const addButton = modal.querySelector('button[onclick*="addCommodityRow"]');
+                        if (addButton) addButton.click();
+                    }
+
+                    setTimeout(() => {
+                        const commodityRows = modal.querySelectorAll('#commodities-container .commodity-row');
+                        if (commodityRows[index]) {
+                            const inputs = commodityRows[index].querySelectorAll('input');
+                            if (inputs[0]) inputs[0].value = commodity;
+                            // Add remaining percentage to first commodity to ensure 100% total
+                            const thisPercentage = index === 0 ? percentage + remainingPercentage : percentage;
+                            if (inputs[1]) inputs[1].value = thisPercentage + '%';
+                            console.log(`📦 Populated commodity row ${index + 1}: ${commodity} (${thisPercentage}%)`);
+                        }
+                    }, 250 * (index + 1));
+                });
+
+                // Auto-populate class of risk based on commodities
+                setTimeout(() => {
+                    populateClassOfRisk(modal, commodities);
+                }, 400 + (commodities.length * 250));
+            }
+        } else {
+            console.log('📦 No commodities found in lead data');
+        }
+    }, 200);
 
     // Check if we're viewing/editing an existing application
     if (window.editingApplicationData) {
@@ -1051,7 +1078,6 @@ function prefillApplicationForm(applicationData) {
             'Box Truck': formData['Box Truck'],
             'Reefer': formData['Reefer'],
             'Dumptruck': formData['Dumptruck'],
-            'Intermodal': formData['Intermodal'],
 
             // Coverage fields
             'Auto Liability': formData['Auto Liability'],
@@ -1435,9 +1461,6 @@ window.saveQuoteApplication = async function() {
             } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
                 formData['Dumptruck'] = value;
                 console.log(`🎯 Explicitly captured Dumptruck: "${value}"`);
-            } else if (parentText.includes('Intermodal') || grandparentText.includes('Intermodal')) {
-                formData['Intermodal'] = value;
-                console.log(`🎯 Explicitly captured Intermodal: "${value}"`);
             }
         });
 
@@ -1696,59 +1719,17 @@ async function saveToServer(applicationData) {
     }
 }
 
-// Helper function to calculate effective date from renewal date
-function calculateEffectiveDate(lead) {
-    try {
-        if (lead && lead.renewalDate) {
-            // Parse the renewal date (format: MM/DD/YYYY or similar)
-            const renewalDate = lead.renewalDate;
-            const dateParts = renewalDate.split('/');
-
-            if (dateParts.length === 3) {
-                const month = dateParts[0].padStart(2, '0');
-                const day = dateParts[1].padStart(2, '0');
-                const year = '2026'; // Always use 2026 as requested
-
-                return `${year}-${month}-${day}`;
-            }
-        }
-    } catch (error) {
-        console.warn('Error parsing renewal date:', error);
-    }
-
-    // Fallback to current date if renewal date is not available or invalid
-    return new Date().toISOString().split('T')[0];
-}
-
 // Function to show enhanced quote modal with saved application data
-window.showEnhancedQuoteApplicationWithData = async function(leadId, application) {
+window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
     console.log('👁️ Showing enhanced quote modal with saved data for lead:', leadId, 'application:', application);
 
     try {
 
     // Get the lead data from both possible sources
-    let leads = JSON.parse(localStorage.getItem('leads') || '[]');
-    let insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    let allLeads = [...leads, ...insuranceLeads];
-    let lead = allLeads.find(l => l.id == leadId);
-
-    if (!lead) {
-        console.log('⚡ Lead not found locally, refreshing from server...');
-        try {
-            // Refresh leads from server if lead not found locally
-            if (typeof loadLeadsFromServerAndRefresh === 'function') {
-                await loadLeadsFromServerAndRefresh();
-            }
-
-            // Try again after refresh
-            leads = JSON.parse(localStorage.getItem('leads') || '[]');
-            insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-            allLeads = [...leads, ...insuranceLeads];
-            lead = allLeads.find(l => l.id == leadId);
-        } catch (error) {
-            console.error('❌ Error refreshing leads from server:', error);
-        }
-    }
+    const leads = JSON.parse(localStorage.getItem('leads') || '[]');
+    const insuranceLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const allLeads = [...leads, ...insuranceLeads];
+    const lead = allLeads.find(l => l.id == leadId);
 
     if (!lead) {
         console.error('Lead not found with ID:', leadId);
@@ -1769,20 +1750,10 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
         existingModal.remove();
     }
 
-    // Hide lead profile modal while quote app is open (or detect if we're in clients context)
+    // Hide lead profile modal while quote app is open
     const leadProfileModal = document.getElementById('lead-profile-modal');
-    const clientProfileModal = document.getElementById('client-profile-modal');
-    const isInClientsContext = window.location.hash === '#clients' || clientProfileModal;
-
-    // Store the context for when we close the modal
-    window.applicationViewContext = isInClientsContext ? 'clients' : 'leads';
-    console.log('📍 Application view context detected:', window.applicationViewContext);
-
     if (leadProfileModal) {
         leadProfileModal.style.display = 'none';
-    }
-    if (clientProfileModal) {
-        clientProfileModal.style.display = 'none';
     }
 
     // Get saved form data
@@ -1853,7 +1824,7 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Effective Date:</label>
-                        <input type="date" value="${getSavedValue('Effective Date', calculateEffectiveDate(lead))}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <input type="date" value="${getSavedValue('Effective Date', new Date().toISOString().split('T')[0])}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Insured's Name (including DBA):</label>
@@ -1944,13 +1915,6 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                         <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dumptruck:</label>
                         <div style="display: flex; align-items: center;">
                             <input type="text" value="${getSavedValue('Dumptruck', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
-                            <span style="margin-left: 3px;">%</span>
-                        </div>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Intermodal:</label>
-                        <div style="display: flex; align-items: center;">
-                            <input type="text" value="${getSavedValue('Intermodal', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
                             <span style="margin-left: 3px;">%</span>
                         </div>
                     </div>
@@ -2120,25 +2084,13 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured/Underinsured Bodily Injury:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$100,000', '$150,000', '$200,000', '$250,000', '$500,000', '$750,000', '$1,000,000', '$1,500,000', '$2,000,000'], getSavedValue('Uninsured/Underinsured Bodily Injury', '$100,000'))}
+                            ${generateDropdownOptions(['$500,000', '$750,000', '$1,000,000', '$1,500,000', '$2,000,000'], getSavedValue('Uninsured/Underinsured Bodily Injury', '$1,000,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured Motorist Property Damage:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             ${generateDropdownOptions(['$50,000', '$100,000', '$150,000', '$200,000', '$250,000', '$500,000', '$1,000,000'], getSavedValue('Uninsured Motorist Property Damage', '$100,000'))}
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Hired Auto Liability:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['Not Included', 'Matching Bodily and Property Limits'], getSavedValue('Hired Auto Liability', 'Not Included'))}
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Employer Non-Owned Auto Liability:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['Not Included', 'Matching Bodily and Property Limits'], getSavedValue('Employer Non-Owned Auto Liability', 'Not Included'))}
                         </select>
                     </div>
                     <div>
@@ -2156,19 +2108,19 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Non-Owned Trailer Phys Dam:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000/$1,000', '$25,000/$2,000', '$50,000/$1,000', '$50,000/$2,000', '$75,000/$1,000', '$75,000/$2,000', '$100,000/$1,000', '$100,000/$2,000', '$150,000/$1,000', '$150,000/$2,000', '$250,000/$1,000', '$250,000/$2,000', 'Not Included'], getSavedValue('Non-Owned Trailer Phys Dam', 'Not Included'))}
+                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Non-Owned Trailer Phys Dam', '$50,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000/$1,000', '$25,000/$2,000', '$50,000/$1,000', '$50,000/$2,000', '$60,000/$1,000', '$60,000/$2,000', '$75,000/$1,000', '$75,000/$2,000', '$100,000/$1,000', '$100,000/$2,000', '$150,000/$1,000', '$150,000/$2,000', 'Not Included'], getSavedValue('Trailer Interchange', 'Not Included'))}
+                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Trailer Interchange', '$50,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['Included', 'Selected w/ 250', 'Not Included'], getSavedValue('Roadside Assistance', 'Selected w/ 250'))}
+                            ${generateDropdownOptions(['Included', 'Not Included'], getSavedValue('Roadside Assistance', 'Included'))}
                         </select>
                     </div>
                     <div>
@@ -2192,24 +2144,8 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Reefer Breakdown:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$5,000', '$10,000', '$15,000', '$25,000', '$50,000', 'Included DED. $2500', 'Not Included'], getSavedValue('Reefer Breakdown', 'Not Included'))}
+                            ${generateDropdownOptions(['$5,000', '$10,000', '$15,000', '$25,000', '$50,000', 'Included DED. $2500', 'Not Included'], getSavedValue('Reefer Breakdown', '$15,000'))}
                         </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Aggregate:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$1,000,000', '$2,000,000'], getSavedValue('Aggregate', '$1,000,000'))}
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental Reimbursement:</label>
-                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['Not Included', '$40 per day/$1200 max', '$70 per day/$2100 max', '$80 per day/$2400 max'], getSavedValue('Rental Reimbursement', 'Not Included'))}
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental with Downtime:</label>
-                        <input type="text" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter downtime details" value="${getSavedValue('Rental with Downtime', '')}">
                     </div>
                 </div>
             </div>
@@ -2245,19 +2181,10 @@ window.showEnhancedQuoteApplicationWithData = async function(leadId, application
     } catch (error) {
         console.error('❌ Error in showEnhancedQuoteApplicationWithData:', error);
         alert('Error loading application details: ' + error.message);
-
-        // Restore the appropriate modal based on the context
-        const applicationContext = window.applicationViewContext || 'leads';
-        if (applicationContext === 'clients') {
-            const clientProfileModal = document.getElementById('client-profile-modal');
-            if (clientProfileModal) {
-                clientProfileModal.style.display = 'block';
-            }
-        } else {
-            const leadProfileModal = document.getElementById('lead-profile-modal');
-            if (leadProfileModal) {
-                leadProfileModal.style.display = 'block';
-            }
+        // Show the lead profile modal if it was hidden
+        const leadProfileModal = document.getElementById('lead-profile-modal');
+        if (leadProfileModal) {
+            leadProfileModal.style.display = 'block';
         }
     }
 };
@@ -2549,9 +2476,6 @@ window.downloadQuoteApplicationPDF = function() {
             } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
                 formData['Dumptruck'] = value;
                 console.log(`🎯 Download: Captured Dumptruck: "${value}"`);
-            } else if (parentText.includes('Intermodal') || grandparentText.includes('Intermodal')) {
-                formData['Intermodal'] = value;
-                console.log(`🎯 Download: Captured Intermodal: "${value}"`);
             }
         });
 
@@ -3007,10 +2931,6 @@ function generateApplicationPDF(lead, formData) {
                 <div class="field-label">Dumptruck:</div>
                 <div class="field-value">${formData['Dumptruck'] || ''}${formData['Dumptruck'] ? '%' : ''}</div>
             </div>
-            <div class="field">
-                <div class="field-label">Intermodal:</div>
-                <div class="field-value">${formData['Intermodal'] || ''}${formData['Intermodal'] ? '%' : ''}</div>
-            </div>
         </div>
     </div>
 
@@ -3068,18 +2988,6 @@ function generateApplicationPDF(lead, formData) {
             <div class="field">
                 <div class="field-label">Reefer Breakdown:</div>
                 <div class="field-value">${formData['Reefer Breakdown'] || '$15,000'}</div>
-            </div>
-            <div class="field">
-                <div class="field-label">Aggregate:</div>
-                <div class="field-value">${formData['Aggregate'] || '$1,000,000'}</div>
-            </div>
-            <div class="field">
-                <div class="field-label">Rental Reimbursement:</div>
-                <div class="field-value">${formData['Rental Reimbursement'] || 'Not Included'}</div>
-            </div>
-            <div class="field">
-                <div class="field-label">Rental with Downtime:</div>
-                <div class="field-value">${formData['Rental with Downtime'] || ''}</div>
             </div>
         </div>
     </div>
@@ -3516,5 +3424,141 @@ document.addEventListener('DOMContentLoaded', function() {
 
     observer.observe(document.body, { childList: true, subtree: true });
 });
+
+// Function to auto-populate Class of Risk based on commodity types
+function populateClassOfRisk(modal, commodities) {
+    console.log('🎯 Auto-populating Class of Risk based on commodities:', commodities);
+
+    // Define mapping from commodities to class of risk categories
+    const commodityToRiskMapping = {
+        // Dry Van commodities
+        'general freight': 'Dry Van',
+        'consumer goods': 'Dry Van',
+        'packaged goods': 'Dry Van',
+        'retail goods': 'Dry Van',
+        'clothing': 'Dry Van',
+        'textiles': 'Dry Van',
+        'paper products': 'Dry Van',
+        'food products': 'Dry Van',
+        'beverages': 'Dry Van',
+
+        // Flatbed commodities (matching "Flat Bed" in the form)
+        'construction materials': 'Flat Bed',
+        'building materials': 'Flat Bed',
+        'steel': 'Flat Bed',
+        'lumber': 'Flat Bed',
+        'pipes': 'Flat Bed',
+        'machinery': 'Flat Bed',
+        'equipment': 'Flat Bed',
+        'metal products': 'Flat Bed',
+        'coils': 'Flat Bed',
+        'structural steel': 'Flat Bed',
+
+        // Reefer commodities
+        'refrigerated': 'Reefer',
+        'frozen': 'Reefer',
+        'perishable': 'Reefer',
+        'dairy': 'Reefer',
+        'meat': 'Reefer',
+        'produce': 'Reefer',
+        'pharmaceuticals': 'Reefer',
+        'temperature controlled': 'Reefer',
+        'fresh produce': 'Reefer',
+
+        // Auto Hauler commodities
+        'vehicles': 'Auto Hauler',
+        'cars': 'Auto Hauler',
+        'automobiles': 'Auto Hauler',
+        'auto': 'Auto Hauler',
+
+        // Box Truck commodities
+        'local delivery': 'Box Truck',
+        'packages': 'Box Truck',
+        'small freight': 'Box Truck',
+
+        // Dump Truck commodities
+        'aggregate': 'Dump Truck',
+        'sand': 'Dump Truck',
+        'gravel': 'Dump Truck',
+        'dirt': 'Dump Truck',
+        'rock': 'Dump Truck',
+        'demolition': 'Dump Truck'
+    };
+
+    // Count occurrences of each risk category
+    const riskCategoryCounts = {};
+
+    commodities.forEach(commodity => {
+        const lowerCommodity = commodity.toLowerCase().trim();
+
+        // Find matching risk category
+        let matchedCategory = null;
+        for (const [key, category] of Object.entries(commodityToRiskMapping)) {
+            if (lowerCommodity.includes(key) || key.includes(lowerCommodity)) {
+                matchedCategory = category;
+                break;
+            }
+        }
+
+        // Default to Dry Van if no specific match found
+        if (!matchedCategory) {
+            matchedCategory = 'Dry Van';
+        }
+
+        riskCategoryCounts[matchedCategory] = (riskCategoryCounts[matchedCategory] || 0) + 1;
+        console.log(`📦 Commodity "${commodity}" → ${matchedCategory}`);
+    });
+
+    // Calculate percentages for each risk category
+    const totalCommodities = commodities.length;
+    const riskPercentages = {};
+
+    Object.keys(riskCategoryCounts).forEach(category => {
+        const count = riskCategoryCounts[category];
+        const percentage = Math.floor((count / totalCommodities) * 100);
+        riskPercentages[category] = percentage;
+    });
+
+    // Distribute any remaining percentage to the most common category
+    const totalAssigned = Object.values(riskPercentages).reduce((sum, pct) => sum + pct, 0);
+    const remaining = 100 - totalAssigned;
+
+    if (remaining > 0) {
+        // Find the category with the highest count
+        const mostCommonCategory = Object.keys(riskCategoryCounts).reduce((a, b) =>
+            riskCategoryCounts[a] > riskCategoryCounts[b] ? a : b
+        );
+        riskPercentages[mostCommonCategory] += remaining;
+    }
+
+    console.log('🎯 Calculated risk percentages:', riskPercentages);
+
+    // Now populate the Class of Risk fields
+    setTimeout(() => {
+        Object.keys(riskPercentages).forEach(category => {
+            const percentage = riskPercentages[category];
+
+            // Find the input field for this risk category
+            const inputs = modal.querySelectorAll('input[type="text"]');
+
+            inputs.forEach(input => {
+                const parentText = input.parentElement?.textContent || '';
+                const grandparentText = input.parentElement?.parentElement?.textContent || '';
+
+                // Check if this input corresponds to our risk category
+                if (parentText.includes(category) || grandparentText.includes(category)) {
+                    input.value = percentage + '%';
+                    console.log(`🎯 Set ${category} to ${percentage}%`);
+
+                    // Trigger any change events
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        });
+
+        console.log('✅ Class of Risk auto-population completed');
+    }, 100);
+}
 
 console.log('✅ Enhanced Quote Application Modal Loaded');
