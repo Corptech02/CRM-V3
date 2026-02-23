@@ -250,7 +250,8 @@ async function generateCarrierQuoteSections(carrierName) {
                 physicalCoverage: quote.physical_coverage,
                 premiumText: quote.premium_text,
                 liabilityPerUnit: quote.liability_per_unit,
-                dateCreated: quote.date_created
+                dateCreated: quote.date_created,
+                source: quote.source || 'MANUAL ENTRY'
             }));
         }
     } catch (error) {
@@ -265,19 +266,22 @@ async function generateCarrierQuoteSections(carrierName) {
     const liabilityQuotes = carrierQuotes.filter(q => q.liabilityPerUnit).map(q => ({
         id: q.id,
         value: q.liabilityPerUnit,
-        date: new Date(q.dateCreated).toLocaleDateString()
+        date: new Date(q.dateCreated).toLocaleDateString(),
+        source: q.source || 'MANUAL ENTRY'
     }));
 
     const physicalQuotes = carrierQuotes.filter(q => q.physicalCoverage || q.clientName).map(q => ({
         id: q.id,
         value: q.physicalCoverage || q.clientName,
-        date: new Date(q.dateCreated).toLocaleDateString()
+        date: new Date(q.dateCreated).toLocaleDateString(),
+        source: q.source || 'MANUAL ENTRY'
     }));
 
     const cargoQuotes = carrierQuotes.filter(q => q.premiumText).map(q => ({
         id: q.id,
         value: q.premiumText,
-        date: new Date(q.dateCreated).toLocaleDateString()
+        date: new Date(q.dateCreated).toLocaleDateString(),
+        source: q.source || 'MANUAL ENTRY'
     }));
 
     return `
@@ -292,9 +296,14 @@ async function generateCarrierQuoteSections(carrierName) {
                     '<div style="color: #9ca3af; text-align: center; padding: 20px;">No liability data recorded</div>' :
                     liabilityQuotes.map(quote => `
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-                            <div>
-                                <span style="font-weight: 600; color: #374151;">${quote.value}</span>
-                                <span style="font-size: 12px; color: #6b7280; margin-left: 8px;">${quote.date}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-weight: 600; color: #374151;">${quote.value}</span>
+                                    <span style="font-size: 12px; color: #6b7280;">${quote.date}</span>
+                                </div>
+                                <div style="font-size: 11px; color: ${quote.source === 'MANUAL ENTRY' ? '#8b5cf6' : '#059669'}; font-weight: 500; margin-top: 2px;">
+                                    ${quote.source === 'MANUAL ENTRY' ? '📝 Manual Entry' : `📥 From: ${quote.source}`}
+                                </div>
                             </div>
                             <button onclick="deleteQuote(${quote.id}, '${carrierName}')"
                                     style="background: #dc2626; color: white; border: none; padding: 4px 8px;
@@ -318,9 +327,14 @@ async function generateCarrierQuoteSections(carrierName) {
                     '<div style="color: #9ca3af; text-align: center; padding: 20px;">No physical coverage data recorded</div>' :
                     physicalQuotes.map(quote => `
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-                            <div>
-                                <span style="font-weight: 600; color: #374151;">${quote.value}</span>
-                                <span style="font-size: 12px; color: #6b7280; margin-left: 8px;">${quote.date}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-weight: 600; color: #374151;">${quote.value}</span>
+                                    <span style="font-size: 12px; color: #6b7280;">${quote.date}</span>
+                                </div>
+                                <div style="font-size: 11px; color: ${quote.source === 'MANUAL ENTRY' ? '#8b5cf6' : '#059669'}; font-weight: 500; margin-top: 2px;">
+                                    ${quote.source === 'MANUAL ENTRY' ? '📝 Manual Entry' : `📥 From: ${quote.source}`}
+                                </div>
                             </div>
                             <button onclick="deleteQuote(${quote.id}, '${carrierName}')"
                                     style="background: #dc2626; color: white; border: none; padding: 4px 8px;
@@ -344,9 +358,14 @@ async function generateCarrierQuoteSections(carrierName) {
                     '<div style="color: #9ca3af; text-align: center; padding: 20px;">No cargo cost data recorded</div>' :
                     cargoQuotes.map(quote => `
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-                            <div>
-                                <span style="font-weight: 600; color: #374151;">${quote.value}</span>
-                                <span style="font-size: 12px; color: #6b7280; margin-left: 8px;">${quote.date}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-weight: 600; color: #374151;">${quote.value}</span>
+                                    <span style="font-size: 12px; color: #6b7280;">${quote.date}</span>
+                                </div>
+                                <div style="font-size: 11px; color: ${quote.source === 'MANUAL ENTRY' ? '#8b5cf6' : '#059669'}; font-weight: 500; margin-top: 2px;">
+                                    ${quote.source === 'MANUAL ENTRY' ? '📝 Manual Entry' : `📥 From: ${quote.source}`}
+                                </div>
                             </div>
                             <button onclick="deleteQuote(${quote.id}, '${carrierName}')"
                                     style="background: #dc2626; color: white; border: none; padding: 4px 8px;
@@ -461,9 +480,9 @@ function showLogQuoteModal(carrierName = null) {
     modalContent.style.cssText = `
         background: white;
         border-radius: 16px;
-        width: 90%;
-        max-width: 600px;
-        max-height: 80vh;
+        width: 98%;
+        max-width: 1400px;
+        max-height: 85vh;
         overflow-y: auto;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         animation: modalSlideIn 0.3s ease-out;
@@ -484,18 +503,24 @@ function showLogQuoteModal(carrierName = null) {
                 </button>
             </div>
             <div style="margin-top: 8px; opacity: 0.9; font-size: 16px;">
-                Enter quote details for insurance carrier
+                Enter quote details for insurance carriers (minimum 2 quotes required)
             </div>
         </div>
 
         <div style="padding: 30px;">
-            <form id="log-quote-form">
+            <div style="display: flex; gap: 20px;">
+                <!-- First Quote Form -->
+                <div style="flex: 1;">
+                    <h3 style="margin: 0 0 20px 0; color: #374151; font-size: 18px; font-weight: 600; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+                        <i class="fas fa-file-alt" style="color: #059669; margin-right: 8px;"></i>Quote #1
+                    </h3>
+                    <form class="quote-form" data-quote-number="1">
                 <!-- Carrier Selection -->
                 <div style="margin-bottom: 24px;">
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
                         <i class="fas fa-building" style="color: #059669; margin-right: 8px;"></i>Insurance Carrier
                     </label>
-                    <select id="carrier-selection"
+                    <select id="carrier-selection-1"
                             style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
                                    font-size: 15px; transition: border-color 0.2s ease; background: white;">
                         <option value="">Select a carrier...</option>
@@ -515,7 +540,7 @@ function showLogQuoteModal(carrierName = null) {
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
                         <i class="fas fa-shield-alt" style="color: #3b82f6; margin-right: 8px;"></i>Physical Coverage
                     </label>
-                    <input type="text" id="client-name"
+                    <input type="text" id="client-name-1"
                            style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
                                   font-size: 15px; transition: border-color 0.2s ease;">
                 </div>
@@ -525,7 +550,7 @@ function showLogQuoteModal(carrierName = null) {
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
                         <i class="fas fa-dollar-sign" style="color: #059669; margin-right: 8px;"></i>Cargo Cost: 100K
                     </label>
-                    <input type="text" id="premium-text"
+                    <input type="text" id="premium-text-1"
                            style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
                                   font-size: 15px; transition: border-color 0.2s ease;"
                            inputmode="numeric" pattern="[0-9]*">
@@ -534,50 +559,161 @@ function showLogQuoteModal(carrierName = null) {
                 <!-- Liability Per Unit -->
                 <div style="margin-bottom: 24px;">
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
-                        <i class="fas fa-shield-alt" style="color: #8b5cf6; margin-right: 8px;"></i>Liability Per Unit
+                        <i class="fas fa-shield-alt" style="color: #8b5cf6; margin-right: 8px;"></i>Liability
                     </label>
-                    <input type="text" id="liability-per-unit"
+                    <input type="text" id="liability-per-unit-1"
                            style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
                                   font-size: 15px; transition: border-color 0.2s ease;"
                            inputmode="numeric" pattern="[0-9]*">
                 </div>
 
-                <!-- Action Buttons -->
-                <div style="display: flex; gap: 12px; justify-content: center; margin-top: 30px;">
-                    <button type="submit"
-                            style="background: linear-gradient(135deg, #059669, #047857); color: white;
-                                   border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px;
-                                   font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-                        <i class="fas fa-save" style="margin-right: 8px;"></i>Save Quote
-                    </button>
-                    <button type="button" onclick="closeLogQuoteModal()"
-                            style="background: #6b7280; color: white; border: none; padding: 14px 28px;
-                                   border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
-                                   transition: all 0.2s ease;">
-                        <i class="fas fa-times" style="margin-right: 8px;"></i>Cancel
-                    </button>
+                    </form>
                 </div>
-            </form>
+
+                <!-- Second Quote Form -->
+                <div style="flex: 1;">
+                    <h3 style="margin: 0 0 20px 0; color: #374151; font-size: 18px; font-weight: 600; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+                        <i class="fas fa-file-alt" style="color: #059669; margin-right: 8px;"></i>Quote #2
+                    </h3>
+                    <form class="quote-form" data-quote-number="2">
+                        <!-- Carrier Selection -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-building" style="color: #059669; margin-right: 8px;"></i>Insurance Carrier
+                            </label>
+                            <select id="carrier-selection-2"
+                                    style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                           font-size: 15px; transition: border-color 0.2s ease; background: white;">
+                                <option value="">Select a carrier...</option>
+                                <option value="Progressive">Progressive</option>
+                                <option value="Geico">Geico</option>
+                                <option value="Northland">Northland</option>
+                                <option value="Canal">Canal</option>
+                                <option value="Occidental">Occidental</option>
+                                <option value="Crum & Forster">Crum & Forster</option>
+                                <option value="Nico">Nico</option>
+                                <option value="Berkley Prime">Berkley Prime</option>
+                            </select>
+                        </div>
+
+                        <!-- Physical Coverage -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-shield-alt" style="color: #3b82f6; margin-right: 8px;"></i>Physical Coverage
+                            </label>
+                            <input type="text" id="client-name-2"
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                          font-size: 15px; transition: border-color 0.2s ease;">
+                        </div>
+
+                        <!-- Cargo Cost -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-dollar-sign" style="color: #059669; margin-right: 8px;"></i>Cargo Cost: 100K
+                            </label>
+                            <input type="text" id="premium-text-2"
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                          font-size: 15px; transition: border-color 0.2s ease;"
+                                   inputmode="numeric" pattern="[0-9]*">
+                        </div>
+
+                        <!-- Liability Per Unit -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-shield-alt" style="color: #8b5cf6; margin-right: 8px;"></i>Liability
+                            </label>
+                            <input type="text" id="liability-per-unit-2"
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                          font-size: 15px; transition: border-color 0.2s ease;"
+                                   inputmode="numeric" pattern="[0-9]*">
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Third Quote Form -->
+                <div style="flex: 1;">
+                    <h3 style="margin: 0 0 20px 0; color: #374151; font-size: 18px; font-weight: 600; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+                        <i class="fas fa-file-alt" style="color: #059669; margin-right: 8px;"></i>Quote #3
+                    </h3>
+                    <form class="quote-form" data-quote-number="3">
+                        <!-- Carrier Selection -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-building" style="color: #059669; margin-right: 8px;"></i>Insurance Carrier
+                            </label>
+                            <select id="carrier-selection-3"
+                                    style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                           font-size: 15px; transition: border-color 0.2s ease; background: white;">
+                                <option value="">Select a carrier...</option>
+                                <option value="Progressive">Progressive</option>
+                                <option value="Geico">Geico</option>
+                                <option value="Northland">Northland</option>
+                                <option value="Canal">Canal</option>
+                                <option value="Occidental">Occidental</option>
+                                <option value="Crum & Forster">Crum & Forster</option>
+                                <option value="Nico">Nico</option>
+                                <option value="Berkley Prime">Berkley Prime</option>
+                            </select>
+                        </div>
+
+                        <!-- Physical Coverage -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-shield-alt" style="color: #3b82f6; margin-right: 8px;"></i>Physical Coverage
+                            </label>
+                            <input type="text" id="client-name-3"
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                          font-size: 15px; transition: border-color 0.2s ease;">
+                        </div>
+
+                        <!-- Cargo Cost -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-dollar-sign" style="color: #059669; margin-right: 8px;"></i>Cargo Cost: 100K
+                            </label>
+                            <input type="text" id="premium-text-3"
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                          font-size: 15px; transition: border-color 0.2s ease;"
+                                   inputmode="numeric" pattern="[0-9]*">
+                        </div>
+
+                        <!-- Liability Per Unit -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                                <i class="fas fa-shield-alt" style="color: #8b5cf6; margin-right: 8px;"></i>Liability
+                            </label>
+                            <input type="text" id="liability-per-unit-3"
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                          font-size: 15px; transition: border-color 0.2s ease;"
+                                   inputmode="numeric" pattern="[0-9]*">
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 12px; justify-content: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+                <button onclick="saveAllQuotes()"
+                        style="background: linear-gradient(135deg, #059669, #047857); color: white;
+                               border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px;
+                               font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                    <i class="fas fa-save" style="margin-right: 8px;"></i>Save All Quotes
+                </button>
+                <button type="button" onclick="closeLogQuoteModal()"
+                        style="background: #6b7280; color: white; border: none; padding: 14px 28px;
+                               border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
+                               transition: all 0.2s ease;">
+                    <i class="fas fa-times" style="margin-right: 8px;"></i>Cancel
+                </button>
+            </div>
         </div>
     `;
 
     modalOverlay.appendChild(modalContent);
     document.body.appendChild(modalOverlay);
 
-    // Handle form submission
-    const form = document.getElementById('log-quote-form');
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        // Remove any HTML5 validation attributes that might interfere
-        const inputs = form.querySelectorAll('input');
-        inputs.forEach(input => input.removeAttribute('required'));
-
-        saveQuote();
-    });
-
-    // Add numeric input validation
-    const numericInputs = ['premium-text', 'liability-per-unit'];
+    // Add numeric input validation for all three forms
+    const numericInputs = ['premium-text-1', 'liability-per-unit-1', 'premium-text-2', 'liability-per-unit-2', 'premium-text-3', 'liability-per-unit-3'];
     numericInputs.forEach(inputId => {
         const input = document.getElementById(inputId);
         if (input) {
@@ -595,8 +731,8 @@ function showLogQuoteModal(carrierName = null) {
         }
     });
 
-    // Focus on first input (carrier selection)
-    document.getElementById('carrier-selection').focus();
+    // Focus on first input (carrier selection for form 1)
+    document.getElementById('carrier-selection-1').focus();
 
     console.log(`✅ Log Quote modal created for: ${carrierName}`);
 }
@@ -639,7 +775,8 @@ async function saveQuote() {
                 carrier: carrierName,
                 physical_coverage: physicalCoverage || null,
                 premium_text: premiumText || null,
-                liability_per_unit: liabilityPerUnit || null
+                liability_per_unit: liabilityPerUnit || null,
+                source: 'MANUAL ENTRY'
             })
         });
 
@@ -691,6 +828,179 @@ async function saveQuote() {
         console.error('Error saving quote:', error);
         alert('Error saving quote to server. Please try again.');
     }
+}
+
+// Save all quotes function
+async function saveAllQuotes() {
+    const quote1 = {
+        carrier: document.getElementById('carrier-selection-1').value.trim(),
+        physicalCoverage: document.getElementById('client-name-1').value.trim(),
+        premiumText: document.getElementById('premium-text-1').value.trim(),
+        liabilityPerUnit: document.getElementById('liability-per-unit-1').value.trim()
+    };
+
+    const quote2 = {
+        carrier: document.getElementById('carrier-selection-2').value.trim(),
+        physicalCoverage: document.getElementById('client-name-2').value.trim(),
+        premiumText: document.getElementById('premium-text-2').value.trim(),
+        liabilityPerUnit: document.getElementById('liability-per-unit-2').value.trim()
+    };
+
+    const quote3 = {
+        carrier: document.getElementById('carrier-selection-3').value.trim(),
+        physicalCoverage: document.getElementById('client-name-3').value.trim(),
+        premiumText: document.getElementById('premium-text-3').value.trim(),
+        liabilityPerUnit: document.getElementById('liability-per-unit-3').value.trim()
+    };
+
+    // Count how many quotes have carriers selected
+    const quotesWithCarriers = [quote1, quote2, quote3].filter(quote => quote.carrier).length;
+
+    // Validate that at least 2 quotes have carriers selected
+    if (quotesWithCarriers < 2) {
+        alert('Please select at least 2 insurance carriers to compare quotes');
+        return;
+    }
+
+    let savedQuotes = 0;
+    const errors = [];
+
+    // Save quote 1 if it has data
+    if (quote1.carrier && (quote1.physicalCoverage || quote1.premiumText || quote1.liabilityPerUnit)) {
+        try {
+            const response = await fetch('/api/market-quotes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    carrier: quote1.carrier,
+                    physical_coverage: quote1.physicalCoverage || null,
+                    premium_text: quote1.premiumText || null,
+                    liability_per_unit: quote1.liabilityPerUnit || null,
+                    source: 'MANUAL ENTRY'
+                })
+            });
+
+            if (response.ok) {
+                savedQuotes++;
+                console.log('💾 Quote 1 saved successfully');
+            } else {
+                errors.push(`Quote 1 (${quote1.carrier}): Server error ${response.status}`);
+            }
+        } catch (error) {
+            errors.push(`Quote 1 (${quote1.carrier}): ${error.message}`);
+        }
+    }
+
+    // Save quote 2 if it has data
+    if (quote2.carrier && (quote2.physicalCoverage || quote2.premiumText || quote2.liabilityPerUnit)) {
+        try {
+            const response = await fetch('/api/market-quotes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    carrier: quote2.carrier,
+                    physical_coverage: quote2.physicalCoverage || null,
+                    premium_text: quote2.premiumText || null,
+                    liability_per_unit: quote2.liabilityPerUnit || null,
+                    source: 'MANUAL ENTRY'
+                })
+            });
+
+            if (response.ok) {
+                savedQuotes++;
+                console.log('💾 Quote 2 saved successfully');
+            } else {
+                errors.push(`Quote 2 (${quote2.carrier}): Server error ${response.status}`);
+            }
+        } catch (error) {
+            errors.push(`Quote 2 (${quote2.carrier}): ${error.message}`);
+        }
+    }
+
+    // Save quote 3 if it has data
+    if (quote3.carrier && (quote3.physicalCoverage || quote3.premiumText || quote3.liabilityPerUnit)) {
+        try {
+            const response = await fetch('/api/market-quotes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    carrier: quote3.carrier,
+                    physical_coverage: quote3.physicalCoverage || null,
+                    premium_text: quote3.premiumText || null,
+                    liability_per_unit: quote3.liabilityPerUnit || null,
+                    source: 'MANUAL ENTRY'
+                })
+            });
+
+            if (response.ok) {
+                savedQuotes++;
+                console.log('💾 Quote 3 saved successfully');
+            } else {
+                errors.push(`Quote 3 (${quote3.carrier}): Server error ${response.status}`);
+            }
+        } catch (error) {
+            errors.push(`Quote 3 (${quote3.carrier}): ${error.message}`);
+        }
+    }
+
+    // Show results
+    if (savedQuotes < 2) {
+        alert('At least 2 quotes must be saved. Please fill in at least 2 complete quotes with a carrier and one other field.');
+        return;
+    }
+
+    // Close modal
+    closeLogQuoteModal();
+
+    // Refresh market data
+    setTimeout(() => {
+        if (typeof refreshMarketData === 'function') {
+            refreshMarketData();
+        }
+    }, 100);
+
+    // Show success/error message
+    let message = `✅ Successfully saved ${savedQuotes} quote${savedQuotes > 1 ? 's' : ''}`;
+    if (errors.length > 0) {
+        message += `\n\n⚠️ Errors:\n${errors.join('\n')}`;
+    }
+
+    // Create notification
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10001;
+        max-width: 300px;
+        font-weight: 500;
+    `;
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center;">
+            <i class="fas fa-check-circle" style="margin-right: 8px; color: #6ee7b7;"></i>
+            <span>Quotes saved successfully!</span>
+        </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Remove notification after 4 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 4000);
+
+    console.log(`✅ Saved ${savedQuotes} quotes successfully`);
 }
 
 // Add modal animation styles
@@ -754,19 +1064,19 @@ function showMetricSelector() {
         <div class="metric-option ${currentMetric === 'liability' ? 'selected' : ''}"
              onclick="selectMetric('liability')" data-metric="liability">
             <i class="fas fa-shield-alt" style="width: 16px; color: #8b5cf6;"></i>
-            <span>Avg Liability Per Unit</span>
+            <span>Liability % Difference</span>
             ${currentMetric === 'liability' ? '<i class="fas fa-check" style="color: #059669; margin-left: auto;"></i>' : ''}
         </div>
         <div class="metric-option ${currentMetric === 'physical' ? 'selected' : ''}"
              onclick="selectMetric('physical')" data-metric="physical">
             <i class="fas fa-shield-alt" style="width: 16px; color: #3b82f6;"></i>
-            <span>Avg Physical Per Unit</span>
+            <span>Physical % Difference</span>
             ${currentMetric === 'physical' ? '<i class="fas fa-check" style="color: #059669; margin-left: auto;"></i>' : ''}
         </div>
         <div class="metric-option ${currentMetric === 'cargo' ? 'selected' : ''}"
              onclick="selectMetric('cargo')" data-metric="cargo">
             <i class="fas fa-dollar-sign" style="width: 16px; color: #059669;"></i>
-            <span>Avg Cargo</span>
+            <span>Cargo % Difference</span>
             ${currentMetric === 'cargo' ? '<i class="fas fa-check" style="color: #059669; margin-left: auto;"></i>' : ''}
         </div>
     `;
@@ -830,17 +1140,17 @@ function selectMetric(metric) {
 
     // Update header text
     const priceHeader = document.querySelector('.price-col');
-    let headerText = 'Avg Rate Per Unit';
+    let headerText = 'Market % Difference';
 
     switch(metric) {
         case 'physical':
-            headerText = 'Avg Physical Per Unit';
+            headerText = 'Physical % Difference';
             break;
         case 'cargo':
-            headerText = 'Avg Cargo';
+            headerText = 'Cargo % Difference';
             break;
         case 'liability':
-            headerText = 'Avg Liability Per Unit';
+            headerText = 'Liability % Difference';
             break;
     }
 
@@ -864,10 +1174,174 @@ window.showCarrierDetails = showCarrierDetails;
 window.closeCarrierDetailsModal = closeCarrierDetailsModal;
 window.showLogQuoteModal = showLogQuoteModal;
 window.closeLogQuoteModal = closeLogQuoteModal;
+window.saveAllQuotes = saveAllQuotes;
 window.showMetricSelector = showMetricSelector;
 window.closeMetricSelector = closeMetricSelector;
 window.selectMetric = selectMetric;
 window.deleteQuote = deleteQuote;
 window.clearAllCarrierData = clearAllCarrierData;
+window.autoImportLeadQuotes = autoImportLeadQuotes;
+window.checkAutoImportEligibility = checkAutoImportEligibility;
+
+// Auto-import quotes from lead profile to market tab
+async function autoImportLeadQuotes(leadId, leadName) {
+    console.log(`🔄 Auto-importing quotes from lead ${leadId} (${leadName}) to market tab`);
+
+    try {
+        const response = await fetch('/api/market-quotes/auto-import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                leadId: leadId
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success && result.imported > 0) {
+            // Show success notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+                z-index: 10001;
+                animation: slideInRight 0.3s ease-out;
+                font-weight: 600;
+                max-width: 300px;
+            `;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-check-circle" style="margin-right: 8px; color: #6ee7b7;"></i>
+                    <span>Auto-imported ${result.imported} quotes from ${result.leadName}!</span>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Remove notification after 4 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+
+            // Refresh market data
+            setTimeout(() => {
+                if (typeof refreshMarketData === 'function') {
+                    refreshMarketData();
+                }
+            }, 100);
+
+            console.log(`✅ Auto-imported ${result.imported} quotes from ${leadName}`);
+        } else {
+            console.log(`ℹ️ Auto-import not eligible: ${result.message}`);
+
+            // Show error notification for eligibility issues
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #f59e0b;
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+                z-index: 10001;
+                animation: slideInRight 0.3s ease-out;
+                font-weight: 600;
+                max-width: 400px;
+            `;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-info-circle" style="margin-right: 8px; color: #fbbf24;"></i>
+                    <span>${result.message}</span>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Remove notification after 5 seconds (longer for error messages)
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        return result;
+
+    } catch (error) {
+        console.error('Error auto-importing quotes:', error);
+        return {
+            success: false,
+            message: `Error: ${error.message}`,
+            imported: 0
+        };
+    }
+}
+
+// Check if lead is eligible for auto-import
+async function checkAutoImportEligibility(leadId) {
+    console.log(`🔍 Checking auto-import eligibility for lead ${leadId}`);
+
+    try {
+        const response = await fetch(`/api/quotes/${leadId}`);
+        if (!response.ok) {
+            return { eligible: false, reason: 'Could not fetch lead quotes' };
+        }
+
+        const result = await response.json();
+        const quotes = result.quotes || [];
+
+        if (quotes.length < 2) {
+            return { eligible: false, reason: 'Need at least 2 quotes' };
+        }
+
+        // Check if at least one quote matches carriers that ALREADY EXIST in market database
+        let existingCarriers = [];
+        try {
+            const marketResponse = await fetch('/api/market-quotes');
+            if (marketResponse.ok) {
+                const marketQuotes = await marketResponse.json();
+                existingCarriers = [...new Set(marketQuotes.map(q => q.carrier))];
+            }
+        } catch (error) {
+            console.error('Error fetching existing market carriers:', error);
+            return { eligible: false, reason: 'Error checking existing market carriers' };
+        }
+
+        if (existingCarriers.length === 0) {
+            return { eligible: false, reason: 'No carriers exist in market yet - cannot calculate percentage differences' };
+        }
+
+        const matchingQuotes = quotes.filter(quote =>
+            existingCarriers.includes(quote.insuranceCarrier)
+        );
+
+        if (matchingQuotes.length === 0) {
+            return { eligible: false, reason: `No quotes match existing market carriers. Available: ${existingCarriers.join(', ')}` };
+        }
+
+        return {
+            eligible: true,
+            totalQuotes: quotes.length,
+            matchingQuotes: matchingQuotes.length,
+            carriers: matchingQuotes.map(q => q.insuranceCarrier)
+        };
+
+    } catch (error) {
+        console.error('Error checking eligibility:', error);
+        return { eligible: false, reason: 'Error checking eligibility' };
+    }
+}
 
 console.log('✅ Market functions loaded successfully');

@@ -15,9 +15,11 @@
         // Get current user and check if they are admin for template rendering
         const sessionData = sessionStorage.getItem('vanguard_user');
         let isAdmin = false;
+        let currentUser = null;
         if (sessionData) {
             try {
                 const user = JSON.parse(sessionData);
+                currentUser = user.username;
                 isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase());
             } catch (error) {
                 console.error('Error parsing session data:', error);
@@ -62,10 +64,11 @@
                             <option>Life & Health</option>
                         </select>
                         ${isAdmin ? `<select class="filter-select" id="clientAgentFilter" onchange="filterClients()">
-                            <option value="">All Agents</option>
+                            <option value="">${currentUser && currentUser.toLowerCase() === 'maureen' ? 'All My Clients' : 'All Agents'}</option>
+                            ${currentUser && currentUser.toLowerCase() === 'maureen' ? '<option value="Maureen">Maureen</option>' : `
                             <option value="Grant">Grant</option>
                             <option value="Carson">Carson</option>
-                            <option value="Hunter">Hunter</option>
+                            <option value="Hunter">Hunter</option>`}
                         </select>` : ''}
                         <button class="btn-filter">
                             <i class="fas fa-filter"></i> More Filters

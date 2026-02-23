@@ -52,13 +52,12 @@
             }
         }
 
-        // Handle HTTPS protocol issues - keep HTTP for API calls to avoid SSL errors
+        // Handle HTTPS protocol issues - convert HTTP API calls to HTTPS
         if (typeof fixedUrl === 'string' && fixedUrl.startsWith('http://') && window.location.protocol === 'https:') {
-            // For API calls, keep HTTP but try nginx proxy (no port) first, then fallback to HTTP with port
             if (fixedUrl.includes('/api/')) {
-                console.log(`🔒 HTTPS site detected, trying nginx proxy first: ${fixedUrl}`);
-                // Don't convert to HTTPS for API calls - this causes SSL protocol errors
-                // Instead, try without port first (nginx proxy), keep original as fallback
+                console.log(`🔒 HTTPS site detected, converting API call to HTTPS: ${fixedUrl}`);
+                // Convert HTTP API calls to HTTPS and remove port (nginx handles SSL termination)
+                fixedUrl = fixedUrl.replace('http://', 'https://').replace(':3001', '');
             } else {
                 console.log(`🔒 Converting HTTP to HTTPS and removing port: ${fixedUrl}`);
                 fixedUrl = fixedUrl.replace('http://', 'https://').replace(':3001', '');
@@ -85,11 +84,12 @@
                 fixedUrl = fixedUrl.replace(':8880', ':3001');
             }
 
-            // Handle HTTPS protocol issues - keep HTTP for API calls to avoid SSL errors
+            // Handle HTTPS protocol issues - convert HTTP API calls to HTTPS
             if (fixedUrl.startsWith('http://') && window.location.protocol === 'https:') {
                 if (fixedUrl.includes('/api/')) {
-                    console.log(`🔒 XHR: HTTPS site detected, keeping HTTP for API call: ${fixedUrl}`);
-                    // Keep HTTP for API calls to avoid SSL protocol errors
+                    console.log(`🔒 XHR: HTTPS site detected, converting API call to HTTPS: ${fixedUrl}`);
+                    // Convert HTTP API calls to HTTPS and remove port (nginx handles SSL termination)
+                    fixedUrl = fixedUrl.replace('http://', 'https://').replace(':3001', '');
                 } else {
                     console.log(`🔒 XHR: Converting HTTP to HTTPS and removing port: ${fixedUrl}`);
                     fixedUrl = fixedUrl.replace('http://', 'https://').replace(':3001', '');

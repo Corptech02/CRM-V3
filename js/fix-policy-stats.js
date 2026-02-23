@@ -29,8 +29,21 @@
             }
         }
 
-        // Filter policies based on user role
-        if (!isAdmin && currentUser) {
+        // Filter policies based on user role - SPECIAL CASE: Maureen gets filtered even though she's admin
+        if (currentUser && currentUser.toLowerCase() === 'maureen') {
+            // MAUREEN SPECIAL CASE: Filter to only her policies despite admin status
+            const originalCount = policies.length;
+            policies = policies.filter(policy => {
+                const assignedTo = policy.assignedTo ||
+                                  policy.agent ||
+                                  policy.assignedAgent ||
+                                  policy.producer ||
+                                  'Grant'; // Default to Grant if no assignment
+                return assignedTo.toLowerCase() === 'maureen';
+            });
+            console.log(`📊 Maureen special filter: ${originalCount} -> ${policies.length} (showing only Maureen's policies)`);
+        } else if (!isAdmin && currentUser) {
+            // Regular non-admin filtering
             const originalCount = policies.length;
             policies = policies.filter(policy => {
                 const assignedTo = policy.assignedTo ||
@@ -41,8 +54,8 @@
                 return assignedTo.toLowerCase() === currentUser.toLowerCase();
             });
             console.log(`📊 Filtered policy stats: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
-        } else if (isAdmin) {
-            console.log(`📊 Admin user - calculating stats for all ${policies.length} policies`);
+        } else if (isAdmin && currentUser && currentUser.toLowerCase() !== 'maureen') {
+            console.log(`📊 Admin user (${currentUser}) - calculating stats for all ${policies.length} policies`);
         }
 
         const totalPolicies = policies.length;

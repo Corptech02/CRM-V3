@@ -120,6 +120,7 @@ class MarketDataCalculator {
                 quotes: [],
                 totalQuotes: 0,
                 averageRate: null,
+                percentageRate: null,
                 hasData: false,
                 rank: null
             };
@@ -152,15 +153,28 @@ class MarketDataCalculator {
             }
         });
 
-        // Calculate rankings
+        // Calculate percentage-based ratings
         const carriersWithData = Object.values(stats).filter(c => c.hasData);
-        carriersWithData.sort((a, b) => a.averageRate - b.averageRate);
 
-        carriersWithData.forEach((carrier, index) => {
-            carrier.rank = index + 1;
-        });
+        if (carriersWithData.length > 0) {
+            // Find the highest rate (this gets 100%)
+            const maxRate = Math.max(...carriersWithData.map(c => c.averageRate));
 
-        console.log('📈 Carrier stats calculated:', stats);
+            // Calculate percentage for each carrier relative to the max
+            carriersWithData.forEach(carrier => {
+                carrier.percentageRate = Math.round((carrier.averageRate / maxRate) * 100);
+            });
+
+            // Sort by percentage (lowest percentage = best/most competitive)
+            carriersWithData.sort((a, b) => a.percentageRate - b.percentageRate);
+
+            // Assign ranks (1 = most competitive, i.e., lowest percentage)
+            carriersWithData.forEach((carrier, index) => {
+                carrier.rank = index + 1;
+            });
+        }
+
+        console.log('📈 Carrier stats calculated with percentages:', stats);
         return stats;
     }
 
@@ -181,7 +195,7 @@ class MarketDataCalculator {
         const carriers = Object.values(this.carrierStats);
 
         // Separate carriers with data and without data
-        const withData = carriers.filter(c => c.hasData).sort((a, b) => a.averageRate - b.averageRate);
+        const withData = carriers.filter(c => c.hasData).sort((a, b) => a.percentageRate - b.percentageRate);
         const withoutData = carriers.filter(c => !c.hasData).sort((a, b) => a.name.localeCompare(b.name));
 
         return [...withData, ...withoutData];
@@ -198,6 +212,12 @@ class MarketDataCalculator {
         }).format(amount);
     }
 
+    // Format percentage for display
+    formatPercentage(percentage) {
+        if (percentage === null || percentage === undefined) return null;
+        return `${percentage}%`;
+    }
+
     // Get quote volume text
     getQuoteVolumeText(totalQuotes) {
         if (totalQuotes === 0) return 'No quotes';
@@ -205,19 +225,13 @@ class MarketDataCalculator {
         return `${totalQuotes} quotes`;
     }
 
-    // Calculate bar width percentage
-    getBarWidth(carrierRate) {
-        if (!carrierRate) return 0;
+    // Calculate bar width percentage (should match the actual percentage value)
+    getBarWidth(carrierPercentage) {
+        if (!carrierPercentage) return 0;
 
-        const withDataCarriers = Object.values(this.carrierStats).filter(c => c.hasData);
-        if (withDataCarriers.length === 0) return 0;
-
-        const maxRate = Math.max(...withDataCarriers.map(c => c.averageRate));
-        const minRate = Math.min(...withDataCarriers.map(c => c.averageRate));
-
-        if (maxRate === minRate) return 50; // Single carrier case
-
-        return Math.round(((carrierRate - minRate) / (maxRate - minRate)) * 100);
+        // Bar width should directly represent the percentage
+        // 85% should show as 85% bar width, 100% as 100% bar width
+        return carrierPercentage;
     }
 
     // Get price bar class based on ranking
@@ -287,12 +301,12 @@ function rebuildMarketTable() {
 
     rankedCarriers.forEach((carrier, index) => {
         const displayRank = carrier.hasData ? carrier.rank : '—';
-        const averageRate = carrier.hasData
-            ? window.marketDataCalculator.formatCurrency(carrier.averageRate)
-            : '$0';
+        const displayRate = carrier.hasData
+            ? window.marketDataCalculator.formatPercentage(carrier.percentageRate)
+            : '0%';
 
         const quoteVolume = window.marketDataCalculator.getQuoteVolumeText(carrier.totalQuotes);
-        const barWidth = window.marketDataCalculator.getBarWidth(carrier.averageRate);
+        const barWidth = window.marketDataCalculator.getBarWidth(carrier.percentageRate);
         const priceBarClass = window.marketDataCalculator.getPriceBarClass(carrier.rank, totalRanked);
         const rowClass = window.marketDataCalculator.getRowClass(carrier.rank, totalRanked);
 
@@ -303,12 +317,12 @@ function rebuildMarketTable() {
                 <td class="price">
                     ${carrier.hasData ? `
                         <div class="price-bar ${priceBarClass}">
-                            <span class="price-value">${averageRate}</span>
+                            <span class="price-value">${displayRate}</span>
                             <div class="price-visual" style="width: ${barWidth}%;"></div>
                         </div>
                     ` : `
                         <div class="no-data-message">
-                            <span class="no-data-text">${averageRate}</span>
+                            <span class="no-data-text">${displayRate}</span>
                         </div>
                     `}
                 </td>
@@ -405,18 +419,18 @@ function initializeMetricHeader() {
     const priceHeader = document.querySelector('.price-col');
 
     if (priceHeader) {
-        let headerText = 'Avg Liability Per Unit'; // Default
+        let headerText = 'Market % Difference'; // Default - now shows percentage difference
 
         switch(savedMetric) {
             case 'physical':
-                headerText = 'Avg Physical Per Unit';
+                headerText = 'Physical % Difference';
                 break;
             case 'cargo':
-                headerText = 'Avg Cargo';
+                headerText = 'Cargo % Difference';
                 break;
             case 'liability':
             default:
-                headerText = 'Avg Liability Per Unit';
+                headerText = 'Liability % Difference';
                 break;
         }
 

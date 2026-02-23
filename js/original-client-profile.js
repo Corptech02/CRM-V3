@@ -231,6 +231,11 @@ window.viewClientOriginal = async function(id) {
                         </div>
 
                         <div>
+                            <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase;">Date of Birth</label>
+                            <p style="margin: 0; font-size: 16px; color: #1f2937;">${client.dateOfBirth || 'N/A'}</p>
+                        </div>
+
+                        <div>
                             <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase;">Address</label>
                             <p style="margin: 0; font-size: 16px; color: #1f2937;">${client.address || 'N/A'}</p>
                         </div>

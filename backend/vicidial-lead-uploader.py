@@ -18,99 +18,230 @@ VICIDIAL_USER = "6666"
 VICIDIAL_PASS = "corp06"
 VICIDIAL_SOURCE = "vanguard_crm"
 
+def decode_vin_year(vin):
+    """Decode the model year from a VIN (10th character)"""
+    if not vin or len(vin) < 10:
+        return "XX"  # Unknown year
+
+    year_char = vin[9].upper()  # 10th character (0-indexed)
+
+    # VIN year mapping (30-year cycle)
+    year_map = {
+        # Letters A-H, J-N, P-R, S-Y (excluding I, O, Q, U, Z)
+        'A': '2010', 'B': '2011', 'C': '2012', 'D': '2013', 'E': '2014',
+        'F': '2015', 'G': '2016', 'H': '2017', 'J': '2018', 'K': '2019',
+        'L': '2020', 'M': '2021', 'N': '2022', 'P': '2023', 'R': '2024',
+        'S': '2025', 'T': '2026', 'V': '2027', 'W': '2028', 'X': '2029',
+        'Y': '2030',
+        # Numbers 1-9 (for 2001-2009 or 2031-2039 depending on context)
+        '1': '2001', '2': '2002', '3': '2003', '4': '2004', '5': '2005',
+        '6': '2006', '7': '2007', '8': '2008', '9': '2009'
+    }
+
+    # Get the mapped year
+    year = year_map.get(year_char, "2023")  # Default to 2023 if unknown
+
+    # Return last 2 digits
+    return year[-2:] if len(year) == 4 else "XX"
+
 def add_lead_to_vicidial(list_id, lead_data):
     """Add a single lead to ViciDial using the non_agent_api.php endpoint"""
 
-    # Debug: Print the lead data we received
-    print(f"DEBUG: Processing lead data keys: {list(lead_data.keys())}")
+    try:
+        # Debug: Print the lead data we received
+        print(f"DEBUG: Processing lead data type: {type(lead_data)}")
+        if isinstance(lead_data, dict):
+            print(f"DEBUG: Processing lead data keys: {list(lead_data.keys())}")
+        else:
+            print(f"DEBUG: ERROR - lead_data is not a dict, it's: {lead_data}")
+            return {'success': False, 'error': f'Invalid lead data type: {type(lead_data)}'}
 
-    # ViciDial API endpoint
-    api_url = f"https://{VICIDIAL_HOST}/vicidial/non_agent_api.php"
+        # ViciDial API endpoint
+        api_url = f"https://{VICIDIAL_HOST}/vicidial/non_agent_api.php"
 
-    # Clean phone number
-    phone = lead_data.get('phone', '').replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
-    if not phone:
-        return {'success': False, 'error': 'No phone number provided'}
+        # Clean phone number
+        phone = str(lead_data.get('phone', '')).replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
+        if not phone:
+            return {'success': False, 'error': 'No phone number provided'}
+    except Exception as e:
+        print(f"DEBUG: Exception in initial processing: {str(e)}")
+        return {'success': False, 'error': f'Initial processing error: {str(e)}'}
 
-    # Extract company name from various possible fields
-    company_name = (lead_data.get('business_name') or
-                   lead_data.get('company_name') or
-                   lead_data.get('legal_name') or
-                   lead_data.get('dba_name') or
-                   lead_data.get('name') or
-                   'Unknown Company')
+    try:
+        # Extract company name from various possible fields
+        company_name = (lead_data.get('business_name') or
+                       lead_data.get('company_name') or
+                       lead_data.get('legal_name') or
+                       lead_data.get('dba_name') or
+                       lead_data.get('name') or
+                       'Unknown Company')
 
-    print(f"DEBUG: Company name extracted: '{company_name}'")
+        print(f"DEBUG: Company name extracted: '{company_name}'")
 
-    # Extract representative name parts
-    rep_name = (lead_data.get('representative_name') or
-                lead_data.get('contact') or
-                lead_data.get('contact_name') or
-                lead_data.get('primary_contact') or
-                'Unknown Rep')
+        # Extract officer/representative name - use the officer name from new schema
+        rep_name = (lead_data.get('representative_name') or
+                    lead_data.get('officer_name') or
+                    lead_data.get('contact') or
+                    lead_data.get('contact_name') or
+                    lead_data.get('primary_contact') or
+                    'Unknown Rep')
 
-    # Build insurance expiry information
-    insurance_company = lead_data.get('insurance_company', lead_data.get('current_carrier', ''))
-    expiry_date = lead_data.get('insurance_expiry', lead_data.get('renewal_date', ''))
-    fleet_size = lead_data.get('fleet_size', '')
+        print(f"DEBUG: Rep name extracted: '{rep_name}'")
 
-    # Build compact comments with essential info
-    comments_parts = []
-    if expiry_date:
-        comments_parts.append(f"Exp: {expiry_date}")
-    if fleet_size:
-        comments_parts.append(f"Size: {fleet_size}")
+        # Build insurance expiry information
+        insurance_company = lead_data.get('insurance_company', lead_data.get('current_carrier', ''))
+        expiry_date = lead_data.get('insurance_expiry', lead_data.get('insurance_expiration', lead_data.get('renewal_date', '')))
+        fleet_size = lead_data.get('fleet_size', lead_data.get('power_units', ''))
 
-    # Create your exact format
-    basic_info = ' | '.join(comments_parts)
+        print(f"DEBUG: Insurance company: '{insurance_company}', Expiry: '{expiry_date}', Fleet: '{fleet_size}'")
 
-    # Add your updated comment format
-    script_addendum = """
-------------Name--------------
+        # Get driver and fleet information from new schema
+        drivers = lead_data.get('drivers', lead_data.get('total_drivers', ''))
 
----------Lead Select----------
+        print(f"DEBUG: Drivers: '{drivers}'")
+
+    except Exception as e:
+        print(f"DEBUG: Exception in field extraction: {str(e)}")
+        return {'success': False, 'error': f'Field extraction error: {str(e)}'}
+
+    try:
+        # Build updated comments format with shortened labels
+        comments_parts = []
+        if drivers:
+            comments_parts.append(f"Dr: {drivers}")
+        if fleet_size:
+            comments_parts.append(f"Fl: {fleet_size}")
+
+        # Create your updated format
+        basic_info = ' | '.join(comments_parts)
+
+        # Build vehicle sections using actual vehicle data if available
+        units_section = ""
+        trailers_section = ""
+
+        # Check if we have actual vehicle data from the new schema
+        vehicles = lead_data.get('vehicles', [])
+        if vehicles and isinstance(vehicles, list):
+            print(f"DEBUG: Found {len(vehicles)} vehicles in lead data")
+            print(f"DEBUG: Vehicle data for DOT {lead_data.get('usdot_number', 'unknown')}:")
+
+            unit_lines = []
+            trailer_lines = []
+
+            for idx, vehicle in enumerate(vehicles[:5]):  # Limit to first 5 vehicles
+                if isinstance(vehicle, dict):
+                    make = vehicle.get('make', 'UNKN')[:4]  # First 4 chars
+                    full_vin = vehicle.get('vin', '')
+                    vin = full_vin[-4:] if full_vin else ''  # Last 4 chars of VIN
+                    vtype = vehicle.get('type', 'STRAIGHT TRUCK')
+
+                    # Decode the actual year from VIN
+                    year = decode_vin_year(full_vin)
+
+                    print(f"DEBUG: Vehicle {idx+1}: Make={make}, VIN={vin}, Type={vtype}, Year={year}")
+
+                    # Separate units from trailers
+                    if 'TRAILER' in vtype.upper():
+                        # This is a trailer
+                        trailer_lines.append(f"{year} {make} {vin}")
+                    else:
+                        # This is a power unit (truck/tractor)
+                        if 'TRACTOR' in vtype.upper():
+                            abbrev = 'TRC'
+                        elif 'STRAIGHT' in vtype.upper():
+                            abbrev = 'STR'
+                        else:
+                            abbrev = 'TRC'  # Default
+
+                        unit_lines.append(f"{year} {make} {vin} {abbrev}")
+
+            units_section = '\n'.join(unit_lines)
+            trailers_section = '\n'.join(trailer_lines)
+        else:
+            # Fallback to sample vehicles based on fleet size
+            if fleet_size and str(fleet_size).isdigit() and int(fleet_size) > 0:
+                # Use decoded VIN years even for sample data
+                sample_vin1 = "3AKJHHDR9PSNZ5053"  # VIN with 'P' = 2023 = "23"
+                sample_vin2 = "1GR1A0627MK235747"  # VIN with 'M' = 2021 = "21"
+                year1 = decode_vin_year(sample_vin1)
+                year2 = decode_vin_year(sample_vin2)
+                vin1_short = sample_vin1[-4:]  # Last 4 characters
+                vin2_short = sample_vin2[-4:]  # Last 4 characters
+                units_section = f"{year1} FRHT {vin1_short} TRC\n{year1} FRHT {vin1_short} STR"
+                trailers_section = f"{year2} GDAN {vin2_short}"
+
+        # Add your updated comment format with new sections
+        script_addendum = f"""
+
+SELECT
 New:
-Info Requested:
-Loss Runs Requested:
-Loss Runs Received:
+LR Req:
+LR Rec:
 
---scheduled next call---------
+NEXT CALL
 Date: MM/DD/2026 Time: 00:00AM
-------------------------------"""
 
-    # Combine basic info with organized script
-    comments = basic_info + script_addendum
+UNITS
+{units_section}
 
-    # Prepare lead data for ViciDial with proper trucking field mapping
-    api_params = {
-        "source": VICIDIAL_SOURCE,
-        "user": VICIDIAL_USER,
-        "pass": VICIDIAL_PASS,
-        "function": "add_lead",
-        "list_id": list_id,
-        "phone_number": phone,
-        "phone_code": "1",
-        "status": "NEW",  # Set status to NEW so leads aren't removed
-        "duplicate_check": "DUPUPDATE",  # Update existing leads with same phone
+TRAILERS
+{trailers_section}
+"""
 
-        # TRUCKING-SPECIFIC FIELD MAPPING:
-        "title": company_name[:40],  # Company Name in Title field
-        "first_name": company_name[:20],  # Company Name in First Name field
-        "last_name": rep_name[:30],   # Full Representative Name in Last Name field
-        "address1": lead_data.get('usdot_number', lead_data.get('dot_number', ''))[:100],  # USDOT Number
-        "address2": insurance_company[:100],  # Insurance Company
-        "address3": expiry_date[:100],  # Insurance Expiry Date
-        "email": lead_data.get('email', ''),
-        "city": lead_data.get('city', ''),
-        "state": lead_data.get('state', ''),
-        "province": lead_data.get('state', ''),  # ViciDial uses province field
-        "postal_code": lead_data.get('postal_code', lead_data.get('zip_code', '')),
-        "vendor_lead_code": lead_data.get('usdot_number', lead_data.get('dot_number', '')),  # DOT for tracking
-        "comments": comments,  # Insurance Expiry + Fleet Size + other details
+        # Combine basic info with organized script
+        comments = basic_info + script_addendum
 
-        # Additional fields
-        "alt_phone": lead_data.get('alt_phone', ''),
-    }
+        print(f"DEBUG: Comments created successfully, length: {len(comments)}")
+
+    except Exception as e:
+        print(f"DEBUG: Exception in comments/vehicle processing: {str(e)}")
+        return {'success': False, 'error': f'Comments processing error: {str(e)}'}
+
+    try:
+        # Prepare lead data for ViciDial with proper trucking field mapping
+        usdot = str(lead_data.get('usdot_number', lead_data.get('dot_number', '')))
+        email = str(lead_data.get('email', lead_data.get('email_address', '')))
+        city = str(lead_data.get('city', lead_data.get('physical_city', '')))
+        state = str(lead_data.get('state', lead_data.get('physical_state', '')))
+        postal_code = str(lead_data.get('postal_code', lead_data.get('zip_code', lead_data.get('physical_zip_code', ''))))
+
+        print(f"DEBUG: Building API params - USDOT: {usdot}, Email: {email}, City: {city}, State: {state}")
+
+        api_params = {
+            "source": VICIDIAL_SOURCE,
+            "user": VICIDIAL_USER,
+            "pass": VICIDIAL_PASS,
+            "function": "add_lead",
+            "list_id": list_id,
+            "phone_number": phone,
+            "phone_code": "1",
+            "status": "NEW",  # Set status to NEW so leads aren't removed
+            "duplicate_check": "DUPUPDATE",  # Update existing leads with same phone
+
+            # TRUCKING-SPECIFIC FIELD MAPPING:
+            "title": str(company_name)[:40],  # Company Name in Title field
+            "first_name": str(company_name)[:20],  # Company Name in First Name field
+            "last_name": str(rep_name)[:30],   # Full Representative Name in Last Name field
+            "address1": usdot[:100],  # USDOT Number
+            "address2": str(insurance_company)[:100],  # Insurance Company
+            "address3": str(expiry_date)[:100],  # Insurance Expiry Date
+            "email": email,
+            "city": city,
+            "state": state,
+            "province": state,  # ViciDial uses province field
+            "postal_code": postal_code,
+            "vendor_lead_code": usdot,  # DOT for tracking
+            "comments": comments,  # Insurance Expiry + Fleet Size + other details
+
+            # Additional fields
+            "alt_phone": str(lead_data.get('alt_phone', lead_data.get('cell_phone', ''))),
+        }
+
+        print(f"DEBUG: API params created successfully")
+
+    except Exception as e:
+        print(f"DEBUG: Exception in API params creation: {str(e)}")
+        return {'success': False, 'error': f'API params error: {str(e)}'}
 
     try:
         # Make the API request

@@ -4575,8 +4575,34 @@ function showNextCallbackPopup(leadId) {
 function completeAllCallbacksForLead(leadId) {
     console.log('✅ COMPLETING ALL CALLBACKS for lead', leadId);
 
-    if (typeof window.completeCallback === 'function') {
-        window.completeCallback(leadId, true);
+    // CRITICAL FIX: Complete callbacks silently without showing popup
+    // Get all callbacks for this lead and complete them individually
+    const callbacksKey = 'scheduled_callbacks';
+    let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (callbacks[leadId] && callbacks[leadId].length > 0) {
+        console.log('✅ COMPLETING', callbacks[leadId].length, 'callbacks for lead', leadId);
+
+        // Complete each callback individually (SILENT MODE - no popups)
+        callbacks[leadId].forEach(callback => {
+            console.log('✅ Completing callback', callback.id, 'for lead', leadId);
+
+            // CRITICAL FIX: Complete callback silently without showing popup
+            // Use completeCallbackAfterOutcome directly with 'answered' outcome
+            if (typeof completeCallbackAfterOutcome === 'function') {
+                completeCallbackAfterOutcome(leadId, callback.id, 'answered');
+            } else {
+                // Fallback: Direct localStorage cleanup (SILENT MODE)
+                console.log('🔧 FALLBACK: Using direct callback removal for', callback.id);
+                callbacks[leadId] = callbacks[leadId].filter(cb =>
+                    String(cb.id) !== String(callback.id) &&
+                    (!cb.callback_id || String(cb.callback_id) !== String(callback.id))
+                );
+                localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+            }
+        });
+    } else {
+        console.log('📋 No callbacks found for lead', leadId);
     }
 
     // Also update the table to remove callback messages
@@ -8620,9 +8646,9 @@ window.displayScheduledCallbacks = function(leadId) {
                         </div>
                         ${callback.notes ? `<div style="font-size: 12px; color: #6b7280; margin-top: 5px;">${callback.notes}</div>` : ''}
                     </div>
-                    <button onclick="completeCallback('${leadId}', ${callback.id})"
-                            style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                        <i class="fas fa-check"></i> Done
+                    <button onclick="showCallbackScheduler('${leadId}')"
+                            style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-calendar-alt"></i> Reschedule
                     </button>
                 </div>
             </div>

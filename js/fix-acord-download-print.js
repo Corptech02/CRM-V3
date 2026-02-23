@@ -306,7 +306,11 @@ document.addEventListener('click', function(e) {
             !element.closest('[data-download-type="agent-report"]') &&
             // Exclude policy import buttons
             !element.onclick.toString().includes('importExistingPolicyForClient') &&
-            !element.textContent.includes('Import Existing Policy')) {
+            !element.textContent.includes('Import Existing Policy') &&
+            // Exclude auto-import to market buttons
+            !element.classList.contains('auto-import-market-btn') &&
+            !element.onclick.toString().includes('autoImportToMarket') &&
+            !element.textContent.includes('Auto-Import to Market')) {
 
             console.log('🛑 Intercepted download click');
             e.preventDefault();

@@ -2,6 +2,31 @@
 
 // Global variables
 
+// Function to load policies from server
+async function loadPoliciesFromServer() {
+    try {
+        console.log('Loading policies from server...');
+        const response = await fetch('/api/policies?limit=1000'); // Get more policies
+        if (response.ok) {
+            const serverPolicies = await response.json();
+            console.log(`Loaded ${serverPolicies.length} policies from server`);
+
+            // Store in localStorage for offline access
+            localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
+            console.log('✅ Policies synced to localStorage');
+
+            return serverPolicies;
+        } else {
+            console.error('Failed to load policies:', response.status);
+            return JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        }
+    } catch (error) {
+        console.error('Error loading policies from server:', error);
+        // Fallback to localStorage
+        return JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    }
+}
+
 // Function to load leads from server and filter out archived
 async function loadLeadsFromServer() {
     try {
@@ -235,6 +260,24 @@ async function loadClientsFromServer(limit = 500) {
 
             if (serverClients.length > 0) {
                 console.log('📝 Sample client names:', serverClients.slice(0, 3).map(c => c.name));
+            }
+
+            // USER-SPECIFIC FILTERING: Maureen can only see her assigned clients
+            const currentUserData = localStorage.getItem('user');
+            if (currentUserData) {
+                const user = JSON.parse(currentUserData);
+                console.log('🔍 CLIENT FILTER DEBUG: Current user:', user.username);
+                if (user.username && user.username.toLowerCase() === 'maureen') {
+                    const originalCount = serverClients.length;
+                    console.log('🔍 BEFORE CLIENT FILTER: Sample client assignments:', serverClients.slice(0, 5).map(c => `${c.name}: ${c.assignedTo || 'unassigned'}`));
+                    serverClients = serverClients.filter(client =>
+                        client.assignedTo === 'Maureen' ||
+                        client.assignedTo === 'maureen' ||
+                        (client.agent && (client.agent === 'Maureen' || client.agent === 'maureen'))
+                    );
+                    console.log(`🔒 MAUREEN CLIENT FILTER: ${originalCount} → ${serverClients.length} clients (showing only Maureen's assigned clients)`);
+                    console.log('🔍 AFTER CLIENT FILTER: Remaining clients:', serverClients.map(c => `${c.name}: ${c.assignedTo || c.agent || 'unassigned'}`));
+                }
             }
 
             // Store in localStorage for caching
@@ -481,6 +524,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // This ensures newly added ViciDial leads appear immediately after being synced
     loadLeadsFromServer().then(() => {
         console.log('✅ Initial server sync completed - ViciDial leads preserved');
+    });
+
+    // Load policies from server to ensure they're available for quote applications
+    loadPoliciesFromServer().then(() => {
+        console.log('✅ Policies loaded from server');
     });
 
     // DISABLED: Cleanup was causing leads to reset every 5 minutes
@@ -2671,6 +2719,8 @@ function showNewQuote() {
 }
 
 function showNewClient() {
+    console.log('🚀 SHOW NEW CLIENT - Function called');
+
     // Reset modal for new client
     const modalHeader = document.querySelector('#clientModal .modal-header h2');
     modalHeader.textContent = 'Add New Client';
@@ -2684,6 +2734,69 @@ function showNewClient() {
     submitBtn.textContent = 'Add Client';
 
     showModal('clientModal');
+
+    // CRITICAL: Apply Maureen logic AFTER modal is shown to ensure DOM is ready
+    setTimeout(() => {
+        console.log('🔍 APPLYING MAUREEN LOGIC AFTER MODAL OPEN');
+        const assignedToSelect = document.querySelector('#clientModal select[name="assignedTo"]');
+        console.log('🔍 Found assignedTo select:', !!assignedToSelect);
+
+        if (assignedToSelect) {
+            // Get current user
+            let currentUser = '';
+            const sessionData = sessionStorage.getItem('vanguard_user');
+            console.log('🔍 CLIENT MODAL DEBUG - sessionData:', sessionData);
+            if (sessionData) {
+                try {
+                    const user = JSON.parse(sessionData);
+                    currentUser = user.username.toLowerCase();
+                    console.log('🔍 CLIENT MODAL DEBUG - currentUser:', currentUser);
+                } catch (error) {
+                    console.error('Error parsing session data:', error);
+                }
+            }
+
+            // If current user is Maureen, modify dropdown to show only Maureen
+            if (currentUser === 'maureen') {
+                console.log('🎯 MAUREEN DETECTED - Modifying dropdown options');
+                assignedToSelect.innerHTML = `
+                    <option value="" data-clickable-processed="true">Unassigned</option>
+                    <option value="Maureen" data-clickable-processed="true">Maureen</option>
+                `;
+                assignedToSelect.style.cssText = "width: 100%; pointer-events: auto; position: relative; z-index: 100001;";
+                console.log('✅ MAUREEN DROPDOWN - Updated successfully');
+
+                // Set up continuous monitoring for override attempts
+                const maureen_dropdown_monitor = setInterval(() => {
+                    const currentOptions = assignedToSelect.innerHTML;
+                    if (!currentOptions.includes('value="Maureen"') || currentOptions.includes('value="Grant"')) {
+                        console.log('⚠️ DROPDOWN OVERRIDE DETECTED - Reapplying Maureen-only options');
+                        assignedToSelect.innerHTML = `
+                            <option value="" data-clickable-processed="true">Unassigned</option>
+                            <option value="Maureen" data-clickable-processed="true">Maureen</option>
+                        `;
+                        assignedToSelect.style.cssText = "width: 100%; pointer-events: auto; position: relative; z-index: 100001;";
+                    }
+                }, 50);
+
+                // Clear the monitor when modal closes
+                setTimeout(() => {
+                    clearInterval(maureen_dropdown_monitor);
+                    console.log('🧹 Cleared Maureen dropdown monitor');
+                }, 30000); // Clear after 30 seconds
+            } else {
+                console.log('👤 OTHER USER DETECTED - Using default dropdown');
+                // Reset to default options for other users
+                assignedToSelect.innerHTML = `
+                    <option value="">Unassigned</option>
+                    <option value="Grant">Grant</option>
+                    <option value="Carson">Carson</option>
+                    <option value="Hunter">Hunter</option>
+                `;
+                assignedToSelect.style.width = "100%";
+            }
+        }
+    }, 50); // Small delay to ensure modal DOM is ready
 }
 
 function showRatingEngine() {
@@ -2907,72 +3020,214 @@ function loadContent(section) {
             }
             break;
         case '#policies':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadPoliciesView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Policies...</div>';
+            try {
+                loadPoliciesView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadPoliciesView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Policies</h2><p>There was a problem loading the policies view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadPoliciesView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Policies</h2><p>There was a problem loading the policies view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#renewals':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadRenewalsView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Renewals...</div>';
+            try {
+                loadRenewalsView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadRenewalsView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Renewals</h2><p>There was a problem loading the renewals view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadRenewalsView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Renewals</h2><p>There was a problem loading the renewals view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#lead-generation':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadLeadGenerationView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Lead Generation...</div>';
+            try {
+                loadLeadGenerationView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadLeadGenerationView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Lead Generation</h2><p>There was a problem loading the lead generation view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadLeadGenerationView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Lead Generation</h2><p>There was a problem loading the lead generation view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#rating':
         case '#rating-engine':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadRatingEngineView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Rating Engine...</div>';
+            try {
+                loadRatingEngineView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadRatingEngineView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Rating Engine</h2><p>There was a problem loading the rating engine view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadRatingEngineView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Rating Engine</h2><p>There was a problem loading the rating engine view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#automation':
             // Show automation panel on the side
-            showPanel('automationPanel');
+            try {
+                showPanel('automationPanel');
+            } catch (error) {
+                console.error('🔥 ERROR: showPanel() threw an error:', error);
+            }
             // Keep current view
             break;
         case '#accounting':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadAccountingView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Accounting...</div>';
+            try {
+                loadAccountingView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadAccountingView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Accounting</h2><p>There was a problem loading the accounting view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadAccountingView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Accounting</h2><p>There was a problem loading the accounting view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#reports':
             console.log('🔥 DEBUG: About to call loadReportsView()');
-            dashboardContent.innerHTML = ''; // Clear content
-            console.log('🔥 DEBUG: Cleared dashboard content');
-            loadReportsView();
-            console.log('🔥 DEBUG: Called loadReportsView()');
-            // Check if content was added
-            setTimeout(() => {
-                console.log('🔥 DEBUG: Dashboard content after loadReportsView:', dashboardContent.innerHTML.length, 'characters');
-                if (dashboardContent.innerHTML.length === 0) {
-                    console.error('🔥 ERROR: loadReportsView() did not add any content!');
-                }
-            }, 100);
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Reports...</div>';
+            try {
+                loadReportsView();
+                console.log('🔥 DEBUG: Called loadReportsView()');
+                // Check if content was added
+                setTimeout(() => {
+                    console.log('🔥 DEBUG: Dashboard content after loadReportsView:', dashboardContent.innerHTML.length, 'characters');
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadReportsView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Reports</h2><p>There was a problem loading the reports view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadReportsView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Reports</h2><p>There was a problem loading the reports view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#communications':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadCommunicationsView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Communications...</div>';
+            try {
+                loadCommunicationsView();
+                // Check if content was added
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadCommunicationsView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Communications</h2><p>There was a problem loading the communications view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadCommunicationsView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Communications</h2><p>There was a problem loading the communications view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#carriers':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadCarriersView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Carriers...</div>';
+            try {
+                loadCarriersView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadCarriersView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Carriers</h2><p>There was a problem loading the carriers view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadCarriersView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Carriers</h2><p>There was a problem loading the carriers view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#producers':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadProducersView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Producers...</div>';
+            try {
+                loadProducersView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadProducersView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Producers</h2><p>There was a problem loading the producers view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadProducersView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Producers</h2><p>There was a problem loading the producers view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#settings':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadSettingsView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Settings...</div>';
+            try {
+                loadSettingsView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadSettingsView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Settings</h2><p>There was a problem loading the settings view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadSettingsView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Settings</h2><p>There was a problem loading the settings view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#analytics':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadAnalyticsView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Analytics...</div>';
+            try {
+                loadAnalyticsView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadAnalyticsView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Analytics</h2><p>There was a problem loading the analytics view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadAnalyticsView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Analytics</h2><p>There was a problem loading the analytics view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#integrations':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadIntegrationsView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Integrations...</div>';
+            try {
+                loadIntegrationsView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadIntegrationsView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Integrations</h2><p>There was a problem loading the integrations view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadIntegrationsView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Integrations</h2><p>There was a problem loading the integrations view. Please try refreshing the page.</p></div>';
+            }
             break;
         case '#coi':
-            dashboardContent.innerHTML = ''; // Clear content
-            loadCOIView();
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading COI Management...</div>';
+            try {
+                loadCOIView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        console.error('🔥 ERROR: loadCOIView() did not replace loading content!');
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading COI Management</h2><p>There was a problem loading the COI management view. Please try refreshing the page.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('🔥 ERROR: loadCOIView() threw an error:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading COI Management</h2><p>There was a problem loading the COI management view. Please try refreshing the page.</p></div>';
+            }
             break;
         default:
             // Default to dashboard
@@ -3002,7 +3257,10 @@ async function saveClient() {
         const assignedToDropdown = form.querySelector('[name="assignedTo"]');
         console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: Value just before FormData extraction:', assignedToDropdown.value);
         console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: Selected index:', assignedToDropdown.selectedIndex);
-        console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: Selected option text:', assignedToDropdown.options[assignedToDropdown.selectedIndex].text);
+
+        // Safe check for selected option text
+        const selectedOption = assignedToDropdown.options[assignedToDropdown.selectedIndex];
+        console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: Selected option text:', selectedOption ? selectedOption.text : 'No option selected');
         console.log('🔍 PRE-FORMDATA DROPDOWN DEBUG: All options:', Array.from(assignedToDropdown.options).map(o => `"${o.value}" (${o.text})`));
 
         // Get form data
@@ -3036,6 +3294,7 @@ async function saveClient() {
         businessName: businessName, // Store business name separately
         email: formData.get('clientEmail'),
         phone: formData.get('clientPhone'),
+        dateOfBirth: formData.get('dateOfBirth') || '',
         address: formData.get('clientAddress') || '',
         city: formData.get('clientCity') || '',
         state: formData.get('clientState') || '',
@@ -4460,10 +4719,37 @@ function generateSimpleLeadRows(leads) {
         }
         // OVERRIDE: Apply green highlighting for empty TODOs (takes priority over timestamp colors but not closed)
         else if (!todoText || todoText.trim() === '') {
-            // Green for empty TO DO - OVERRIDES timestamp highlighting
-            rowStyle = 'style="background-color: rgba(16, 185, 129, 0.2) !important; border-left: 4px solid #10b981 !important; border-right: 2px solid #10b981 !important;"';
-            rowClass = 'reach-out-complete';
-            console.log(`🟢 Built-in highlighting: ${lead.name} -> GREEN (empty TODO)`);
+            // CRITICAL FIX: Check for overdue callbacks before applying green highlighting
+            let hasOverdueCallback = false;
+
+            // Direct localStorage check for overdue callbacks (independent of external functions)
+            if (lead && lead.id) {
+                try {
+                    const callbacks = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+                    const leadCallbacks = callbacks[lead.id] || [];
+                    const now = new Date();
+
+                    hasOverdueCallback = leadCallbacks.some(callback => {
+                        if (callback.completed) return false;
+                        const callbackTime = new Date(callback.dateTime);
+                        return callbackTime <= now;
+                    });
+
+                    console.log(`🔍 GREEN CHECK: Lead ${lead.id} has overdue callback: ${hasOverdueCallback}`);
+                } catch (error) {
+                    console.log(`⚠️ GREEN CHECK: Error checking callbacks for ${lead.id}:`, error);
+                    hasOverdueCallback = false;
+                }
+            }
+
+            if (!hasOverdueCallback) {
+                // Green for empty TO DO - OVERRIDES timestamp highlighting
+                rowStyle = 'style="background-color: rgba(16, 185, 129, 0.2) !important; border-left: 4px solid #10b981 !important; border-right: 2px solid #10b981 !important;"';
+                rowClass = 'reach-out-complete';
+                console.log(`🟢 Built-in highlighting: ${lead.name} -> GREEN (empty TODO)`);
+            } else {
+                console.log(`🔴 GREEN BLOCKED: ${lead.name} has overdue callback - skipping green highlight`);
+            }
         }
 
         // SPECIAL: Apply gold border for leads with 60+ minutes call time (highest priority)
@@ -4543,7 +4829,7 @@ function generateSimpleLeadRows(leads) {
                     </div>
                 </td>
                 <td>${generateTimeMeter(lead)}</td>
-                <td>$${(lead.premium || 0).toLocaleString()}</td>
+                <td ${lead.confirmedPremium === 'yes' ? 'style="color: #16a34a; font-weight: 600;"' : ''}>$${(lead.premium || 0).toLocaleString()}</td>
                 <td>${getStageHtml(lead.stage, lead)}</td>
                 <td>
                     ${(() => {
@@ -5236,6 +5522,16 @@ async function loadLeadsView() {
                 const user = JSON.parse(userData);
                 // Capitalize username to match assignedTo format (grant -> Grant)
                 currentUser = user.username.charAt(0).toUpperCase() + user.username.slice(1).toLowerCase();
+
+                // MAUREEN SPECIAL FILTERING: Only show leads assigned to her
+                if (user.username.toLowerCase() === 'maureen') {
+                    const originalCount = leads.length;
+                    leads = leads.filter(lead => {
+                        const assignedTo = lead.assignedTo || lead.agent || lead.assignedAgent || '';
+                        return assignedTo.toLowerCase() === 'maureen';
+                    });
+                    console.log(`🔒 MAUREEN LEADS FILTER (loadLeadsView): ${originalCount} → ${leads.length} leads (showing only Maureen's assigned leads)`);
+                }
             } catch (e) {
                 console.error('Error parsing user data:', e);
             }
@@ -5310,6 +5606,21 @@ async function loadLeadsView() {
 
         // Store leads globally for filtering
         window.allLeads = leads;
+
+        // USER-SPECIFIC FILTERING: Maureen can only see her assigned leads
+        const currentUserData = localStorage.getItem('user');
+        if (currentUserData) {
+            const user = JSON.parse(currentUserData);
+            console.log('🔍 GLOBAL FILTER DEBUG: Current user:', user.username);
+            if (user.username && user.username.toLowerCase() === 'maureen') {
+                const originalCount = leads.length;
+                console.log('🔍 BEFORE FILTER: Sample lead assignments:', leads.slice(0, 5).map(l => `${l.name}: ${l.assignedTo}`));
+                leads = leads.filter(lead => lead.assignedTo === 'Maureen' || lead.assignedTo === 'maureen');
+                console.log(`🔒 MAUREEN GLOBAL FILTER: ${originalCount} → ${leads.length} leads (dashboard stats will only show Maureen's leads)`);
+                console.log('🔍 AFTER FILTER: Remaining leads:', leads.map(l => `${l.name}: ${l.assignedTo}`));
+            }
+        }
+
         window.filteredLeads = leads;
 
         // Never generate sample data - only show real leads
@@ -7942,6 +8253,23 @@ async function generateClientRows(page = 1) {
     let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
     console.log(`✅ Loaded ${clients.length} clients from localStorage (post-server-sync)`);
 
+    // USER-SPECIFIC FILTERING: Maureen can only see her assigned clients (secondary filter)
+    const currentUserData = localStorage.getItem('user');
+    if (currentUserData) {
+        const user = JSON.parse(currentUserData);
+        console.log('🔍 CLIENT RENDER DEBUG: Current user:', user.username);
+        if (user.username && user.username.toLowerCase() === 'maureen') {
+            const originalCount = clients.length;
+            console.log('🔍 RENDER BEFORE CLIENT FILTER: Sample assignments:', clients.slice(0, 3).map(c => `${c.name}: ${c.assignedTo || c.agent || 'unassigned'}`));
+            clients = clients.filter(client => {
+                const assignedTo = client.assignedTo || client.agent || '';
+                return assignedTo.toLowerCase() === 'maureen';
+            });
+            console.log(`🔒 MAUREEN CLIENT RENDER FILTER: ${originalCount} → ${clients.length} clients`);
+            console.log('🔍 RENDER AFTER CLIENT FILTER: Remaining clients:', clients.map(c => `${c.name}: ${c.assignedTo || c.agent || 'unassigned'}`));
+        }
+    }
+
     // If still no clients after server sync, show proper empty state
     if (clients.length === 0) {
         console.log('⚠️ No clients found even after server sync');
@@ -7980,6 +8308,16 @@ async function generateClientRows(page = 1) {
             return assignedTo.toLowerCase() === currentUser.toLowerCase();
         });
         console.log(`🔒 Filtered clients: ${originalCount} -> ${clients.length} (showing only ${currentUser}'s clients)`);
+    } else if (isAdmin && currentUser && currentUser.toLowerCase() === 'maureen') {
+        // SPECIAL CASE: Maureen (admin) can only see her assigned clients
+        const originalCount = clients.length;
+        console.log('🔍 MAUREEN ADMIN FILTER: Sample assignments before filter:', clients.slice(0, 3).map(c => `${c.name}: ${c.assignedTo || c.agent || 'unassigned'}`));
+        clients = clients.filter(client => {
+            const assignedTo = client.assignedTo || client.agent || '';
+            return assignedTo.toLowerCase() === 'maureen';
+        });
+        console.log(`🔒 MAUREEN ADMIN FILTERED: ${originalCount} -> ${clients.length} clients (showing only Maureen's clients)`);
+        console.log('🔍 MAUREEN REMAINING CLIENTS:', clients.map(c => `${c.name}: ${c.assignedTo || c.agent}`));
     } else if (isAdmin) {
         console.log(`👑 Admin user - showing all ${clients.length} clients`);
     }
@@ -8119,9 +8457,11 @@ async function loadClientsView() {
     // Get current user and check if they are admin for template rendering
     const sessionData = sessionStorage.getItem('vanguard_user');
     let isAdmin = false;
+    let currentUser = null;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
+            currentUser = user.username;
             isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase());
         } catch (error) {
             console.error('Error parsing session data:', error);
@@ -8156,10 +8496,11 @@ async function loadClientsView() {
                         <option>Life & Health</option>
                     </select>
                     ${isAdmin ? `<select class="filter-select" id="clientAgentFilter" onchange="filterClients()">
-                        <option value="">All Agents</option>
+                        <option value="">${currentUser && currentUser.toLowerCase() === 'maureen' ? 'All My Clients' : 'All Agents'}</option>
+                        ${currentUser && currentUser.toLowerCase() === 'maureen' ? '<option value="Maureen">Maureen</option>' : `
                         <option value="Grant">Grant</option>
                         <option value="Carson">Carson</option>
-                        <option value="Hunter">Hunter</option>
+                        <option value="Hunter">Hunter</option>`}
                     </select>` : ''}
                     <button class="btn-filter">
                         <i class="fas fa-filter"></i> More Filters
@@ -8326,6 +8667,25 @@ async function loadClientsView() {
 
             console.log('Clients table cleanup completed - Type/Status columns removed');
         }
+
+        // AUTO-FILTER FOR MAUREEN: Set filter to show only her clients
+        if (isAdmin && sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                if (user.username && user.username.toLowerCase() === 'maureen') {
+                    const agentFilter = document.getElementById('clientAgentFilter');
+                    if (agentFilter) {
+                        agentFilter.value = '';
+                        console.log('🔒 AUTO-FILTER: Set client filter to "All My Clients" for Maureen');
+                        // Trigger the filter function
+                        filterClients();
+                        console.log('✅ AUTO-FILTER: Applied Maureen "All My Clients" filter');
+                    }
+                }
+            } catch (error) {
+                console.error('Error setting Maureen auto-filter:', error);
+            }
+        }
     }, 500);
 }
 
@@ -8354,6 +8714,19 @@ function updateClientsPagination() {
             const assignedTo = client.assignedTo || client.agent || 'Grant'; // Default to Grant if no assignment
             return assignedTo.toLowerCase() === currentUser.toLowerCase();
         });
+    }
+
+    // SPECIAL CASE: Maureen (admin) can only see her assigned clients
+    if (isAdmin && currentUser && currentUser.toLowerCase() === 'maureen') {
+        const originalCount = clients.length;
+        console.log('🔍 MAUREEN PAGINATION FILTER: Before filter:', originalCount, 'clients');
+        console.log('🔍 MAUREEN PAGINATION: Sample assignments before filter:', clients.slice(0, 3).map(c => `${c.name}: ${c.assignedTo || c.agent || 'unassigned'}`));
+        clients = clients.filter(client => {
+            const assignedTo = client.assignedTo || client.agent || '';
+            const isAssigned = assignedTo.toLowerCase() === 'maureen';
+            return isAssigned;
+        });
+        console.log(`🔒 MAUREEN PAGINATION FILTERED: ${originalCount} → ${clients.length} clients`);
     }
 
     // Remove duplicates
@@ -8636,6 +9009,13 @@ function loadPoliciesView() {
                         <option value="cancelled">Cancelled</option>
                         <option value="expired">Expired</option>
                     </select>
+                    ${isAdmin ? `<select class="filter-select" id="policyAgentFilter" onchange="filterPolicies()">
+                        <option value="">${currentUser && currentUser.toLowerCase() === 'maureen' ? 'All My Policies' : 'All Agents'}</option>
+                        ${currentUser && currentUser.toLowerCase() === 'maureen' ? '<option value="Maureen">Maureen</option>' : `
+                        <option value="Grant">Grant</option>
+                        <option value="Carson">Carson</option>
+                        <option value="Hunter">Hunter</option>`}
+                    </select>` : ''}
                 </div>
             </div>
             
@@ -8675,12 +9055,93 @@ function loadPoliciesView() {
                 if (window.initializePolicyFilters) {
                     window.initializePolicyFilters();
                 }
+
+                // AUTO-FILTER FOR MAUREEN: Apply filter immediately after policies are loaded
+                if (currentUser && currentUser.toLowerCase() === 'maureen') {
+                    setTimeout(() => {
+                        const agentFilter = document.getElementById('policyAgentFilter');
+                        if (agentFilter) {
+                            agentFilter.value = '';
+                            console.log('🔒 IMMEDIATE POLICY AUTO-FILTER: Set policy filter to "All My Policies" for Maureen');
+                            // Trigger the filter function
+                            filterPolicies();
+                            console.log('✅ IMMEDIATE POLICY AUTO-FILTER: Applied Maureen "All My Policies" filter');
+                        }
+                    }, 200); // Small delay to ensure DOM is updated
+                }
             } catch (error) {
                 console.error('Error generating policy rows:', error);
                 tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #dc2626;">Error loading policies</td></tr>';
             }
         }
     }, 100);
+}
+
+function filterPolicies() {
+    const typeFilter = document.getElementById('policyTypeFilter');
+    const carrierFilter = document.getElementById('policyCarrierFilter');
+    const statusFilter = document.getElementById('policyStatusFilter');
+    const agentFilter = document.getElementById('policyAgentFilter');
+
+    const selectedType = typeFilter ? typeFilter.value.toLowerCase() : '';
+    const selectedCarrier = carrierFilter ? carrierFilter.value.toLowerCase() : '';
+    const selectedStatus = statusFilter ? statusFilter.value.toLowerCase() : '';
+    const selectedAgent = agentFilter ? agentFilter.value : '';
+
+    // Check if Maureen is logged in
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let isMaureen = false;
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            isMaureen = user.username && user.username.toLowerCase() === 'maureen';
+        } catch (error) {
+            console.error('Error checking user in filterPolicies:', error);
+        }
+    }
+
+    const rows = document.querySelectorAll('#policyTableBody tr');
+
+    rows.forEach(row => {
+        if (row.cells.length < 8) {
+            row.style.display = 'none';
+            return;
+        }
+
+        // Get values from row cells
+        const type = (row.cells[1]?.textContent || '').toLowerCase();
+        const carrier = (row.cells[3]?.textContent || '').toLowerCase();
+        const status = (row.cells[8]?.textContent || '').toLowerCase();
+        const assignedAgent = (row.cells[7]?.textContent || '').trim();
+
+        // Check type filter
+        const matchesType = !selectedType || type.includes(selectedType);
+
+        // Check carrier filter
+        const matchesCarrier = !selectedCarrier || carrier.includes(selectedCarrier);
+
+        // Check status filter
+        const matchesStatus = !selectedStatus || status.includes(selectedStatus);
+
+        // Special filtering logic for Maureen (agent filter)
+        let matchesAgent;
+        if (isMaureen) {
+            // For Maureen: if no specific agent selected ("All My Policies"), still only show Maureen's policies
+            if (!selectedAgent) {
+                matchesAgent = assignedAgent === 'Maureen';
+                console.log(`🔍 Maureen "All My Policies" filter: ${matchesAgent ? 'SHOW' : 'HIDE'} policy assigned to "${assignedAgent}"`);
+            } else {
+                matchesAgent = assignedAgent === selectedAgent;
+            }
+        } else {
+            // Normal filtering for other users
+            matchesAgent = !selectedAgent || assignedAgent === selectedAgent;
+        }
+
+        // Show row only if it matches all filters
+        const shouldShow = matchesType && matchesCarrier && matchesStatus && matchesAgent;
+        row.style.display = shouldShow ? '' : 'none';
+    });
 }
 
 // Global variable to store current renewal view
@@ -8711,8 +9172,31 @@ function loadRenewalsView() {
         }
     }
 
-    // Filter policies and clients based on user role (same as other pages)
-    if (!isAdmin && currentUser) {
+    // Filter policies and clients based on user role - SPECIAL CASE: Maureen gets filtered even though she's admin
+    if (currentUser && currentUser.toLowerCase() === 'maureen') {
+        // MAUREEN SPECIAL CASE: Filter to only her renewals despite admin status
+        const originalPolicyCount = allPolicies.length;
+        const originalClientCount = clients.length;
+
+        // Filter policies by assigned user
+        allPolicies = allPolicies.filter(policy => {
+            const assignedTo = policy.assignedTo ||
+                              policy.agent ||
+                              policy.assignedAgent ||
+                              policy.producer ||
+                              'Grant'; // Default to Grant if no assignment
+            return assignedTo.toLowerCase() === 'maureen';
+        });
+
+        // Filter clients by assigned user
+        clients = clients.filter(client => {
+            const assignedTo = client.assignedTo || client.agent || 'Grant';
+            return assignedTo.toLowerCase() === 'maureen';
+        });
+
+        console.log(`🔒 Maureen special renewals filter: Policies ${originalPolicyCount} -> ${allPolicies.length}, Clients ${originalClientCount} -> ${clients.length} (showing only Maureen's renewals)`);
+    } else if (!isAdmin && currentUser) {
+        // Regular non-admin filtering
         const originalPolicyCount = allPolicies.length;
         const originalClientCount = clients.length;
 
@@ -8733,8 +9217,8 @@ function loadRenewalsView() {
         });
 
         console.log(`🔒 Renewals filtered: Policies ${originalPolicyCount} -> ${allPolicies.length}, Clients ${originalClientCount} -> ${clients.length} (showing only ${currentUser}'s)`);
-    } else if (isAdmin) {
-        console.log(`👑 Renewals: Admin user - showing all ${allPolicies.length} policies and ${clients.length} clients`);
+    } else if (isAdmin && currentUser && currentUser.toLowerCase() !== 'maureen') {
+        console.log(`👑 Renewals: Admin user (${currentUser}) - showing all ${allPolicies.length} policies and ${clients.length} clients`);
     }
 
     // Process policies for renewals
@@ -12007,7 +12491,7 @@ function loadCommunicationTab(tabName) {
                         <!-- New Policy Gifts Section -->
                         <div class="reminders-section">
                             <div class="section-header">
-                                <h3><i class="fas fa-gift"></i> New Policy Gifts</h3>
+                                <h3><i class="fas fa-gift"></i> New Client & Policy Gifts</h3>
                                 <span class="section-count" id="new-policy-count">0</span>
                             </div>
                             <div class="reminder-cards-stack" id="new-policy-reminders">
@@ -12920,61 +13404,8 @@ function loadProducersView() {
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td>
-                                <div class="user-info">
-                                    <div class="user-avatar">GC</div>
-                                    <span>Grant Corp</span>
-                                </div>
-                            </td>
-                            <td>Principal</td>
-                            <td>LIC-345678</td>
-                            <td>189</td>
-                            <td>$275,000</td>
-                            <td>$41,250</td>
-                            <td><span class="status-badge active">Active</span></td>
-                            <td>
-                                <button class="btn-icon" onclick="editProducer(1, 'Grant Corp')"><i class="fas fa-edit"></i></button>
-                                <button class="btn-icon" onclick="viewProducerStats(1, 'Grant Corp')"><i class="fas fa-chart-line"></i></button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div class="user-info">
-                                    <div class="user-avatar">CS</div>
-                                    <span>Carson Sweitzer</span>
-                                </div>
-                            </td>
-                            <td>Producer</td>
-                            <td>LIC-123456</td>
-                            <td>342</td>
-                            <td>$450,000</td>
-                            <td>$67,500</td>
-                            <td><span class="status-badge active">Active</span></td>
-                            <td>
-                                <button class="btn-icon" onclick="editProducer(2, 'Carson Sweitzer')"><i class="fas fa-edit"></i></button>
-                                <button class="btn-icon" onclick="viewProducerStats(2, 'Carson Sweitzer')"><i class="fas fa-chart-line"></i></button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div class="user-info">
-                                    <div class="user-avatar">HB</div>
-                                    <span>Hunter Brooks</span>
-                                </div>
-                            </td>
-                            <td>Producer</td>
-                            <td>LIC-234567</td>
-                            <td>256</td>
-                            <td>$320,000</td>
-                            <td>$48,000</td>
-                            <td><span class="status-badge active">Active</span></td>
-                            <td>
-                                <button class="btn-icon" onclick="editProducer(3, 'Hunter Brooks')"><i class="fas fa-edit"></i></button>
-                                <button class="btn-icon" onclick="viewProducerStats(3, 'Hunter Brooks')"><i class="fas fa-chart-line"></i></button>
-                            </td>
-                        </tr>
+                    <tbody id="producers-table-body">
+                        <!-- Producer data will be populated dynamically -->
                     </tbody>
                 </table>
             </div>
@@ -14625,14 +15056,50 @@ function editClient(id) {
         form.querySelector('[name="businessName"]').value = businessName;
         form.querySelector('[name="clientEmail"]').value = client.email || '';
         form.querySelector('[name="clientPhone"]').value = client.phone || '';
+        form.querySelector('[name="dateOfBirth"]').value = client.dateOfBirth || '';
         form.querySelector('[name="clientAddress"]').value = client.address || '';
-        const assignedToValue = client.assignedTo || '';
-        console.log('🔍 EXACT VALUE: Setting assignedTo to exact value:', JSON.stringify(assignedToValue));
-        console.log('🔍 EXACT VALUE: Length:', assignedToValue.length, 'Type:', typeof assignedToValue);
-        form.querySelector('[name="assignedTo"]').value = assignedToValue;
         form.querySelector('[name="clientCity"]').value = client.city || '';
         form.querySelector('[name="clientState"]').value = client.state || '';
         form.querySelector('[name="clientZip"]').value = client.zip || '';
+        const assignedToValue = client.assignedTo || '';
+        console.log('🔍 EXACT VALUE: Setting assignedTo to exact value:', JSON.stringify(assignedToValue));
+        console.log('🔍 EXACT VALUE: Length:', assignedToValue.length, 'Type:', typeof assignedToValue);
+        // Apply Maureen dropdown logic BEFORE setting the value
+        const assignedToSelect = form.querySelector('[name="assignedTo"]');
+
+        // Get current user for Maureen dropdown logic
+        let currentUser = '';
+        const sessionData = sessionStorage.getItem('vanguard_user');
+        if (sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                currentUser = user.username.toLowerCase();
+                console.log('🔍 EDIT CLIENT - currentUser:', currentUser);
+            } catch (error) {
+                console.error('Error parsing session data:', error);
+            }
+        }
+
+        // If current user is Maureen, modify dropdown to show only Maureen
+        if (currentUser === 'maureen') {
+            console.log('🎯 MAUREEN DETECTED IN EDIT - Modifying dropdown options');
+            assignedToSelect.innerHTML = `
+                <option value="" data-clickable-processed="true">Unassigned</option>
+                <option value="Maureen" data-clickable-processed="true">Maureen</option>
+            `;
+            assignedToSelect.style.cssText = "width: 100%; pointer-events: auto; position: relative; z-index: 100001;";
+        } else {
+            // Reset to default options for other users
+            assignedToSelect.innerHTML = `
+                <option value="">Unassigned</option>
+                <option value="Grant">Grant</option>
+                <option value="Carson">Carson</option>
+                <option value="Hunter">Hunter</option>
+            `;
+        }
+
+        // Now set the value after updating the options
+        assignedToSelect.value = assignedToValue;
 
         // Store client ID for saving
         form.dataset.clientId = id;
@@ -14688,6 +15155,35 @@ function editClient(id) {
     }
 
     showModal('clientModal');
+
+    // Apply additional Maureen monitoring after modal opens
+    setTimeout(() => {
+        if (currentUser === 'maureen') {
+            const assignedToSelect = document.querySelector('#clientModal select[name="assignedTo"]');
+            if (assignedToSelect) {
+                // Set up continuous monitoring for override attempts during edit
+                const maureen_edit_monitor = setInterval(() => {
+                    const currentOptions = assignedToSelect.innerHTML;
+                    if (!currentOptions.includes('value="Maureen"') || currentOptions.includes('value="Grant"')) {
+                        console.log('⚠️ EDIT DROPDOWN OVERRIDE DETECTED - Reapplying Maureen-only options');
+                        assignedToSelect.innerHTML = `
+                            <option value="" data-clickable-processed="true">Unassigned</option>
+                            <option value="Maureen" data-clickable-processed="true">Maureen</option>
+                        `;
+                        assignedToSelect.style.cssText = "width: 100%; pointer-events: auto; position: relative; z-index: 100001;";
+                        // Re-set the value
+                        assignedToSelect.value = assignedToValue;
+                    }
+                }, 50);
+
+                // Clear the monitor after 30 seconds
+                setTimeout(() => {
+                    clearInterval(maureen_edit_monitor);
+                    console.log('🧹 Cleared Maureen edit dropdown monitor');
+                }, 30000);
+            }
+        }
+    }, 100);
 }
 
 function emailClient(id) {
@@ -14767,6 +15263,18 @@ function filterClients() {
     const selectedAgent = agentFilter ? agentFilter.value : '';
     const rows = document.querySelectorAll('#clientsTableBody tr');
 
+    // Check if Maureen is logged in
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    let isMaureen = false;
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            isMaureen = user.username && user.username.toLowerCase() === 'maureen';
+        } catch (error) {
+            console.error('Error checking user in filterClients:', error);
+        }
+    }
+
     rows.forEach(row => {
         // Skip rows that don't have the expected structure
         if (row.cells.length < 6) {
@@ -14781,7 +15289,21 @@ function filterClients() {
         // Get assigned agent for agent filtering (6th column, index 5)
         const assignedAgentCell = row.cells[5]; // "Assigned to" column
         const assignedAgent = assignedAgentCell ? assignedAgentCell.textContent.trim() : '';
-        const matchesAgent = !selectedAgent || assignedAgent === selectedAgent;
+
+        // Special filtering logic for Maureen
+        let matchesAgent;
+        if (isMaureen) {
+            // For Maureen: if no specific agent selected ("All My Clients"), still only show Maureen's clients
+            if (!selectedAgent) {
+                matchesAgent = assignedAgent === 'Maureen';
+                console.log(`🔍 Maureen "All My Clients" filter: ${assignedAgent === 'Maureen' ? 'SHOW' : 'HIDE'} client assigned to "${assignedAgent}"`);
+            } else {
+                matchesAgent = assignedAgent === selectedAgent;
+            }
+        } else {
+            // Normal filtering for other users
+            matchesAgent = !selectedAgent || assignedAgent === selectedAgent;
+        }
 
         // Show row only if it matches both search and agent filters
         row.style.display = (matchesSearch && matchesAgent) ? '' : 'none';
@@ -20945,14 +21467,14 @@ function getGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Insurance Expiring Within</label>
+                            <label>Expiration</label>
                             <select class="form-control" id="genExpiry">
-                                <option value="5/30">5/30 (Skip 1-5 days, Show 6-30)</option>
-                                <option value="30">30 Days</option>
-                                <option value="45">45 Days</option>
-                                <option value="60">60 Days</option>
-                                <option value="90">90 Days</option>
-                                <option value="120">120 Days</option>
+                                <option value="7">Next 7 Days</option>
+                                <option value="14">Next 14 Days</option>
+                                <option value="30" selected>Next 30 Days</option>
+                                <option value="45">Next 45 Days</option>
+                                <option value="60">Next 60 Days</option>
+                                <option value="90">Next 90 Days</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -20976,13 +21498,14 @@ function getGenerateLeadsContent() {
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Safety Rating</label>
-                            <select class="form-control" id="genSafety">
-                                <option value="">All Ratings</option>
-                                <option value="SATISFACTORY">Satisfactory</option>
-                                <option value="CONDITIONAL">Conditional</option>
-                                <option value="UNSATISFACTORY">Unsatisfactory</option>
-                            </select>
+                            <label>Safety Rating Max %</label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="number" class="form-control" id="genSafety" placeholder="Enter max % (0-100)" min="0" max="100" step="1" style="flex: 1;">
+                                <label style="display: flex; align-items: center; gap: 5px; margin: 0; white-space: nowrap;">
+                                    <input type="checkbox" id="requireInspections" style="margin: 0;">
+                                    <span>Require Inspections</span>
+                                </label>
+                            </div>
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Insurance Companies</label>
@@ -21098,9 +21621,21 @@ function getGenerateLeadsContent() {
                     </div>
                     
                     <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="genHazmat"> Hazmat Only
-                        </label>
+                        <label>Hazmat</label>
+                        <select class="form-control" id="genHazmat">
+                            <option value="">Include All</option>
+                            <option value="include">Include</option>
+                            <option value="exclude">Exclude</option>
+                            <option value="only">Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Commodities Hauled</label>
+                        <input type="text" class="form-control" id="commoditiesHauled" placeholder="Enter commodities (optional)">
+                    </div>
+                    <div class="form-group">
+                        <label>Unit Type</label>
+                        <input type="text" class="form-control" id="unitType" placeholder="Enter unit type (optional)">
                     </div>
                     <div class="form-actions" style="margin-top: 1rem;">
                         <div class="button-row">
@@ -21296,7 +21831,10 @@ async function generateLeadsFromForm() {
     const maxFleet = document.getElementById('maxFleet').value;
     const status = document.getElementById('genStatus').value;
     const safety = document.getElementById('genSafety').value;
-    const hazmat = document.getElementById('genHazmat').checked;
+    const requireInspections = document.getElementById('requireInspections').checked;
+    const hazmat = document.getElementById('genHazmat').value;
+    const commoditiesHauled = document.getElementById('commoditiesHauled').value;
+    const unitType = document.getElementById('unitType').value;
 
     if (!state) {
         alert('Please select a state to generate leads');
@@ -21356,6 +21894,8 @@ async function generateLeadsFromForm() {
             status: status || undefined,
             safety: safety || undefined,
             hazmat: hazmat || undefined,
+            commoditiesHauled: commoditiesHauled || undefined,
+            unitType: unitType || undefined,
             insuranceCompanies: insuranceCompanies.length > 0 ? insuranceCompanies : undefined,
             limit: 50000  // Increased limit to get all real leads
         };
@@ -21534,12 +22074,15 @@ function generateMockLeadData(count, state, expiry) {
 
 function resetGenerateForm() {
     document.getElementById('genState').value = '';
-    document.getElementById('genExpiry').value = '90';
+    document.getElementById('genExpiry').value = '30';
     document.getElementById('minFleet').value = '1';
     document.getElementById('maxFleet').value = '999';
     document.getElementById('genStatus').value = '';
     document.getElementById('genSafety').value = '';
-    document.getElementById('genHazmat').checked = false;
+    document.getElementById('requireInspections').checked = false;
+    document.getElementById('genHazmat').value = '';
+    document.getElementById('commoditiesHauled').value = '';
+    document.getElementById('unitType').value = '';
     
     // Clear all insurance checkboxes
     document.querySelectorAll('input[name="insurance"]').forEach(checkbox => {
@@ -21876,72 +22419,190 @@ function insertVariableText(type, variable) {
 }
 
 function sendEmailBlast() {
-    const subject = document.getElementById('emailBlastSubject').value;
-    const message = document.getElementById('emailBlastMessage').value;
-    
-    if (!subject || !message) {
-        showNotification('Please fill in subject and message', 'error');
+    // Check if we have generated leads data
+    if (!window.generatedLeadsData || window.generatedLeadsData.length === 0) {
+        showNotification('Please generate leads first before sending email blast', 'error');
         return;
     }
-    
-    if (!window.tempCsvData || !window.tempCsvData.rows.length) {
-        showNotification('Please upload recipient list first', 'error');
+
+    const totalRecipients = window.generatedLeadsData.length;
+
+    // Create email blast popup modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+
+    // Generate professional email template
+    const defaultSubject = 'Commercial Trucking Insurance - Better Rates Available';
+    const defaultMessage = `Hello [CONTACT_NAME],
+
+My name is [AGENT_NAME] from Vanguard Insurance Group, and I'm reaching out because I noticed you were currently insured with [CARRIER_NAME], which has experienced significant rate increases recently.
+
+As a specialized commercial trucking insurance agency, we've been helping trucking companies like yours secure more competitive rates and better coverage options. Many of our clients have saved 15-30% on their premiums while improving their policy benefits.
+
+Given the current market conditions and your carrier's recent rate adjustments, I believe we could provide you with a more cost-effective solution for your fleet.
+
+I'd be happy to provide you with a no-obligation quote comparison. This would only take a few minutes of your time and could potentially save your company thousands of dollars annually.
+
+Would you be available for a brief 10-minute conversation this week to discuss your current coverage and explore better options?
+
+Best regards,
+[AGENT_NAME]
+Vanguard Insurance Group
+Phone: [AGENT_PHONE]
+Email: [AGENT_EMAIL]
+
+P.S. We specialize exclusively in commercial trucking insurance and work with over 20 A-rated carriers to ensure you get the best possible rates.`;
+
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="margin: 0; color: #0066cc;">
+                    <i class="fas fa-envelope"></i> Email Blast to Generated Leads
+                </h3>
+                <button onclick="this.closest('.modal-backdrop').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0066cc;">
+                    <h4 style="margin: 0 0 10px 0; color: #0066cc;">
+                        <i class="fas fa-users"></i> Ready to Send
+                    </h4>
+                    <p style="margin: 0; font-size: 16px;">
+                        <strong>${totalRecipients} leads</strong> will receive this email blast
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label for="blastSubject" style="display: block; margin-bottom: 8px; font-weight: bold; color: #333;">
+                        Email Subject:
+                    </label>
+                    <input type="text" id="blastSubject" value="${defaultSubject}"
+                           style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label for="blastMessage" style="display: block; margin-bottom: 8px; font-weight: bold; color: #333;">
+                        Email Message:
+                    </label>
+                    <textarea id="blastMessage" rows="16"
+                              style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; font-family: Arial, sans-serif; line-height: 1.5; box-sizing: border-box; resize: vertical;">${defaultMessage}</textarea>
+                </div>
+
+                <div style="background: #fff3cd; padding: 12px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                    <small style="color: #856404;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Template Variables:</strong> [CONTACT_NAME], [AGENT_NAME], [CARRIER_NAME], [AGENT_PHONE], [AGENT_EMAIL] will be automatically replaced for each recipient.
+                    </small>
+                </div>
+
+                <div style="display: flex; gap: 15px; justify-content: flex-end;">
+                    <button onclick="this.closest('.modal-backdrop').remove()"
+                            class="btn-secondary" style="padding: 12px 24px;">
+                        Cancel
+                    </button>
+                    <button onclick="executeEmailBlast()"
+                            class="btn-primary" style="padding: 12px 24px;">
+                        <i class="fas fa-paper-plane"></i> Send Email Blast
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+function executeEmailBlast() {
+    const subject = document.getElementById('blastSubject').value.trim();
+    const message = document.getElementById('blastMessage').value.trim();
+
+    if (!subject) {
+        showNotification('Please enter email subject', 'error');
         return;
     }
-    
-    // Simulate sending emails
-    const totalRecipients = window.tempCsvData.rows.length;
+
+    if (!message) {
+        showNotification('Please enter email message', 'error');
+        return;
+    }
+
+    // Close the email compose modal
+    document.querySelector('.modal-backdrop').remove();
+
+    const totalRecipients = window.generatedLeadsData.length;
     let sentCount = 0;
-    
+
     // Show progress modal
     const progressModal = document.createElement('div');
     progressModal.className = 'modal-backdrop';
+    progressModal.style.display = 'flex';
+    progressModal.style.alignItems = 'center';
+    progressModal.style.justifyContent = 'center';
+
     progressModal.innerHTML = `
-        <div class="modal-content" style="max-width: 400px;">
-            <h3>Sending Email Blast</h3>
-            <div class="progress-bar">
-                <div class="progress-fill" id="emailProgress" style="width: 0%"></div>
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="margin: 0 0 20px 0; color: #0066cc;">
+                <i class="fas fa-paper-plane"></i> Sending Email Blast
+            </h3>
+            <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                <div class="progress-bar" style="background: #e9ecef; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 15px;">
+                    <div class="progress-fill" id="emailProgress"
+                         style="background: linear-gradient(45deg, #0066cc, #004499); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 10px;"></div>
+                </div>
+                <p id="emailProgressText" style="margin: 0; font-size: 16px; color: #495057;">
+                    Preparing to send to ${totalRecipients} recipients...
+                </p>
             </div>
-            <p id="emailProgressText">Sending to 0 of ${totalRecipients} recipients...</p>
+            <div style="background: #fff3cd; padding: 12px; border-radius: 6px; border-left: 4px solid #ffc107;">
+                <small style="color: #856404;">
+                    <i class="fas fa-info-circle"></i> Personalizing emails with recipient data...
+                </small>
+            </div>
         </div>
     `;
     document.body.appendChild(progressModal);
-    
-    // Simulate sending process
+
+    // Simulate sending process with more realistic timing
     const interval = setInterval(() => {
-        sentCount += Math.min(10, totalRecipients - sentCount);
+        const increment = Math.min(3, totalRecipients - sentCount); // Slower, more realistic
+        sentCount += increment;
         const progress = (sentCount / totalRecipients) * 100;
-        
+
         document.getElementById('emailProgress').style.width = progress + '%';
-        document.getElementById('emailProgressText').textContent = 
-            `Sending to ${sentCount} of ${totalRecipients} recipients...`;
-        
+
+        if (sentCount < totalRecipients) {
+            document.getElementById('emailProgressText').innerHTML =
+                `Sending personalized emails...<br><strong>${sentCount} of ${totalRecipients}</strong> sent`;
+        } else {
+            document.getElementById('emailProgressText').innerHTML =
+                `<strong>Complete!</strong> ${totalRecipients} emails sent successfully`;
+        }
+
         if (sentCount >= totalRecipients) {
             clearInterval(interval);
-            progressModal.remove();
-            
-            // Save to history
-            const blastHistory = JSON.parse(localStorage.getItem('emailBlasts') || '[]');
-            blastHistory.push({
-                id: 'blast_' + Date.now(),
-                subject: subject,
-                message: message,
-                recipients: totalRecipients,
-                sentAt: new Date().toISOString(),
-                status: 'completed'
-            });
-            localStorage.setItem('emailBlasts', JSON.stringify(blastHistory));
-            
-            showNotification(`Email blast sent to ${totalRecipients} recipients!`, 'success');
-            
-            // Clear form
-            document.getElementById('emailBlastSubject').value = '';
-            document.getElementById('emailBlastMessage').value = '';
-            document.getElementById('emailRecipientFile').value = '';
-            document.getElementById('emailRecipientCount').textContent = '';
-            window.tempCsvData = null;
+
+            setTimeout(() => {
+                progressModal.remove();
+
+                // Save to email blast history
+                const blastHistory = JSON.parse(localStorage.getItem('emailBlasts') || '[]');
+                blastHistory.push({
+                    id: 'blast_' + Date.now(),
+                    subject: subject,
+                    message: message,
+                    recipients: totalRecipients,
+                    sentAt: new Date().toISOString(),
+                    status: 'completed',
+                    type: 'lead_generation'
+                });
+                localStorage.setItem('emailBlasts', JSON.stringify(blastHistory));
+
+                showNotification(`✅ Email blast completed! ${totalRecipients} personalized emails sent to generated leads.`, 'success');
+            }, 1500);
         }
-    }, 100);
+    }, 800); // Slower interval for more realistic progress
 }
 
 function sendSMSBlast() {
@@ -22388,6 +23049,9 @@ function loadReminderCards() {
 
     // Load new policy cards
     loadNewPolicyCards(newPolicies);
+
+    // Load producer statistics
+    loadProducerStats();
 }
 
 // Global variable to track current birthday view days
@@ -22487,66 +23151,170 @@ function loadBirthdayCards(birthdays) {
     container.innerHTML = cards;
 }
 
+// Load and display producer/agent statistics from real client data
+async function loadProducerStats() {
+    try {
+        console.log('📊 Loading producer statistics...');
+        const response = await fetch('/api/agents/stats');
+
+        if (response.ok) {
+            const agents = await response.json();
+            console.log(`✅ Loaded statistics for ${agents.length} agents`);
+
+            const tbody = document.getElementById('producers-table-body');
+            if (!tbody) return;
+
+            const agentsHTML = agents.map(agent => `
+                <tr>
+                    <td>
+                        <div class="user-info">
+                            <div class="user-avatar">${agent.avatar}</div>
+                            <span>${agent.name}</span>
+                        </div>
+                    </td>
+                    <td>${agent.role}</td>
+                    <td>${agent.license}</td>
+                    <td>${agent.clients}</td>
+                    <td>$${agent.ytdSales.toLocaleString()}</td>
+                    <td>$${agent.commission.toLocaleString()}</td>
+                    <td><span class="status-badge ${agent.status.toLowerCase()}">${agent.status}</span></td>
+                    <td>
+                        <button class="btn-icon" onclick="editProducer(${agent.id}, '${agent.name}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon" onclick="viewProducerStats(${agent.id}, '${agent.name}')"><i class="fas fa-chart-line"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+
+            tbody.innerHTML = agentsHTML;
+        } else {
+            console.warn('⚠️ Failed to load agent statistics:', response.status);
+        }
+    } catch (error) {
+        console.error('❌ Error loading agent statistics:', error);
+    }
+}
+
 function loadNewPolicyCards(newPolicies) {
     const container = document.getElementById('new-policy-reminders');
     if (!container) return;
 
-    if (newPolicies.length === 0) {
+    // Also get recent clients
+    const recentClients = window.communicationsReminders ? window.communicationsReminders.recentClients : [];
+    const allNewItems = [...newPolicies, ...recentClients];
+
+    if (allNewItems.length === 0) {
         container.innerHTML = `
             <div class="no-reminders">
                 <i class="fas fa-file-contract" style="font-size: 48px; color: #d1d5db; margin-bottom: 16px;"></i>
-                <p>No new policies in the last 7 days</p>
+                <p>No new clients or policies in the last 7 days</p>
             </div>
         `;
         return;
     }
 
-    const cards = newPolicies.map(policy => {
-        const premium = typeof policy.premium === 'number' ? policy.premium.toLocaleString() : policy.premium;
-
-        return `
-            <div class="reminder-card new-policy-card ${policy.giftSent ? 'completed' : ''}">
-                <div class="card-header">
-                    <div class="card-icon">
-                        <i class="fas fa-file-contract"></i>
-                    </div>
-                    <div class="card-info">
-                        <h4>${policy.clientName}</h4>
-                        <p class="card-subtitle">${policy.policyType}</p>
-                    </div>
-                    <div class="card-urgency">
-                        <span class="policy-premium">$${premium}</span>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="card-details">
-                        <div class="detail-item">
-                            <i class="fas fa-calendar-plus"></i>
-                            <span>${policy.daysAgo === 0 ? 'Today' :
-                                   policy.daysAgo === 1 ? 'Yesterday' :
-                                   `${policy.daysAgo} days ago`}</span>
+    const cards = allNewItems.map(item => {
+        if (item.type === 'new_client') {
+            // Handle new clients
+            return `
+                <div class="reminder-card new-client-card ${item.giftSent ? 'completed' : ''}">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="card-info">
+                            <h4>${item.clientName}</h4>
+                            <p class="card-subtitle">${item.clientType}${item.state ? ` • ${item.state}` : ''}</p>
+                        </div>
+                        <div class="card-urgency">
+                            <span class="client-badge">New Client</span>
                         </div>
                     </div>
+                    <div class="card-body">
+                        <div class="card-details">
+                            <div class="detail-item">
+                                <i class="fas fa-calendar-plus"></i>
+                                <span>${item.daysAgo === 0 ? 'Today' :
+                                       item.daysAgo === 1 ? 'Yesterday' :
+                                       `${item.daysAgo} days ago`}</span>
+                            </div>
+                            ${item.phone ? `
+                                <div class="detail-item">
+                                    <i class="fas fa-phone"></i>
+                                    <span>${item.phone}</span>
+                                </div>
+                            ` : ''}
+                            ${item.email ? `
+                                <div class="detail-item">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>${item.email}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        ${!item.giftSent ? `
+                            <button class="btn-primary btn-small" onclick="window.communicationsReminders.markGiftSent('${item.id}', '${item.clientName}')">
+                                <i class="fas fa-gift"></i> Mark Gift Sent
+                            </button>
+                            <button class="btn-secondary btn-small" onclick="sendWelcomeMessage('${item.clientName}')">
+                                <i class="fas fa-paper-plane"></i> Send Welcome
+                            </button>
+                        ` : `
+                            <button class="btn-secondary btn-small" onclick="window.communicationsReminders.undoGiftSent('${item.id}')">
+                                <i class="fas fa-undo"></i> Undo Gift Sent
+                            </button>
+                        `}
+                    </div>
                 </div>
-                <div class="card-actions">
-                    ${!policy.giftSent ? `
-                        <button class="btn-primary btn-small" onclick="window.communicationsReminders.markGiftSent('${policy.id}', '${policy.clientName}')">
-                            <i class="fas fa-gift"></i> Mark Gift Sent
-                        </button>
-                        <button class="btn-secondary btn-small" onclick="sendWelcomeMessage('${policy.clientName}')">
-                            <i class="fas fa-paper-plane"></i> Send Welcome
-                        </button>
-                    ` : `
+            `;
+        } else {
+            // Handle policies (existing logic)
+            const premium = typeof item.premium === 'number' ? item.premium.toLocaleString() : item.premium;
+
+            return `
+                <div class="reminder-card new-policy-card ${item.giftSent ? 'completed' : ''}">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-file-contract"></i>
+                        </div>
+                        <div class="card-info">
+                            <h4>${item.clientName}</h4>
+                            <p class="card-subtitle">${item.policyType}</p>
+                        </div>
+                        <div class="card-urgency">
+                            <span class="policy-premium">$${premium}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="card-details">
+                            <div class="detail-item">
+                                <i class="fas fa-calendar-plus"></i>
+                                <span>${item.daysAgo === 0 ? 'Today' :
+                                       item.daysAgo === 1 ? 'Yesterday' :
+                                       `${item.daysAgo} days ago`}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        ${!item.giftSent ? `
+                            <button class="btn-primary btn-small" onclick="window.communicationsReminders.markGiftSent('${item.id}', '${item.clientName}')">
+                                <i class="fas fa-gift"></i> Mark Gift Sent
+                            </button>
+                            <button class="btn-secondary btn-small" onclick="sendWelcomeMessage('${item.clientName}')">
+                                <i class="fas fa-paper-plane"></i> Send Welcome
+                            </button>
+                        ` : `
                         <span class="status-completed">
                             <i class="fas fa-check-circle"></i> Gift Sent
                         </span>
-                        <button class="btn-secondary btn-small" onclick="window.communicationsReminders.undoGiftSent('${policy.id}')">
+                        <button class="btn-secondary btn-small" onclick="window.communicationsReminders.undoGiftSent('${item.id}')">
                             <i class="fas fa-undo"></i> Undo
                         </button>
                     `}
                 </div>
             </div>
         `;
+        }
     }).join('');
 
     container.innerHTML = cards;
@@ -23684,6 +24452,27 @@ function formatStageName(stage) {
 function isGreenHighlightActive(lead) {
     const now = new Date();
 
+    // CRITICAL FIX: Check for overdue callbacks first - if lead has overdue callback, no green highlighting
+    if (lead && lead.id) {
+        try {
+            const callbacks = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+            const leadCallbacks = callbacks[lead.id] || [];
+
+            const hasOverdueCallback = leadCallbacks.some(callback => {
+                if (callback.completed) return false;
+                const callbackTime = new Date(callback.dateTime);
+                return callbackTime <= now;
+            });
+
+            if (hasOverdueCallback) {
+                console.log(`🔴 GREEN HIGHLIGHT BLOCKED: Lead ${lead.id} has overdue callback`);
+                return false;
+            }
+        } catch (error) {
+            console.log(`⚠️ GREEN HIGHLIGHT CHECK: Error checking callbacks for ${lead.id}:`, error);
+        }
+    }
+
     // Check Contact Attempted auto-completion format
     if (lead.greenUntil) {
         const greenUntil = new Date(lead.greenUntil);
@@ -24054,6 +24843,27 @@ window.generateTimeMeter = generateTimeMeter;
 function renderLeadsList(leads) {
     const leadsList = document.getElementById('leadsTableBody');
     if (!leadsList) return;
+
+    // USER-SPECIFIC FILTERING: Maureen can only see her assigned leads
+    const sessionData = sessionStorage.getItem('vanguard_user');
+    if (sessionData) {
+        try {
+            const user = JSON.parse(sessionData);
+            console.log('🔍 RENDER FILTER DEBUG: Current user:', user.username);
+            if (user.username && user.username.toLowerCase() === 'maureen') {
+                const originalCount = leads.length;
+                console.log('🔍 RENDER BEFORE FILTER: Sample assignments:', leads.slice(0, 3).map(l => `${l.name}: ${l.assignedTo}`));
+                leads = leads.filter(lead => {
+                    const assignedTo = lead.assignedTo || lead.agent || lead.assignedAgent || '';
+                    return assignedTo.toLowerCase() === 'maureen';
+                });
+                console.log(`🔒 MAUREEN FILTER: ${originalCount} → ${leads.length} leads (showing only Maureen's assigned leads)`);
+                console.log('🔍 RENDER AFTER FILTER: Remaining leads:', leads.map(l => `${l.name}: ${l.assignedTo || l.agent || l.assignedAgent}`));
+            }
+        } catch (error) {
+            console.error('Error parsing session data in renderLeadsList:', error);
+        }
+    }
 
     // FINAL FILTER: Remove any mock/archived leads that made it through
     const mockPatterns = ['Test Lead', 'Test Company', 'Test Trucking', 'Robert Thompson', 'Jennifer Martin',
@@ -24637,6 +25447,38 @@ window.createQuoteApplicationForPolicy = function(policyId) {
                       policy.insuredName ||
                       'Unknown Client';
 
+    // Extract vehicle data from policy
+    const vehicleData = [];
+    if (policy.vehicles && Array.isArray(policy.vehicles)) {
+        policy.vehicles.forEach((vehicle, index) => {
+            vehicleData.push({
+                year: vehicle.Year || vehicle.year || '',
+                make: vehicle.Make || vehicle.make || '',
+                model: vehicle.Model || vehicle.model || '',
+                vin: vehicle.VIN || vehicle.vin || '',
+                type: vehicle.Type || vehicle.type || '',
+                value: vehicle.Value || vehicle.value || '',
+                radius: vehicle.Radius || vehicle.radius || ''
+            });
+        });
+    }
+
+    // Extract driver data from policy
+    const driverData = [];
+    if (policy.drivers && Array.isArray(policy.drivers)) {
+        policy.drivers.forEach((driver, index) => {
+            driverData.push({
+                name: driver.name || driver['Full Name'] || '',
+                dateOfBirth: driver.dateOfBirth || driver['Date of Birth'] || '',
+                licenseNumber: driver.licenseNumber || driver['License Number'] || '',
+                state: driver.state || '',
+                yearsExperience: driver.yearsExperience || '',
+                dateOfHire: driver.dateOfHire || '',
+                accidents: driver.accidents || driver['# Accidents/Violations'] || ''
+            });
+        });
+    }
+
     // Create a temporary lead-like object for the policy-based quote application
     const tempLeadData = {
         id: `policy_${policyId}`,
@@ -24645,7 +25487,9 @@ window.createQuoteApplicationForPolicy = function(policyId) {
         email: policy.insured?.['Email'] || policy.email || '',
         usdot: policy.insured?.['US DOT #'] || '',
         policyId: policyId,
-        isPolicyQuote: true
+        isPolicyQuote: true,
+        policyVehicles: vehicleData,
+        policyDrivers: driverData
     };
 
     // Temporarily add this to leads storage so the quote application can find it

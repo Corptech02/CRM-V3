@@ -101,23 +101,32 @@ function showPolicyModal(existingPolicy = null) {
                             </div>
                             <div class="form-group">
                                 <label>Insurance Carrier <span class="required">*</span></label>
-                                <select id="carrier" class="form-control" required>
-                                    <option value="">Select Carrier</option>
-                                    <option>Progressive</option>
-                                    <option>State Farm</option>
-                                    <option>GEICO</option>
-                                    <option>Allstate</option>
-                                    <option>Liberty Mutual</option>
-                                    <option>Nationwide</option>
-                                    <option>Farmers</option>
-                                    <option>USAA</option>
-                                    <option>Travelers</option>
-                                    <option>American Family</option>
-                                    <option>Hartford</option>
-                                    <option>Chubb</option>
-                                    <option>MetLife</option>
-                                    <option>Other</option>
-                                </select>
+                                <div style="position: relative;">
+                                    <select id="carrier" class="form-control" required onchange="handleCarrierChange(this)">
+                                        <option value="">Select Carrier</option>
+                                        <option>Progressive</option>
+                                        <option>State Farm</option>
+                                        <option>GEICO</option>
+                                        <option>Allstate</option>
+                                        <option>Liberty Mutual</option>
+                                        <option>Nationwide</option>
+                                        <option>Farmers</option>
+                                        <option>USAA</option>
+                                        <option>Travelers</option>
+                                        <option>American Family</option>
+                                        <option>Hartford</option>
+                                        <option>Chubb</option>
+                                        <option>MetLife</option>
+                                        <option>Canal</option>
+                                        <option>Northland</option>
+                                        <option>NICO</option>
+                                        <option>Coverwhale</option>
+                                        <option>Occidental</option>
+                                        <option>Other</option>
+                                    </select>
+                                    <input type="text" id="carrier-text" class="form-control" style="display: none;" placeholder="Enter carrier name" required>
+                                    <button type="button" id="carrier-arrow" onclick="switchBackToDropdown('carrier')" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px;">▼</button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Policy Status <span class="required">*</span></label>
@@ -258,7 +267,17 @@ function showTabbedPolicyForm(isEditing = false) {
                 document.getElementById('overview-carrier').value = policyData.carrier || '';
             }
             if (document.getElementById('overview-status')) {
-                document.getElementById('overview-status').value = policyData.policyStatus || 'Active';
+                // Handle case-insensitive status matching
+                const statusValue = policyData.policyStatus || 'Active';
+                const statusElement = document.getElementById('overview-status');
+
+                // Try exact match first, then try capitalized version
+                statusElement.value = statusValue;
+                if (!statusElement.value && statusValue.toLowerCase() === 'active') {
+                    statusElement.value = 'Active';
+                }
+
+                console.log('✅ Setting status to:', statusElement.value);
             }
             if (document.getElementById('overview-effective-date')) {
                 document.getElementById('overview-effective-date').value = policyData.effectiveDate || '';
@@ -271,6 +290,55 @@ function showTabbedPolicyForm(isEditing = false) {
                                  policyData.policyType === 'personal-auto' ? 'Personal Auto' :
                                  policyData.policyType ? policyData.policyType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : '';
                 document.getElementById('overview-policy-type').value = typeLabel;
+            }
+
+            // Prefill client contact information if available
+            if (window.currentClientInfo) {
+                const client = window.currentClientInfo;
+                console.log('🔍 PREFILL CLIENT DATA:', client);
+
+                // Prefill contact information
+                if (document.getElementById('contact-phone') && client.phone) {
+                    document.getElementById('contact-phone').value = client.phone;
+                    console.log('✅ Prefilled phone:', client.phone);
+                }
+                if (document.getElementById('contact-email') && client.email) {
+                    document.getElementById('contact-email').value = client.email;
+                    console.log('✅ Prefilled email:', client.email);
+                }
+                if (document.getElementById('contact-address') && client.address) {
+                    document.getElementById('contact-address').value = client.address;
+                    console.log('✅ Prefilled address:', client.address);
+                }
+                if (document.getElementById('contact-city') && client.city) {
+                    document.getElementById('contact-city').value = client.city;
+                    console.log('✅ Prefilled city:', client.city);
+                }
+                if (document.getElementById('contact-state') && client.state) {
+                    document.getElementById('contact-state').value = client.state;
+                    console.log('✅ Prefilled state:', client.state);
+                }
+                if (document.getElementById('contact-zip') && client.zip) {
+                    document.getElementById('contact-zip').value = client.zip;
+                    console.log('✅ Prefilled zip:', client.zip);
+                }
+
+                // Prefill assigned agent
+                if (document.getElementById('overview-agent') && client.assignedTo) {
+                    document.getElementById('overview-agent').value = client.assignedTo;
+                    console.log('✅ Prefilled agent:', client.assignedTo);
+                }
+
+                // Prefill insured name/business name
+                if (document.getElementById('insured-name')) {
+                    const insuredName = client.businessName || client.name || client.fullName || '';
+                    if (insuredName) {
+                        document.getElementById('insured-name').value = insuredName;
+                        console.log('✅ Prefilled insured name:', insuredName);
+                    }
+                }
+
+                console.log('🎯 CLIENT DATA PREFILL COMPLETE');
             }
         }
     }, 100);
@@ -308,6 +376,11 @@ function showTabbedPolicyForm(isEditing = false) {
         setTimeout(() => {
             if (window.initQuickFill && typeof window.initQuickFill === 'function') {
                 window.initQuickFill();
+            }
+
+            // Initialize coverage mode to dropdown (default)
+            if (window.toggleCoverageMode && typeof window.toggleCoverageMode === 'function') {
+                window.toggleCoverageMode('dropdown');
             }
         }, 200);
     }
@@ -374,22 +447,32 @@ function generateTabContent(tabId, policyType) {
                         </div>
                         <div class="form-group">
                             <label>Carrier</label>
-                            <select class="form-control" id="overview-carrier">
-                                <option value="">Select Carrier</option>
-                                <option>Progressive</option>
-                                <option>State Farm</option>
-                                <option>GEICO</option>
-                                <option>Allstate</option>
-                                <option>Liberty Mutual</option>
-                                <option>Nationwide</option>
-                                <option>Farmers</option>
-                                <option>USAA</option>
-                                <option>Travelers</option>
-                                <option>American Family</option>
-                                <option>Hartford</option>
-                                <option>Chubb</option>
-                                <option>MetLife</option>
-                            </select>
+                            <div style="position: relative;">
+                                <select class="form-control" id="overview-carrier" onchange="handleCarrierChange(this)">
+                                    <option value="">Select Carrier</option>
+                                    <option>Progressive</option>
+                                    <option>State Farm</option>
+                                    <option>GEICO</option>
+                                    <option>Allstate</option>
+                                    <option>Liberty Mutual</option>
+                                    <option>Nationwide</option>
+                                    <option>Farmers</option>
+                                    <option>USAA</option>
+                                    <option>Travelers</option>
+                                    <option>American Family</option>
+                                    <option>Hartford</option>
+                                    <option>Chubb</option>
+                                    <option>MetLife</option>
+                                    <option>Canal</option>
+                                    <option>Northland</option>
+                                    <option>NICO</option>
+                                    <option>Coverwhale</option>
+                                    <option>Occidental</option>
+                                    <option>Other</option>
+                                </select>
+                                <input type="text" id="overview-carrier-text" class="form-control" style="display: none;" placeholder="Enter carrier name">
+                                <button type="button" id="overview-carrier-arrow" onclick="switchBackToDropdown('overview-carrier')" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px;">▼</button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Status</label>
@@ -413,7 +496,7 @@ function generateTabContent(tabId, policyType) {
                         </div>
                         <div class="form-group">
                             <label>Premium</label>
-                            <input type="text" class="form-control" id="overview-premium">
+                            <input type="text" class="form-control" id="overview-premium" onchange="handlePremiumChange(this)" oninput="handlePremiumChange(this)">
                         </div>
                         <div class="form-group">
                             <label>Agent</label>
@@ -422,6 +505,7 @@ function generateTabContent(tabId, policyType) {
                                 <option value="Grant">Grant</option>
                                 <option value="Hunter">Hunter</option>
                                 <option value="Carson">Carson</option>
+                                <option value="Maureen">Maureen</option>
                             </select>
                         </div>
                     </div>
@@ -435,19 +519,6 @@ function generateTabContent(tabId, policyType) {
                         <div class="form-group">
                             <label>MC Number</label>
                             <input type="text" class="form-control" id="overview-mc-number">
-                        </div>
-                        <div class="form-group">
-                            <label>Fleet Size</label>
-                            <input type="text" class="form-control" id="overview-fleet-size">
-                        </div>
-                        <div class="form-group">
-                            <label>Operating Radius</label>
-                            <select class="form-control" id="overview-operating-radius">
-                                <option value="">Select Radius</option>
-                                <option>Local (0-50 miles)</option>
-                                <option>Regional (50-300 miles)</option>
-                                <option>Interstate (300+ miles)</option>
-                            </select>
                         </div>
                     </div>
                     ` : ''}
@@ -542,16 +613,13 @@ function generateTabContent(tabId, policyType) {
                             <h3 style="margin-bottom: 16px; color: #495057;">Coverage Input Mode</h3>
                             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500;">
-                                    <input type="radio" name="coverage-input-mode" value="text" checked onchange="toggleCoverageMode(this.value)" style="margin: 0;">
-                                    <span>Text Input (Default)</span>
+                                    <input type="radio" name="coverage-input-mode" value="text" onchange="toggleCoverageMode(this.value)" style="margin: 0;">
+                                    <span>Text Input</span>
                                 </label>
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500;">
-                                    <input type="radio" name="coverage-input-mode" value="dropdown" onchange="toggleCoverageMode(this.value)" style="margin: 0;">
-                                    <span>Dropdown Selection</span>
+                                    <input type="radio" name="coverage-input-mode" value="dropdown" checked onchange="toggleCoverageMode(this.value)" style="margin: 0;">
+                                    <span>Dropdown Selection (Default)</span>
                                 </label>
-                                <div style="margin-left: auto; padding: 8px 12px; background: #e3f2fd; border-radius: 4px; font-size: 14px; color: #1565c0;">
-                                    💡 Use text mode for easy copy-paste from policy docs
-                                </div>
                             </div>
                         </div>
 
@@ -559,10 +627,10 @@ function generateTabContent(tabId, policyType) {
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Liability Limits</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-liability-limits-text" placeholder="e.g. $1,000,000 CSL" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-liability-limits" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-liability-limits-text" placeholder="e.g. $1,000,000 CSL" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-liability-limits" style="display: block;">
                                     <option value="">Select Liability Limits</option>
                                     <option value="750000">$750,000 CSL</option>
                                     <option value="1000000">$1,000,000 CSL</option>
@@ -576,10 +644,10 @@ function generateTabContent(tabId, policyType) {
                             </div>
                             <div class="form-group">
                                 <label>General Aggregate</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-general-aggregate-text" placeholder="e.g. $2,000,000" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-general-aggregate" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-general-aggregate-text" placeholder="e.g. $2,000,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-general-aggregate" style="display: block;">
                                     <option value="">Select Aggregate Limit</option>
                                     <option value="1000000">$1,000,000</option>
                                     <option value="2000000">$2,000,000</option>
@@ -595,10 +663,10 @@ function generateTabContent(tabId, policyType) {
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Comprehensive Deductible</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-comp-deduct-text" placeholder="e.g. $1,000" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-comp-deduct" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-comp-deduct-text" placeholder="e.g. $1,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-comp-deduct" style="display: block;">
                                     <option value="">Select Deductible</option>
                                     <option value="0">$0</option>
                                     <option value="250">$250</option>
@@ -610,10 +678,10 @@ function generateTabContent(tabId, policyType) {
                             </div>
                             <div class="form-group">
                                 <label>Collision Deductible</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-coll-deduct-text" placeholder="e.g. $1,000" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-coll-deduct" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-coll-deduct-text" placeholder="e.g. $1,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-coll-deduct" style="display: block;">
                                     <option value="">Select Deductible</option>
                                     <option value="0">$0</option>
                                     <option value="500">$500</option>
@@ -629,10 +697,10 @@ function generateTabContent(tabId, policyType) {
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Cargo Limit</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-cargo-limit-text" placeholder="e.g. $100,000" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-cargo-limit" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-cargo-limit-text" placeholder="e.g. $100,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-cargo-limit" style="display: block;">
                                     <option value="">Select Cargo Limit</option>
                                     <option value="0">No Cargo Coverage</option>
                                     <option value="10000">$10,000</option>
@@ -648,10 +716,10 @@ function generateTabContent(tabId, policyType) {
                             </div>
                             <div class="form-group">
                                 <label>Cargo Deductible</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-cargo-deduct-text" placeholder="e.g. $2,500" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-cargo-deduct" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-cargo-deduct-text" placeholder="e.g. $2,500" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-cargo-deduct" style="display: block;">
                                     <option value="">Select Deductible</option>
                                     <option value="0">$0</option>
                                     <option value="1000">$1,000</option>
@@ -666,10 +734,10 @@ function generateTabContent(tabId, policyType) {
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Medical Payments</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-medical-text" placeholder="e.g. $5,000" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-medical" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-medical-text" placeholder="e.g. $5,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-medical" style="display: block;">
                                     <option value="">Select Limit</option>
                                     <option value="0">No Coverage</option>
                                     <option value="1000">$1,000</option>
@@ -681,10 +749,10 @@ function generateTabContent(tabId, policyType) {
                             </div>
                             <div class="form-group">
                                 <label>Uninsured/Underinsured Motorist</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-um-uim-text" placeholder="e.g. $75,000" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-um-uim" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-um-uim-text" placeholder="e.g. $75,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-um-uim" style="display: block;">
                                     <option value="">Select Limit</option>
                                     <option value="0">Rejected</option>
                                     <option value="25/50">$25K/$50K</option>
@@ -699,10 +767,10 @@ function generateTabContent(tabId, policyType) {
                             </div>
                             <div class="form-group">
                                 <label>Trailer Interchange Limit</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-trailer-interchange-text" placeholder="e.g. $50,000" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-trailer-interchange" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-trailer-interchange-text" placeholder="e.g. $50,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-trailer-interchange" style="display: block;">
                                     <option value="">Select Limit</option>
                                     <option value="0">No Coverage</option>
                                     <option value="20000">$20,000</option>
@@ -714,10 +782,10 @@ function generateTabContent(tabId, policyType) {
                             </div>
                             <div class="form-group">
                                 <label>Non-Trucking Liability</label>
-                                <!-- Text input (default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-non-trucking-text" placeholder="e.g. $1,000,000 CSL" style="display: block;">
-                                <!-- Dropdown (hidden by default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-non-trucking" style="display: none;">
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-non-trucking-text" placeholder="e.g. $1,000,000 CSL" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-non-trucking" style="display: block;">
                                     <option value="">Select Limit</option>
                                     <option value="0">No Coverage</option>
                                     <option value="30/60/25">$30K/$60K/$25K</option>
@@ -843,7 +911,7 @@ function generateTabContent(tabId, policyType) {
                     <div class="form-grid">
                         <div class="form-group">
                             <label>Annual Premium <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="financial-annual-premium">
+                            <input type="text" class="form-control" id="financial-annual-premium" onchange="handleAnnualPremiumChange(this)" oninput="handleAnnualPremiumChange(this)">
                         </div>
                         <div class="form-group">
                             <label>Payment Plan</label>
@@ -960,25 +1028,37 @@ function addPolicyVehicle() {
 
     const vehicleEntry = document.createElement('div');
     vehicleEntry.className = 'vehicle-entry';
+    vehicleEntry.style.marginBottom = '20px';
+    vehicleEntry.style.padding = '15px';
+    vehicleEntry.style.border = '1px solid rgb(229, 231, 235)';
+    vehicleEntry.style.borderRadius = '8px';
+    vehicleEntry.style.background = 'rgb(249, 250, 251)';
+
     vehicleEntry.innerHTML = `
         <h4>Vehicle ${vehicleCount}</h4>
-        <div class="form-grid">
-            <input type="text" class="form-control" placeholder="Year">
-            <input type="text" class="form-control" placeholder="Make">
-            <input type="text" class="form-control" placeholder="Model">
-            <input type="text" class="form-control" placeholder="VIN">
-            <input type="number" class="form-control" placeholder="Value ($)" step="1000">
-            <input type="number" class="form-control" placeholder="Deductible ($)" step="250">
-            <select class="form-control">
-                <option>Comprehensive & Collision</option>
-                <option>Liability Only</option>
-            </select>
-            <button type="button" class="btn-danger" onclick="this.parentElement.parentElement.remove()">
-                <i class="fas fa-trash"></i>
-            </button>
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+            <input type="text" class="form-control vehicle-year" placeholder="Year" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+            <input type="text" class="form-control vehicle-make" placeholder="Make" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+            <input type="text" class="form-control vehicle-model" placeholder="Model" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
         </div>
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+            <select class="form-control vehicle-radius" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                <option value="">Select Mile Radius</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="300">300</option>
+                <option value="500">500</option>
+                <option value="unlimited">Unlimited</option>
+            </select>
+            <input type="number" class="form-control vehicle-value" placeholder="Value ($)" step="1000" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 10px;">
+            <input type="text" class="form-control vehicle-vin" placeholder="VIN" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;" oninput="checkVINLength(this)">
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" style="margin-top: 10px; background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Remove Vehicle</button>
     `;
-    
+
     vehiclesList.appendChild(vehicleEntry);
 }
 
@@ -1011,22 +1091,49 @@ function addPolicyTrailer() {
 
     const trailerEntry = document.createElement('div');
     trailerEntry.className = 'trailer-entry';
+    trailerEntry.style.marginBottom = '20px';
+    trailerEntry.style.padding = '15px';
+    trailerEntry.style.border = '1px solid rgb(229, 231, 235)';
+    trailerEntry.style.borderRadius = '8px';
+    trailerEntry.style.background = 'rgb(249, 250, 251)';
+
     trailerEntry.innerHTML = `
         <h4>Trailer ${trailerCount}</h4>
-        <div class="form-grid">
-            <input type="text" class="form-control" placeholder="Year">
-            <input type="text" class="form-control" placeholder="Make">
-            <input type="text" class="form-control" placeholder="Type (Flatbed, Reefer, etc.)">
-            <input type="text" class="form-control" placeholder="VIN">
-            <input type="text" class="form-control" placeholder="Length">
-            <input type="number" class="form-control" placeholder="Value ($)" step="1000">
-            <input type="number" class="form-control" placeholder="Deductible ($)" step="250">
-            <button type="button" class="btn-danger" onclick="this.parentElement.parentElement.remove()">
-                <i class="fas fa-trash"></i>
-            </button>
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+            <input type="text" class="form-control trailer-year" placeholder="Year" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+            <input type="text" class="form-control trailer-make" placeholder="Make" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+            <div style="position: relative;">
+                <select class="form-control trailer-type" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;" onchange="handleTrailerTypeChange(this, ${trailerCount})">
+                    <option value="">Select Type</option>
+                    <option>Dry Freight</option>
+                    <option>Reefer</option>
+                    <option>Flatbed</option>
+                    <option>Dump</option>
+                    <option>Gooseneck</option>
+                    <option>Other</option>
+                </select>
+                <input type="text" class="form-control trailer-type-text-${trailerCount}" style="display: none; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;" placeholder="Enter trailer type">
+                <button type="button" class="trailer-type-arrow-${trailerCount}" onclick="switchBackToTrailerTypeDropdown(${trailerCount})" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px;">▼</button>
+            </div>
         </div>
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+            <select class="form-control trailer-radius" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                <option value="">Select Mile Radius</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="300">300</option>
+                <option value="500">500</option>
+                <option value="unlimited">Unlimited</option>
+            </select>
+            <input type="number" class="form-control trailer-value" placeholder="Value ($)" step="1000" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+        </div>
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 10px;">
+            <input type="text" class="form-control trailer-vin" placeholder="VIN" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;" oninput="checkTrailerVINLength(this)">
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" style="margin-top: 10px; background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Remove Trailer</button>
     `;
-    
+
     trailersList.appendChild(trailerEntry);
 }
 
@@ -1467,17 +1574,19 @@ async function savePolicy() {
                     
                     // Store financial data at root level too
                     if (tabId === 'financial') {
-                        if (label === 'Annual Premium') {
+                        if (label === 'Annual Premium' && input.value) {
                             policyData.premium = input.value;
                             policyData.annualPremium = input.value;
                             // Also ensure it's in the financial object
                             if (!policyData.financial) policyData.financial = {};
                             policyData.financial['Annual Premium'] = input.value;
+                            console.log('Setting premium from financial Annual Premium field:', input.value);
                         }
-                        if (label === 'Premium') {
+                        if (label === 'Premium' && input.value) {
                             policyData.premium = input.value;
+                            console.log('Setting premium from financial Premium field:', input.value);
                         }
-                        if (label === 'Monthly Premium') {
+                        if (label === 'Monthly Premium' && input.value) {
                             policyData.monthlyPremium = input.value;
                         }
                     }
@@ -1826,17 +1935,19 @@ function savePolicyDraft() {
                     
                     // Store financial data at root level too
                     if (tabId === 'financial') {
-                        if (label === 'Annual Premium') {
+                        if (label === 'Annual Premium' && input.value) {
                             policyData.premium = input.value;
                             policyData.annualPremium = input.value;
                             // Also ensure it's in the financial object
                             if (!policyData.financial) policyData.financial = {};
                             policyData.financial['Annual Premium'] = input.value;
+                            console.log('Setting premium from financial Annual Premium field:', input.value);
                         }
-                        if (label === 'Premium') {
+                        if (label === 'Premium' && input.value) {
                             policyData.premium = input.value;
+                            console.log('Setting premium from financial Premium field:', input.value);
                         }
-                        if (label === 'Monthly Premium') {
+                        if (label === 'Monthly Premium' && input.value) {
                             policyData.monthlyPremium = input.value;
                         }
                     }
@@ -2309,3 +2420,253 @@ window.toggleCoverageMode = function(mode) {
         console.log('✅ Switched to dropdown mode');
     }
 };
+
+// Handle carrier dropdown change to "Other"
+function handleCarrierChange(selectElement) {
+    const selectId = selectElement.id;
+    const textInputId = selectId + '-text';
+    const arrowButtonId = selectId + '-arrow';
+
+    if (selectElement.value === 'Other') {
+        // Hide dropdown and show text input with arrow button
+        selectElement.style.display = 'none';
+        const textInput = document.getElementById(textInputId);
+        const arrowButton = document.getElementById(arrowButtonId);
+
+        if (textInput) {
+            textInput.style.display = 'block';
+            textInput.focus();
+        }
+        if (arrowButton) {
+            arrowButton.style.display = 'block';
+        }
+
+        console.log('✅ Switched carrier to text input mode');
+    }
+}
+
+// Switch carrier input back to dropdown
+function switchBackToDropdown(selectId) {
+    const selectElement = document.getElementById(selectId);
+    const textInputId = selectId + '-text';
+    const arrowButtonId = selectId + '-arrow';
+    const textInput = document.getElementById(textInputId);
+    const arrowButton = document.getElementById(arrowButtonId);
+
+    // Show dropdown and hide text input with arrow button
+    if (selectElement) {
+        selectElement.style.display = 'block';
+        selectElement.value = ''; // Reset to default
+    }
+    if (textInput) {
+        textInput.style.display = 'none';
+        textInput.value = ''; // Clear text input
+    }
+    if (arrowButton) {
+        arrowButton.style.display = 'none';
+    }
+
+    console.log('✅ Switched carrier back to dropdown mode');
+}
+
+// Handle premium change and auto-fill annual premium
+function handlePremiumChange(premiumInput) {
+    const premiumValue = premiumInput.value;
+    const annualPremiumField = document.getElementById('financial-annual-premium');
+
+    if (annualPremiumField && premiumValue && annualPremiumField.value !== premiumValue) {
+        // Auto-fill the annual premium field with the same value
+        annualPremiumField.value = premiumValue;
+        console.log('✅ Auto-filled annual premium from overview:', premiumValue);
+    }
+}
+
+// Handle annual premium change and auto-fill overview premium
+function handleAnnualPremiumChange(annualPremiumInput) {
+    const annualPremiumValue = annualPremiumInput.value;
+    const overviewPremiumField = document.getElementById('overview-premium');
+
+    if (overviewPremiumField && annualPremiumValue && overviewPremiumField.value !== annualPremiumValue) {
+        // Auto-fill the overview premium field with the same value
+        overviewPremiumField.value = annualPremiumValue;
+        console.log('✅ Auto-filled overview premium from annual:', annualPremiumValue);
+    }
+}
+
+// VIN Length checker - triggers decoder when 17 characters are entered
+function checkVINLength(vinInput) {
+    const vin = vinInput.value.trim();
+    if (vin.length === 17) {
+        decodeVIN(vinInput);
+    }
+}
+
+// Trailer VIN Length checker
+function checkTrailerVINLength(vinInput) {
+    const vin = vinInput.value.trim();
+    if (vin.length === 17) {
+        decodeTrailerVIN(vinInput);
+    }
+}
+
+// VIN Decoder for Vehicles
+function decodeVIN(vinInput) {
+    const vin = vinInput.value.trim().toUpperCase();
+
+    if (!vin || vin.length !== 17) {
+        console.log('VIN must be 17 characters long');
+        return;
+    }
+
+    // Find the parent vehicle entry
+    const vehicleEntry = vinInput.closest('.vehicle-entry');
+    if (!vehicleEntry) {
+        console.error('Could not find vehicle entry');
+        return;
+    }
+
+    // Get the input fields within this vehicle entry
+    const yearInput = vehicleEntry.querySelector('.vehicle-year');
+    const makeInput = vehicleEntry.querySelector('.vehicle-make');
+    const modelInput = vehicleEntry.querySelector('.vehicle-model');
+
+    // Show loading state
+    if (yearInput) yearInput.value = 'Loading...';
+    if (makeInput) makeInput.value = 'Loading...';
+    if (modelInput) modelInput.value = 'Loading...';
+
+    // Use NHTSA VIN decoder API (free)
+    const apiUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vin}?format=json`;
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (data.Results && data.Results.length > 0) {
+                const result = data.Results[0];
+
+                // Extract year, make, model
+                const year = result.ModelYear || '';
+                const make = result.Make || '';
+                const model = result.Model || '';
+
+                // Populate the fields
+                if (yearInput) yearInput.value = year;
+                if (makeInput) makeInput.value = make;
+                if (modelInput) modelInput.value = model;
+
+                console.log('✅ VIN decoded successfully:', { year, make, model });
+            } else {
+                // Clear loading state if no results
+                if (yearInput) yearInput.value = '';
+                if (makeInput) makeInput.value = '';
+                if (modelInput) modelInput.value = '';
+                console.log('❌ No vehicle data found for VIN');
+            }
+        })
+        .catch(error => {
+            console.error('Error decoding VIN:', error);
+            // Clear loading state on error
+            if (yearInput) yearInput.value = '';
+            if (makeInput) makeInput.value = '';
+            if (modelInput) modelInput.value = '';
+        });
+}
+
+// VIN Decoder for Trailers
+function decodeTrailerVIN(vinInput) {
+    const vin = vinInput.value.trim().toUpperCase();
+
+    if (!vin || vin.length !== 17) {
+        console.log('VIN must be 17 characters long');
+        return;
+    }
+
+    // Find the parent trailer entry
+    const trailerEntry = vinInput.closest('.trailer-entry');
+    if (!trailerEntry) {
+        console.error('Could not find trailer entry');
+        return;
+    }
+
+    // Get the input fields within this trailer entry
+    const yearInput = trailerEntry.querySelector('.trailer-year');
+    const makeInput = trailerEntry.querySelector('.trailer-make');
+
+    // Show loading state
+    if (yearInput) yearInput.value = 'Loading...';
+    if (makeInput) makeInput.value = 'Loading...';
+
+    // Use NHTSA VIN decoder API (free)
+    const apiUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vin}?format=json`;
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (data.Results && data.Results.length > 0) {
+                const result = data.Results[0];
+
+                // Extract year, make for trailers
+                const year = result.ModelYear || '';
+                const make = result.Make || '';
+
+                // Populate the fields
+                if (yearInput) yearInput.value = year;
+                if (makeInput) makeInput.value = make;
+
+                console.log('✅ Trailer VIN decoded successfully:', { year, make });
+            } else {
+                // Clear loading state if no results
+                if (yearInput) yearInput.value = '';
+                if (makeInput) makeInput.value = '';
+                console.log('❌ No trailer data found for VIN');
+            }
+        })
+        .catch(error => {
+            console.error('Error decoding trailer VIN:', error);
+            // Clear loading state on error
+            if (yearInput) yearInput.value = '';
+            if (makeInput) makeInput.value = '';
+        });
+}
+
+// Handle trailer type dropdown change to "Other"
+function handleTrailerTypeChange(selectElement, trailerCount) {
+    if (selectElement.value === 'Other') {
+        // Hide dropdown and show text input with arrow button
+        selectElement.style.display = 'none';
+        const textInput = document.querySelector(`.trailer-type-text-${trailerCount}`);
+        const arrowButton = document.querySelector(`.trailer-type-arrow-${trailerCount}`);
+
+        if (textInput) {
+            textInput.style.display = 'block';
+            textInput.focus();
+        }
+        if (arrowButton) {
+            arrowButton.style.display = 'block';
+        }
+
+        console.log('✅ Switched trailer type to text input mode');
+    }
+}
+
+// Switch trailer type input back to dropdown
+function switchBackToTrailerTypeDropdown(trailerCount) {
+    const selectElement = document.querySelector(`.trailer-entry:nth-child(${trailerCount}) .trailer-type`);
+    const textInput = document.querySelector(`.trailer-type-text-${trailerCount}`);
+    const arrowButton = document.querySelector(`.trailer-type-arrow-${trailerCount}`);
+
+    // Show dropdown and hide text input with arrow button
+    if (selectElement) {
+        selectElement.style.display = 'block';
+        selectElement.value = ''; // Reset to default
+    }
+    if (textInput) {
+        textInput.style.display = 'none';
+        textInput.value = ''; // Clear text input
+    }
+    if (arrowButton) {
+        arrowButton.style.display = 'none';
+    }
+
+    console.log('✅ Switched trailer type back to dropdown mode');
+}

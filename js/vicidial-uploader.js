@@ -241,7 +241,11 @@ const vicidialUploader = {
 
             // Get the actual leads data from criteria
             const allLeads = criteria.leads || [];
-            console.log(`Sending ${allLeads.length} actual leads in single batch`);
+            if (allLeads.length > 50) {
+                console.log(`🔄 Sending ${allLeads.length} leads to backend for batch processing (${Math.ceil(allLeads.length / 50)} batches expected)`);
+            } else {
+                console.log(`🔄 Sending ${allLeads.length} leads for standard processing`);
+            }
 
             const API_URL = window.location.origin;
             // Use the new direct upload endpoint that accepts leads data
@@ -255,8 +259,8 @@ const vicidialUploader = {
                     list_id: listId,
                     leads: allLeads
                 }),
-                // Dynamic timeout for large uploads
-                signal: AbortSignal.timeout(Math.max(600000, allLeads.length * 1000)) // Min 10 minutes, or 1 second per lead
+                // Dynamic timeout for large uploads - be more generous for batch processing
+                signal: AbortSignal.timeout(Math.max(1200000, allLeads.length * 2000)) // Min 20 minutes, or 2 seconds per lead
             });
 
             if (!response.ok) {

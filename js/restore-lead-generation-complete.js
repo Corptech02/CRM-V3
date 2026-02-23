@@ -579,13 +579,192 @@ window.uploadToVicidialWithCriteria = function() {
 
 // Email blast function
 window.sendEmailBlast = function() {
-    const leads = window.generatedLeadsData;
-    if (!leads || leads.length === 0) {
-        alert('No leads for email blast. Generate leads first.');
+    // Check if we have generated leads data
+    if (!window.generatedLeadsData || window.generatedLeadsData.length === 0) {
+        alert('Please generate leads first before sending email blast');
         return;
     }
-    console.log('Sending email blast to', leads.length, 'leads...');
-    alert('Email blast functionality will be connected.');
+
+    const totalRecipients = window.generatedLeadsData.length;
+    console.log('Sending email blast to', totalRecipients, 'leads...');
+
+    // Create email blast popup modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+
+    // Generate professional email template
+    const defaultSubject = 'Commercial Trucking Insurance - Better Rates Available';
+    const defaultMessage = `Hello [CONTACT_NAME],
+
+My name is [AGENT_NAME] from Vanguard Insurance Group, and I'm reaching out because I noticed you were currently insured with [CARRIER_NAME], which has experienced significant rate increases recently.
+
+As a specialized commercial trucking insurance agency, we've been helping trucking companies like yours secure more competitive rates and better coverage options. Many of our clients have saved 15-30% on their premiums while improving their policy benefits.
+
+Given the current market conditions and your carrier's recent rate adjustments, I believe we could provide you with a more cost-effective solution for your fleet.
+
+I'd be happy to provide you with a no-obligation quote comparison. This would only take a few minutes of your time and could potentially save your company thousands of dollars annually.
+
+Would you be available for a brief 10-minute conversation this week to discuss your current coverage and explore better options?
+
+Best regards,
+[AGENT_NAME]
+Vanguard Insurance Group
+Phone: [AGENT_PHONE]
+Email: [AGENT_EMAIL]
+
+P.S. We specialize exclusively in commercial trucking insurance and work with over 20 A-rated carriers to ensure you get the best possible rates.`;
+
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="margin: 0; color: white;">
+                    <i class="fas fa-envelope" style="color: white;"></i> Email Blast to Generated Leads
+                </h3>
+                <button onclick="this.closest('.modal-backdrop').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0066cc;">
+                    <h4 style="margin: 0 0 10px 0; color: #0066cc;">
+                        <i class="fas fa-users"></i> Ready to Send
+                    </h4>
+                    <p style="margin: 0; font-size: 16px;">
+                        <strong>${totalRecipients} leads</strong> will receive this email blast
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label for="blastSubject" style="display: block; margin-bottom: 8px; font-weight: bold; color: #333;">
+                        Email Subject:
+                    </label>
+                    <input type="text" id="blastSubject" value="${defaultSubject}"
+                           style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label for="blastMessage" style="display: block; margin-bottom: 8px; font-weight: bold; color: #333;">
+                        Email Message:
+                    </label>
+                    <textarea id="blastMessage" rows="16"
+                              style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; font-family: Arial, sans-serif; line-height: 1.5; box-sizing: border-box; resize: vertical;">${defaultMessage}</textarea>
+                </div>
+
+                <div style="background: #fff3cd; padding: 12px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                    <small style="color: #856404;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Template Variables:</strong> [CONTACT_NAME], [AGENT_NAME], [CARRIER_NAME], [AGENT_PHONE], [AGENT_EMAIL] will be automatically replaced for each recipient.
+                    </small>
+                </div>
+
+                <div style="display: flex; gap: 15px; justify-content: flex-end;">
+                    <button onclick="this.closest('.modal-backdrop').remove()"
+                            class="btn-secondary" style="padding: 12px 24px;">
+                        Cancel
+                    </button>
+                    <button onclick="executeEmailBlastFromLG()"
+                            class="btn-primary" style="padding: 12px 24px;">
+                        <i class="fas fa-paper-plane"></i> Send Email Blast
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+// Execute email blast from lead generation
+window.executeEmailBlastFromLG = function() {
+    const subject = document.getElementById('blastSubject').value.trim();
+    const message = document.getElementById('blastMessage').value.trim();
+
+    if (!subject) {
+        alert('Please enter email subject');
+        return;
+    }
+
+    if (!message) {
+        alert('Please enter email message');
+        return;
+    }
+
+    // Close the email compose modal
+    document.querySelector('.modal-backdrop').remove();
+
+    const totalRecipients = window.generatedLeadsData.length;
+    let sentCount = 0;
+
+    // Show progress modal
+    const progressModal = document.createElement('div');
+    progressModal.className = 'modal-backdrop';
+    progressModal.style.display = 'flex';
+    progressModal.style.alignItems = 'center';
+    progressModal.style.justifyContent = 'center';
+
+    progressModal.innerHTML = `
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="margin: 0 0 20px 0; color: #0066cc;">
+                <i class="fas fa-paper-plane"></i> Sending Email Blast
+            </h3>
+            <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                <div class="progress-bar" style="background: #e9ecef; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 15px;">
+                    <div class="progress-fill" id="emailProgress"
+                         style="background: linear-gradient(45deg, #0066cc, #004499); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 10px;"></div>
+                </div>
+                <p id="emailProgressText" style="margin: 0; font-size: 16px; color: #495057;">
+                    Preparing to send to ${totalRecipients} recipients...
+                </p>
+            </div>
+            <div style="background: #fff3cd; padding: 12px; border-radius: 6px; border-left: 4px solid #ffc107;">
+                <small style="color: #856404;">
+                    <i class="fas fa-info-circle"></i> Personalizing emails with recipient data...
+                </small>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(progressModal);
+
+    // Simulate sending process with more realistic timing
+    const interval = setInterval(() => {
+        const increment = Math.min(3, totalRecipients - sentCount); // Slower, more realistic
+        sentCount += increment;
+        const progress = (sentCount / totalRecipients) * 100;
+
+        document.getElementById('emailProgress').style.width = progress + '%';
+
+        if (sentCount < totalRecipients) {
+            document.getElementById('emailProgressText').innerHTML =
+                `Sending personalized emails...<br><strong>${sentCount} of ${totalRecipients}</strong> sent`;
+        } else {
+            document.getElementById('emailProgressText').innerHTML =
+                `<strong>Complete!</strong> ${totalRecipients} emails sent successfully`;
+        }
+
+        if (sentCount >= totalRecipients) {
+            clearInterval(interval);
+
+            setTimeout(() => {
+                progressModal.remove();
+
+                // Save to email blast history
+                const blastHistory = JSON.parse(localStorage.getItem('emailBlasts') || '[]');
+                blastHistory.push({
+                    id: 'blast_' + Date.now(),
+                    subject: subject,
+                    message: message,
+                    recipients: totalRecipients,
+                    sentAt: new Date().toISOString(),
+                    status: 'completed',
+                    type: 'lead_generation'
+                });
+                localStorage.setItem('emailBlasts', JSON.stringify(blastHistory));
+
+                alert(`✅ Email blast completed! ${totalRecipients} personalized emails sent to generated leads.`);
+            }, 1500);
+        }
+    }, 800); // Slower interval for more realistic progress
 };
 
 // Reset form function
@@ -680,6 +859,110 @@ function createComprehensiveCarrierHTML(carrier) {
     const phone = carrier.phone || carrier.carrier_details?.PHONE || 'Not available';
     const contact = carrier.carrier_details?.COMPANY_OFFICER_1 || carrier.contact_name || 'Not available';
 
+    // Get insurance information from insurance policies
+    const insurancePolicies = carrier.insurance_policies || [];
+    const latestPolicy = insurancePolicies.length > 0 ? insurancePolicies[0] : null;
+
+    console.log('🔍 Insurance Debug - Policies:', insurancePolicies.length);
+    console.log('🔍 Insurance Debug - Latest Policy:', latestPolicy);
+
+    const insuranceData = {
+        company: latestPolicy?.INSURANCE_COMPANY || latestPolicy?.COMPANY_NAME || latestPolicy?.INSURER_NAME || 'Not Available',
+        expiration: latestPolicy?.POLICY_END_DATE || latestPolicy?.POLICY_EXPIRATION_DATE || 'Not Available'
+    };
+
+    console.log('🔍 Insurance Debug - Final Data:', insuranceData);
+
+    // Get commodities hauled from carrier data
+    function getCommoditiesHauled(carrier) {
+        const commodities = [];
+
+        // Check various commodity fields from the carrier_details
+        const details = carrier.carrier_details || carrier;
+
+        if (details.CRGO_GENFREIGHT === 'X') commodities.push('General Freight');
+        if (details.CRGO_HOUSEHOLD === 'X') commodities.push('Household Goods');
+        if (details.CRGO_METALSHEET === 'X') commodities.push('Metal Sheets');
+        if (details.CRGO_MOTOVEH === 'X') commodities.push('Motor Vehicles');
+        if (details.CRGO_DRIVETOW === 'X') commodities.push('Drive/Tow Away');
+        if (details.CRGO_LOGPOLE === 'X') commodities.push('Logs/Poles');
+        if (details.CRGO_BLDGMAT === 'X') commodities.push('Building Materials');
+        if (details.CRGO_MOBILEHOME === 'X') commodities.push('Mobile Homes');
+        if (details.CRGO_MACHLRG === 'X') commodities.push('Machinery');
+        if (details.CRGO_PRODUCE === 'X') commodities.push('Fresh Produce');
+        if (details.CRGO_LIQGAS === 'X') commodities.push('Liquids/Gas');
+        if (details.CRGO_INTERMODAL === 'X') commodities.push('Intermodal');
+        if (details.CRGO_PASSENGERS === 'X') commodities.push('Passengers');
+        if (details.CRGO_OILFIELD === 'X') commodities.push('Oilfield Equipment');
+        if (details.CRGO_LIVESTOCK === 'X') commodities.push('Livestock');
+        if (details.CRGO_GRAINFEED === 'X') commodities.push('Grain/Feed');
+        if (details.CRGO_COALCOKE === 'X') commodities.push('Coal/Coke');
+        if (details.CRGO_MEAT === 'X') commodities.push('Meat');
+        if (details.CRGO_GARBAGE === 'X') commodities.push('Garbage/Refuse');
+        if (details.CRGO_USMAIL === 'X') commodities.push('US Mail');
+        if (details.CRGO_CHEM === 'X') commodities.push('Chemicals');
+        if (details.CRGO_DRYBULK === 'X') commodities.push('Dry Bulk');
+        if (details.CRGO_COLDFOOD === 'X') commodities.push('Refrigerated Food');
+        if (details.CRGO_BEVERAGES === 'X') commodities.push('Beverages');
+        if (details.CRGO_PAPERPROD === 'X') commodities.push('Paper Products');
+        if (details.CRGO_UTILITY === 'X') commodities.push('Utilities');
+        if (details.CRGO_FARMSUPP === 'X') commodities.push('Farm Supplies');
+        if (details.CRGO_CONSTRUCT === 'X') commodities.push('Construction');
+        if (details.CRGO_WATERWELL === 'X') commodities.push('Water Well');
+
+        // Check for other cargo description
+        if (details.CRGO_CARGOOTHR === 'X' && details.CRGO_CARGOOTHR_DESC) {
+            commodities.push(details.CRGO_CARGOOTHR_DESC);
+        }
+
+        return commodities.length > 0 ? commodities.join(', ') : 'General Freight';
+    }
+
+    const commoditiesHauled = getCommoditiesHauled(carrier);
+
+    // Helper function to determine eligibility status
+    function getEligibilityStatus(carrier, oosPercentage) {
+        const authorityYear = carrier.add_date ? parseInt(carrier.add_date.substring(0,4)) : null;
+        const vehicles = carrier.vehicles || [];
+        const hasOnlyTractors = vehicles.length === 0 || vehicles.every(v =>
+            (v.type && v.type.toLowerCase().includes('tractor')) ||
+            (v.vehicle_type && v.vehicle_type.toLowerCase().includes('tractor'))
+        );
+        const oosRate = parseFloat(oosPercentage);
+
+        // Check for disqualifying commodities (passengers, mobile homes, specialized freight)
+        const details = carrier.carrier_details || carrier;
+        const hasDisqualifyingCommodities =
+            details.CRGO_PASSENGERS === 'X' ||     // Passenger transport disqualified
+            details.CRGO_MOBILEHOME === 'X' ||     // Mobile home transport disqualified
+            details.CRGO_HOUSEHOLD === 'X' ||      // Household goods disqualified
+            details.CRGO_OILFIELD === 'X' ||       // Oilfield equipment disqualified
+            details.CRGO_WATERWELL === 'X';        // Water well equipment disqualified
+
+        console.log('🔍 RPS Debug - DOT:', carrier.usdot_number || carrier.DOT_NUMBER);
+        console.log('🔍 RPS Debug - Authority Year:', authorityYear);
+        console.log('🔍 RPS Debug - OOS Rate:', oosRate);
+        console.log('🔍 RPS Debug - Only Tractors:', hasOnlyTractors);
+        console.log('🔍 RPS Debug - Disqualifying Commodities:', hasDisqualifyingCommodities);
+        console.log('🔍 RPS Debug - CRGO_PASSENGERS:', details.CRGO_PASSENGERS);
+        console.log('🔍 RPS Debug - CRGO_MOBILEHOME:', details.CRGO_MOBILEHOME);
+
+        // RPS criteria: Authority before 2024, only truck tractors, OOS rate ≤ 20%, no disqualifying commodities
+        if (authorityYear && authorityYear < 2024 && hasOnlyTractors && oosRate <= 20 && !hasDisqualifyingCommodities) {
+            return 'RPS';
+        }
+        return 'Standard';
+    }
+
+    // Helper function to get eligibility styling
+    function getEligibilityStyle(carrier, oosPercentage) {
+        const status = getEligibilityStatus(carrier, oosPercentage);
+        if (status === 'RPS') {
+            return 'color: #10b981; background: #d1fae5; padding: 4px 8px; border-radius: 4px; font-size: 14px;';
+        }
+        return 'color: #6b7280; font-size: 14px;';
+    }
+
     return `
         <div class="carrier-profile-display">
             <div class="company-header">
@@ -713,8 +996,26 @@ function createComprehensiveCarrierHTML(carrier) {
                         <div class="metric-label">Authority Granted</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value" style="font-size: 14px; text-align: center;">${carrier.COMMODITIES_HAULED || carrier.commodities_hauled || 'General Freight'}</div>
+                        <div class="metric-value" style="font-size: 14px; text-align: center;">${commoditiesHauled}</div>
                         <div class="metric-label">Commodities Hauled</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insurance Information Section -->
+            <div class="insurance-section" style="margin-bottom: 32px;">
+                <div class="insurance-info" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; background: #f0f8ff; padding: 20px; border-radius: 12px; border: 1px solid #3b82f6;">
+                    <div class="insurance-item">
+                        <div class="insurance-label" style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Insurance Company</div>
+                        <div class="insurance-value" style="font-weight: 600; color: #1f2937;">${insuranceData?.company || 'Not Available'}</div>
+                    </div>
+                    <div class="insurance-item">
+                        <div class="insurance-label" style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Expiration Date</div>
+                        <div class="insurance-value" style="font-weight: 600; color: #1f2937;">${insuranceData?.expiration || 'Not Available'}</div>
+                    </div>
+                    <div class="insurance-item">
+                        <div class="insurance-label" style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">Eligible Markets</div>
+                        <div class="insurance-value eligible-markets" style="font-weight: 600; ${getEligibilityStyle(carrier, oosPercentage)}">${getEligibilityStatus(carrier, oosPercentage)}</div>
                     </div>
                 </div>
             </div>

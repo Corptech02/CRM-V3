@@ -6,22 +6,43 @@ console.log('🎯 HIGHLIGHT BUTTON INTERCEPTOR - Loading...');
 (function() {
     // Function to handle app sent stage highlight button clicks
     function handleHighlightButtonClick(event) {
-        console.log('🔍 HIGHLIGHT BUTTON CLICKED');
-
-        // Find the clicked button
-        const button = event.target.closest('button');
+        // Find the clicked button or link
+        const button = event.target.closest('button, a');
         if (!button) return;
 
-        // Check if this is a highlight duration button
+        // Check if this is a highlight duration button FIRST
         const buttonText = button.textContent || button.innerHTML;
-        console.log(`🔍 Button text: "${buttonText}"`);
 
-        if (!buttonText.toLowerCase().includes('highlight') &&
-            !buttonText.toLowerCase().includes('duration') &&
-            !button.id.includes('highlight') &&
-            !button.classList.contains('highlight')) {
-            return; // Not a highlight button
+        // Exclude navigation buttons completely first
+        const isNavigationButton = button.classList.contains('nav-link') ||
+                                   button.classList.contains('mobile-nav-link') ||
+                                   button.closest('.mobile-nav') ||
+                                   button.closest('[class*="nav"]') ||
+                                   button.closest('.tab') ||
+                                   button.hasAttribute('data-tab') ||
+                                   (button.hasAttribute('onclick') && button.getAttribute('onclick').includes('setActiveTab'));
+
+        if (isNavigationButton) {
+            return; // Definitely a navigation button, don't intercept
         }
+
+        // Only intercept actual highlight/duration buttons
+        const isHighlightButton = (buttonText.toLowerCase().includes('highlight') ||
+                                  buttonText.toLowerCase().includes('duration') ||
+                                  button.id.includes('highlight') ||
+                                  button.classList.contains('highlight') ||
+                                  button.classList.contains('call-status-btn')) &&
+                                 // Must have showCallStatus in onclick if it has onclick
+                                 (!button.hasAttribute('onclick') ||
+                                  button.getAttribute('onclick').includes('showCallStatus'));
+
+        if (!isHighlightButton) {
+            return; // Not a highlight button, let it proceed normally without logging
+        }
+
+        // Now log only for actual highlight buttons
+        console.log('🔍 HIGHLIGHT BUTTON CLICKED');
+        console.log(`🔍 Button text: "${buttonText}"`);
 
         // Try to find the lead ID from the button or nearby elements
         let leadId = null;

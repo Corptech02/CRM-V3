@@ -45,8 +45,9 @@ window.generateLeadsFromForm = async function() {
         selectedCommodities.push(checkbox.value);
     });
 
-    // Get minimum years in business
+    // Get years in business range
     const yearsInBusinessMin = document.getElementById('yearsInBusinessMin').value;
+    const yearsInBusinessMax = document.getElementById('yearsInBusinessMax').value;
 
     // Log the criteria being applied
     console.log(`   🏛️  State: ${state}`);
@@ -56,7 +57,7 @@ window.generateLeadsFromForm = async function() {
     console.log(`   🏢  Insurance companies: ${selectedInsurance.length > 0 ? selectedInsurance.join(', ') : 'ALL'}`);
     console.log(`   🚗  Unit types: ${selectedUnitTypes.length > 0 ? selectedUnitTypes.join(', ') : 'ALL'}`);
     console.log(`   📦  Commodities: ${selectedCommodities.length > 0 ? selectedCommodities.join(', ') : 'ALL'}`);
-    console.log(`   📅  Years in business (min): ${yearsInBusinessMin || 'No minimum'}`);
+    console.log(`   📅  Years in business: ${yearsInBusinessMin || '0'} - ${yearsInBusinessMax || '100'} years`);
 
     if (hasOthersSelected) {
         console.log(`   🔍  "Others" selected - API will get ALL companies (no insurance filter applied)`);
@@ -111,9 +112,12 @@ window.generateLeadsFromForm = async function() {
             params.append('commodities', JSON.stringify(selectedCommodities));
         }
 
-        // Add minimum years in business filter if specified
+        // Add years in business range filter if specified
         if (yearsInBusinessMin && yearsInBusinessMin > 0) {
             params.append('yearsInBusinessMin', yearsInBusinessMin);
+        }
+        if (yearsInBusinessMax && yearsInBusinessMax < 100) {
+            params.append('yearsInBusinessMax', yearsInBusinessMax);
         }
 
         // Use proxy endpoint through main backend - use current location to avoid CORS

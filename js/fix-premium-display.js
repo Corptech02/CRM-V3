@@ -33,9 +33,11 @@ function renderClientsViewWithFreshData(allPolicies) {
     // Get current user and check if they are admin for template rendering
     const sessionData = sessionStorage.getItem('vanguard_user');
     let isAdmin = false;
+    let currentUser = null;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
+            currentUser = user.username;
             isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase());
         } catch (error) {
             console.error('Error parsing session data:', error);
@@ -70,10 +72,11 @@ function renderClientsViewWithFreshData(allPolicies) {
                         <option>Life & Health</option>
                     </select>
                     ${isAdmin ? `<select class="filter-select" id="clientAgentFilter" onchange="filterClients()">
-                        <option value="">All Agents</option>
+                        <option value="">${currentUser && currentUser.toLowerCase() === 'maureen' ? 'All My Clients' : 'All Agents'}</option>
+                        ${currentUser && currentUser.toLowerCase() === 'maureen' ? '<option value="Maureen">Maureen</option>' : `
                         <option value="Grant">Grant</option>
                         <option value="Carson">Carson</option>
-                        <option value="Hunter">Hunter</option>
+                        <option value="Hunter">Hunter</option>`}
                     </select>` : ''}
                     <button class="btn-filter">
                         <i class="fas fa-filter"></i> More Filters
@@ -101,6 +104,22 @@ function renderClientsViewWithFreshData(allPolicies) {
             </div>
         </div>
     `;
+
+    // AUTO-FILTER FOR MAUREEN: Apply filter immediately after rendering
+    setTimeout(() => {
+        if (currentUser && currentUser.toLowerCase() === 'maureen') {
+            const agentFilter = document.getElementById('clientAgentFilter');
+            if (agentFilter) {
+                agentFilter.value = '';
+                console.log('🔒 IMMEDIATE AUTO-FILTER: Set client filter to "All My Clients" for Maureen');
+                // Trigger the filter function
+                if (typeof filterClients === 'function') {
+                    filterClients();
+                    console.log('✅ IMMEDIATE AUTO-FILTER: Applied Maureen "All My Clients" filter');
+                }
+            }
+        }
+    }, 100); // Small delay to ensure DOM is updated
 };
 
 // Generate client rows with proper premium calculation
@@ -345,6 +364,30 @@ setTimeout(() => {
     if (window.location.hash === '#clients') {
         console.log('Reloading clients view with fixed premium display...');
         loadClientsView();
+
+        // AUTO-FILTER FOR MAUREEN: Set filter to show only her clients
+        const sessionData = sessionStorage.getItem('vanguard_user');
+        if (sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                if (user.username && user.username.toLowerCase() === 'maureen') {
+                    setTimeout(() => {
+                        const agentFilter = document.getElementById('clientAgentFilter');
+                        if (agentFilter) {
+                            agentFilter.value = '';
+                            console.log('🔒 AUTO-FILTER (Premium Display): Set client filter to "All My Clients" for Maureen');
+                            // Trigger the filter function
+                            if (typeof filterClients === 'function') {
+                                filterClients();
+                                console.log('✅ AUTO-FILTER (Premium Display): Applied Maureen "All My Clients" filter');
+                            }
+                        }
+                    }, 200); // Shorter delay since we also have immediate filter above
+                }
+            } catch (error) {
+                console.error('Error setting Maureen auto-filter:', error);
+            }
+        }
     }
 }, 500);
 

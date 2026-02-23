@@ -135,7 +135,6 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>App Sent</option>
                             <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
                             <option value="sale" ${lead.stage === 'sale' ? 'selected' : ''}>Sale</option>
-                            <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
                             <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
                         </select>
                     </div>
@@ -331,14 +330,13 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Premium:</label>
-                            <input type="text" id="lead-premium-${lead.id}" value="${lead.premium || ''}" placeholder="Enter premium amount" onchange="updateLeadField('${lead.id}', 'premium', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                            <input type="text" id="lead-premium-${lead.id}" value="${lead.premium || ''}" placeholder="Enter premium amount" onchange="updateLeadField('${lead.id}', 'premium', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white; ${(lead.confirmedPremium === 'yes') ? 'color: #16a34a; font-weight: 600;' : ''}">
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 12px;">Win/Loss:</label>
-                            <select id="lead-winloss-${lead.id}" onchange="updateWinLossStatus('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-                                <option value="neutral" ${(lead.winLoss === 'neutral' || !lead.winLoss) ? 'selected' : ''}>Neutral</option>
-                                <option value="win" ${lead.winLoss === 'win' ? 'selected' : ''}>Win</option>
-                                <option value="loss" ${lead.winLoss === 'loss' ? 'selected' : ''}>Loss</option>
+                            <label style="font-weight: 600; font-size: 12px;">Confirmed Premium:</label>
+                            <select id="lead-confirmedpremium-${lead.id}" onchange="updateConfirmedPremiumStatus('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                                <option value="no" ${(lead.confirmedPremium === 'no' || !lead.confirmedPremium) ? 'selected' : ''}>No</option>
+                                <option value="yes" ${lead.confirmedPremium === 'yes' ? 'selected' : ''}>Yes</option>
                             </select>
                         </div>
                         <div>
@@ -389,7 +387,12 @@ protectedFunctions.createEnhancedProfile = function(lead) {
 
                 <!-- Company Information -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3>Company Information</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">Company Information</h3>
+                        <button id="dot-lookup-btn-${lead.id}" onclick="triggerManualDOTLookup('${lead.id}', document.getElementById('dot-input-${lead.id}')?.value || '${lead.dotNumber || ''}')" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;" title="Manual DOT lookup - reads DOT from input field">
+                            <i class="fas fa-search"></i> DOT Lookup
+                        </button>
+                    </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Company Name:</label>
@@ -409,7 +412,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">DOT Number:</label>
-                            <input type="text" value="${lead.dotNumber || ''}" onchange="updateLeadField('${lead.id}', 'dotNumber', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <input type="text" value="${lead.dotNumber || ''}" onchange="updateLeadField('${lead.id}', 'dotNumber', this.value); toggleDOTButton('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;" id="dot-input-${lead.id}">
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">MC Number:</label>
@@ -417,7 +420,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Years in Business:</label>
-                            <input type="text" value="${lead.yearsInBusiness || ''}" onchange="updateLeadField('${lead.id}', 'yearsInBusiness', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <input type="text" value="${lead.yearsInBusiness || ''}" onchange="updateLeadField('${lead.id}', 'yearsInBusiness', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background-color: ${lead.yearsInBusiness ? '#e8f5e8' : '#fff'};" placeholder="Auto-populated from DOT lookup">
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Renewal Date:</label>
@@ -429,7 +432,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">State:</label>
-                            <input type="text" value="${lead.state || ''}" placeholder="State" onchange="updateLeadField('${lead.id}', 'state', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <input type="text" value="${lead.state || ''}" placeholder="Auto-populated from DOT lookup" onchange="updateLeadField('${lead.id}', 'state', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background-color: ${lead.state ? '#e8f5e8' : '#fff'};">
                         </div>
                     </div>
                 </div>
@@ -437,18 +440,14 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 <!-- Operation Details -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h3>Operation Details</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 15px;">
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Radius of Operation:</label>
                             <input type="text" value="${lead.radiusOfOperation || ''}" placeholder="e.g., 500 miles" onchange="updateLeadField('${lead.id}', 'radiusOfOperation', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">Commodity Hauled:</label>
-                            <input type="text" value="${lead.commodityHauled || ''}" placeholder="e.g., General Freight" onchange="updateLeadField('${lead.id}', 'commodityHauled', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Operating States:</label>
-                            <input type="text" value="${lead.operatingStates || ''}" placeholder="e.g., TX, LA, OK" onchange="updateLeadField('${lead.id}', 'operatingStates', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <input type="text" value="${lead.commodityHauled || ''}" placeholder="Auto-populated from DOT lookup" onchange="updateLeadField('${lead.id}', 'commodityHauled', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background-color: ${lead.commodityHauled ? '#e8f5e8' : '#fff'};">
                         </div>
                     </div>
                 </div>
@@ -645,11 +644,11 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3><i class="fas fa-file-contract"></i> Quote Submissions</h3>
                         <div style="display: flex; gap: 10px;">
-                            <button onclick="createQuoteApplication('${lead.id}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
-                                <i class="fas fa-file-alt"></i> Quote Application
-                            </button>
                             <button onclick="addQuoteSubmission('${lead.id}')" style="background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
                                 <i class="fas fa-plus"></i> Add Quote
+                            </button>
+                            <button class="auto-import-market-btn" onclick="autoImportToMarket('${lead.id}', '${(lead.name || 'Lead').replace(/'/g, "\\'")}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                                <i class="fas fa-arrow-right"></i> Auto-Import to Market
                             </button>
                         </div>
                     </div>
@@ -738,6 +737,9 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 <div class="profile-section" style="background: #f0f9f0; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3><i class="fas fa-file-signature"></i> Application Submissions</h3>
+                        <button onclick="createQuoteApplication('${lead.id}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                            <i class="fas fa-file-alt"></i> Quote Application
+                        </button>
                     </div>
                     <div id="application-submissions-container-${lead.id}">
                         <p style="color: #9ca3af; text-align: center; padding: 20px;">No applications submitted yet</p>
@@ -767,6 +769,9 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     `;
 
     document.body.appendChild(modalContainer);
+
+    // Load existing quotes for this lead
+    loadQuotesForLead(lead.id);
 
     // Activate DOM protection to prevent hardcoded ID overwrites
     protectedFunctions.protectModalIDs(lead.id, modalContainer);
@@ -1964,6 +1969,109 @@ window.handleVoicemailOutcome = function(leadId, leftVoicemail) {
     // Update the sequential to-do display - FORCE UPDATE since we know this is a reach-out stage
     applyReachOutStyling(leadId, true);
     console.log('🔄 Updated TO DO display after voicemail outcome');
+
+    // Show callback reschedule popup after a brief delay
+    setTimeout(() => {
+        showCallbackReschedulePopup(leadId);
+    }, 1000);
+};
+
+// Show callback reschedule popup after unsuccessful call
+function showCallbackReschedulePopup(leadId) {
+    console.log(`📅 Showing callback reschedule popup for lead ${leadId}`);
+
+    // Get lead data for display
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+
+    if (!lead) {
+        console.error('❌ Lead not found for callback reschedule popup');
+        return;
+    }
+
+    // Remove any existing popup
+    const existingPopup = document.getElementById('callback-reschedule-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+
+    // Create backdrop
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+
+    // Create popup
+    const popup = document.createElement('div');
+    popup.id = 'callback-reschedule-popup';
+    popup.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: rgba(0, 0, 0, 0.5) 0px 20px 50px;
+        min-width: 400px;
+        max-width: 500px;
+    `;
+
+    popup.innerHTML = `
+        <div style="text-align: center;">
+            <div style="width: 60px; height: 60px; background: #dbeafe; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-calendar-plus" style="font-size: 24px; color: #3b82f6;"></i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1f2937;">Schedule Follow-up Call</h3>
+            <p style="margin: 0 0 15px 0; color: #6b7280; font-size: 14px;">
+                Please schedule a callback for <strong>${lead.name}</strong>
+            </p>
+
+            <div style="display: flex; justify-content: center; margin-top: 25px;">
+                <button onclick="handleCallbackRescheduleChoice('${leadId}', true)" style="
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    width: 200px;
+                ">
+                    <i class="fas fa-calendar-plus"></i> Schedule Callback
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Add to page
+    backdrop.appendChild(popup);
+    document.body.appendChild(backdrop);
+
+    // Prevent closing on backdrop click since callback scheduling is required
+}
+
+// Handle callback reschedule choice
+window.handleCallbackRescheduleChoice = function(leadId, shouldSchedule) {
+    console.log(`📅 Callback scheduling required for lead ${leadId}`);
+
+    // Close popup
+    const popup = document.getElementById('callback-reschedule-popup');
+    if (popup) {
+        popup.parentElement.remove(); // Remove the backdrop which contains the popup
+    }
+
+    // Always show the callback scheduler since it's required
+    setTimeout(() => {
+        showCallbackScheduler(leadId);
+    }, 200);
 };
 
 // Helper function to save reach-out data to server
@@ -2245,6 +2353,16 @@ window.handleCallDuration = function(leadId, duration) {
         if (backdrop) {
             backdrop.remove();
         }
+
+        // CRITICAL FIX: Prevent duplicate popups from appearing after call duration save
+        // Remove any existing callback outcome popups that might be triggered
+        setTimeout(() => {
+            const existingCallbackPopup = document.getElementById('callback-outcome-popup');
+            if (existingCallbackPopup) {
+                console.log('🔧 CLEANUP: Removing existing callback outcome popup to prevent duplicates');
+                existingCallbackPopup.remove();
+            }
+        }, 100);
 
         // Update checkbox to checked and set called property
         const checkbox = document.getElementById(`call-made-${leadId}`);
@@ -2535,6 +2653,81 @@ function removeGreenHighlightFromTableRow(leadId) {
     } else {
         console.log(`ℹ️ Lead ${leadId} table row had no green highlighting to remove`);
     }
+}
+
+// Function to rescan all rows and remove green highlighting from leads with "Reach out: CALL" text
+function rescanGreenHighlightingAfterCallbacks() {
+    console.log('🔄 GREEN RESCAN: Starting comprehensive green highlight rescan after callback updates');
+
+    const tableBody = document.getElementById('leadsTableBody');
+    if (!tableBody) {
+        console.log('❌ GREEN RESCAN: leadsTableBody not found');
+        return;
+    }
+
+    const rows = tableBody.querySelectorAll('tr');
+    let rescannedCount = 0;
+    let removedCount = 0;
+
+    console.log(`🔄 GREEN RESCAN: Found ${rows.length} rows to scan`);
+
+    rows.forEach((row, index) => {
+        const checkbox = row.querySelector('.lead-checkbox');
+        if (!checkbox) {
+            return;
+        }
+
+        const leadId = checkbox.value;
+        const cells = row.querySelectorAll('td');
+
+        if (cells.length <= 6) {
+            return;
+        }
+
+        const todoCell = cells[6]; // TODO column
+        const todoText = todoCell.textContent || '';
+
+        rescannedCount++;
+
+        // Check if row has green highlighting
+        const hasGreenHighlight =
+            row.classList.contains('reach-out-complete') ||
+            row.classList.contains('force-green-highlight') ||
+            (row.style.backgroundColor && (
+                row.style.backgroundColor.includes('16, 185, 129') ||
+                row.style.backgroundColor.includes('rgb(16, 185, 129)') ||
+                row.style.backgroundColor.includes('rgba(16, 185, 129')
+            ));
+
+        // If row has "Reach out: CALL" text AND green highlighting, remove the green highlight
+        if (todoText.includes('Reach out: CALL') && hasGreenHighlight) {
+            console.log(`🔴 GREEN RESCAN: Lead ${leadId} has "Reach out: CALL" but green highlight - REMOVING`);
+
+            // Remove green highlighting
+            row.classList.remove('reach-out-complete', 'force-green-highlight');
+
+            if (row.style.backgroundColor && (
+                row.style.backgroundColor.includes('16, 185, 129') ||
+                row.style.backgroundColor.includes('rgb(16, 185, 129)') ||
+                row.style.backgroundColor.includes('rgba(16, 185, 129'))) {
+
+                row.style.removeProperty('background-color');
+                row.style.removeProperty('background');
+                row.style.removeProperty('border-left');
+                row.style.removeProperty('border-right');
+
+                // Clear style attribute if it's now empty
+                const remainingStyle = row.getAttribute('style');
+                if (!remainingStyle || remainingStyle.trim() === '') {
+                    row.removeAttribute('style');
+                }
+            }
+
+            removedCount++;
+        }
+    });
+
+    console.log(`✅ GREEN RESCAN: Completed rescan - checked ${rescannedCount} rows, removed green from ${removedCount} leads`);
 }
 
 // Function to display reach-out completion styling (for profile loading - no popup)
@@ -3745,28 +3938,14 @@ window.showCallScheduledPopup = function(leadId) {
 
     modalContent.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
-            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-calendar-check" style="color: #3b82f6;"></i> Call Scheduled?</h2>
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-calendar-check" style="color: #3b82f6;"></i> Schedule Callback</h2>
             <button onclick="this.closest('.call-scheduled-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">×</button>
         </div>
 
-        <div style="text-align: center; margin-bottom: 25px;">
-            <div style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 15px;">Was a call scheduled with this lead?</div>
-        </div>
 
         <!-- Initial Response Options -->
-        <div id="initial-options" style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
-            <button onclick="handleCallScheduled('${leadId}', true)" style="
-                background: #10b981;
-                color: white;
-                border: none;
-                padding: 15px 25px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 600;
-                font-size: 16px;
-                min-width: 120px;
-                transition: all 0.2s;
-            " onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+        <div id="initial-options" style="display: none; gap: 15px; justify-content: center; margin-bottom: 20px;">
+            <button onclick="handleCallScheduled('${leadId}', true)" style="background: rgb(16, 185, 129); color: white; border: none; padding: 15px 25px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 16px; min-width: 120px; transition: 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
                 <i class="fas fa-check"></i> Yes
             </button>
             <button onclick="handleCallScheduled('${leadId}', false)" style="
@@ -3786,17 +3965,22 @@ window.showCallScheduledPopup = function(leadId) {
         </div>
 
         <!-- Date Selector (Initially Hidden) -->
-        <div id="date-selector" style="display: none; text-align: center; margin-top: 20px;">
+        <div id="date-selector" style="display: block; text-align: center; margin-top: 20px;">
             <div style="margin-bottom: 15px;">
                 <label style="font-weight: 600; font-size: 16px; display: block; margin-bottom: 10px;">Select Call Date & Time:</label>
                 <div style="display: flex; gap: 15px; justify-content: center; align-items: center;">
                     <div>
                         <label style="font-weight: 500; font-size: 14px; display: block; margin-bottom: 5px;">Date:</label>
-                        <input type="date" id="call-date-${leadId}" min="${new Date().toISOString().split('T')[0]}" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                        <input type="date" id="call-date-${leadId}" min="${new Date().toISOString().split('T')[0]}" value="${new Date().toISOString().split('T')[0]}" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                     </div>
                     <div>
                         <label style="font-weight: 500; font-size: 14px; display: block; margin-bottom: 5px;">Time:</label>
-                        <input type="time" id="call-time-${leadId}" value="10:00" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                        <input type="time" id="call-time-${leadId}" value="${(() => {
+                            const now = new Date();
+                            const hours = now.getHours().toString().padStart(2, '0');
+                            const minutes = now.getMinutes().toString().padStart(2, '0');
+                            return hours + ':' + minutes;
+                        })()}" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                     </div>
                 </div>
             </div>
@@ -3839,19 +4023,7 @@ window.handleCallScheduled = function(leadId, isScheduled) {
             initialOptions.style.display = 'none';
             dateSelector.style.display = 'block';
 
-            // Set default date to tomorrow
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const dateInput = document.getElementById(`call-date-${leadId}`);
-            if (dateInput) {
-                dateInput.value = tomorrow.toISOString().split('T')[0];
-            }
-
-            // Set default time to 10:00 AM
-            const timeInput = document.getElementById(`call-time-${leadId}`);
-            if (timeInput) {
-                timeInput.value = '10:00';
-            }
+            // Date and time are now set via HTML template to current date/time
         }
     } else {
         // No call scheduled - reset reach-out to uncompleted state and uncheck the call checkbox
@@ -3919,14 +4091,77 @@ window.confirmCallScheduled = function(leadId) {
         return;
     }
 
-    console.log(`📅 Call scheduled for ${selectedDate} at ${selectedTime} for lead ${leadId}`);
+    console.log(`📅 Scheduling callback for ${selectedDate} at ${selectedTime} for lead ${leadId}`);
 
-    // Calculate days until the scheduled date for green highlighting
-    const scheduledDate = new Date(selectedDate);
-    const today = new Date();
-    const daysDiff = Math.ceil((scheduledDate - today) / (1000 * 60 * 60 * 24));
+    // Create callback date with proper timezone
+    const callbackDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
 
-    // Set green highlight until the scheduled date
+    // Save callback using the same system as normal callback scheduler
+    const callbacksKey = 'scheduled_callbacks';
+    const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+    if (!callbacks[leadId]) {
+        callbacks[leadId] = [];
+    }
+
+    // Remove any existing callbacks for this lead (replace with new one)
+    callbacks[leadId] = [];
+
+    // Create new callback
+    const newCallback = {
+        id: Date.now().toString(),
+        dateTime: callbackDateTime.toISOString(),
+        notes: `Scheduled call for ${selectedDate} at ${selectedTime}`,
+        completed: false,
+        createdAt: new Date().toISOString()
+    };
+
+    callbacks[leadId].push(newCallback);
+    localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+
+    console.log(`📅 Callback scheduled and saved to localStorage:`, newCallback);
+
+    // Save callback to server using proper API
+    // Use same API as working callback scheduler
+    const callbackUrl = '/api/callbacks';
+
+    const saveCallbackToServer = async () => {
+        try {
+            const response = await fetch(callbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    callback_id: newCallback.id.toString(),
+                    lead_id: leadId,
+                    date_time: newCallback.dateTime,
+                    notes: newCallback.notes
+                })
+            });
+
+            if (response.ok) {
+                console.log('✅ Callback saved to server');
+                return true;
+            } else {
+                console.log(`❌ Server callback save failed: ${response.status}`);
+                return false;
+            }
+        } catch (error) {
+            console.log('❌ Error saving callback to server:', error.message);
+            return false;
+        }
+    };
+
+    saveCallbackToServer();
+
+    // Refresh callback display in any open profile
+    setTimeout(() => {
+        if (typeof displayScheduledCallbacks === 'function') {
+            displayScheduledCallbacks(leadId);
+            console.log('🔄 CALLBACK DISPLAY: Refreshed after scheduling callback');
+        }
+    }, 100);
+
+    // Update leads data for reach-out tracking
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
     const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
 
@@ -3935,53 +4170,39 @@ window.confirmCallScheduled = function(leadId) {
             leads[leadIndex].reachOut = {};
         }
 
-        // Initialize reachOut with proper structure (matching email confirmation)
-        if (!leads[leadIndex].reachOut.emailCount) leads[leadIndex].reachOut.emailCount = 0;
-        if (!leads[leadIndex].reachOut.textCount) leads[leadIndex].reachOut.textCount = 0;
-        if (!leads[leadIndex].reachOut.callAttempts) leads[leadIndex].reachOut.callAttempts = 0;
-        if (!leads[leadIndex].reachOut.callsConnected) leads[leadIndex].reachOut.callsConnected = 0;
-        if (!leads[leadIndex].reachOut.voicemailCount) leads[leadIndex].reachOut.voicemailCount = 0;
+        // Initialize reachOut with proper structure
+        if (typeof leads[leadIndex].reachOut.emailCount !== 'number') leads[leadIndex].reachOut.emailCount = 0;
+        if (typeof leads[leadIndex].reachOut.textCount !== 'number') leads[leadIndex].reachOut.textCount = 0;
+        if (typeof leads[leadIndex].reachOut.callAttempts !== 'number') leads[leadIndex].reachOut.callAttempts = 0;
+        if (typeof leads[leadIndex].reachOut.callsConnected !== 'number') leads[leadIndex].reachOut.callsConnected = 0;
+        if (typeof leads[leadIndex].reachOut.voicemailCount !== 'number') leads[leadIndex].reachOut.voicemailCount = 0;
         if (!leads[leadIndex].reachOut.callLogs) leads[leadIndex].reachOut.callLogs = [];
 
         // Add 1 connected call (since call was scheduled)
         leads[leadIndex].reachOut.callsConnected = leads[leadIndex].reachOut.callsConnected + 1;
         leads[leadIndex].reachOut.callAttempts = leads[leadIndex].reachOut.callAttempts + 1;
 
-        // Add call log entry with time
+        // Add call log entry
         const callLog = {
             timestamp: new Date().toISOString(),
             connected: true,
             duration: '5 min',
             leftVoicemail: false,
-            notes: `Call scheduled for ${selectedDate} at ${selectedTime} - Lead agreed to scheduled call`
+            notes: `Call scheduled for ${selectedDate} at ${selectedTime}`
         };
         leads[leadIndex].reachOut.callLogs.push(callLog);
 
-        // Mark reach-out as COMPLETE (matching email confirmation)
+        // Mark reach-out as COMPLETE
         leads[leadIndex].reachOut.completedAt = new Date().toISOString();
-        leads[leadIndex].reachOut.called = true;
-
-        // Set green highlight until scheduled call time (Eastern Time)
-        // Simple approach: treat the input as if it's in the user's current timezone
-        // Since you're in Eastern Time, this should work correctly
-        const [hours, minutes] = selectedTime.split(':');
-        const highlightUntil = new Date(selectedDate + 'T' + selectedTime + ':00');
-
-        console.log(`🕐 TIMEZONE DEBUG: Selected time: ${selectedDate} ${selectedTime}`);
-        console.log(`🕐 TIMEZONE DEBUG: Parsed highlightUntil: ${highlightUntil.toISOString()}`);
-        console.log(`🕐 TIMEZONE DEBUG: Local time string: ${highlightUntil.toString()}`);
-
-        leads[leadIndex].reachOut.greenHighlightUntil = highlightUntil.toISOString();
-        leads[leadIndex].reachOut.greenHighlightDays = daysDiff;
+        leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
         leads[leadIndex].reachOut.callScheduled = true;
         leads[leadIndex].reachOut.scheduledCallDate = selectedDate;
         leads[leadIndex].reachOut.scheduledCallTime = selectedTime;
         leads[leadIndex].reachOut.scheduledCallDateTime = `${selectedDate} ${selectedTime}`;
-        leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
 
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
 
-        // CRITICAL: Save to server for persistence (matching email confirmation approach)
+        // Save reach-out data to server
         const updateData = {
             reachOut: leads[leadIndex].reachOut
         };
@@ -3993,18 +4214,7 @@ window.confirmCallScheduled = function(leadId) {
         }).then(response => response.json())
         .then(data => {
             if (data.success) {
-                console.log('✅ Call scheduled reach-out data saved to server successfully');
-
-                // Force immediate profile refresh after server save
-                setTimeout(() => {
-                    console.log('🔄 FORCE REFRESH after server save...');
-                    const finalLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-                    const finalLead = finalLeads.find(l => String(l.id) === String(leadId));
-                    if (finalLead && window.createEnhancedProfile) {
-                        console.log('📊 Final lead reach-out data:', finalLead.reachOut);
-                        window.createEnhancedProfile(finalLead);
-                    }
-                }, 200);
+                console.log('✅ Reach-out completion saved to server');
             } else {
                 console.error('❌ Server reach-out update failed:', data.error);
             }
@@ -4014,20 +4224,17 @@ window.confirmCallScheduled = function(leadId) {
         });
 
         console.log(`✅ Call scheduled: connected=${leads[leadIndex].reachOut.callsConnected}`);
-        console.log(`✅ Call scheduled for ${selectedDate} at ${selectedTime}`);
-        console.log(`✅ Green highlight set until ${selectedDate} (${daysDiff} days) for scheduled call`);
+        console.log(`✅ Callback scheduled for ${selectedDate} at ${selectedTime}`);
         console.log(`✅ Reach-out marked as COMPLETE with timestamp: ${leads[leadIndex].reachOut.completedAt}`);
     }
 
-    // Close popup (skip email confirmation since call is scheduled)
+    // Close popup
     document.querySelector('.call-scheduled-modal').remove();
 
-    // Refresh the table to show green highlighting
-    if (window.displayLeads) {
-        setTimeout(() => window.displayLeads(), 100);
-    }
+    // Show notification
+    showNotification(`Callback scheduled for ${selectedDate} at ${selectedTime}`, 'success');
 
-    // Refresh the lead profile if it's open to update reach-out section
+    // Refresh the lead profile if it's open
     console.log('🔄 Checking for open profile to refresh...');
     const currentProfile = document.querySelector('.lead-profile-modal');
     if (currentProfile && currentProfile.style.display !== 'none') {
@@ -4036,11 +4243,12 @@ window.confirmCallScheduled = function(leadId) {
         if (String(profileLeadId) === String(leadId)) {
             console.log('✅ Profile matches target lead, refreshing...');
             setTimeout(() => {
-                if (window.showLeadProfile) {
-                    console.log('🔄 Calling showLeadProfile to refresh...');
-                    window.showLeadProfile(leadId);
-                } else {
-                    console.log('❌ showLeadProfile not available');
+                const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const updatedLead = updatedLeads.find(l => String(l.id) === String(leadId));
+                if (updatedLead && window.createEnhancedProfile) {
+                    console.log('🔄 FORCE REFRESH: Creating new profile with updated data...');
+                    console.log(`📊 Updated lead data:`, updatedLead);
+                    window.createEnhancedProfile(updatedLead);
                 }
             }, 300);
         }
@@ -4048,16 +4256,10 @@ window.confirmCallScheduled = function(leadId) {
         console.log('❌ No profile modal found or not visible');
     }
 
-    // ALSO try alternative refresh method
+    // Also refresh the leads table to show any changes
     setTimeout(() => {
-        const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-        const updatedLead = updatedLeads.find(l => String(l.id) === String(leadId));
-        if (updatedLead) {
-            console.log('🔄 FORCE REFRESH: Creating new profile with updated data...');
-            console.log(`📊 Updated lead reach-out data:`, updatedLead.reachOut);
-            if (window.createEnhancedProfile) {
-                window.createEnhancedProfile(updatedLead);
-            }
+        if (window.displayLeads) {
+            window.displayLeads();
         }
     }, 500);
 };
@@ -4107,7 +4309,7 @@ window.showEmailConfirmationPopup = function(leadId) {
 
         <div style="text-align: center; margin-bottom: 25px;">
             <div style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 15px;">Did the lead confirm they received your email?</div>
-            <div style="font-size: 14px; color: #6b7280;">This affects how long the lead will be highlighted green</div>
+            <div style="font-size: 14px; color: #6b7280;">This will schedule your next callback timing</div>
         </div>
 
         <!-- Response Options -->
@@ -4125,7 +4327,7 @@ window.showEmailConfirmationPopup = function(leadId) {
                 transition: all 0.2s;
             " onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
                 <i class="fas fa-check"></i> Yes
-                <div style="font-size: 12px; margin-top: 4px;">7 days green</div>
+                <div style="font-size: 12px; margin-top: 4px;">schedule in 5 days 2pm</div>
             </button>
             <button onclick="handleEmailConfirmation('${leadId}', false)" style="
                 background: #ef4444;
@@ -4140,7 +4342,7 @@ window.showEmailConfirmationPopup = function(leadId) {
                 transition: all 0.2s;
             " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
                 <i class="fas fa-times"></i> No
-                <div style="font-size: 12px; margin-top: 4px;">2 days green</div>
+                <div style="font-size: 12px; margin-top: 4px;">schedule call 2 days 2pm</div>
             </button>
         </div>
 
@@ -4167,11 +4369,13 @@ window.showEmailConfirmationPopup = function(leadId) {
 // Function to handle email confirmation response
 window.handleEmailConfirmation = function(leadId, confirmed) {
     console.log(`📧 Email confirmation for lead ${leadId}: ${confirmed ? 'YES' : 'NO'}`);
-    console.log(`📧 NOTE: Email confirmation will NOT create fake call logs - only tracks email response`);
+    console.log(`📧 NOTE: Email confirmation will schedule callback instead of green highlight`);
 
-    const days = confirmed ? 7 : 2;
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + days);
+    const days = confirmed ? 5 : 2; // 5 days if confirmed, 2 days if not confirmed
+    const callbackDate = new Date();
+    callbackDate.setDate(callbackDate.getDate() + days);
+    // Set callback to 2 PM
+    callbackDate.setHours(14, 0, 0, 0); // 2 PM
 
     // Get leads and complete reach-out
     const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
@@ -4217,16 +4421,57 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
         leads[leadIndex].reachOut.reachOutCompletedAt = new Date().toISOString();
         leads[leadIndex].reachOut.emailConfirmed = true; // More accurate than 'called'
 
-        // Set green highlight (using existing format)
-        if (!leads[leadIndex].reachOut) {
-            leads[leadIndex].reachOut = {};
+        // Schedule callback instead of green highlight
+        const callbacksKey = 'scheduled_callbacks';
+        const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+        if (!callbacks[leadId]) {
+            callbacks[leadId] = [];
         }
-        leads[leadIndex].reachOut.greenHighlightUntil = expiryDate.toISOString();
-        leads[leadIndex].reachOut.greenHighlightDays = days;
+
+        // Create new callback
+        const newCallback = {
+            id: Date.now().toString(),
+            dateTime: callbackDate.toISOString(),
+            notes: `Email follow-up - ${confirmed ? 'Lead confirmed email, schedule follow-up in 5 days' : 'Lead did not confirm email, follow up in 2 days'}`,
+            completed: false,
+            createdAt: new Date().toISOString()
+        };
+
+        callbacks[leadId].push(newCallback);
+        localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+
+        console.log(`📅 Scheduled callback for ${days} days at 2 PM:`, newCallback);
 
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
 
-        // Save to server
+        // Save callback to server using same API as working callback scheduler
+        const saveCallbackToServer = async () => {
+            try {
+                const response = await fetch('/api/callbacks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        callback_id: newCallback.id.toString(),
+                        lead_id: leadId,
+                        date_time: newCallback.dateTime,
+                        notes: newCallback.notes
+                    })
+                });
+
+                if (response.ok) {
+                    console.log('✅ Email confirmation callback saved to server');
+                } else {
+                    console.log(`❌ Server callback save failed: ${response.status}`);
+                }
+            } catch (error) {
+                console.log('❌ Error saving callback to server:', error.message);
+            }
+        };
+
+        saveCallbackToServer();
+
+        // Save reach-out completion to leads API
         const updateData = {
             reachOut: leads[leadIndex].reachOut
         };
@@ -4238,7 +4483,7 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
         }).then(response => response.json())
         .then(data => {
             if (data.success) {
-                console.log('✅ Reach-out completion and green highlight saved to server');
+                console.log('✅ Reach-out completion saved to server');
             }
         }).catch(error => console.error('❌ Error saving completion data:', error));
 
@@ -4257,7 +4502,10 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
         // Mark reach-out as COMPLETE with green styling
         markReachOutComplete(leadId, leads[leadIndex].reachOut.completedAt, leads[leadIndex]);
 
-        showNotification(`Email confirmed! Reach-out completed. Lead will stay green for ${days} days.`, 'success');
+        const confirmationMessage = confirmed
+            ? `Email confirmed! Callback scheduled for ${days} days at 2 PM.`
+            : `Email not confirmed. Follow-up callback scheduled for ${days} days at 2 PM.`;
+        showNotification(confirmationMessage, 'success');
     }
 
     // Close modal
@@ -4303,203 +4551,16 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
     }, 300);
 };
 
-// Function to show green highlight duration popup
+// Function to show green highlight duration popup (DISABLED - popup removed)
 window.showGreenHighlightDurationPopup = function(leadId) {
-    console.log(`🟢 Showing green highlight duration popup for lead: ${leadId}`);
-
-    // Check if this lead has "REACH OUT" todo
-    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const lead = leads.find(l => String(l.id) === String(leadId));
-
-    if (!lead) {
-        console.log(`❌ Lead ${leadId} not found, skipping popup`);
-        return;
-    }
-
-    // Check if lead is in a reachout scenario
-    const todoText = (typeof getNextAction === 'function' ? getNextAction(lead.stage || 'new', lead) : '').toLowerCase();
-
-    // Check for reachout scenarios:
-    // 1. Todo text includes "reach out"
-    // 2. Stages like "info requested", "loss runs requested", "quote sent" with called box checked
-    const stage = (lead.stage || '').toLowerCase();
-    const hasCalled = lead.reachOut && lead.reachOut.called;
-
-    const isReachOutScenario = todoText.includes('reach out') ||
-                              (stage.includes('info_requested') && hasCalled) ||
-                              (stage.includes('loss_runs_requested') && hasCalled) ||
-                              (stage.includes('quote_sent') && hasCalled) ||
-                              (stage.includes('contact_attempted') && hasCalled);
-
-    if (!isReachOutScenario) {
-        console.log(`⏭️ Lead ${leadId} not in reachout scenario (stage: "${stage}", called: ${hasCalled}, todo: "${todoText}"), skipping popup`);
-        return;
-    }
-
-    console.log(`✅ Lead ${leadId} is in reachout scenario (stage: "${stage}", called: ${hasCalled}, todo: "${todoText}"), showing popup`);
-
-    // Create modal for green highlight duration selection
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000004;
-    `;
-
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = `
-        background: white;
-        padding: 30px;
-        border-radius: 12px;
-        max-width: 400px;
-        width: 90%;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    `;
-
-    modalContent.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
-            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-highlight" style="color: #10b981;"></i> Set Green Highlight Duration</h2>
-            <button onclick="this.closest('.green-highlight-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
-        </div>
-
-        <p style="color: #6b7280; margin-bottom: 20px; text-align: center;">How long should this lead stay highlighted in green?</p>
-
-        <!-- Duration Options -->
-        <div style="margin-bottom: 25px;">
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px;">
-                <button onclick="setGreenHighlightDuration('${leadId}', 2)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
-                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
-                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
-                    2 Days<br><span style="font-size: 12px; color: #6b7280;">Standard</span>
-                </button>
-                <button onclick="setGreenHighlightDuration('${leadId}', 3)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
-                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
-                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
-                    3 Days
-                </button>
-                <button onclick="setGreenHighlightDuration('${leadId}', 5)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
-                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
-                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
-                    5 Days
-                </button>
-                <button onclick="setGreenHighlightDuration('${leadId}', 7)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
-                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
-                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
-                    7 Days
-                </button>
-                <button onclick="setGreenHighlightDuration('${leadId}', 14)" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
-                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
-                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
-                    14 Days
-                </button>
-                <button onclick="showCustomDurationInput('${leadId}')" style="padding: 12px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s;"
-                        onmouseover="this.style.borderColor='#10b981'; this.style.background='#f0fdf4';"
-                        onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
-                    Custom
-                </button>
-            </div>
-        </div>
-
-        <!-- Custom Duration Input (initially hidden) -->
-        <div id="customDurationDiv" style="display: none; margin-bottom: 20px; padding: 15px; background: #f9fafb; border-radius: 8px;">
-            <label style="font-weight: 600; margin-bottom: 10px; display: block;">Custom Duration (days):</label>
-            <input type="number" id="customDays" min="1" max="365" placeholder="Enter days" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; margin-bottom: 10px;">
-            <div style="display: flex; gap: 10px;">
-                <button onclick="setGreenHighlightDuration('${leadId}', document.getElementById('customDays').value)" style="flex: 1; padding: 8px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Set Custom</button>
-                <button onclick="document.getElementById('customDurationDiv').style.display='none'" style="flex: 1; padding: 8px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancel</button>
-            </div>
-        </div>
-
-        <!-- Close Button -->
-        <div style="text-align: center;">
-            <button onclick="this.closest('.green-highlight-modal').remove()" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                Skip
-            </button>
-        </div>
-    `;
-
-    modal.className = 'green-highlight-modal';
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
-
-    // Close modal when clicking outside
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.remove();
-        }
-    });
+    console.log(`🟢 Green highlight duration popup disabled for lead: ${leadId}`);
+    return; // Exit early - popup disabled
 };
 
-// Function to show custom duration input
-window.showCustomDurationInput = function(leadId) {
-    document.getElementById('customDurationDiv').style.display = 'block';
-};
-
-// Function to set green highlight duration
+// Function to set green highlight duration (DISABLED - popup removed)
 window.setGreenHighlightDuration = function(leadId, days) {
-    const daysNum = parseInt(days) || 2;
-    console.log(`🟢 Setting green highlight duration for lead ${leadId}: ${daysNum} days`);
-
-    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
-
-    if (leadIndex !== -1) {
-        // Set green highlight expiration
-        const expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() + daysNum);
-
-        if (!leads[leadIndex].reachOut) {
-            leads[leadIndex].reachOut = {};
-        }
-
-        leads[leadIndex].reachOut.greenHighlightUntil = expirationDate.toISOString();
-        leads[leadIndex].reachOut.greenHighlightDays = daysNum;
-
-        // Save to localStorage
-        localStorage.setItem('insurance_leads', JSON.stringify(leads));
-
-        console.log(`✅ Green highlight set until: ${expirationDate.toLocaleDateString()}`);
-
-        // CRITICAL FIX: Save green highlight duration to server
-        const updateData = {
-            reachOut: leads[leadIndex].reachOut
-        };
-
-        fetch(`/api/leads/${leadId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updateData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log(`✅ Green highlight duration saved to server: ${daysNum} days until ${expirationDate.toLocaleDateString()}`);
-            } else {
-                console.error('❌ Server save failed for green highlight duration:', data.error);
-            }
-        })
-        .catch(error => {
-            console.error('❌ Server save error for green highlight duration:', error);
-        });
-    }
-
-    // Close the modal
-    const modal = document.querySelector('.green-highlight-modal');
-    if (modal) {
-        modal.remove();
-    }
-
-    // Show notification
-    showNotification(`Lead will stay green for ${daysNum} ${daysNum === 1 ? 'day' : 'days'}`, 'success');
+    console.log(`🟢 Green highlight duration function disabled for lead ${leadId} (${days} days)`);
+    return; // Function disabled since popup was removed
 };
 
 // Custom modal for Next Callback scheduling
@@ -4648,12 +4709,13 @@ function completeAllCallbacksForLead(leadId) {
     if (callbacks[leadId] && callbacks[leadId].length > 0) {
         console.log('✅ COMPLETING', callbacks[leadId].length, 'callbacks for lead', leadId);
 
-        // Complete each callback individually
+        // Complete each callback individually (SILENT MODE - no popups)
         callbacks[leadId].forEach(callback => {
             console.log('✅ Completing callback', callback.id, 'for lead', leadId);
-            if (typeof window.completeCallback === 'function') {
-                window.completeCallback(leadId, callback.id);
-            }
+
+            // CRITICAL FIX: Complete callback silently without showing popup
+            // Use completeCallbackAfterOutcome directly with 'answered' outcome
+            completeCallbackAfterOutcome(leadId, callback.id, 'answered');
         });
     } else {
         console.log('📋 No callbacks found for lead', leadId);
@@ -4729,7 +4791,7 @@ function showCallbackScheduler(leadId) {
                 <i class="fas fa-calendar-alt" style="font-size: 24px; color: #3b82f6;"></i>
             </div>
             <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Schedule Next Call</h3>
-            <p style="margin: 0; color: #6b7280; font-size: 14px;">
+            <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">
                 Lead: <strong>${lead.name}</strong>
             </p>
         </div>
@@ -4860,8 +4922,7 @@ async function saveCallbackToLocalStorageAndServer(leadId, dateTime, notes) {
     // Save to server
     try {
         const urls = [
-            'http://162-220-14-239.nip.io:3001/api/callbacks',
-            'http://localhost:3001/api/callbacks'
+            '/api/callbacks'
         ];
 
         for (const url of urls) {
@@ -4871,7 +4932,12 @@ async function saveCallbackToLocalStorageAndServer(leadId, dateTime, notes) {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(newCallback)
+                    body: JSON.stringify({
+                        callback_id: newCallback.id.toString(),
+                        lead_id: leadId,
+                        date_time: newCallback.dateTime,
+                        notes: newCallback.notes
+                    })
                 });
 
                 if (response.ok) {
@@ -5001,11 +5067,19 @@ function showContactAttemptedModal(leadId, callback) {
     noBtn.addEventListener('click', () => {
         document.body.removeChild(modalOverlay);
         callback(false);
+        // Show callback scheduling popup after contact attempt popup
+        setTimeout(() => {
+            showCallbackSchedulingPopup(leadId);
+        }, 300);
     });
 
     yesBtn.addEventListener('click', () => {
         document.body.removeChild(modalOverlay);
         callback(true);
+        // Show callback scheduling popup after contact attempt popup
+        setTimeout(() => {
+            showCallbackSchedulingPopup(leadId);
+        }, 300);
     });
 
     // Handle escape key
@@ -5343,13 +5417,34 @@ protectedFunctions.viewLead = async function(leadId) {
                 console.log('🔍 SERVER DATA emailConfirmed:', serverLead.reachOut?.emailConfirmed);
                 console.log('🔍 LOCAL DATA emailConfirmed:', lead.reachOut?.emailConfirmed);
 
-                // Update localStorage lead with server data
+                // Update localStorage lead with server data, preserving DOT data
                 const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
                 if (leadIndex !== -1) {
-                    leads[leadIndex] = serverLead;
+                    // Preserve DOT-related data from localStorage before server sync
+                    const preservedData = {
+                        state: leads[leadIndex].state,
+                        yearsInBusiness: leads[leadIndex].yearsInBusiness,
+                        commodityHauled: leads[leadIndex].commodityHauled
+                    };
+
+                    console.log('🔧 SYNC: Preserving DOT data before server sync:', preservedData);
+
+                    // Use server data but preserve DOT fields if they exist locally
+                    leads[leadIndex] = {
+                        ...serverLead,
+                        ...(preservedData.state && { state: preservedData.state }),
+                        ...(preservedData.yearsInBusiness && { yearsInBusiness: preservedData.yearsInBusiness }),
+                        ...(preservedData.commodityHauled && { commodityHauled: preservedData.commodityHauled })
+                    };
+
                     localStorage.setItem('insurance_leads', JSON.stringify(leads));
-                    lead = serverLead; // Use fresh server data
-                    console.log('✅ Lead synced with server data');
+                    lead = leads[leadIndex]; // Use merged data
+                    console.log('✅ Lead synced with server data (DOT data preserved)');
+                    console.log('🎯 FINAL LEAD DATA:', {
+                        state: lead.state,
+                        yearsInBusiness: lead.yearsInBusiness,
+                        commodityHauled: lead.commodityHauled
+                    });
                 }
             }
         } catch (error) {
@@ -5381,6 +5476,27 @@ protectedFunctions.updateLeadStatus = function(leadId, status) {
 
 protectedFunctions.updateWinLossStatus = function(leadId, winLoss) {
     protectedFunctions.updateLeadField(leadId, 'winLoss', winLoss);
+};
+
+protectedFunctions.updateConfirmedPremiumStatus = function(leadId, confirmedPremium) {
+    console.log('💰 updateConfirmedPremiumStatus called:', leadId, confirmedPremium);
+
+    // Update the field in localStorage
+    protectedFunctions.updateLeadField(leadId, 'confirmedPremium', confirmedPremium);
+
+    // Update the premium field styling immediately
+    const premiumField = document.getElementById(`lead-premium-${leadId}`);
+    if (premiumField) {
+        if (confirmedPremium === 'yes') {
+            premiumField.style.color = '#16a34a';
+            premiumField.style.fontWeight = '600';
+        } else {
+            premiumField.style.color = '';
+            premiumField.style.fontWeight = '';
+        }
+    }
+
+    console.log('✅ Confirmed premium status updated:', confirmedPremium);
 };
 
 protectedFunctions.updateLeadAssignedTo = function(leadId, assignedTo) {
@@ -6154,8 +6270,537 @@ protectedFunctions.loadQuoteApplications = function(leadId) {
 
 protectedFunctions.addQuoteSubmission = function(leadId) {
     console.log('Add quote submission for lead:', leadId);
-    // Placeholder - can be expanded later
-    alert('Quote submission functionality coming soon');
+
+    // Find the quote submissions container
+    const container = document.getElementById('quote-submissions-container');
+    if (!container) {
+        console.error('Quote submissions container not found');
+        alert('Error: Cannot find quote container. Please refresh and try again.');
+        return;
+    }
+
+    // Check if form already exists
+    let existingForm = document.getElementById('quote-entry-form');
+    if (existingForm) {
+        existingForm.remove();
+    }
+
+    // Create the quote entry modal
+    const modal = document.createElement('div');
+    modal.id = 'quote-entry-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999999;
+    `;
+
+    // Force z-index with !important using style property
+    modal.style.setProperty('z-index', '999999999', 'important');
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        position: relative;
+        z-index: 999999999;
+    `;
+
+    // Force z-index on modal content as well
+    modalContent.style.setProperty('z-index', '999999999', 'important');
+
+    modalContent.innerHTML = `
+        <div style="flex: 1;">
+            <h3 style="margin: 0 0 20px 0; color: #374151; font-size: 18px; font-weight: 600; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+                <i class="fas fa-file-alt" style="color: #059669; margin-right: 8px;"></i>Quote #1
+            </h3>
+            <form class="quote-form" data-quote-number="1">
+                <!-- Carrier Selection -->
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                        <i class="fas fa-building" style="color: #059669; margin-right: 8px;"></i>Insurance Carrier
+                    </label>
+                    <select id="carrier-selection-1" style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                       font-size: 15px; transition: border-color 0.2s ease; background: white;">
+                        <option value="">Select a carrier...</option>
+                        <option value="Progressive">Progressive</option>
+                        <option value="Geico">Geico</option>
+                        <option value="Northland">Northland</option>
+                        <option value="Canal">Canal</option>
+                        <option value="Occidental">Occidental</option>
+                        <option value="Crum & Forster">Crum & Forster</option>
+                        <option value="Nico">Nico</option>
+                        <option value="Berkley Prime">Berkley Prime</option>
+                    </select>
+                </div>
+
+                <!-- Physical Coverage -->
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                        <i class="fas fa-shield-alt" style="color: #3b82f6; margin-right: 8px;"></i>Physical Coverage
+                    </label>
+                    <input type="text" id="physical-coverage-1" style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                      font-size: 15px; transition: border-color 0.2s ease;" placeholder="Enter physical coverage amount">
+                </div>
+
+                <!-- Cargo Cost -->
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                        <i class="fas fa-dollar-sign" style="color: #059669; margin-right: 8px;"></i>Cargo Cost: 100K
+                    </label>
+                    <input type="text" id="cargo-cost-1" style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                      font-size: 15px; transition: border-color 0.2s ease;" inputmode="numeric" pattern="[0-9]*" placeholder="Enter cargo cost">
+                </div>
+
+                <!-- Liability Per Unit -->
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                        <i class="fas fa-shield-alt" style="color: #8b5cf6; margin-right: 8px;"></i>Liability
+                    </label>
+                    <input type="text" id="liability-per-unit-1" style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                      font-size: 15px; transition: border-color 0.2s ease;" inputmode="numeric" pattern="[0-9]*" placeholder="Enter liability amount">
+                </div>
+
+                <!-- Total Premium -->
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                        <i class="fas fa-dollar-sign" style="color: #dc2626; margin-right: 8px;"></i>Total Premium
+                    </label>
+                    <input type="text" id="total-premium-1" style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                      font-size: 15px; transition: border-color 0.2s ease;" inputmode="numeric" pattern="[0-9]*" placeholder="Enter total premium amount">
+                </div>
+
+                <!-- File Upload -->
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151; font-size: 16px;">
+                        <i class="fas fa-file-pdf" style="color: #ef4444; margin-right: 8px;"></i>Quote Document
+                    </label>
+                    <input type="file" id="quote-document-1" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+                                      font-size: 15px; transition: border-color 0.2s ease; background: white;">
+                    <small style="color: #6b7280; font-size: 13px;">Upload quote document (PDF, DOC, or image files)</small>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+                    <button type="button" onclick="closeQuoteModal()" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        <i class="fas fa-times" style="margin-right: 8px;"></i>Cancel
+                    </button>
+                    <button type="button" onclick="saveQuoteSubmission('${leadId}')" style="background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        <i class="fas fa-save" style="margin-right: 8px;"></i>Save Quote
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
+
+// Helper function to close quote modal
+window.closeQuoteModal = function() {
+    const modal = document.getElementById('quote-entry-modal');
+    if (modal) {
+        modal.remove();
+    }
+};
+
+// Helper function to save quote submission
+window.saveQuoteSubmission = async function(leadId) {
+    console.log('Saving quote submission for lead:', leadId);
+
+    // Get form data
+    const carrier = document.getElementById('carrier-selection-1').value;
+    const physicalCoverage = document.getElementById('physical-coverage-1').value;
+    const cargoCost = document.getElementById('cargo-cost-1').value;
+    const liability = document.getElementById('liability-per-unit-1').value;
+    const totalPremium = document.getElementById('total-premium-1').value;
+    const documentFile = document.getElementById('quote-document-1').files[0];
+
+    // Validate required fields
+    if (!carrier) {
+        alert('Please select an insurance carrier');
+        return;
+    }
+
+    if (!totalPremium) {
+        alert('Please enter the total premium amount');
+        return;
+    }
+
+    // Show loading state
+    const saveButton = document.querySelector('button[onclick*="saveQuoteSubmission"]');
+    const originalText = saveButton.innerHTML;
+    saveButton.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i>Saving...';
+    saveButton.disabled = true;
+
+    try {
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('leadId', leadId);
+        formData.append('insuranceCarrier', carrier);
+        formData.append('physicalCoverage', physicalCoverage);
+        formData.append('cargoCost', cargoCost);
+        formData.append('liability', liability);
+        formData.append('totalPremium', totalPremium);
+        formData.append('notes', ''); // Add notes field
+
+        if (documentFile) {
+            formData.append('file', documentFile);
+        }
+
+        // Send to server
+        const response = await fetch('/api/quotes', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Quote saved successfully to server:', result);
+
+        // Also save to localStorage for offline access and immediate display
+        const quoteData = {
+            id: result.quote.id || `quote_${Date.now()}`,
+            leadId: leadId,
+            insuranceCarrier: carrier,
+            physicalCoverage: physicalCoverage,
+            cargoCost: cargoCost,
+            liability: liability,
+            totalPremium: totalPremium,
+            fileName: result.quote.fileName || null,
+            filePath: result.quote.filePath || null,
+            fileSize: result.quote.fileSize || null,
+            created_date: result.quote.created_date || new Date().toISOString(),
+            status: result.quote.status || 'submitted',
+            synced: true
+        };
+
+        // Update localStorage
+        let quotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+        quotes.push(quoteData);
+        localStorage.setItem('lead_quotes', JSON.stringify(quotes));
+
+        // Close modal
+        closeQuoteModal();
+
+        // Show success message
+        alert('Quote saved successfully to server!');
+
+        // Refresh the quotes display
+        await refreshQuotesDisplay(leadId);
+
+    } catch (error) {
+        console.error('Error saving quote to server:', error);
+
+        // Fallback: Save to localStorage only
+        console.log('Falling back to localStorage save...');
+
+        const quoteData = {
+            id: `quote_${Date.now()}`,
+            leadId: leadId,
+            insuranceCarrier: carrier,
+            physicalCoverage: physicalCoverage,
+            cargoCost: cargoCost,
+            liability: liability,
+            totalPremium: totalPremium,
+            fileName: documentFile ? documentFile.name : null,
+            filePath: null,
+            fileSize: documentFile ? documentFile.size : null,
+            created_date: new Date().toISOString(),
+            status: 'submitted',
+            synced: false // Flag to indicate local-only storage
+        };
+
+        let quotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+        quotes.push(quoteData);
+        localStorage.setItem('lead_quotes', JSON.stringify(quotes));
+
+        // Close modal
+        closeQuoteModal();
+
+        // Show warning message
+        alert('Warning: Could not save to server. Quote saved locally only.\n\nError: ' + error.message);
+
+        // Refresh the quotes display
+        await refreshQuotesDisplay(leadId);
+
+    } finally {
+        // Restore button state
+        if (saveButton) {
+            saveButton.innerHTML = originalText;
+            saveButton.disabled = false;
+        }
+    }
+};
+
+// Function to refresh and display quotes for a lead
+window.refreshQuotesDisplay = async function(leadId) {
+    console.log('Refreshing quotes display for lead:', leadId);
+
+    // Get the quotes container
+    const quotesContainer = document.getElementById(`quotes-container-${leadId}`);
+    if (!quotesContainer) {
+        console.warn('Quotes container not found for lead:', leadId);
+        return;
+    }
+
+    let leadQuotes = [];
+
+    // First try to load quotes from server
+    try {
+        const response = await fetch(`/api/quotes/${leadId}`);
+        if (response.ok) {
+            const result = await response.json();
+            leadQuotes = result.quotes || [];
+            console.log(`Loaded ${leadQuotes.length} quotes from server for lead ${leadId}`);
+
+            // Update localStorage with server data for offline access
+            const allLocalQuotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+            const otherLeadQuotes = allLocalQuotes.filter(quote => String(quote.leadId) !== String(leadId));
+            const combinedQuotes = [...otherLeadQuotes, ...leadQuotes];
+            localStorage.setItem('lead_quotes', JSON.stringify(combinedQuotes));
+        } else {
+            throw new Error(`Server returned ${response.status}`);
+        }
+    } catch (error) {
+        console.log('Failed to load quotes from server, using localStorage:', error.message);
+        // Fallback to localStorage
+        const allQuotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+        leadQuotes = allQuotes.filter(quote => String(quote.leadId) === String(leadId));
+    }
+
+    if (leadQuotes.length === 0) {
+        quotesContainer.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No quotes submitted yet</p>';
+        return;
+    }
+
+    // Generate HTML for each quote
+    const quotesHTML = leadQuotes.map((quote, index) => `
+        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: white;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #374151; font-size: 16px; font-weight: 600;">
+                    <i class="fas fa-file-contract" style="color: #3b82f6; margin-right: 8px;"></i>Quote #${index + 1} - ${quote.insuranceCarrier || quote.carrier || 'No Carrier'}
+                </h4>
+                <div style="display: flex; gap: 8px;">
+                    ${(quote.fileName || quote.documentName) ? `
+                        <button onclick="viewQuoteDocument('${quote.id}')" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-eye"></i> View Document
+                        </button>
+                    ` : ''}
+                    <button onclick="deleteQuoteFromServer('${quote.id}', '${leadId}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px;">
+                <div>
+                    <strong style="color: #374151;">Physical Coverage:</strong><br>
+                    <span style="color: #6b7280;">${quote.physicalCoverage || 'Not specified'}</span>
+                </div>
+                <div>
+                    <strong style="color: #374151;">Cargo Cost:</strong><br>
+                    <span style="color: #6b7280;">$${quote.cargoCost ? parseInt(quote.cargoCost).toLocaleString() : 'Not specified'}</span>
+                </div>
+                <div>
+                    <strong style="color: #374151;">Liability:</strong><br>
+                    <span style="color: #6b7280;">$${quote.liability ? parseInt(quote.liability).toLocaleString() : 'Not specified'}</span>
+                </div>
+                <div>
+                    <strong style="color: #374151;">Total Premium:</strong><br>
+                    <span style="color: #dc2626; font-weight: 600; font-size: 14px;">$${quote.totalPremium ? parseInt(quote.totalPremium).toLocaleString() : 'Not specified'}</span>
+                </div>
+            </div>
+
+            ${quote.documentName ? `
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f3f4f6;">
+                    <small style="color: #6b7280;">
+                        <i class="fas fa-paperclip" style="margin-right: 4px;"></i>Document: ${quote.documentName}
+                    </small>
+                </div>
+            ` : ''}
+
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f3f4f6;">
+                <small style="color: #9ca3af;">
+                    Created: ${new Date(quote.created_date || quote.dateCreated || Date.now()).toLocaleDateString()} ${new Date(quote.created_date || quote.dateCreated || Date.now()).toLocaleTimeString()}
+                </small>
+            </div>
+        </div>
+    `).join('');
+
+    quotesContainer.innerHTML = quotesHTML;
+    console.log(`Displayed ${leadQuotes.length} quotes for lead ${leadId}`);
+};
+
+// Function to view quote document
+window.viewQuoteDocument = function(quoteId) {
+    console.log('Viewing document for quote:', quoteId);
+
+    // Get quote data from localStorage (which should now include server data)
+    const allQuotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+    let quote = allQuotes.find(q => String(q.id) === String(quoteId));
+
+    if (!quote) {
+        console.log('Quote not found in localStorage, searching by different ID formats...');
+        // Try different ID format matches
+        quote = allQuotes.find(q =>
+            q.id === quoteId ||
+            String(q.id) === String(quoteId) ||
+            q.id === parseInt(quoteId) ||
+            q.id === `quote_${quoteId}`
+        );
+    }
+
+    if (!quote) {
+        console.error('Quote not found. Available quotes:', allQuotes.map(q => ({id: q.id, leadId: q.leadId})));
+        alert(`Quote not found. Quote ID: ${quoteId}\n\nAvailable quotes: ${allQuotes.length}\n\nThis might be a sync issue. Please refresh the page and try again.`);
+        return;
+    }
+
+    // Check if this quote has a document
+    const fileName = quote.fileName || quote.documentName;
+    const filePath = quote.filePath;
+
+    if (!fileName) {
+        alert('No document found for this quote');
+        return;
+    }
+
+    // For server-stored files, open directly in new tab
+    if (filePath && quote.synced) {
+        const viewUrl = `https://162-220-14-239.nip.io/api/quotes/file/${quote.leadId}/${filePath.split('/').pop()}`;
+        window.open(viewUrl, '_blank');
+        return;
+    }
+
+    // For local-only files, show message
+    alert('This document is stored locally only and cannot be viewed online. Please re-upload the document to store it on the server for viewing.');
+};
+
+
+// Function to load and display quotes when a lead profile is opened
+window.loadQuotesForLead = async function(leadId) {
+    console.log('Loading quotes for lead profile:', leadId);
+
+    // Simply call refreshQuotesDisplay which now handles server loading
+    await refreshQuotesDisplay(leadId);
+};
+
+// Function to delete a quote
+window.deleteQuote = async function(quoteId, leadId) {
+    if (!confirm('Are you sure you want to delete this quote? This action cannot be undone.')) {
+        return;
+    }
+
+    console.log('Deleting quote:', quoteId);
+
+    // Get all quotes
+    let allQuotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+
+    // Filter out the quote to delete
+    allQuotes = allQuotes.filter(quote => quote.id !== quoteId);
+
+    // Save back to localStorage
+    localStorage.setItem('lead_quotes', JSON.stringify(allQuotes));
+
+    console.log('Quote deleted successfully');
+
+    // Refresh the display
+    await refreshQuotesDisplay(leadId);
+};
+
+// Function to load and display quotes when a lead profile is opened
+window.loadQuotesForLead = async function(leadId) {
+    console.log('Loading quotes for lead profile:', leadId);
+
+    // Load quotes from server first
+    try {
+        const response = await fetch(`/api/quotes?leadId=${leadId}`);
+        if (response.ok) {
+            const serverQuotes = await response.json();
+            console.log('Loaded quotes from server:', serverQuotes);
+
+            // Merge with localStorage quotes (in case some are local-only)
+            let localQuotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+            const leadLocalQuotes = localQuotes.filter(quote => quote.leadId === leadId);
+
+            // Combine server quotes with any local-only quotes
+            const serverQuoteIds = serverQuotes.map(q => q.id);
+            const localOnlyQuotes = leadLocalQuotes.filter(q => !serverQuoteIds.includes(q.id));
+
+            // Update localStorage with server data
+            const otherLeadQuotes = localQuotes.filter(quote => quote.leadId !== leadId);
+            const allQuotes = [...otherLeadQuotes, ...serverQuotes, ...localOnlyQuotes];
+            localStorage.setItem('lead_quotes', JSON.stringify(allQuotes));
+
+            console.log(`Synced ${serverQuotes.length} server quotes, ${localOnlyQuotes.length} local-only quotes`);
+        }
+    } catch (error) {
+        console.warn('Could not load quotes from server:', error.message);
+        // Continue with localStorage-only quotes
+    }
+
+    // Small delay to ensure the DOM is ready
+    setTimeout(() => {
+        refreshQuotesDisplay(leadId);
+    }, 100);
+};
+
+// Function to delete quote from both server and localStorage
+window.deleteQuoteFromServer = async function(quoteId, leadId) {
+    if (!confirm('Are you sure you want to delete this quote? This action cannot be undone.')) {
+        return;
+    }
+
+    console.log('Deleting quote from server:', quoteId);
+
+    try {
+        // Try to delete from server first
+        const response = await fetch(`/api/quotes/${leadId}/${quoteId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            console.log('Quote deleted from server successfully');
+        } else {
+            console.warn('Could not delete from server, proceeding with local delete');
+        }
+    } catch (error) {
+        console.warn('Server delete failed:', error.message);
+    }
+
+    // Always delete from localStorage regardless of server response
+    let allQuotes = JSON.parse(localStorage.getItem('lead_quotes') || '[]');
+    allQuotes = allQuotes.filter(quote => quote.id !== quoteId);
+    localStorage.setItem('lead_quotes', JSON.stringify(allQuotes));
+
+    console.log('Quote deleted from localStorage');
+
+    // Refresh the display
+    await refreshQuotesDisplay(leadId);
 };
 
 // PROTECTION: Assign functions to window and protect from overriding
@@ -6861,6 +7506,7 @@ window.updateLeadAssignedTo = protectedFunctions.updateLeadAssignedTo;
 window.updateLeadStatus = protectedFunctions.updateLeadStatus;
 window.updateLeadPriority = protectedFunctions.updateLeadPriority;
 window.updateWinLossStatus = protectedFunctions.updateWinLossStatus;
+window.updateConfirmedPremiumStatus = protectedFunctions.updateConfirmedPremiumStatus;
 window.removeAttachment = protectedFunctions.removeAttachment;
 window.addMoreAttachments = protectedFunctions.addMoreAttachments;
 window.sendEmail = protectedFunctions.sendEmail;
@@ -7072,6 +7718,10 @@ window.addDriver = function(leadId) {
             violations: ''
         });
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Sync to server
+        syncLeadToServer(leadId, { drivers: lead.drivers });
+
         // Refresh the lead profile to show new card
         if (window.showLeadProfile) {
             window.showLeadProfile(leadId);
@@ -7088,6 +7738,9 @@ window.updateVehicle = function(leadId, vehicleIndex, field, value) {
     if (lead && lead.vehicles && lead.vehicles[vehicleIndex]) {
         lead.vehicles[vehicleIndex][field] = value;
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Also save to server to persist changes
+        syncLeadToServer(leadId, { vehicles: lead.vehicles });
         console.log('✅ Vehicle updated');
     }
 };
@@ -7099,6 +7752,9 @@ window.updateTrailer = function(leadId, trailerIndex, field, value) {
     if (lead && lead.trailers && lead.trailers[trailerIndex]) {
         lead.trailers[trailerIndex][field] = value;
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Also save to server to persist changes
+        syncLeadToServer(leadId, { trailers: lead.trailers });
         console.log('✅ Trailer updated');
     }
 };
@@ -7110,6 +7766,9 @@ window.updateDriver = function(leadId, driverIndex, field, value) {
     if (lead && lead.drivers && lead.drivers[driverIndex]) {
         lead.drivers[driverIndex][field] = value;
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Also save to server to persist changes
+        syncLeadToServer(leadId, { drivers: lead.drivers });
         console.log('✅ Driver updated');
     }
 };
@@ -7122,6 +7781,10 @@ window.removeVehicle = function(leadId, vehicleIndex) {
     if (lead && lead.vehicles && lead.vehicles[vehicleIndex] !== undefined) {
         lead.vehicles.splice(vehicleIndex, 1);
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Also save to server to persist changes
+        syncLeadToServer(leadId, { vehicles: lead.vehicles });
+
         // Refresh the lead profile
         if (window.showLeadProfile) {
             window.showLeadProfile(leadId);
@@ -7137,6 +7800,10 @@ window.removeTrailer = function(leadId, trailerIndex) {
     if (lead && lead.trailers && lead.trailers[trailerIndex] !== undefined) {
         lead.trailers.splice(trailerIndex, 1);
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Also save to server to persist changes
+        syncLeadToServer(leadId, { trailers: lead.trailers });
+
         // Refresh the lead profile
         if (window.showLeadProfile) {
             window.showLeadProfile(leadId);
@@ -7152,6 +7819,10 @@ window.removeDriver = function(leadId, driverIndex) {
     if (lead && lead.drivers && lead.drivers[driverIndex] !== undefined) {
         lead.drivers.splice(driverIndex, 1);
         localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Also save to server to persist changes
+        syncLeadToServer(leadId, { drivers: lead.drivers });
+
         // Refresh the lead profile
         if (window.showLeadProfile) {
             window.showLeadProfile(leadId);
@@ -8219,7 +8890,7 @@ window.scheduleCallback = async function(leadId) {
 
     try {
         // Save to server
-        const response = await fetch(`http://${window.location.hostname}:3001/api/callbacks`, {
+        const response = await fetch(`/api/callbacks`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -8242,12 +8913,8 @@ window.scheduleCallback = async function(leadId) {
         const callbacksKey = 'scheduled_callbacks';
         let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
 
-        if (!callbacks[leadId]) {
-            callbacks[leadId] = [];
-        }
-
-        callbacks[leadId].push(newCallback);
-        callbacks[leadId].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+        // SINGLE CALLBACK OVERRIDE: Replace any existing callbacks for this lead
+        callbacks[leadId] = [newCallback]; // Only keep the new callback, override all previous ones
         localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
 
         // Clear inputs
@@ -8258,7 +8925,7 @@ window.scheduleCallback = async function(leadId) {
         // Refresh display
         displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
 
-        console.log('✅ Callback scheduled for:', callbackDateTime);
+        console.log('✅ Callback scheduled (replaced any existing) for:', callbackDateTime);
     } catch (error) {
         console.error('❌ Failed to save callback:', error);
         alert('Failed to save callback. Please try again.');
@@ -8278,15 +8945,13 @@ window.displayScheduledCallbacks = async function(leadId) {
 
     // Load from server/database
     let serverCallbacks = [];
+    let serverRequestSuccessful = false;
     try {
-        const baseUrl = window.location.hostname === 'localhost'
-            ? 'http://localhost:3001'
-            : `${window.location.protocol}//${window.location.hostname}:3001`;
-
-        const response = await fetch(`${baseUrl}/api/callbacks?leadId=${leadId}`);
+        const response = await fetch(`/api/callbacks?leadId=${leadId}`);
         if (response.ok) {
             const data = await response.json();
             serverCallbacks = data.callbacks || [];
+            serverRequestSuccessful = true;
             console.log('📋 SERVER CALLBACKS: Loaded', serverCallbacks.length, 'callbacks from server for lead', leadId);
         } else {
             console.warn('⚠️ Failed to load callbacks from server:', response.status);
@@ -8304,18 +8969,72 @@ window.displayScheduledCallbacks = async function(leadId) {
         importedFromVicidial: callback.notes && callback.notes.includes('imported from ViciDial')
     }));
 
+    // CONSERVATIVE CLEANUP: Only clean up localStorage if we're absolutely certain
+    // the server doesn't have callbacks AND the local callbacks are old (>24 hours)
+    if (localLeadCallbacks.length > 0 && convertedServerCallbacks.length === 0 && serverRequestSuccessful) {
+        // Check if local callbacks are old (created more than 24 hours ago)
+        const now = new Date();
+        const oldCallbacks = localLeadCallbacks.filter(callback => {
+            const callbackCreated = new Date(callback.createdAt || callback.dateTime);
+            const hoursDiff = (now - callbackCreated) / (1000 * 60 * 60);
+            return hoursDiff > 24;
+        });
+
+        if (oldCallbacks.length > 0 && oldCallbacks.length === localLeadCallbacks.length) {
+            // Only clean up if ALL callbacks are old (>24 hours)
+            console.log('🧹 CONSERVATIVE CLEANUP: All localStorage callbacks are >24h old and server has none - cleaning up', oldCallbacks.length, 'callbacks');
+            const callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+            if (callbacks[leadId]) {
+                delete callbacks[leadId];
+                localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+                console.log('✅ CLEANUP: Removed old localStorage callbacks for lead', leadId);
+            }
+        } else {
+            console.log('🛡️ PRESERVING: Server has no callbacks but localStorage callbacks are recent - keeping them');
+        }
+    } else if (!serverRequestSuccessful && localLeadCallbacks.length > 0) {
+        console.log('🔧 PRESERVING: Server request failed, keeping localStorage callbacks for lead', leadId);
+    }
+
     // Combine local and server callbacks, avoiding duplicates
     const allCallbacks = [...localLeadCallbacks];
     convertedServerCallbacks.forEach(serverCallback => {
-        const exists = allCallbacks.find(local => local.id === serverCallback.id);
+        const exists = allCallbacks.find(local => String(local.id) === String(serverCallback.id));
         if (!exists) {
             allCallbacks.push(serverCallback);
         }
     });
 
     // FILTER OUT COMPLETED CALLBACKS - only show active ones
-    const activeCallbacks = allCallbacks.filter(callback => !callback.completed);
-    console.log('📋 CALLBACK DISPLAY: Lead', leadId, 'has', allCallbacks.length, 'total callbacks,', activeCallbacks.length, 'active (incomplete)');
+    let activeCallbacks = allCallbacks.filter(callback => !callback.completed);
+
+    // SINGLE CALLBACK CONSTRAINT: Only show the most recent callback (sort by creation time or callback time)
+    if (activeCallbacks.length > 1) {
+        console.log('🔧 SINGLE CALLBACK FIX: Found', activeCallbacks.length, 'active callbacks, showing only the most recent');
+
+        // Sort by dateTime (most recent callback time) and take the last one
+        activeCallbacks.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+        const mostRecentCallback = activeCallbacks[activeCallbacks.length - 1];
+        const oldCallbacks = activeCallbacks.slice(0, -1); // All except the most recent
+
+        // Clean up old callbacks in localStorage
+        if (localCallbacks[leadId]) {
+            localCallbacks[leadId] = [mostRecentCallback];
+            localStorage.setItem(callbacksKey, JSON.stringify(localCallbacks));
+            console.log('🧹 CLEANUP: Removed', oldCallbacks.length, 'old callbacks from localStorage');
+        }
+
+        // Clean up old callbacks on server (async, don't wait)
+        oldCallbacks.forEach(oldCallback => {
+            fetch(`/api/callbacks/${oldCallback.id}`, { method: 'DELETE' })
+                .then(() => console.log('🧹 SERVER CLEANUP: Deleted old callback', oldCallback.id))
+                .catch(err => console.warn('⚠️ Failed to delete old callback:', err));
+        });
+
+        activeCallbacks = [mostRecentCallback]; // Keep only the most recent callback
+    }
+
+    console.log('📋 CALLBACK DISPLAY: Lead', leadId, 'has', allCallbacks.length, 'total callbacks,', activeCallbacks.length, 'active (showing most recent only)');
     console.log('📋 CALLBACK DETAILS:', activeCallbacks.map(cb => ({ id: cb.id, dateTime: cb.dateTime, notes: cb.notes?.substring(0, 50) })));
 
     if (activeCallbacks.length === 0) {
@@ -8348,9 +9067,9 @@ window.displayScheduledCallbacks = async function(leadId) {
                         </div>
                         ${callback.notes ? `<div style="font-size: 12px; color: #6b7280; margin-top: 5px;">${callback.notes}</div>` : ''}
                     </div>
-                    <button onclick="completeCallback('${leadId}', '${callback.id}')"
-                            style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                        <i class="fas fa-check"></i> Done
+                    <button onclick="showCallbackScheduler('${leadId}')"
+                            style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <i class="fas fa-calendar-alt"></i> Reschedule
                     </button>
                 </div>
             </div>
@@ -8364,13 +9083,213 @@ window.displayScheduledCallbacks = async function(leadId) {
 window.completeCallback = async function(leadId, callbackId) {
     console.log('✅ COMPLETING CALLBACK:', leadId, callbackId);
 
+    // CRITICAL FIX: Check the call stack to detect if this is from "Not Needed" flow
+    const stackTrace = new Error().stack || '';
+    const isFromCompleteAllCallbacks = stackTrace.includes('completeAllCallbacksForLead') ||
+                                       stackTrace.includes('no-callback-needed') ||
+                                       callbackId === true ||
+                                       callbackId === 'true';
+
+    if (isFromCompleteAllCallbacks) {
+        console.log('🔧 SILENT COMPLETION: Detected call from "Not Needed" flow - completing silently');
+
+        // Complete callback silently using completeCallbackAfterOutcome directly
+        if (callbackId && callbackId !== true && callbackId !== 'true') {
+            console.log('🔧 SILENT: Completing callback', callbackId, 'silently for lead', leadId);
+            completeCallbackAfterOutcome(leadId, callbackId, 'answered');
+        } else {
+            // Complete all callbacks silently
+            const callbacksKey = 'scheduled_callbacks';
+            let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+
+            if (callbacks[leadId] && callbacks[leadId].length > 0) {
+                console.log('🔧 SILENT: Completing', callbacks[leadId].length, 'callbacks silently for lead', leadId);
+                callbacks[leadId].forEach(callback => {
+                    completeCallbackAfterOutcome(leadId, callback.id, 'answered');
+                });
+            }
+        }
+        return;
+    }
+
+    // Show call outcome popup for individual callback completions (when user clicks "Done" button)
+    console.log('🎯 SHOWING POPUP: Regular callback completion from user action');
+    showCallbackOutcomePopup(leadId, callbackId);
+};
+
+// Show callback completion outcome popup
+function showCallbackOutcomePopup(leadId, callbackId) {
+    // CRITICAL FIX: Prevent duplicate popups by checking if one was recently shown
+    const popupKey = `callback_popup_${leadId}_${callbackId}`;
+    const lastShown = window.lastCallbackPopupTimes = window.lastCallbackPopupTimes || {};
+    const now = Date.now();
+
+    if (lastShown[popupKey] && (now - lastShown[popupKey]) < 2000) {
+        console.log('🛑 DUPLICATE PREVENTION: Callback popup was shown recently, skipping duplicate');
+        return;
+    }
+    lastShown[popupKey] = now;
+
+    // Remove any existing popup
+    const existingPopup = document.getElementById('callback-outcome-popup');
+    if (existingPopup) {
+        console.log('🔧 CLEANUP: Removing existing callback outcome popup');
+        existingPopup.remove();
+    }
+
+    // Create backdrop
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000001;
+    `;
+
+    // Create popup
+    const popup = document.createElement('div');
+    popup.id = 'callback-outcome-popup';
+    popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: rgba(0, 0, 0, 0.5) 0px 20px 50px;
+        z-index: 1000002;
+        min-width: 400px;
+    `;
+
+    popup.innerHTML = `
+        <div style="text-align: center;">
+            <h3 style="margin-top: 0;">Callback Complete</h3>
+            <p style="font-size: 16px; margin: 20px 0;">Did they answer?</p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                <button onclick="handleCallbackOutcome('${leadId}', '${callbackId}', true)" style="
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 10px 30px;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                ">Yes</button>
+                <button onclick="handleCallbackOutcome('${leadId}', '${callbackId}', false)" style="
+                    background: #ef4444;
+                    color: white;
+                    border: none;
+                    padding: 10px 30px;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                ">No</button>
+            </div>
+            <div id="callback-voicemail-question" style="display: none;">
+                <p style="font-size: 16px; margin: 20px 0;">Did you leave a voicemail?</p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button onclick="handleCallbackVoicemailOutcome('${leadId}', '${callbackId}', true)" style="
+                        background: #f59e0b;
+                        color: white;
+                        border: none;
+                        padding: 10px 30px;
+                        border-radius: 5px;
+                        font-size: 16px;
+                        cursor: pointer;
+                    ">Yes</button>
+                    <button onclick="handleCallbackVoicemailOutcome('${leadId}', '${callbackId}', false)" style="
+                        background: #6b7280;
+                        color: white;
+                        border: none;
+                        padding: 10px 30px;
+                        border-radius: 5px;
+                        font-size: 16px;
+                        cursor: pointer;
+                    ">No</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add to page
+    document.body.appendChild(backdrop);
+    document.body.appendChild(popup);
+
+    // Close on backdrop click
+    backdrop.addEventListener('click', () => {
+        backdrop.remove();
+        popup.remove();
+    });
+}
+
+// Handle callback outcome response
+window.handleCallbackOutcome = function(leadId, callbackId, answered) {
+    console.log(`📞 Callback outcome: ${answered ? 'Answered' : 'No answer'} for lead ${leadId}`);
+
+    if (answered) {
+        // They answered - complete the callback
+        completeCallbackAfterOutcome(leadId, callbackId, 'answered');
+
+        // Close popup
+        const popup = document.getElementById('callback-outcome-popup');
+        const backdrop = popup?.previousElementSibling;
+        if (popup) popup.remove();
+        if (backdrop) backdrop.remove();
+    } else {
+        // They didn't answer - show voicemail question
+        const answerSection = document.querySelector('#callback-outcome-popup div[style*="display: flex"]');
+        const voicemailSection = document.getElementById('callback-voicemail-question');
+
+        if (answerSection) answerSection.style.display = 'none';
+        if (voicemailSection) voicemailSection.style.display = 'block';
+    }
+};
+
+// Handle callback voicemail response
+window.handleCallbackVoicemailOutcome = function(leadId, callbackId, leftVoicemail) {
+    console.log(`📞 Callback voicemail: ${leftVoicemail ? 'Left voicemail' : 'No voicemail'} for lead ${leadId}`);
+
+    const outcome = leftVoicemail ? 'voicemail_left' : 'no_answer';
+    completeCallbackAfterOutcome(leadId, callbackId, outcome);
+
+    // Close popup
+    const popup = document.getElementById('callback-outcome-popup');
+    const backdrop = popup?.previousElementSibling;
+    if (popup) popup.remove();
+    if (backdrop) backdrop.remove();
+};
+
+// Complete callback after getting outcome
+async function completeCallbackAfterOutcome(leadId, callbackId, outcome) {
+    console.log('✅ COMPLETING CALLBACK WITH OUTCOME:', leadId, callbackId, outcome);
+
     // ALWAYS remove from localStorage first (don't wait for server)
     const callbacksKey = 'scheduled_callbacks';
     let callbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
 
     if (callbacks[leadId]) {
         const originalCount = callbacks[leadId].length;
-        callbacks[leadId] = callbacks[leadId].filter(cb => cb.id !== callbackId);
+        console.log('🔍 LOCAL CALLBACK IDs:', callbacks[leadId].map(cb => ({id: cb.id, type: typeof cb.id})));
+        console.log('🔍 LOOKING FOR ID:', callbackId, 'type:', typeof callbackId);
+
+        callbacks[leadId] = callbacks[leadId].filter(cb => {
+            // Check multiple possible ID formats using string comparison for consistency
+            const matchesId = String(cb.id) !== String(callbackId);
+            const matchesCallbackId = cb.callback_id && String(cb.callback_id) !== String(callbackId);
+            const shouldKeep = matchesId && (matchesCallbackId !== false);
+            console.log('🔍 COMPARING:', {
+                cbId: cb.id,
+                cbCallbackId: cb.callback_id,
+                searchFor: callbackId,
+                keepCallback: shouldKeep
+            });
+            return shouldKeep;
+        });
+
         localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
         console.log('✅ LOCAL REMOVAL: Removed callback', callbackId, 'from localStorage. Count:', originalCount, '->', callbacks[leadId].length);
     }
@@ -8385,7 +9304,7 @@ window.completeCallback = async function(leadId, callbackId) {
 
     // Try to mark as complete on server (but don't fail if it doesn't work)
     try {
-        const response = await fetch(`http://${window.location.hostname}:3001/api/callbacks/${callbackId}`, {
+        const response = await fetch(`/api/callbacks/${callbackId}`, {
             method: 'DELETE'
         });
 
@@ -8397,7 +9316,10 @@ window.completeCallback = async function(leadId, callbackId) {
     } catch (error) {
         console.log('⚠️  SERVER SYNC: Server unavailable but local removal succeeded:', error.message);
     }
-};
+
+    // TODO: Here we could save the outcome to the lead's history or notes
+    console.log('📋 CALLBACK OUTCOME RECORDED:', outcome);
+}
 
 // Function to update table cell after callback completion
 function updateTableAfterCallbackComplete(leadId) {
@@ -8499,6 +9421,13 @@ function monitorCallbacks() {
     localStorage.setItem('callback_warnings_sent', JSON.stringify(newWarnings));
 
     console.log('🔍 CALLBACK MONITOR: Monitor check completed');
+
+    // CRITICAL FIX: Rescan green highlighting after callback monitor completes
+    // This ensures any leads that got "Reach out: CALL" text have their green highlighting removed
+    console.log('🔄 CALLBACK RESCAN: Starting green highlight rescan after callback monitor completion');
+    setTimeout(() => {
+        rescanGreenHighlightingAfterCallbacks();
+    }, 100); // Small delay to ensure DOM updates are complete
 }
 
 // Function to send callback warning email to assigned agent
@@ -8712,6 +9641,10 @@ function updateTableForDueCallback(leadId, lead) {
             todoCell.innerHTML = newContent;
             console.log('✅ CALLBACK DEBUG: Table updated with callback due message for lead:', lead.name);
             console.log('🔍 CALLBACK DEBUG: New cell content:', todoCell.innerHTML);
+
+            // CRITICAL FIX: Remove green highlighting after adding "Reach out: CALL"
+            console.log('🔴 CALLBACK FIX: Removing green highlight from lead with new callback message');
+            removeGreenHighlightFromTableRow(leadId);
         }
     });
 
@@ -8873,10 +9806,7 @@ function checkAndRestoreCallbackMessages() {
 // Function to load callbacks from server and sync with localStorage
 async function loadCallbacksFromServer() {
     const possibleUrls = [
-        `http://${window.location.hostname}:3001/api/callbacks`,
-        `https://${window.location.hostname}:3001/api/callbacks`,
-        `/api/callbacks`,
-        `http://162.220.14.239:3001/api/callbacks`
+        `/api/callbacks`
     ];
 
     for (let url of possibleUrls) {
@@ -9030,6 +9960,12 @@ setTimeout(hookTableUpdates, 3000);
 window.testCallbackMonitor = function() {
     console.log('🧪 MANUAL TEST: Triggering callback monitor check...');
     monitorCallbacks();
+};
+
+// Manual test function to trigger green highlight rescan
+window.testGreenRescan = function() {
+    console.log('🧪 MANUAL TEST: Triggering green highlight rescan...');
+    rescanGreenHighlightingAfterCallbacks();
 };
 
 // Manual test function to send a test email notification
@@ -9366,7 +10302,7 @@ async function saveCallbackToServer(leadId, callbackData) {
     try {
         console.log('💾 Saving ViciDial callback to server for lead:', leadId);
 
-        const response = await fetch(`http://${window.location.hostname}:3001/api/callbacks`, {
+        const response = await fetch(`/api/callbacks`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -9800,3 +10736,355 @@ setInterval(() => {
         lockFunctions();
     }
 }, 2000);
+
+// Function to show callback scheduling popup after contact attempt
+function showCallbackSchedulingPopup(leadId) {
+    console.log(`📞 Showing callback scheduling popup for lead: ${leadId}`);
+
+    // Create modal backdrop
+    const modal = document.createElement('div');
+    modal.className = 'call-scheduled-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000003;
+    `;
+    modal.setAttribute('data-clickable-processed', 'true');
+
+    // Create modal content
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: rgba(0, 0, 0, 0.3) 0px 10px 30px;
+    `;
+
+    // Get current date and time for defaults
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px;">
+            <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-calendar-check" style="color: #3b82f6;"></i> Schedule Callback</h2>
+            <button onclick="this.closest('.call-scheduled-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">×</button>
+        </div>
+
+        <!-- Initial Response Options -->
+        <div id="initial-options" style="display: none; gap: 15px; justify-content: center; margin-bottom: 20px;">
+            <button onclick="handleCallScheduled('${leadId}', true)" style="background: rgb(16, 185, 129); color: white; border: none; padding: 15px 25px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 16px; min-width: 120px; transition: 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                <i class="fas fa-check"></i> Yes
+            </button>
+            <button onclick="handleCallScheduled('${leadId}', false)" style="
+                background: #ef4444;
+                color: white;
+                border: none;
+                padding: 15px 25px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 16px;
+                min-width: 120px;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                <i class="fas fa-times"></i> No
+            </button>
+        </div>
+
+        <!-- Date Selector (Initially Visible) -->
+        <div id="date-selector" style="display: block; text-align: center; margin-top: 20px;">
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; font-size: 16px; display: block; margin-bottom: 10px;">Select Call Date & Time:</label>
+                <div style="display: flex; gap: 15px; justify-content: center; align-items: center;">
+                    <div>
+                        <label style="font-weight: 500; font-size: 14px; display: block; margin-bottom: 5px;">Date:</label>
+                        <input type="date" id="call-date-${leadId}" min="${currentDate}" value="${currentDate}" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div>
+                        <label style="font-weight: 500; font-size: 14px; display: block; margin-bottom: 5px;">Time:</label>
+                        <input type="time" id="call-time-${leadId}" value="${currentTime}" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+            </div>
+            <button onclick="confirmCallScheduled('${leadId}')" style="
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 14px;
+            ">
+                <i class="fas fa-calendar-check"></i> Confirm
+            </button>
+        </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    console.log('✅ Callback scheduling popup displayed after contact attempt');
+}
+
+// Auto-import lead quotes to market tab
+async function autoImportToMarket(leadId, leadName) {
+    console.log(`🔄 Auto-importing quotes from lead ${leadId} (${leadName}) to market tab`);
+
+    // First check eligibility
+    if (typeof checkAutoImportEligibility === 'function') {
+        const eligibility = await checkAutoImportEligibility(leadId);
+
+        if (!eligibility.eligible) {
+            // Show informational message about why it's not eligible
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #f59e0b;
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+                z-index: 10001;
+                animation: slideInRight 0.3s ease-out;
+                font-weight: 600;
+                max-width: 300px;
+            `;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-info-circle" style="margin-right: 8px; color: #fbbf24;"></i>
+                    <span>Auto-import not available: ${eligibility.reason}</span>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+
+            console.log(`ℹ️ Auto-import not eligible: ${eligibility.reason}`);
+            return;
+        }
+
+        console.log(`✅ Eligibility check passed: ${eligibility.matchingQuotes} matching quotes from ${eligibility.totalQuotes} total`);
+    }
+
+    // Perform auto-import
+    if (typeof autoImportLeadQuotes === 'function') {
+        await autoImportLeadQuotes(leadId, leadName);
+    } else {
+        console.error('❌ autoImportLeadQuotes function not available');
+        alert('Auto-import functionality not available. Please ensure market functions are loaded.');
+    }
+}
+
+// Make function globally available
+window.autoImportToMarket = autoImportToMarket;
+
+// Manual DOT Lookup function for profile button
+window.triggerManualDOTLookup = async function(leadId, dotNumber) {
+    if (!leadId || !dotNumber) {
+        alert('❌ Lead ID or DOT number missing');
+        return;
+    }
+
+    console.log(`🎯 MANUAL DOT LOOKUP: Triggered for lead ${leadId} with DOT ${dotNumber}`);
+
+    try {
+        // Show loading state
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Looking up...';
+        button.disabled = true;
+
+        let result = null;
+
+        // Try the manual trigger function first
+        if (window.manualDOTLookupTrigger) {
+            console.log('🔧 Using manualDOTLookupTrigger function');
+            result = await window.manualDOTLookupTrigger(leadId, dotNumber);
+        }
+
+        // If that didn't work, try direct API call
+        if (!result) {
+            console.log('🔧 Trying direct API call');
+            const cleanDOT = dotNumber.toString().trim().replace(/[^\\d]/g, '');
+            const response = await fetch(`/api/test-db/${cleanDOT}`);
+            const data = await response.json();
+
+            if (data.success && data.carrier) {
+                // Calculate years from DOT
+                function calculateYearsFromDOT(dotNumber) {
+                    if (!dotNumber) return '';
+                    const dotNum = parseInt(dotNumber);
+                    if (dotNum < 1000000) return '25+ years';
+                    if (dotNum < 2000000) return '15-20 years';
+                    if (dotNum < 3000000) return '10-15 years';
+                    return '5-10 years';
+                }
+
+                // Manually update the lead
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const leadIndex = leads.findIndex(lead => lead.id === leadId || lead.id === leadId.toString());
+
+                if (leadIndex !== -1) {
+                    leads[leadIndex].state = data.carrier.PHY_STATE || data.carrier.state || '';
+                    leads[leadIndex].yearsInBusiness = calculateYearsFromDOT(data.carrier.DOT_NUMBER) || '';
+                    leads[leadIndex].commodityHauled = 'General Freight';
+
+                    console.log(`🔧 MANUAL DOT: Before save - Lead ${leadId}:`, {
+                        state: leads[leadIndex].state,
+                        yearsInBusiness: leads[leadIndex].yearsInBusiness,
+                        commodityHauled: leads[leadIndex].commodityHauled
+                    });
+
+                    // Use protected save with enhanced persistence
+                    window.dotLookupInProgress = true;
+                    localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+                    // Force multiple saves to ensure persistence
+                    setTimeout(() => {
+                        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                        console.log('🔄 MANUAL DOT: Second save completed');
+
+                        setTimeout(() => {
+                            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                            window.dotLookupInProgress = false;
+                            console.log('🔄 MANUAL DOT: Final save completed');
+
+                            // Verify the data was saved
+                            const verifyLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                            const verifyLead = verifyLeads.find(lead => lead.id === leadId || lead.id === leadId.toString());
+                            console.log(`✅ MANUAL DOT: Verification - Lead ${leadId} saved data:`, {
+                                state: verifyLead?.state,
+                                yearsInBusiness: verifyLead?.yearsInBusiness,
+                                commodityHauled: verifyLead?.commodityHauled
+                            });
+                        }, 100);
+                    }, 50);
+
+                    result = {
+                        success: true,
+                        state: leads[leadIndex].state,
+                        yearsInBusiness: leads[leadIndex].yearsInBusiness,
+                        commodityHauled: leads[leadIndex].commodityHauled
+                    };
+
+                    console.log('✅ MANUAL DOT LOOKUP: Data populated successfully', result);
+                } else {
+                    console.log('❌ MANUAL DOT LOOKUP: Lead not found for update');
+                }
+            }
+        }
+
+        // Restore button and show result
+        button.innerHTML = originalText;
+        button.disabled = false;
+
+        if (result && result.success !== false) {
+            console.log('✅ MANUAL DOT LOOKUP: Success!', result);
+            alert(`✅ DOT Lookup Success!
+
+State: ${result.state || 'Not found'}
+Years in Business: ${result.yearsInBusiness || 'Not found'}
+Commodity: ${result.commodityHauled || 'Not found'}
+
+Profile will refresh with green backgrounds.`);
+
+            // Refresh the profile to show updated data with updated values - delay to allow localStorage saves
+            setTimeout(() => {
+                // Force update the input fields immediately
+                const stateInput = document.querySelector(`input[onchange*="updateLeadField('${leadId}', 'state'"]`);
+                const yearsInput = document.querySelector(`input[onchange*="updateLeadField('${leadId}', 'yearsInBusiness'"]`);
+                const commodityInput = document.querySelector(`input[onchange*="updateLeadField('${leadId}', 'commodityHauled'"]`);
+
+                if (stateInput && result.state) {
+                    stateInput.value = result.state;
+                    stateInput.style.backgroundColor = '#dcfce7'; // Green background
+                    stateInput.style.borderColor = '#10b981';
+                }
+                if (yearsInput && result.yearsInBusiness) {
+                    yearsInput.value = result.yearsInBusiness;
+                    yearsInput.style.backgroundColor = '#dcfce7'; // Green background
+                    yearsInput.style.borderColor = '#10b981';
+                }
+                if (commodityInput && result.commodityHauled) {
+                    commodityInput.value = result.commodityHauled;
+                    commodityInput.style.backgroundColor = '#dcfce7'; // Green background
+                    commodityInput.style.borderColor = '#10b981';
+                }
+
+                console.log(`🎨 MANUAL DOT: Updated form fields directly for lead ${leadId}`);
+
+                // Fallback: Also try to find by placeholder text and update
+                const allInputs = document.querySelectorAll('input[placeholder*="Auto-populated from DOT lookup"]');
+                allInputs.forEach(input => {
+                    const labelText = input.previousElementSibling?.textContent || '';
+                    if (labelText.includes('State:') && result.state) {
+                        input.value = result.state;
+                        input.style.backgroundColor = '#dcfce7';
+                        input.style.borderColor = '#10b981';
+                    }
+                    if (labelText.includes('Years') && result.yearsInBusiness) {
+                        input.value = result.yearsInBusiness;
+                        input.style.backgroundColor = '#dcfce7';
+                        input.style.borderColor = '#10b981';
+                    }
+                    if (labelText.includes('Commodity') && result.commodityHauled) {
+                        input.value = result.commodityHauled;
+                        input.style.backgroundColor = '#dcfce7';
+                        input.style.borderColor = '#10b981';
+                    }
+                });
+
+                // Then refresh the profile with longer delay
+                if (window.viewLead) {
+                    setTimeout(() => {
+                        window.viewLead(leadId);
+                    }, 1000);
+                }
+            }, 2000);
+        } else {
+            console.log('❌ MANUAL DOT LOOKUP: Failed');
+            alert(`❌ DOT Lookup Failed
+
+No data found for DOT ${dotNumber}
+The DOT number may not exist in our database.`);
+        }
+
+    } catch (error) {
+        console.error('❌ MANUAL DOT LOOKUP ERROR:', error);
+        alert(`❌ DOT Lookup Error
+
+${error.message}`);
+
+        // Restore button
+        if (event.target) {
+            event.target.innerHTML = '<i class="fas fa-search"></i> DOT Lookup';
+            event.target.disabled = false;
+        }
+    }
+};
+
+// Function to toggle DOT lookup button visibility
+window.toggleDOTButton = function(leadId, dotValue) {
+    const button = document.getElementById(`dot-lookup-btn-${leadId}`);
+    if (button) {
+        const shouldShow = dotValue && dotValue.toString().trim() !== '';
+        button.style.display = shouldShow ? 'flex' : 'none';
+        console.log(`🔘 DOT Button toggle for lead ${leadId}: ${shouldShow ? 'SHOW' : 'HIDE'} (DOT: "${dotValue}")`);
+    }
+};

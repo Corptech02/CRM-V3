@@ -688,28 +688,68 @@
                                     return adminUsers.includes(username.toLowerCase());
                                 };
 
-                                // Create admin badge if user is admin
-                                const adminBadge = isAdmin(user.username) ? `
-                                    <span style="
-                                        background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-                                        color: white;
-                                        padding: 2px 6px;
-                                        border-radius: 10px;
-                                        font-size: 10px;
-                                        font-weight: 600;
-                                        text-transform: uppercase;
-                                        letter-spacing: 0.5px;
-                                        margin-left: 6px;
-                                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                                        border: 1px solid rgba(255,255,255,0.3);
-                                    ">
-                                        <i class="fas fa-crown" style="margin-right: 3px; font-size: 9px;"></i>ADMIN
-                                    </span>
-                                ` : '';
+                                // Create badge based on user type
+                                let userBadge = '';
+                                console.log('🔍 DEBUG: Checking user for badge:', user.username, 'lowercase:', user.username.toLowerCase());
+                                if (user.username.toLowerCase() === 'maureen') {
+                                    console.log('✅ Maureen detected - applying EXCLUSIVE badge');
+                                    userBadge = `
+                                        <span style="
+                                            background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+                                            color: white;
+                                            padding: 2px 6px;
+                                            border-radius: 10px;
+                                            font-size: 10px;
+                                            font-weight: 600;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.5px;
+                                            margin-left: 6px;
+                                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                            border: 1px solid rgba(255,255,255,0.3);
+                                        ">
+                                            <i class="fas fa-crown" style="margin-right: 3px; font-size: 9px;"></i>EXCLUSIVE
+                                        </span>
+                                    `;
+                                } else if (isAdmin(user.username)) {
+                                    userBadge = `
+                                        <span style="
+                                            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+                                            color: white;
+                                            padding: 2px 6px;
+                                            border-radius: 10px;
+                                            font-size: 10px;
+                                            font-weight: 600;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.5px;
+                                            margin-left: 6px;
+                                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                            border: 1px solid rgba(255,255,255,0.3);
+                                        ">
+                                            <i class="fas fa-crown" style="margin-right: 3px; font-size: 9px;"></i>ADMIN
+                                        </span>
+                                    `;
+                                }
+                                const adminBadge = userBadge;
 
                                 nameDisplay.innerHTML = user.username + adminBadge;
                             }
                             if (avatar) avatar.src = `https://ui-avatars.com/api/?name=${user.username}&background=0066cc&color=fff`;
+
+                            // Update company branding for Maureen
+                            console.log('🔍 DEBUG: Checking user for branding:', user.username);
+                            if (user.username.toLowerCase() === 'maureen') {
+                                console.log('✅ Maureen detected - updating to United Software');
+                                const brandText = document.querySelector('.brand-text h1');
+                                if (brandText) {
+                                    brandText.textContent = 'United Software';
+                                    console.log('🏢 Updated company name to United Software for Maureen');
+                                }
+                            } else {
+                                const brandText = document.querySelector('.brand-text h1');
+                                if (brandText) {
+                                    brandText.textContent = 'Vanguard Software';
+                                }
+                            }
 
                             // Control admin UI sections based on user role
                             controlAdminUI(user.username);
@@ -1363,26 +1403,73 @@
                     </div>
                     <div class="form-group">
                         <label>Address</label>
-                        <input type="text" name="clientAddress" placeholder="Street Address">
+                        <input type="text" name="clientAddress" placeholder="Street Address (Optional)" style="pointer-events: auto; position: relative; z-index: 100001;">
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>City</label>
-                            <input type="text" name="clientCity">
+                            <input type="text" name="clientCity" placeholder="City (Optional)" style="pointer-events: auto; position: relative; z-index: 100001;">
                         </div>
                         <div class="form-group">
                             <label>State</label>
-                            <select name="clientState">
-                                <option>Select State</option>
-                                <option>NY</option>
+                            <select name="clientState" style="pointer-events: auto; position: relative; z-index: 100001;">
+                                <option value="">Select State (Optional)</option>
+                                <option>AL</option>
+                                <option>AK</option>
+                                <option>AZ</option>
+                                <option>AR</option>
                                 <option>CA</option>
-                                <option>TX</option>
+                                <option>CO</option>
+                                <option>CT</option>
+                                <option>DE</option>
                                 <option>FL</option>
+                                <option>GA</option>
+                                <option>HI</option>
+                                <option>ID</option>
+                                <option>IL</option>
+                                <option>IN</option>
+                                <option>IA</option>
+                                <option>KS</option>
+                                <option>KY</option>
+                                <option>LA</option>
+                                <option>ME</option>
+                                <option>MD</option>
+                                <option>MA</option>
+                                <option>MI</option>
+                                <option>MN</option>
+                                <option>MS</option>
+                                <option>MO</option>
+                                <option>MT</option>
+                                <option>NE</option>
+                                <option>NV</option>
+                                <option>NH</option>
+                                <option>NJ</option>
+                                <option>NM</option>
+                                <option>NY</option>
+                                <option>NC</option>
+                                <option>ND</option>
+                                <option>OH</option>
+                                <option>OK</option>
+                                <option>OR</option>
+                                <option>PA</option>
+                                <option>RI</option>
+                                <option>SC</option>
+                                <option>SD</option>
+                                <option>TN</option>
+                                <option>TX</option>
+                                <option>UT</option>
+                                <option>VT</option>
+                                <option>VA</option>
+                                <option>WA</option>
+                                <option>WV</option>
+                                <option>WI</option>
+                                <option>WY</option>
+                                <option>DC</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label>ZIP</label>
-                            <input type="text" name="clientZip">
+                            <input type="text" name="clientZip" placeholder="ZIP Code (Optional)" style="pointer-events: auto; position: relative; z-index: 100001;">
                         </div>
                     </div>
                     <div class="form-row">

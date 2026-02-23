@@ -11,7 +11,7 @@
     // Override fetch function to intercept API calls
     window.fetch = async function(url, options = {}) {
         // Check if this is the leads API call we want to intercept
-        if (typeof url === 'string' && (url.includes('/api/leads/expiring-insurance') || url.includes('/api/optimized-leads'))) {
+        if (typeof url === 'string' && (url.includes('/api/carriers/expiring') || url.includes('/api/leads/expiring-insurance') || url.includes('/api/optimized-leads'))) {
             console.log('🎯 Enhanced Override v5: Intercepted leads API call:', url);
             return await handleMatchedCarriersRequest(url, options);
         }
@@ -120,12 +120,14 @@
         console.log('📊 FORCED: Querying matched carriers database with criteria:', criteria);
         console.log('🔍 FORCED: Criteria type and details:', typeof criteria, JSON.stringify(criteria, null, 2));
 
-        // Use our LOCAL enhanced API with 175k+ representative names
-        const backendUrl = window.location.origin + '/api/leads/expiring-insurance?' + new URLSearchParams({
+        // Use the actual API endpoint that exists
+        const backendUrl = window.location.origin + '/api/carriers/expiring?' + new URLSearchParams({
             state: criteria.state || '',
             days: criteria.expiryDays || criteria.daysUntilExpiry || 30,
-            limit: Math.min(criteria.limit || 10000, 10000),
-            skip_days: criteria.skipDays || 0
+            skipDays: criteria.skipDays || 0,
+            minFleet: criteria.minFleet || 1,
+            maxFleet: criteria.maxFleet || 9999,
+            limit: Math.min(criteria.limit || 50000, 50000)
         });
 
         console.log('🔗 FIXED: Calling CORRECT API endpoint with params:', backendUrl);

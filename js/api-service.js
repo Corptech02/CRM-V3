@@ -121,13 +121,14 @@ const apiService = {
                 days: criteria.expiryDays || criteria.insurance_expiring_days || 30,
                 limit: criteria.limit || criteria.count || 500,
                 state: criteria.state || '',
-                min_premium: criteria.minPremium || 0
+                minFleet: criteria.minFleet || 1,
+                maxFleet: criteria.maxFleet || 9999
             });
 
             // Add skip days for 5/30 filter
             if (criteria.skipDays && criteria.skipDays > 0) {
-                params.append('skip_days', criteria.skipDays);
-                console.log(`Applying 5/30 filter: skipping first ${criteria.skipDays} days`);
+                params.append('skipDays', criteria.skipDays);
+                console.log(`Applying skip days filter: skipping first ${criteria.skipDays} days`);
             }
             
             // Add insurance companies filter if provided
@@ -135,8 +136,8 @@ const apiService = {
                 params.append('insurance_companies', criteria.insuranceCompanies.join(','));
             }
             
-            // Always use the backend server API endpoint
-            const response = await fetch(`${API_BASE_URL}/leads/expiring-insurance?${params}`, {
+            // Use the actual carriers expiring endpoint that exists in backend
+            const response = await fetch(`${window.location.origin}/api/carriers/expiring?${params}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -149,8 +150,8 @@ const apiService = {
             }
 
             const data = await response.json();
-            // Handle both array response and object with leads property
-            const leadsArray = Array.isArray(data) ? data : (data.leads || []);
+            // Handle response from /api/carriers/expiring endpoint
+            const leadsArray = Array.isArray(data) ? data : (data.carriers || data.leads || []);
             console.log(`Retrieved ${leadsArray.length} real insurance leads from FMCSA database`);
             
             // Pass through the leads with minimal transformation to preserve all fields
@@ -160,11 +161,11 @@ const apiService = {
                 // Add fields expected by the UI
                 usdot_number: lead.dot_number || lead.usdot_number,
                 location: `${lead.city || ''}, ${lead.state || ''}`.trim(),
-                fleet: lead.power_units || 0,
+                fleet: lead.power_units || lead.total_power_units || 0,
                 status: lead.operating_status || 'Active',
-                expiry: lead.policy_renewal_date || lead.insurance_expiry_date || 'N/A',
-                insurance_on_file: lead.bipd_insurance_on_file_amount || lead.premium || 0,
-                lead_score: parseInt(lead.quality_score === 'HIGH' ? 80 : 50)
+                expiry: lead.insurance_expiry || lead.insurance_expiration || 'N/A',
+                insurance_on_file: lead.premium || 0,
+                lead_score: 75 // Default score since we don't have quality data
             }));
             
             // Save to localStorage

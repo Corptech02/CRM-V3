@@ -210,6 +210,14 @@
             return isAdminUser;
         };
 
+        // Check if user can view premium fields (includes Carson and Hunter)
+        const canViewPremiums = (username) => {
+            const premiumViewUsers = ['grant', 'maureen', 'carson', 'hunter'];
+            const canView = premiumViewUsers.includes(username.toLowerCase());
+            console.log('AUTH-MANAGER: Checking premium view permission for:', username, '-> canView:', canView);
+            return canView;
+        };
+
         // Wait for DOM to be ready before manipulating elements
         const applyAdminControls = () => {
             console.log('AUTH-MANAGER: Applying admin controls...');
@@ -370,9 +378,9 @@
                 }
             });
 
-            // Hide premium information in policy views for non-admin users (ONLY if not admin)
-            if (!isAdmin(username)) {
-                console.log('AUTH-MANAGER: Non-admin user - applying continuous premium hiding...');
+            // Hide premium information in policy views for users without premium view permission
+            if (!canViewPremiums(username)) {
+                console.log('AUTH-MANAGER: User without premium permissions - applying continuous premium hiding...');
 
                 // Function to hide premium content aggressively
                 const hidePremiumContent = () => {

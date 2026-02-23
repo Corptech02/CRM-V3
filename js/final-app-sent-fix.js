@@ -61,12 +61,42 @@
                 todoCell.innerHTML = '<div style="font-weight: bold; color: black;"></div>';
             }
 
-            // ALWAYS apply green highlighting for app sent leads (regardless of TODO text)
-            row.style.setProperty('background-color', 'rgba(16, 185, 129, 0.2)', 'important');
-            row.style.setProperty('background', 'rgba(16, 185, 129, 0.2)', 'important');
-            row.style.setProperty('border-left', '4px solid #10b981', 'important');
-            row.style.setProperty('border-right', '2px solid #10b981', 'important');
-            row.classList.add('reach-out-complete');
+            // CRITICAL FIX: Check for overdue callbacks before applying green highlighting
+            let hasOverdueCallback = false;
+            try {
+                const callbacks = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+                const leadCallbacks = callbacks[leadId] || [];
+                const now = new Date();
+
+                hasOverdueCallback = leadCallbacks.some(callback => {
+                    if (callback.completed) return false;
+                    const callbackTime = new Date(callback.dateTime);
+                    return callbackTime <= now;
+                });
+
+                console.log(`🔍 APP SENT FIX: Lead ${leadId} has overdue callback: ${hasOverdueCallback}`);
+            } catch (error) {
+                console.log(`⚠️ APP SENT FIX: Error checking callbacks for ${leadId}:`, error);
+            }
+
+            // Only apply green highlighting if NO overdue callback
+            if (!hasOverdueCallback) {
+                // Apply green highlighting for app sent leads (only if no overdue callback)
+                row.style.setProperty('background-color', 'rgba(16, 185, 129, 0.2)', 'important');
+                row.style.setProperty('background', 'rgba(16, 185, 129, 0.2)', 'important');
+                row.style.setProperty('border-left', '4px solid #10b981', 'important');
+                row.style.setProperty('border-right', '2px solid #10b981', 'important');
+                row.classList.add('reach-out-complete');
+                console.log(`🟢 APP SENT FIX: Applied green highlighting to ${leadId}`);
+            } else {
+                // Lead has overdue callback - remove green highlighting and preserve callback text
+                row.style.removeProperty('background-color');
+                row.style.removeProperty('background');
+                row.style.removeProperty('border-left');
+                row.style.removeProperty('border-right');
+                row.classList.remove('reach-out-complete');
+                console.log(`🔴 APP SENT FIX: Blocked green highlighting for ${leadId} due to overdue callback`);
+            }
         });
 
         // After fixing the single lead, ensure highlighting is applied
