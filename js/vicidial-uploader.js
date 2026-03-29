@@ -308,7 +308,12 @@ const vicidialUploader = {
                         <!-- List Selection -->
                         <div id="vicidialListSelection" style="display: none;">
                             <div class="form-section">
-                                <h3><i class="fas fa-list"></i> Select Vicidial List to Overwrite</h3>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <h3><i class="fas fa-list"></i> Select Vicidial List to Overwrite</h3>
+                                    <button onclick="vicidialUploader.forceRefreshLists()" class="btn btn-sm btn-outline-secondary" style="font-size: 12px;">
+                                        <i class="fas fa-sync"></i> Refresh Lists
+                                    </button>
+                                </div>
                                 <div id="vicidialListsContainer" style="
                                     max-height: 200px;
                                     overflow-y: auto;
@@ -433,6 +438,9 @@ const vicidialUploader = {
             statusDiv.innerHTML = `
                 <i class="fas fa-check-circle"></i>
                 Connected! Using cached lists (${this.cachedLists.length} found)
+                <button onclick="vicidialUploader.forceRefreshLists()" class="btn btn-sm btn-outline-primary" style="margin-left: 15px; font-size: 12px; padding: 4px 8px;">
+                    <i class="fas fa-sync"></i> Refresh Lists
+                </button>
             `;
 
             // Show list selection with cached data
@@ -749,6 +757,38 @@ const vicidialUploader = {
         }
 
         console.log('✅ Complete reset finished - ready for fresh upload');
+    },
+
+    // Force refresh lists function
+    forceRefreshLists: async function() {
+        console.log('🔄 Force refreshing Vicidial lists...');
+        console.log('📋 Previous cached lists count:', this.cachedLists ? this.cachedLists.length : 0);
+
+        // Clear cache to force fresh scan
+        this.cachedLists = null;
+        this.listsAlreadyLoaded = false;
+
+        // Show loading indicator
+        const statusDiv = document.getElementById('vicidialConnectionStatus');
+        statusDiv.className = 'alert alert-info';
+        statusDiv.innerHTML = `
+            <i class="fas fa-spinner fa-spin"></i>
+            Refreshing lists from Vicidial... Please wait.
+        `;
+
+        try {
+            // Reload lists (this will now do a fresh scan)
+            await this.loadVicidialLists();
+            console.log('✅ Lists refresh completed');
+            console.log('📋 New lists count:', this.cachedLists ? this.cachedLists.length : 0);
+        } catch (error) {
+            console.error('❌ Error refreshing lists:', error);
+            statusDiv.className = 'alert alert-danger';
+            statusDiv.innerHTML = `
+                <i class="fas fa-exclamation-circle"></i>
+                Error refreshing lists: ${error.message}
+            `;
+        }
     }
 };
 

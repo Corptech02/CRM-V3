@@ -3,14 +3,10 @@ let windowCounter = 0;
 const openWindows = {};
 const minimizedWindows = {};
 
-// Create taskbar container
+// Create taskbar container - DISABLED
 function initTaskbar() {
-    if (!document.getElementById('minimized-taskbar')) {
-        const taskbar = document.createElement('div');
-        taskbar.id = 'minimized-taskbar';
-        taskbar.className = 'minimized-taskbar';
-        document.body.appendChild(taskbar);
-    }
+    // Disabled: minimized taskbar removed per user request
+    return;
 }
 
 // Create a draggable window
@@ -48,6 +44,14 @@ function createToolWindow(title, icon, content, width = 500, height = 400) {
         <div class="tool-window-content">
             ${content}
         </div>
+        <div class="resize-handle resize-handle-n"></div>
+        <div class="resize-handle resize-handle-s"></div>
+        <div class="resize-handle resize-handle-e"></div>
+        <div class="resize-handle resize-handle-w"></div>
+        <div class="resize-handle resize-handle-nw"></div>
+        <div class="resize-handle resize-handle-ne"></div>
+        <div class="resize-handle resize-handle-sw"></div>
+        <div class="resize-handle resize-handle-se"></div>
     `;
     
     document.body.appendChild(window);
@@ -55,13 +59,16 @@ function createToolWindow(title, icon, content, width = 500, height = 400) {
     
     // Make the window draggable
     makeDraggable(window);
-    
+
+    // Make the window resizable
+    makeResizable(window);
+
     // Bring to front on click
     window.addEventListener('mousedown', () => bringToFront(window));
-    
+
     // Bring to front initially
     bringToFront(window);
-    
+
     return windowId;
 }
 
@@ -103,6 +110,97 @@ function makeDraggable(element) {
     function closeDragElement() {
         document.onmouseup = null;
         document.onmousemove = null;
+    }
+}
+
+// Make element resizable
+function makeResizable(element) {
+    const handles = element.querySelectorAll('.resize-handle');
+
+    handles.forEach(handle => {
+        handle.addEventListener('mousedown', initResize);
+    });
+
+    function initResize(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const handle = e.target;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startWidth = element.offsetWidth;
+        const startHeight = element.offsetHeight;
+        const startTop = element.offsetTop;
+        const startLeft = element.offsetLeft;
+
+        const minWidth = parseInt(getComputedStyle(element).minWidth) || 400;
+        const minHeight = parseInt(getComputedStyle(element).minHeight) || 300;
+
+        function doResize(e) {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            let newWidth = startWidth;
+            let newHeight = startHeight;
+            let newTop = startTop;
+            let newLeft = startLeft;
+
+            // Determine resize direction from handle class
+            if (handle.classList.contains('resize-handle-e') ||
+                handle.classList.contains('resize-handle-ne') ||
+                handle.classList.contains('resize-handle-se')) {
+                newWidth = Math.max(minWidth, startWidth + dx);
+            }
+
+            if (handle.classList.contains('resize-handle-w') ||
+                handle.classList.contains('resize-handle-nw') ||
+                handle.classList.contains('resize-handle-sw')) {
+                newWidth = Math.max(minWidth, startWidth - dx);
+                if (newWidth > minWidth) {
+                    newLeft = startLeft + dx;
+                }
+            }
+
+            if (handle.classList.contains('resize-handle-s') ||
+                handle.classList.contains('resize-handle-se') ||
+                handle.classList.contains('resize-handle-sw')) {
+                newHeight = Math.max(minHeight, startHeight + dy);
+            }
+
+            if (handle.classList.contains('resize-handle-n') ||
+                handle.classList.contains('resize-handle-ne') ||
+                handle.classList.contains('resize-handle-nw')) {
+                newHeight = Math.max(minHeight, startHeight - dy);
+                if (newHeight > minHeight) {
+                    newTop = startTop + dy;
+                }
+            }
+
+            // Apply bounds checking
+            const maxX = window.innerWidth - newWidth;
+            const maxY = window.innerHeight - newHeight;
+
+            newLeft = Math.min(Math.max(0, newLeft), maxX);
+            newTop = Math.min(Math.max(0, newTop), maxY);
+
+            // Apply new dimensions and position
+            element.style.width = newWidth + 'px';
+            element.style.height = newHeight + 'px';
+            element.style.left = newLeft + 'px';
+            element.style.top = newTop + 'px';
+        }
+
+        function stopResize() {
+            document.removeEventListener('mousemove', doResize);
+            document.removeEventListener('mouseup', stopResize);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+        document.body.style.cursor = handle.style.cursor;
+        document.body.style.userSelect = 'none';
     }
 }
 
@@ -2694,6 +2792,897 @@ async function makeTwilioVoiceCall(phoneNumber, callerName = 'Unknown') {
         makeTwilioCallFromToolWindow(phoneNumber, fromNumber);
     }
 }
+
+// Open Todo List tool window
+function openTodoList() {
+    // Initialize popup todo view
+    window.popupTodoView = window.popupTodoView || 'personal';
+
+    const content = `
+        <div style="height: 100%; display: flex; flex-direction: column; font-family: 'Inter', sans-serif;">
+            <!-- Tab Header -->
+            <div style="display: flex; gap: 5px; margin-bottom: 15px; padding: 0 5px;" id="popupTodoViewButtons">
+                <button id="popupPersonalTodoBtn" class="popup-todo-tab active" onclick="switchPopupTodoView('personal')" style="
+                    padding: 6px 12px;
+                    font-size: 0.8rem;
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    flex: 1;
+                ">Personal</button>
+                <button id="popupAgencyTodoBtn" class="popup-todo-tab" onclick="switchPopupTodoView('agency')" style="
+                    padding: 6px 12px;
+                    font-size: 0.8rem;
+                    background: #e5e7eb;
+                    color: #6b7280;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    flex: 1;
+                ">Agency</button>
+            </div>
+
+            <!-- Input Controls -->
+            <div style="margin-bottom: 15px; padding: 0 5px;">
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                    <input id="popup-todo-input" type="text" placeholder="Add a new task..."
+                           style="flex: 1; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 14px;"
+                           onkeypress="handlePopupTodoKeyPress(event, this)">
+                    <button onclick="addPopupTodo(this)" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                        <i class="fas fa-plus"></i> Add
+                    </button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <input id="popup-todo-date" type="date"
+                           style="padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; flex: 1;">
+                    <input id="popup-todo-time" type="time"
+                           style="padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; flex: 1;">
+                </div>
+            </div>
+
+            <!-- Schedule Filter Tabs -->
+            <div style="display: flex; gap: 5px; margin-bottom: 15px; justify-content: center; padding: 0 5px;" id="popupScheduleViewButtons">
+                <button id="popupDayViewBtn" class="popup-schedule-tab active" onclick="switchPopupScheduleView('day')" style="
+                    padding: 6px 10px;
+                    font-size: 0.7rem;
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    flex: 1;
+                ">Today</button>
+                <button id="popupWeekViewBtn" class="popup-schedule-tab" onclick="switchPopupScheduleView('week')" style="
+                    padding: 6px 10px;
+                    font-size: 0.7rem;
+                    background: #e5e7eb;
+                    color: #6b7280;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    flex: 1;
+                ">This Week</button>
+                <button id="popupMonthViewBtn" class="popup-schedule-tab" onclick="switchPopupScheduleView('month')" style="
+                    padding: 6px 10px;
+                    font-size: 0.7rem;
+                    background: #e5e7eb;
+                    color: #6b7280;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    flex: 1;
+                ">This Month</button>
+                <button id="popupAllViewBtn" class="popup-schedule-tab" onclick="switchPopupScheduleView('all')" style="
+                    padding: 6px 10px;
+                    font-size: 0.7rem;
+                    background: #e5e7eb;
+                    color: #6b7280;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    flex: 1;
+                ">All</button>
+            </div>
+
+            <!-- Todo List Container -->
+            <div id="popup-todo-list-container" style="flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafbfc;">
+                <!-- Content will be loaded by loadPopupTodos() -->
+            </div>
+
+            <!-- Footer Stats -->
+            <div style="margin-top: 10px; padding: 8px 12px; background: #f8f9fa; border-radius: 4px; font-size: 12px; color: #6b7280; display: flex; justify-content: space-between;">
+                <span id="popup-todo-stats">Loading...</span>
+                <button onclick="clearCompletedPopupTodos()" style="background: none; border: none; color: #6b7280; cursor: pointer; font-size: 12px; text-decoration: underline;">
+                    Clear completed
+                </button>
+            </div>
+        </div>
+    `;
+    createToolWindow('Todo List', 'fa-tasks', content, 450, 500);
+
+    // Load todos after window is created
+    setTimeout(() => loadPopupTodos(), 100);
+}
+
+// Switch popup todo view between Personal and Agency
+function switchPopupTodoView(view) {
+    window.popupTodoView = view;
+
+    // Update button styles
+    const personalBtn = document.getElementById('popupPersonalTodoBtn');
+    const agencyBtn = document.getElementById('popupAgencyTodoBtn');
+
+    if (personalBtn && agencyBtn) {
+        // Reset button styles
+        personalBtn.style.background = '#e5e7eb';
+        personalBtn.style.color = '#6b7280';
+        agencyBtn.style.background = '#e5e7eb';
+        agencyBtn.style.color = '#6b7280';
+
+        // Set active button
+        if (view === 'personal') {
+            personalBtn.style.background = '#3b82f6';
+            personalBtn.style.color = 'white';
+        } else if (view === 'agency') {
+            agencyBtn.style.background = '#3b82f6';
+            agencyBtn.style.color = 'white';
+        }
+    }
+
+    // Sync with dashboard todo view
+    if (window.dashboardTodoView !== view) {
+        window.dashboardTodoView = view;
+        // Update dashboard todo button styles if they exist
+        const dashboardPersonalBtn = document.getElementById('dashboardPersonalTodoBtn');
+        const dashboardAgencyBtn = document.getElementById('dashboardAgencyTodoBtn');
+        if (dashboardPersonalBtn && dashboardAgencyBtn) {
+            // Reset button styles
+            dashboardPersonalBtn.style.background = '#e5e7eb';
+            dashboardPersonalBtn.style.color = '#6b7280';
+            dashboardAgencyBtn.style.background = '#e5e7eb';
+            dashboardAgencyBtn.style.color = '#6b7280';
+            // Set active button
+            if (view === 'personal') {
+                dashboardPersonalBtn.style.background = '#3b82f6';
+                dashboardPersonalBtn.style.color = 'white';
+            } else if (view === 'agency') {
+                dashboardAgencyBtn.style.background = '#3b82f6';
+                dashboardAgencyBtn.style.color = 'white';
+            }
+        }
+        // Reload dashboard todos if available
+        if (window.loadSimpleTodos) {
+            window.loadSimpleTodos();
+        }
+    }
+
+    // Sync with calendar view
+    if (window.calendarState && window.calendarState.currentView !== view) {
+        window.calendarState.currentView = view;
+        // Update calendar button styles if they exist
+        const calendarPersonalBtn = document.getElementById('personalViewBtn');
+        const calendarAgencyBtn = document.getElementById('agencyViewBtn');
+        if (calendarPersonalBtn && calendarAgencyBtn) {
+            if (view === 'personal') {
+                calendarPersonalBtn.style.background = '#3b82f6';
+                calendarPersonalBtn.style.color = 'white';
+                calendarAgencyBtn.style.background = 'white';
+                calendarAgencyBtn.style.color = '#6b7280';
+            } else {
+                calendarAgencyBtn.style.background = '#3b82f6';
+                calendarAgencyBtn.style.color = 'white';
+                calendarPersonalBtn.style.background = 'white';
+                calendarPersonalBtn.style.color = '#6b7280';
+            }
+        }
+        // Update calendar panel title if it exists
+        const panelTitle = document.getElementById('calendarPanelTitle');
+        if (panelTitle) {
+            if (view === 'personal') {
+                panelTitle.innerHTML = '<i class="fas fa-user" style="margin-right: 8px; color: #3b82f6;"></i>My Schedule';
+            } else {
+                panelTitle.innerHTML = '<i class="fas fa-users" style="margin-right: 8px; color: #10b981;"></i>Agency Schedule';
+            }
+        }
+        // Refresh calendar display if it's open
+        if (window.refreshCalendarDisplay) {
+            window.refreshCalendarDisplay();
+        }
+    }
+
+    // Reload todos for the selected view
+    loadPopupTodos();
+}
+
+// Load todos for popup window (synced with dashboard)
+function loadPopupTodos() {
+    const container = document.getElementById('popup-todo-list-container');
+    const statsElement = document.getElementById('popup-todo-stats');
+
+    if (!container || !statsElement) return;
+
+    // Get todos based on current view
+    let allTodos = [];
+    const currentView = window.popupTodoView || 'personal';
+
+    if (currentView === 'personal') {
+        allTodos = JSON.parse(localStorage.getItem('syncedPersonalTodos') || '[]');
+    } else if (currentView === 'agency') {
+        allTodos = JSON.parse(localStorage.getItem('syncedAgencyTodos') || '[]');
+    }
+
+    // Get current user for filtering
+    const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const currentUser = sessionData.username || '';
+
+    // Add calendar events as todos (same logic as dashboard)
+    const calendarEvents = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
+    const calendarTodos = calendarEvents
+        .filter(event => {
+            if (currentView === 'personal') {
+                return !event.assignedAgent || event.assignedAgent === currentUser;
+            }
+            return true; // Show all for agency view
+        })
+        .map(event => ({
+            id: `calendar_${event.id}`,
+            text: `📅 ${event.title}${event.notes ? ' - ' + event.notes : ''}`,
+            targetDate: new Date(event.date + 'T' + (event.time || '09:00')).toISOString(),
+            date: new Date().toISOString().split('T')[0],
+            completed: false,
+            type: 'calendar_event',
+            originalEvent: event
+        }));
+
+    // Add server calendar events as todos
+    const serverEvents = window.calendarState?.serverEvents || [];
+    console.log('🔍 POPUP: Processing server events for todos:', serverEvents.length);
+
+    const serverCalendarTodos = serverEvents
+        .filter(event => {
+            if (currentView === 'personal') {
+                return !event.created_by || event.created_by === currentUser;
+            }
+            return true; // Show all for agency view
+        })
+        .map(event => ({
+            id: `server_cal_${event.id}`,
+            text: `📅 ${event.title}${event.description ? ' - ' + event.description : ''}`,
+            targetDate: new Date(event.date + 'T' + (event.time || '09:00')).toISOString(),
+            date: new Date().toISOString().split('T')[0],
+            completed: event.completed || false,
+            type: 'server_calendar_event',
+            originalEvent: event
+        }));
+
+    // Add server callbacks as todos
+    const serverCallbacks = window.calendarState?.serverCallbacks || [];
+    const callbackTodos = serverCallbacks
+        .filter(callback => {
+            if (currentView === 'personal') {
+                return !callback.assigned_agent || callback.assigned_agent === currentUser;
+            }
+            return true; // Show all for agency view
+        })
+        .map(callback => ({
+            id: `callback_${callback.id}`,
+            text: `📞 ${callback.lead_name}${callback.notes ? ' - ' + callback.notes : ''}`,
+            targetDate: callback.date_time,
+            date: new Date().toISOString().split('T')[0],
+            completed: callback.completed === 1,
+            type: 'server_callback',
+            originalCallback: callback
+        }));
+
+    // Combine all todos (same logic as dashboard)
+    const combinedTodos = [...allTodos, ...calendarTodos, ...serverCalendarTodos, ...callbackTodos];
+    console.log('🔍 POPUP: Combined todo breakdown:', {
+        regular: allTodos.length,
+        localCalendar: calendarTodos.length,
+        serverCalendar: serverCalendarTodos.length,
+        callbacks: callbackTodos.length,
+        total: combinedTodos.length
+    });
+
+    // Filter todos based on schedule view
+    const scheduleView = window.popupScheduleView || 'day';
+    const todos = filterPopupTodosBySchedule(combinedTodos, scheduleView);
+
+    // Generate HTML
+    container.innerHTML = generatePopupTodoHTML(todos);
+    statsElement.textContent = getPopupTodoStats(todos);
+}
+
+// Helper function to get currently displayed todos (same logic as loadPopupTodos)
+function getCurrentlyDisplayedPopupTodos() {
+    const currentView = window.popupTodoView || 'personal';
+    let allTodos = [];
+
+    if (currentView === 'personal') {
+        allTodos = JSON.parse(localStorage.getItem('syncedPersonalTodos') || '[]');
+    } else if (currentView === 'agency') {
+        allTodos = JSON.parse(localStorage.getItem('syncedAgencyTodos') || '[]');
+    }
+
+    const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const currentUser = sessionData.username || '';
+
+    const calendarEvents = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
+    const calendarTodos = calendarEvents
+        .filter(event => {
+            if (currentView === 'personal') {
+                return !event.assignedAgent || event.assignedAgent === currentUser;
+            }
+            return true;
+        })
+        .map(event => ({
+            id: `calendar_${event.id}`,
+            text: `📅 ${event.title}${event.notes ? ' - ' + event.notes : ''}`,
+            targetDate: new Date(event.date + 'T' + (event.time || '09:00')).toISOString(),
+            date: new Date().toISOString().split('T')[0],
+            completed: false,
+            type: 'calendar_event',
+            originalEvent: event
+        }));
+
+    const serverEvents = window.calendarState?.serverEvents || [];
+    const serverCalendarTodos = serverEvents
+        .filter(event => {
+            if (currentView === 'personal') {
+                return !event.created_by || event.created_by === currentUser;
+            }
+            return true;
+        })
+        .map(event => ({
+            id: `server_cal_${event.id}`,
+            text: `📅 ${event.title}${event.description ? ' - ' + event.description : ''}`,
+            targetDate: new Date(event.date + 'T' + (event.time || '09:00')).toISOString(),
+            date: new Date().toISOString().split('T')[0],
+            completed: event.completed || false,
+            type: 'server_calendar_event',
+            originalEvent: event
+        }));
+
+    const serverCallbacks = window.calendarState?.serverCallbacks || [];
+    const callbackTodos = serverCallbacks
+        .filter(callback => {
+            if (currentView === 'personal') {
+                return !callback.assigned_agent || callback.assigned_agent === currentUser;
+            }
+            return true;
+        })
+        .map(callback => ({
+            id: `callback_${callback.id}`,
+            text: `📞 ${callback.lead_name}${callback.notes ? ' - ' + callback.notes : ''}`,
+            targetDate: callback.date_time,
+            date: new Date().toISOString().split('T')[0],
+            completed: callback.completed === 1,
+            type: 'server_callback',
+            originalCallback: callback
+        }));
+
+    const combinedTodos = [...allTodos, ...calendarTodos, ...serverCalendarTodos, ...callbackTodos];
+    const scheduleView = window.popupScheduleView || 'day';
+    return filterPopupTodosBySchedule(combinedTodos, scheduleView);
+}
+
+// Generate HTML for popup todo list items
+function generatePopupTodoHTML(todos) {
+    if (todos.length === 0) {
+        return `
+            <div style="padding: 40px; text-align: center; color: #6b7280;">
+                <i class="fas fa-check-circle" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                <div style="font-size: 16px; margin-bottom: 5px;">No tasks yet</div>
+                <div style="font-size: 14px;">Add a task to get started</div>
+            </div>
+        `;
+    }
+
+    return todos.map((todo, index) => {
+        // Format target date/time for display
+        let dateTimeDisplay = '';
+        if (todo.targetDate && todo.targetDate !== todo.date) {
+            const targetDate = new Date(todo.targetDate);
+            const now = new Date();
+            const isToday = targetDate.toDateString() === now.toDateString();
+
+            if (isToday) {
+                dateTimeDisplay = `<div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
+                    <i class="fas fa-clock" style="margin-right: 3px;"></i>Today at ${targetDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </div>`;
+            } else {
+                dateTimeDisplay = `<div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
+                    <i class="fas fa-calendar" style="margin-right: 3px;"></i>${targetDate.toLocaleDateString()} at ${targetDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </div>`;
+            }
+        }
+
+        // Different styling and interactions for different types (same as dashboard)
+        const isReadOnly = todo.type === 'calendar_event';
+        const backgroundStyle = todo.completed ? '#f0f9ff' :
+                               todo.type === 'calendar_event' ? '#f8f9ff' :
+                               todo.type === 'server_calendar_event' ? '#f0f9ff' :
+                               todo.type === 'server_callback' ? '#fff7ed' : 'white';
+
+        return `
+        <div class="popup-todo-item" style="
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: ${backgroundStyle};
+            ${(isReadOnly || todo.type === 'server_calendar_event' || todo.type === 'server_callback') ? 'border-left: 4px solid #3b82f6;' : ''}
+        " data-index="${index}">
+            <input type="checkbox"
+                   ${todo.completed ? 'checked' : ''}
+                   ${(isReadOnly || todo.type === 'server_callback') ? 'disabled' : 'onchange="togglePopupTodoComplete(' + index + ', this)"'}
+                   style="margin: 0; cursor: ${(isReadOnly || todo.type === 'server_callback') ? 'not-allowed' : 'pointer'}; ${(isReadOnly || todo.type === 'server_callback') ? 'opacity: 0.5;' : ''}">
+            <div style="flex: 1;">
+                <div style="${todo.completed ? 'text-decoration: line-through; color: #6b7280;' : 'color: #374151;'} font-size: 14px; margin-bottom: 2px;">
+                    ${todo.text}
+                </div>
+                ${dateTimeDisplay}
+                ${(isReadOnly || todo.type === 'server_calendar_event' || todo.type === 'server_callback') ? `<div style="font-size: 10px; color: #6b7280; margin-top: 2px; font-style: italic;">${
+                    todo.type === 'calendar_event' ? 'Calendar Event' :
+                    todo.type === 'server_calendar_event' ? 'Server Calendar Event' :
+                    'Scheduled Callback'
+                }</div>` : ''}
+                ${todo.author ? `<div style="font-size: 12px; color: #9ca3af;">by ${todo.author}</div>` : ''}
+            </div>
+            ${todo.type === 'server_callback' ? `<div style="display: flex; gap: 5px;">
+                <button onclick="openLeadProfileFromPopupTodo('${todo.originalCallback?.lead_id || ''}')" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 500;" title="Open Lead Profile">
+                    <i class="fas fa-user" style="margin-right: 4px;"></i>Open Profile
+                </button>
+            </div>` :
+            todo.type === 'server_calendar_event' ? `<div style="display: flex; gap: 5px;">
+                <button onclick="deletePopupTodo(${index})" style="background: none; border: none; color: #dc2626; cursor: pointer; padding: 4px;" title="Delete Server Event">
+                    <i class="fas fa-trash" style="font-size: 12px;"></i>
+                </button>
+            </div>` :
+            !isReadOnly ? `<div style="display: flex; gap: 5px;">
+                <button onclick="editPopupTodo(${index})" style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 4px;" title="Edit">
+                    <i class="fas fa-edit" style="font-size: 12px;"></i>
+                </button>
+                <button onclick="deletePopupTodo(${index})" style="background: none; border: none; color: #dc2626; cursor: pointer; padding: 4px;" title="Delete">
+                    <i class="fas fa-trash" style="font-size: 12px;"></i>
+                </button>
+            </div>` : `<div style="font-size: 12px; color: #6b7280; padding: 4px;">
+                <i class="fas fa-info-circle" title="Read-only item"></i>
+            </div>`}
+        </div>`;
+    }).join('');
+}
+
+// Get popup todo statistics
+function getPopupTodoStats(todos) {
+    const total = todos.length;
+    const completed = todos.filter(todo => todo.completed).length;
+    const remaining = total - completed;
+
+    if (total === 0) return 'No tasks';
+    return `${remaining} remaining of ${total} tasks`;
+}
+
+// Handle Enter key press in popup input field
+function handlePopupTodoKeyPress(event, input) {
+    if (event.key === 'Enter') {
+        addPopupTodo(input);
+    }
+}
+
+// Add a new popup todo item (synced with dashboard)
+function addPopupTodo(element) {
+    const container = element.closest('.tool-window-content') || document;
+    const input = container.querySelector('#popup-todo-input');
+    const dateInput = container.querySelector('#popup-todo-date');
+    const timeInput = container.querySelector('#popup-todo-time');
+    const text = input.value.trim();
+
+    if (!text) return;
+
+    const currentView = window.popupTodoView || 'personal';
+
+    // Combine date and time if provided
+    let targetDateTime = new Date().toISOString();
+    if (dateInput && dateInput.value) {
+        const dateValue = dateInput.value;
+        const timeValue = timeInput && timeInput.value ? timeInput.value : '00:00';
+        const combinedDateTime = new Date(dateValue + 'T' + timeValue);
+        targetDateTime = combinedDateTime.toISOString();
+    }
+
+    const newTodo = {
+        id: Date.now(),
+        text: text,
+        completed: false,
+        date: new Date().toISOString(),
+        targetDate: targetDateTime,
+        author: 'User',
+        type: currentView
+    };
+
+    // Save to appropriate storage based on view
+    const storageKey = currentView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+    const todos = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    todos.unshift(newTodo); // Add to beginning
+    localStorage.setItem(storageKey, JSON.stringify(todos));
+
+    // Clear inputs
+    input.value = '';
+    if (dateInput) dateInput.value = '';
+    if (timeInput) timeInput.value = '';
+
+    loadPopupTodos();
+
+    // Sync with dashboard
+    if (typeof window.loadSimpleTodos === 'function') {
+        window.loadSimpleTodos();
+    }
+
+    // Sync to backend for notifications
+    if (typeof window.syncTodosToBackend === 'function') {
+        window.syncTodosToBackend();
+    }
+}
+
+// Toggle popup todo completion status
+function togglePopupTodoComplete(index, checkbox) {
+    console.log('🔍 POPUP: Toggling todo completion for index:', index);
+
+    const currentView = window.popupTodoView || 'personal';
+    const storageKey = currentView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+
+    try {
+        // Get the currently displayed todos to find which one was clicked
+        const currentlyDisplayedTodos = getCurrentlyDisplayedPopupTodos();
+
+        const todoToToggle = currentlyDisplayedTodos[index];
+        if (!todoToToggle) {
+            console.error('Todo not found at index:', index);
+            return;
+        }
+
+        console.log('🔍 POPUP: Todo to toggle:', todoToToggle);
+
+        // Handle different todo types
+        if (todoToToggle.type === 'server_calendar_event') {
+            // Handle server calendar event toggle (same as dashboard)
+            console.log('🔄 POPUP: Toggling server calendar event:', todoToToggle.originalEvent?.id);
+
+            if (window.calendarState?.serverEvents) {
+                const eventIndex = window.calendarState.serverEvents.findIndex(event => event.id === todoToToggle.originalEvent?.id);
+                if (eventIndex !== -1) {
+                    window.calendarState.serverEvents[eventIndex].completed = checkbox.checked;
+                    loadPopupTodos();
+                    if (typeof window.loadSimpleTodos === 'function') {
+                        window.loadSimpleTodos();
+                    }
+                }
+            }
+            return;
+        }
+
+        // Only allow toggling regular todos (not calendar events or server callbacks)
+        if (todoToToggle.type === 'calendar_event' || todoToToggle.type === 'server_callback') {
+            console.log('🔍 POPUP: Cannot toggle read-only todo');
+            return;
+        }
+
+        // Update the stored todos (regular todos only)
+        let allTodos = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const originalTodoIndex = allTodos.findIndex(todo => todo.id === todoToToggle.id);
+
+        if (originalTodoIndex !== -1) {
+            allTodos[originalTodoIndex].completed = checkbox.checked;
+            localStorage.setItem(storageKey, JSON.stringify(allTodos));
+            console.log('🔍 POPUP: Todo completion updated in storage');
+        }
+
+        loadPopupTodos();
+
+        // Sync with dashboard
+        if (typeof window.loadSimpleTodos === 'function') {
+            window.loadSimpleTodos();
+        }
+    } catch (error) {
+        console.error('Error toggling popup todo:', error);
+    }
+}
+
+// Delete a popup todo item
+async function deletePopupTodo(index) {
+    console.log('🔍 POPUP: Deleting todo at index:', index);
+
+    const currentView = window.popupTodoView || 'personal';
+    const storageKey = currentView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+
+    try {
+        // Get the currently displayed todos to find which one was clicked
+        const currentlyDisplayedTodos = getCurrentlyDisplayedPopupTodos();
+
+        const todoToDelete = currentlyDisplayedTodos[index];
+        if (!todoToDelete) {
+            console.error('Todo not found at index:', index);
+            return;
+        }
+
+        console.log('🔍 POPUP: Todo to delete:', todoToDelete);
+
+        // Handle different todo types
+        if (todoToDelete.type === 'server_calendar_event') {
+            // Handle server calendar event deletion (same as dashboard)
+            if (confirm('Delete this server calendar event?')) {
+                console.log('🗑️ POPUP: Deleting server calendar event:', todoToDelete.originalEvent?.id);
+
+                try {
+                    // Get current user session
+                    const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+                    const currentUser = sessionData.username || '';
+
+                    if (!currentUser) {
+                        throw new Error('User not logged in');
+                    }
+
+                    // Delete from server first
+                    const apiUrl = window.location.hostname === 'localhost'
+                        ? 'http://localhost:3001'
+                        : `http://${window.location.hostname}:3001`;
+
+                    const serverEventId = todoToDelete.originalEvent?.id?.toString().replace('server_', '');
+                    const response = await fetch(`${apiUrl}/api/calendar-events/${serverEventId}?userId=${encodeURIComponent(currentUser)}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+
+                    console.log('📅 POPUP: Server event deleted from server successfully');
+
+                    // Remove from local server calendar state
+                    if (window.calendarState?.serverEvents) {
+                        const eventIndex = window.calendarState.serverEvents.findIndex(event => event.id === todoToDelete.originalEvent?.id);
+                        if (eventIndex !== -1) {
+                            window.calendarState.serverEvents.splice(eventIndex, 1);
+                        }
+                    }
+
+                    // Reload server events to ensure sync
+                    if (typeof loadServerCalendarEvents === 'function') {
+                        await loadServerCalendarEvents();
+                    }
+
+                    loadPopupTodos();
+                    if (typeof window.loadSimpleTodos === 'function') {
+                        window.loadSimpleTodos();
+                    }
+                    if (typeof refreshCalendarDisplay === 'function') {
+                        refreshCalendarDisplay();
+                    }
+                    console.log('✅ POPUP: Server calendar event deleted successfully');
+
+                } catch (error) {
+                    console.error('❌ POPUP: Failed to delete server calendar event:', error);
+                    alert('Failed to delete calendar event: ' + error.message);
+                }
+            }
+            return;
+        }
+
+        // Handle calendar event deletion
+        if (todoToDelete.type === 'calendar_event') {
+            if (confirm('Delete this calendar event?')) {
+                console.log('🗑️ POPUP: Deleting calendar event:', todoToDelete.originalEvent?.id);
+
+                // Remove from localStorage calendar events
+                let events = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
+                events = events.filter(event => event.id !== todoToDelete.originalEvent?.id);
+                localStorage.setItem('calendarEvents', JSON.stringify(events));
+
+                // Refresh displays
+                if (typeof loadPopupTodos === 'function') {
+                    loadPopupTodos();
+                }
+                if (typeof loadSimpleTodos === 'function') {
+                    loadSimpleTodos();
+                }
+                if (typeof refreshCalendarDisplay === 'function') {
+                    refreshCalendarDisplay();
+                }
+                console.log('✅ POPUP: Calendar event deleted from localStorage');
+            }
+            return;
+        }
+
+        // Only allow deleting regular todos (not server callbacks)
+        if (todoToDelete.type === 'server_callback') {
+            console.log('🔍 POPUP: Cannot delete read-only server callback');
+            return;
+        }
+
+        if (confirm('Delete this task?')) {
+            // Update the stored todos
+            let allTodos = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            const originalTodoIndex = allTodos.findIndex(todo => todo.id === todoToDelete.id);
+
+            if (originalTodoIndex !== -1) {
+                allTodos.splice(originalTodoIndex, 1);
+                localStorage.setItem(storageKey, JSON.stringify(allTodos));
+                console.log('🔍 POPUP: Todo deleted from storage');
+            }
+
+            loadPopupTodos();
+
+            // Sync with dashboard
+            if (typeof window.loadSimpleTodos === 'function') {
+                window.loadSimpleTodos();
+            }
+        }
+    } catch (error) {
+        console.error('Error deleting popup todo:', error);
+    }
+}
+
+// Edit a popup todo item
+function editPopupTodo(index) {
+    const currentView = window.popupTodoView || 'personal';
+    const storageKey = currentView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+    const todos = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    if (!todos[index]) return;
+
+    const newText = prompt('Edit task:', todos[index].text);
+    if (newText !== null && newText.trim()) {
+        todos[index].text = newText.trim();
+        localStorage.setItem(storageKey, JSON.stringify(todos));
+        loadPopupTodos();
+
+        // Sync with dashboard
+        if (typeof window.loadSimpleTodos === 'function') {
+            window.loadSimpleTodos();
+        }
+    }
+}
+
+// Clear all completed popup todos
+function clearCompletedPopupTodos() {
+    const currentView = window.popupTodoView || 'personal';
+    const storageKey = currentView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+    const todos = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const remaining = todos.filter(todo => !todo.completed);
+
+    if (todos.length === remaining.length) {
+        alert('No completed tasks to clear');
+        return;
+    }
+
+    if (confirm('Delete all completed tasks?')) {
+        localStorage.setItem(storageKey, JSON.stringify(remaining));
+        loadPopupTodos();
+
+        // Sync with dashboard
+        if (typeof window.loadSimpleTodos === 'function') {
+            window.loadSimpleTodos();
+        }
+    }
+}
+
+// Popup Schedule View Functions
+window.popupScheduleView = 'day'; // Default to 'day' view
+
+function switchPopupScheduleView(view) {
+    window.popupScheduleView = view;
+
+    // Update button styles
+    const buttons = document.querySelectorAll('.popup-schedule-tab');
+    buttons.forEach(btn => {
+        btn.style.background = '#e5e7eb';
+        btn.style.color = '#6b7280';
+    });
+
+    // Set active button
+    const activeBtn = document.getElementById('popup' + view.charAt(0).toUpperCase() + view.slice(1) + 'ViewBtn');
+    if (activeBtn) {
+        activeBtn.style.background = '#3b82f6';
+        activeBtn.style.color = 'white';
+    }
+
+    // Reload todos with new filter
+    loadPopupTodos();
+}
+
+function filterPopupTodosBySchedule(todos, scheduleView) {
+    if (scheduleView === 'all') {
+        return todos;
+    }
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setDate(endOfToday.getDate() + 1);
+
+    return todos.filter(todo => {
+        // If no target date, show in 'all' view only
+        if (!todo.targetDate || todo.targetDate === todo.date) {
+            return scheduleView === 'all';
+        }
+
+        const targetDate = new Date(todo.targetDate);
+
+        switch (scheduleView) {
+            case 'day':
+                // Show tasks for today
+                return targetDate >= startOfToday && targetDate < endOfToday;
+
+            case 'week':
+                // Show tasks for this week (Monday to Sunday)
+                const startOfWeek = new Date(startOfToday);
+                const dayOfWeek = startOfToday.getDay();
+                const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Handle Sunday
+                startOfWeek.setDate(startOfToday.getDate() + mondayOffset);
+
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+                return targetDate >= startOfWeek && targetDate < endOfWeek;
+
+            case 'month':
+                // Show tasks for this month
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+                return targetDate >= startOfMonth && targetDate < endOfMonth;
+
+            default:
+                return true;
+        }
+    });
+}
+
+// Make the function globally available
+window.switchPopupScheduleView = switchPopupScheduleView;
+
+// Open lead profile from popup todo callback
+function openLeadProfileFromPopupTodo(leadId) {
+    if (!leadId) {
+        console.error('No lead ID provided for opening profile');
+        return;
+    }
+
+    console.log('🔍 Opening lead profile for ID:', leadId);
+
+    // Use the existing openLeadProfile function if available
+    if (typeof window.openLeadProfile === 'function') {
+        window.openLeadProfile(leadId);
+    } else if (typeof openLeadProfile === 'function') {
+        openLeadProfile(leadId);
+    } else {
+        // Fallback: navigate to the leads tab and search for the lead
+        console.log('🔍 Fallback: Navigating to leads tab for lead', leadId);
+
+        // Switch to leads tab
+        if (typeof window.showTab === 'function') {
+            window.showTab('leads');
+        }
+
+        // Try to search for the lead
+        setTimeout(() => {
+            const searchInput = document.querySelector('#lead-search-input');
+            if (searchInput) {
+                searchInput.value = leadId;
+                // Trigger search
+                if (typeof window.searchLeads === 'function') {
+                    window.searchLeads();
+                }
+            }
+        }, 500);
+    }
+}
+
+// Make the function globally available
+window.openLeadProfileFromPopupTodo = openLeadProfileFromPopupTodo;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', initTaskbar);

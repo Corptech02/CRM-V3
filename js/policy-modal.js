@@ -205,6 +205,20 @@ function createInitialPolicy() {
     
     // Show the tabbed interface
     showTabbedPolicyForm();
+
+    // Wire up United toggle visual (for new policies; edit mode uses populatePolicyForm)
+    setTimeout(() => {
+        const cb = document.getElementById('overview-united');
+        if (cb && !cb._unitedWired) {
+            cb._unitedWired = true;
+            cb.addEventListener('change', function() {
+                const t = document.getElementById('overview-united-track');
+                const th = document.getElementById('overview-united-thumb');
+                if (t) t.style.background = this.checked ? '#3b82f6' : '#cbd5e0';
+                if (th) th.style.left = this.checked ? '25px' : '3px';
+            });
+        }
+    }, 200);
 }
 
 function showTabbedPolicyForm(isEditing = false) {
@@ -508,6 +522,23 @@ function generateTabContent(tabId, policyType) {
                                 <option value="Maureen">Maureen</option>
                             </select>
                         </div>
+                        ${(() => {
+                            try {
+                                const u = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+                                if ((u.username || '').toLowerCase() === 'grant') {
+                                    return `<div class="form-group" id="united-toggle-group" style="display: flex; align-items: center; gap: 12px;">
+                                        <label style="margin: 0; font-weight: 600;">United</label>
+                                        <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer; margin: 0;">
+                                            <input type="checkbox" id="overview-united" style="opacity: 0; width: 0; height: 0;">
+                                            <span id="overview-united-track" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e0; border-radius: 26px; transition: .3s;">
+                                                <span id="overview-united-thumb" style="position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                                            </span>
+                                        </label>
+                                    </div>`;
+                                }
+                            } catch(e) {}
+                            return '';
+                        })()}
                     </div>
                     ${policyType === 'commercial-auto' ? `
                     <h3 style="margin-top: 30px;">Commercial Auto Details</h3>
@@ -634,6 +665,7 @@ function generateTabContent(tabId, policyType) {
                                     <option value="">Select Liability Limits</option>
                                     <option value="750000">$750,000 CSL</option>
                                     <option value="1000000">$1,000,000 CSL</option>
+                                    <option value="1500000">$1,500,000 CSL</option>
                                     <option value="2000000">$2,000,000 CSL</option>
                                     <option value="5000000">$5,000,000 CSL</option>
                                     <option value="100/300/100">$100K/$300K/$100K Split Limit</option>
@@ -758,6 +790,7 @@ function generateTabContent(tabId, policyType) {
                                     <option value="25/50">$25K/$50K</option>
                                     <option value="50/100">$50K/$100K</option>
                                     <option value="100/300">$100K/$300K</option>
+                                    <option value="75000">$75,000 CSL</option>
                                     <option value="100000">$100,000 CSL</option>
                                     <option value="250/500">$250K/$500K</option>
                                     <option value="500/1000">$500K/$1M</option>
@@ -776,6 +809,7 @@ function generateTabContent(tabId, policyType) {
                                     <option value="20000">$20,000</option>
                                     <option value="25000">$25,000</option>
                                     <option value="50000">$50,000</option>
+                                    <option value="60000/2000ded">$60,000/$2,000 Ded.</option>
                                     <option value="75000">$75,000</option>
                                     <option value="100000">$100,000</option>
                                 </select>
@@ -793,15 +827,26 @@ function generateTabContent(tabId, policyType) {
                                     <option value="1000000">$1,000,000 CSL</option>
                                 </select>
                             </div>
+                            <div class="form-group">
+                                <label>Reefer Breakdown</label>
+                                <select class="form-control coverage-dropdown" id="coverage-reefer" style="display: block;">
+                                    <option value="">Select Deductible</option>
+                                    <option value="0">No Coverage</option>
+                                    <option value="included">Included / No Deductible</option>
+                                    <option value="500">$500 Deductible</option>
+                                    <option value="1000">$1,000 Deductible</option>
+                                    <option value="2500">$2,500 Deductible</option>
+                                    <option value="5000">$5,000 Deductible</option>
+                                </select>
+                            </div>
                         </div>
-                        
+
                         <h3>Additional Coverages</h3>
                         <div class="checkbox-group">
                             <label><input type="checkbox" id="coverage-hired"> Hired Auto Physical Damage</label>
                             <label><input type="checkbox" id="coverage-non-owned"> Non-Owned Auto Liability</label>
                             <label><input type="checkbox" id="coverage-towing"> Towing & Labor</label>
                             <label><input type="checkbox" id="coverage-rental"> Rental Reimbursement</label>
-                            <label><input type="checkbox" id="coverage-reefer"> Reefer Breakdown</label>
                             <label><input type="checkbox" id="coverage-general-liability"> General Liability</label>
                         </div>
                     </div>
@@ -850,6 +895,7 @@ function generateTabContent(tabId, policyType) {
                                     <option value="25/50">$25K/$50K</option>
                                     <option value="50/100">$50K/$100K</option>
                                     <option value="100/300">$100K/$300K</option>
+                                    <option value="75000">$75,000</option>
                                     <option value="100000">$100,000</option>
                                     <option value="250/500">$250K/$500K</option>
                                     <option value="500/1000">$500K/$1M</option>
@@ -1395,6 +1441,7 @@ async function savePolicy() {
                     expirationDate: document.getElementById('overview-expiration-date')?.value || '',
                     premium: document.getElementById('overview-premium')?.value || '',
                     agent: document.getElementById('overview-agent')?.value || '',
+                    united: document.getElementById('overview-united')?.checked || false,
                     dotNumber: document.getElementById('overview-dot-number')?.value || '',
                     mcNumber: document.getElementById('overview-mc-number')?.value || ''
                 };
@@ -1570,6 +1617,7 @@ async function savePolicy() {
                         }
                         if (input.id === 'overview-dot-number') policyData.dotNumber = input.value;
                         if (input.id === 'overview-mc-number') policyData.mcNumber = input.value;
+                        if (input.id === 'overview-united') policyData.united = input.checked;
                     }
                     
                     // Store financial data at root level too
@@ -1671,6 +1719,22 @@ async function savePolicy() {
             }
         });
         
+        // Collect Additional Coverages checkboxes (they're in .checkbox-group, not .form-group)
+        const additionalCoverageMap = {
+            'coverage-hired': 'Hired Auto Physical Damage',
+            'coverage-non-owned': 'Non-Owned Auto Liability',
+            'coverage-towing': 'Towing & Labor',
+            'coverage-rental': 'Rental Reimbursement',
+            'coverage-general-liability': 'General Liability'
+        };
+        const additionalCoverages = [];
+        Object.entries(additionalCoverageMap).forEach(([id, name]) => {
+            const el = document.getElementById(id);
+            if (el && el.checked) additionalCoverages.push(name);
+        });
+        if (!policyData.coverage) policyData.coverage = {};
+        policyData.coverage.additionalCoverages = additionalCoverages;
+
         // Ensure policyType is not lost - use initial type if current is empty
         if (!policyData.policyType || policyData.policyType === '') {
             policyData.policyType = initialPolicyType;
@@ -1931,6 +1995,7 @@ function savePolicyDraft() {
                         }
                         if (input.id === 'overview-dot-number') policyData.dotNumber = input.value;
                         if (input.id === 'overview-mc-number') policyData.mcNumber = input.value;
+                        if (input.id === 'overview-united') policyData.united = input.checked;
                     }
                     
                     // Store financial data at root level too
@@ -2296,6 +2361,27 @@ function populatePolicyForm(policyData) {
         }
     }
     
+    // Restore Additional Coverages checkboxes
+    const additionalCoverages = policyData.coverage?.additionalCoverages || [];
+    const coverageCheckboxMap = {
+        'coverage-hired': 'Hired Auto Physical Damage',
+        'coverage-non-owned': 'Non-Owned Auto Liability',
+        'coverage-towing': 'Towing & Labor',
+        'coverage-rental': 'Rental Reimbursement',
+        'coverage-general-liability': 'General Liability'
+    };
+    Object.entries(coverageCheckboxMap).forEach(([id, name]) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = additionalCoverages.includes(name);
+    });
+
+    // Backward compat: if old policy had Reefer Breakdown in additionalCoverages,
+    // map it to the new dropdown as "Included / No Deductible"
+    const reeferSelect = document.getElementById('coverage-reefer');
+    if (reeferSelect && !reeferSelect.value && additionalCoverages.includes('Reefer Breakdown')) {
+        reeferSelect.value = 'included';
+    }
+
     // Populate financial/coverage data from root level if not in tabs
     const financialFields = ['premium', 'monthlyPremium', 'deductible', 'downPayment'];
     financialFields.forEach(fieldName => {
@@ -2356,6 +2442,24 @@ function populatePolicyForm(policyData) {
     }
     
     // Populate Commercial Auto specific fields in Overview
+    // Populate United toggle (Grant-only)
+    const unitedCheckbox = document.getElementById('overview-united');
+    if (unitedCheckbox) {
+        unitedCheckbox.checked = !!policyData.united;
+        const track = document.getElementById('overview-united-track');
+        const thumb = document.getElementById('overview-united-thumb');
+        if (track && thumb) {
+            track.style.background = policyData.united ? '#3b82f6' : '#cbd5e0';
+            thumb.style.left = policyData.united ? '25px' : '3px';
+        }
+        unitedCheckbox.addEventListener('change', function() {
+            const t = document.getElementById('overview-united-track');
+            const th = document.getElementById('overview-united-thumb');
+            if (t) t.style.background = this.checked ? '#3b82f6' : '#cbd5e0';
+            if (th) th.style.left = this.checked ? '25px' : '3px';
+        });
+    }
+
     if (policyData.policyType === 'commercial-auto') {
         if (document.getElementById('overview-dot-number')) {
             document.getElementById('overview-dot-number').value = policyData.dotNumber || policyData['DOT Number'] || '';

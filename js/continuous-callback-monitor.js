@@ -35,7 +35,7 @@
                     // Find the TODO cell - it's the 7th column (index 6)
                     const cells = row.querySelectorAll('td');
                     if (cells.length > 6) {
-                        const todoCell = cells[6]; // TODO column is 7th column (0-indexed = 6)
+                        const todoCell = cells[7]; // TODO column is 7th column (0-indexed = 6)
 
                         // Check if already has callback message
                         if (todoCell.innerHTML.includes('Reach out: CALL')) {

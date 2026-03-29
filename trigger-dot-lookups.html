@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trigger DOT Lookups</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; margin: 8px; font-size: 16px; }
+        .button:hover { background: #0056b3; }
+        .button.success { background: #28a745; }
+        .button.warning { background: #ffc107; color: #212529; }
+        .log { margin: 20px 0; padding: 20px; border: 1px solid #ddd; background: #f9f9f9; border-radius: 4px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 14px; }
+        .log-entry { margin: 5px 0; padding: 8px; border-left: 3px solid #333; background: rgba(0,0,0,0.05); }
+        .log-success { border-left-color: #28a745; }
+        .log-error { border-left-color: #dc3545; }
+        .log-warning { border-left-color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚛 DOT Lookup Trigger</h1>
+        <p>This tool triggers DOT lookups for all leads in your system that have DOT numbers but are missing carrier data.</p>
+
+        <div>
+            <button class="button" onclick="checkStatus()">Check Integration Status</button>
+            <button class="button success" onclick="triggerAllDOTLookups()">🚛 Trigger All DOT Lookups</button>
+            <button class="button warning" onclick="triggerSingleDOT()">Test DOT 3833739</button>
+            <button class="button" onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div id="log" class="log">
+            <div class="log-entry">🔄 Ready to trigger DOT lookups. Click "Check Integration Status" first.</div>
+        </div>
+    </div>
+
+    <!-- Load integration scripts -->
+    <script src="js/vicidial-import-listener.js"></script>
+    <script src="js/vicidial-dot-lookup-integration.js"></script>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
+
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function checkStatus() {
+            log('🔍 Checking DOT integration status...', 'info');
+
+            // Check if functions are available
+            const functions = [
+                'performDOTLookupForLead',
+                'triggerDOTLookupForNewLeads',
+                'triggerDOTLookupForAllLeads'
+            ];
+
+            functions.forEach(funcName => {
+                const exists = typeof window[funcName] === 'function';
+                log(`${exists ? '✅' : '❌'} ${funcName}: ${exists ? 'Available' : 'Missing'}`, exists ? 'success' : 'error');
+            });
+
+            // Check localStorage leads
+            try {
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const leadsWithDOT = leads.filter(lead => lead.dotNumber && lead.dotNumber.trim() !== '');
+
+                log(`📋 Total leads: ${leads.length}`, 'info');
+                log(`🚛 Leads with DOT numbers: ${leadsWithDOT.length}`, 'info');
+
+                if (leadsWithDOT.length > 0) {
+                    leadsWithDOT.forEach((lead, index) => {
+                        if (index < 5) { // Show first 5
+                            const hasData = lead.yearsInBusiness || lead.state || lead.commodityHauled;
+                            log(`  ${hasData ? '✅' : '⚠️'} ${lead.name} (DOT: ${lead.dotNumber}) - ${hasData ? 'Has data' : 'Missing data'}`, hasData ? 'success' : 'warning');
+                        }
+                    });
+
+                    if (leadsWithDOT.length > 5) {
+                        log(`  ... and ${leadsWithDOT.length - 5} more leads with DOT numbers`, 'info');
+                    }
+                }
+            } catch (error) {
+                log(`❌ Error reading localStorage: ${error.message}`, 'error');
+            }
+        }
+
+        function triggerAllDOTLookups() {
+            log('🚛 Triggering DOT lookups for all leads...', 'info');
+
+            if (typeof window.triggerDOTLookupForAllLeads === 'function') {
+                log('✅ Starting bulk DOT lookup process...', 'success');
+                window.triggerDOTLookupForAllLeads();
+                log('📡 DOT lookups have been queued. Check console for detailed progress.', 'info');
+            } else {
+                log('❌ triggerDOTLookupForAllLeads function not available', 'error');
+            }
+        }
+
+        function triggerSingleDOT() {
+            log('🎯 Testing single DOT lookup for 3833739...', 'info');
+
+            if (typeof window.performDOTLookupForLead === 'function') {
+                log('🔍 Calling performDOTLookupForLead...', 'info');
+
+                window.performDOTLookupForLead('test-lead-' + Date.now(), '3833739')
+                    .then(result => {
+                        if (result) {
+                            log('✅ DOT lookup successful!', 'success');
+                            log(`📋 Result: ${JSON.stringify(result, null, 2)}`, 'info');
+                        } else {
+                            log('⚠️ DOT lookup returned null', 'warning');
+                        }
+                    })
+                    .catch(error => {
+                        log(`❌ DOT lookup failed: ${error.message}`, 'error');
+                    });
+            } else {
+                log('❌ performDOTLookupForLead function not available', 'error');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<div class="log-entry">🔄 Log cleared. Ready for new messages.</div>';
+        }
+
+        // Auto-check status on load
+        window.addEventListener('load', () => {
+            setTimeout(checkStatus, 1000);
+        });
+    </script>
+</body>
+</html>

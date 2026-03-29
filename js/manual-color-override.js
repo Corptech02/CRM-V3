@@ -18,7 +18,7 @@
         rows.forEach((row, idx) => {
             const cells = row.querySelectorAll('td');
             if (cells.length >= 7) {
-                const todoCell = cells[6];
+                const todoCell = cells[7];
                 const todoText = (todoCell.textContent || '').trim();
 
                 // Only color rows with TODO text

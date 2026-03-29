@@ -63,6 +63,41 @@ def add_lead_to_vicidial(list_id, lead_data):
         phone = str(lead_data.get('phone', '')).replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
         if not phone:
             return {'success': False, 'error': 'No phone number provided'}
+
+        # ── Commercial lead fast-path ─────────────────────────────────────────
+        if lead_data.get('source_type') == 'commercial':
+            company_name = str(lead_data.get('company', lead_data.get('name', 'Unknown'))).strip()
+            target_lines = str(lead_data.get('target_lines', lead_data.get('insuranceType', ''))).strip()
+            vertical     = str(lead_data.get('vertical', '')).strip()
+            api_params = {
+                "source":          VICIDIAL_SOURCE,
+                "user":            VICIDIAL_USER,
+                "pass":            VICIDIAL_PASS,
+                "function":        "add_lead",
+                "list_id":         list_id,
+                "phone_number":    phone,
+                "phone_code":      "1",
+                "status":          "NEW",
+                "duplicate_check": "DUPUPDATE",
+                "title":           company_name[:40],
+                "first_name":      company_name[:20],
+                "last_name":       "Commercial Lead",
+                "address1":        str(lead_data.get('street_address', lead_data.get('address', '')))[:100],
+                "address2":        str(lead_data.get('website', '')).split('?')[0][:100],  # strip query params to avoid encoding issues
+                "address3":        target_lines[:100],
+                "email":           str(lead_data.get('email', '')),
+                "city":            str(lead_data.get('city', '')),
+                "state":           str(lead_data.get('state', '')),
+                "province":        str(lead_data.get('state', '')),
+                "postal_code":     str(lead_data.get('zip', lead_data.get('postal_code', ''))),
+                "comments":        f"Vertical: {vertical}\nLines: {target_lines}\nSource: {lead_data.get('source','')}\nWebsite: {lead_data.get('website','')}\nEmail: {lead_data.get('email','')}",
+                "vendor_lead_code": str(lead_data.get('sourceId', '')),
+            }
+            response = requests.post(api_url, data=api_params, verify=False, timeout=30)
+            success = 'lead_id' in response.text.lower() or 'added' in response.text.lower() or response.status_code == 200
+            return {'success': success, 'response': response.text[:200]}
+        # ── End commercial fast-path ──────────────────────────────────────────
+
     except Exception as e:
         print(f"DEBUG: Exception in initial processing: {str(e)}")
         return {'success': False, 'error': f'Initial processing error: {str(e)}'}

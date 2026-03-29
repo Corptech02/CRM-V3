@@ -117,7 +117,7 @@
         const apiUrl = window.VANGUARD_API_URL ||
                       (window.location.hostname === 'localhost'
                         ? 'http://localhost:3001'
-                        : `http://${window.location.hostname}:3001`);
+                        : `${window.location.protocol}//${window.location.host}`);
 
         fetch(`${apiUrl}/api/leads`, {
             method: 'POST',

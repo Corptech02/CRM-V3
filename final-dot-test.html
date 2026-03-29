@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚛 Final DOT Lookup Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 6px; cursor: pointer; margin: 10px; font-size: 16px; font-weight: 600; }
+        .button:hover { background: #0056b3; }
+        .button.success { background: #28a745; }
+        .button.warning { background: #ffc107; color: #212529; }
+        .section { margin: 25px 0; padding: 25px; border-radius: 8px; }
+        .section.blue { background: #e3f2fd; border-left: 5px solid #2196f3; }
+        .section.green { background: #e8f5e8; border-left: 5px solid #4caf50; }
+        .section.yellow { background: #fff3cd; border-left: 5px solid #ffc107; }
+        .log { font-family: monospace; font-size: 14px; background: #f8f9fa; padding: 20px; border-radius: 6px; height: 400px; overflow-y: auto; border: 1px solid #dee2e6; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .info { color: #0066cc; }
+        .step { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 10px; }
+        .expected { background: #e8f5e8; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚛 Final DOT Lookup Integration Test</h1>
+        <p style="font-size: 16px; color: #666;">This is the complete test to verify that DOT lookup now works correctly with the recursion fix.</p>
+
+        <div class="section blue">
+            <div class="step">Step 1: Test the Fixed DOT Lookup</div>
+            <p>Click this button to test the recursion-fixed auto-hook:</p>
+            <button class="button success" onclick="runCompleteDOTTest()">🎯 Run Complete DOT Lookup Test</button>
+        </div>
+
+        <div class="section yellow">
+            <div class="step">Step 2: Expected Results</div>
+            <p>After clicking the test button, you should see:</p>
+            <div class="expected">
+                ✅ <strong>State:</strong> IN (will show green background in profile)<br>
+                ✅ <strong>Years in Business:</strong> 5-10 years (will show green background in profile)<br>
+                ✅ <strong>Commodity Hauled:</strong> General Freight (will show green background in profile)
+            </div>
+        </div>
+
+        <div class="section green">
+            <div class="step">Step 3: View in Main Application</div>
+            <p>Once the test passes:</p>
+            <ol>
+                <li>Go to the main Vanguard application</li>
+                <li>Find lead 150420 (GOLDS CUSTOM SERVICE MARIA MICEK)</li>
+                <li>Click the eye icon to view the profile</li>
+                <li>Look for <strong>green backgrounds</strong> on the DOT-populated fields</li>
+            </ol>
+        </div>
+
+        <div class="section blue">
+            <div class="step">Test Log:</div>
+            <div id="log" class="log">Ready to run complete DOT lookup test...\n</div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="button warning" onclick="clearLogAndReset()">🗑️ Clear Log & Reset</button>
+            <button class="button" onclick="location.reload()">🔄 Refresh Page</button>
+        </div>
+    </div>
+
+    <!-- Load the FIXED auto-hook (version 4) -->
+    <script src="js/auto-dot-lookup-hook.js?v=4"></script>
+
+    <script>
+        function log(message, className = '') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const span = document.createElement('span');
+            span.className = className;
+            span.innerHTML = `[${timestamp}] ${message}\\n`;
+            logDiv.appendChild(span);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLogAndReset() {
+            document.getElementById('log').innerHTML = 'Log cleared and reset...\\n';
+
+            // Clear test lead
+            try {
+                let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                leads = leads.filter(lead => lead.id !== '150420');
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                log('🗑️ Cleared test lead from localStorage', '');
+            } catch (error) {
+                log('❌ Error clearing test lead: ' + error.message, 'error');
+            }
+        }
+
+        // Monitor all relevant console messages
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            if (message.includes('BUILT-IN DOT') || message.includes('AUTO DOT') || message.includes('DOT LOOKUP')) {
+                log('🔍 CONSOLE: ' + message, 'info');
+            }
+        };
+
+        const originalConsoleError = console.error;
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            const message = args.join(' ');
+            if (message.includes('DOT') || message.includes('BUILT-IN')) {
+                log('❌ ERROR: ' + message, 'error');
+            }
+        };
+
+        async function runCompleteDOTTest() {
+            log('🚀 Starting complete DOT lookup test with recursion fix...', 'info');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', '');
+
+            // Step 1: Clear any existing test data
+            log('Step 1: Clearing any existing test data...', '');
+            let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const initialCount = leads.length;
+            leads = leads.filter(lead => lead.id !== '150420');
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            log(`✅ Cleared test lead (${initialCount} → ${leads.length} leads)`, 'success');
+
+            // Step 2: Create test lead with DOT number
+            log('Step 2: Creating test lead with DOT number...', '');
+            const testLead = {
+                id: '150420',
+                name: 'GOLDS CUSTOM SERVICE MARIA MICEK',
+                contact: 'GOLDS CUSTOM SERVICE',
+                phone: '(815) 588-3712',
+                email: 'GOLDSCUSTOMSERVICES@GMAIL.COM',
+                dotNumber: '3833739',
+                stage: 'New',
+                createdAt: new Date().toISOString(),
+                notes: 'Test lead for final DOT lookup integration test'
+            };
+            log(`✅ Test lead created: ${testLead.name} (DOT: ${testLead.dotNumber})`, 'success');
+
+            // Step 3: Add lead to localStorage (should trigger auto-hook)
+            log('Step 3: Adding lead to localStorage (should trigger auto-hook)...', '');
+            leads.push(testLead);
+
+            // This localStorage.setItem should trigger the auto-hook
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+            log('✅ Lead saved to localStorage', 'success');
+            log('⏳ Auto-hook should now detect DOT number and start lookup...', 'info');
+
+            // Step 4: Wait for DOT lookup to complete
+            log('Step 4: Waiting 6 seconds for DOT lookup to complete...', '');
+
+            setTimeout(async () => {
+                log('Step 5: Checking DOT lookup results...', '');
+                log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', '');
+
+                const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const updatedLead = updatedLeads.find(lead => lead.id === '150420');
+
+                if (updatedLead) {
+                    log('📊 Lead found, analyzing DOT data...', '');
+
+                    const state = updatedLead.state;
+                    const years = updatedLead.yearsInBusiness;
+                    const commodity = updatedLead.commodityHauled;
+
+                    log(`   State: "${state || 'EMPTY'}"`, state ? 'success' : 'error');
+                    log(`   Years in Business: "${years || 'EMPTY'}"`, years ? 'success' : 'error');
+                    log(`   Commodity Hauled: "${commodity || 'EMPTY'}"`, commodity ? 'success' : 'error');
+
+                    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', '');
+
+                    if (state === 'IN' && years === '5-10 years' && commodity === 'General Freight') {
+                        log('🎉 SUCCESS! DOT lookup worked perfectly!', 'success');
+                        log('✅ All expected data is populated correctly', 'success');
+                        log('', '');
+                        log('📱 NEXT STEPS:', 'info');
+                        log('1. Open the main Vanguard application', 'info');
+                        log('2. Find lead 150420 (GOLDS CUSTOM SERVICE MARIA MICEK)', 'info');
+                        log('3. Click the eye icon to view the profile', 'info');
+                        log('4. Look for GREEN BACKGROUNDS on:', 'info');
+                        log('   • State field (should show "IN")', 'info');
+                        log('   • Years in Business field (should show "5-10 years")', 'info');
+                        log('   • Commodity Hauled field (should show "General Freight")', 'info');
+                        log('', '');
+                        log('🎯 The green backgrounds indicate auto-populated data!', 'success');
+
+                    } else if (state || years || commodity) {
+                        log('⚠️ PARTIAL SUCCESS: Some data populated but not all', 'error');
+                        log('💡 Expected: State="IN", Years="5-10 years", Commodity="General Freight"', 'info');
+
+                    } else {
+                        log('❌ FAILURE: No DOT data was populated', 'error');
+                        log('💡 Trying manual backup trigger...', 'info');
+
+                        if (window.manualDOTLookupTrigger) {
+                            try {
+                                log('🔧 Calling manual DOT lookup trigger...', '');
+                                await window.manualDOTLookupTrigger('150420', '3833739');
+
+                                setTimeout(() => {
+                                    const finalLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                                    const finalLead = finalLeads.find(lead => lead.id === '150420');
+
+                                    if (finalLead && finalLead.state) {
+                                        log('✅ Manual trigger worked as backup!', 'success');
+                                        log(`Final data: State="${finalLead.state}", Years="${finalLead.yearsInBusiness}", Commodity="${finalLead.commodityHauled}"`, 'success');
+                                    } else {
+                                        log('❌ Even manual trigger failed - API may be down', 'error');
+                                    }
+                                }, 2000);
+
+                            } catch (error) {
+                                log(`❌ Manual trigger error: ${error.message}`, 'error');
+                            }
+                        } else {
+                            log('❌ Manual trigger not available', 'error');
+                        }
+                    }
+                } else {
+                    log('❌ Test lead not found in localStorage', 'error');
+                }
+            }, 6000);
+        }
+
+        // Initial status check
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🔧 Checking DOT lookup integration status...', '');
+
+                // Check auto-hook functions
+                if (window.debugDOTLookupHook && window.manualDOTLookupTrigger) {
+                    log('✅ Auto-hook functions loaded', 'success');
+                } else {
+                    log('❌ Some auto-hook functions missing', 'error');
+                }
+
+                // Check localStorage hook
+                const setItemStr = localStorage.setItem.toString();
+                if (setItemStr.includes('dotLookupInProgress')) {
+                    log('✅ Recursion-protected localStorage hook active', 'success');
+                } else {
+                    log('❌ localStorage hook may not be properly installed', 'error');
+                }
+
+                log('🚀 Ready to run complete test!', 'info');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

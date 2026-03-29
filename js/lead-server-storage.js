@@ -230,7 +230,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const localLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
 
     const serverIds = new Set(serverLeads.map(l => String(l.id)));
-    const unsyncedLeads = localLeads.filter(l => !serverIds.has(String(l.id)));
+    const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
+    const unsyncedLeads = localLeads.filter(l =>
+        !serverIds.has(String(l.id)) && !deletedLeadIds.includes(String(l.id))
+    );
 
     if (unsyncedLeads.length > 0) {
         console.log(`Found ${unsyncedLeads.length} unsynced leads, syncing to server...`);

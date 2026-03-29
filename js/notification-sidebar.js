@@ -8,6 +8,74 @@
     let notifications = [];
     let lastCheckTime = null;
 
+    // Grant: all-users toggle state (persisted in localStorage, default ON)
+    function isGrantAllUsersOn() {
+        return localStorage.getItem('grantAllUsersNotif') !== 'false';
+    }
+
+    window.toggleGrantAllUsers = function() {
+        const current = isGrantAllUsersOn();
+        localStorage.setItem('grantAllUsersNotif', current ? 'false' : 'true');
+        const toggle = document.getElementById('grantAllUsersToggle');
+        if (toggle) {
+            toggle.checked = !current;
+            toggle.closest('label').querySelector('.grant-toggle-label').textContent = !current ? 'All Users' : 'My Leads';
+        }
+        updateNotificationDisplay();
+        updateNotificationBadge();
+    };
+
+    function injectGrantToggle() {
+        const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+        if ((sessionData.username || '').toLowerCase() !== 'grant') return;
+        if (document.getElementById('grantAllUsersToggle')) return;
+
+        const header = document.querySelector('.notification-sidebar-header');
+        if (!header) return;
+
+        const isOn = isGrantAllUsersOn();
+        const wrapper = document.createElement('label');
+        wrapper.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;margin:0 8px 0 0;user-select:none;';
+        wrapper.innerHTML = `
+            <span class="grant-toggle-label" style="font-size:12px;font-weight:500;color:#374151;">${isOn ? 'All Users' : 'My Leads'}</span>
+            <div style="position:relative;width:36px;height:20px;">
+                <input id="grantAllUsersToggle" type="checkbox" ${isOn ? 'checked' : ''} onchange="toggleGrantAllUsers()"
+                    style="opacity:0;width:0;height:0;position:absolute;">
+                <span id="grantToggleTrack" style="
+                    position:absolute;inset:0;border-radius:10px;
+                    background:${isOn ? '#3b82f6' : '#d1d5db'};
+                    transition:background 0.2s;cursor:pointer;
+                " onclick="toggleGrantAllUsers()"></span>
+                <span id="grantToggleThumb" style="
+                    position:absolute;top:3px;left:${isOn ? '19px' : '3px'};
+                    width:14px;height:14px;border-radius:50%;background:white;
+                    transition:left 0.2s;pointer-events:none;
+                    box-shadow:0 1px 3px rgba(0,0,0,0.3);
+                "></span>
+            </div>
+        `;
+
+        // Keep toggle state synced visually
+        const origToggle = window.toggleGrantAllUsers;
+        window.toggleGrantAllUsers = function() {
+            const current = isGrantAllUsersOn();
+            localStorage.setItem('grantAllUsersNotif', current ? 'false' : 'true');
+            const newState = !current;
+            const track = document.getElementById('grantToggleTrack');
+            const thumb = document.getElementById('grantToggleThumb');
+            const label = wrapper.querySelector('.grant-toggle-label');
+            if (track) track.style.background = newState ? '#3b82f6' : '#d1d5db';
+            if (thumb) thumb.style.left = newState ? '19px' : '3px';
+            if (label) label.textContent = newState ? 'All Users' : 'My Leads';
+            updateNotificationDisplay();
+            updateNotificationBadge();
+        };
+
+        // Insert before close button
+        const closeBtn = header.querySelector('.close-sidebar-btn');
+        header.insertBefore(wrapper, closeBtn);
+    }
+
     // Load notifications from API
     async function loadNotifications() {
         try {
@@ -29,7 +97,30 @@
 
     // Update notification badge count
     function updateNotificationBadge() {
-        const unreadCount = notifications.filter(n => !n.read_at && !n.dismissed_at).length;
+        // Get current user to filter notifications
+        const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+        const currentUser = sessionData.username || '';
+        const isGrant = currentUser.toLowerCase() === 'grant';
+        const showAll = isGrant && isGrantAllUsersOn();
+
+        const unreadCount = notifications
+            .filter(n => !n.read_at && !n.dismissed_at)
+            .filter(n => {
+                if (showAll) return true; // Grant all-users mode: no filter
+                // Extract assigned agent from metadata for filtering
+                let assignedAgent = null;
+                if (n.metadata) {
+                    try {
+                        const metadata = typeof n.metadata === 'string' ? JSON.parse(n.metadata) : n.metadata;
+                        assignedAgent = metadata.assignedAgent;
+                    } catch (e) {
+                        // Ignore parsing errors
+                    }
+                }
+                // Count only unassigned notifications or notifications assigned to current user
+                return !assignedAgent || assignedAgent === currentUser;
+            }).length;
+
         const notificationBtn = document.querySelector('.notification-btn');
 
         if (notificationBtn) {
@@ -73,7 +164,38 @@
         const sidebarContent = document.querySelector('.notification-sidebar-content');
         if (!sidebarContent) return;
 
-        const activeNotifications = notifications.filter(n => !n.dismissed_at);
+        // Get current user to filter notifications
+        const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+        const currentUser = sessionData.username || '';
+        const isGrant = currentUser.toLowerCase() === 'grant';
+        const showAll = isGrant && isGrantAllUsersOn();
+
+        const activeNotifications = notifications
+            .filter(n => !n.dismissed_at)
+            .filter(n => {
+                if (showAll) return true; // Grant all-users mode: show everything
+                // Extract assigned agent from metadata
+                let assignedAgent = null;
+                if (n.metadata) {
+                    try {
+                        const metadata = typeof n.metadata === 'string' ? JSON.parse(n.metadata) : n.metadata;
+                        assignedAgent = metadata.assignedAgent;
+                    } catch (e) {
+                        // Ignore parsing errors
+                    }
+                }
+
+                // Show notification if:
+                // 1. No assigned agent (unassigned notifications)
+                // 2. Assigned to current user
+                const shouldShow = !assignedAgent || assignedAgent === currentUser;
+
+                if (!shouldShow) {
+                    console.log(`🚫 Filtering out notification for ${assignedAgent} (current user: ${currentUser}):`, n.title);
+                }
+
+                return shouldShow;
+            });
 
         if (activeNotifications.length === 0) {
             sidebarContent.innerHTML = `
@@ -261,16 +383,69 @@
 
     window.markAllAsRead = async function() {
         try {
-            const unreadNotifications = notifications.filter(n => !n.read_at && !n.dismissed_at);
+            // Get current user
+            const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+            const currentUser = sessionData.username || '';
 
-            for (const notification of unreadNotifications) {
-                await fetch(`/api/notifications/${notification.id}/read`, {
-                    method: 'POST'
-                });
+            console.log(`🔔 Mark All Read - Current user: ${currentUser}`);
+
+            // PART 1: Handle callback notifications (localStorage)
+            let callbackNotifications = JSON.parse(localStorage.getItem('callbackNotifications') || '[]');
+
+            let callbackDismissedCount = 0;
+            callbackNotifications = callbackNotifications.map(notification => {
+                const isDismissedByUser = notification.dismissedBy && notification.dismissedBy[currentUser] === true;
+
+                if (!isDismissedByUser) {
+                    if (!notification.dismissedBy) {
+                        notification.dismissedBy = {};
+                    }
+                    notification.dismissedBy[currentUser] = true;
+                    callbackDismissedCount++;
+                }
+                return notification;
+            });
+
+            localStorage.setItem('callbackNotifications', JSON.stringify(callbackNotifications));
+            console.log(`🔔 Bulk dismissed ${callbackDismissedCount} callback notifications for ${currentUser}`);
+
+            // PART 2: Handle API notifications - dismiss all visible ones
+            let apiDismissedCount = 0;
+            if (notifications && notifications.length > 0) {
+                // Filter to get only non-dismissed notifications
+                const visibleApiNotifications = notifications.filter(n => !n.dismissed_at);
+                console.log(`🔔 Found ${visibleApiNotifications.length} API notifications to dismiss`);
+
+                // Dismiss each API notification individually using the existing function
+                for (const notification of visibleApiNotifications) {
+                    try {
+                        const response = await fetch(`/api/notifications/${notification.id}/dismiss`, {
+                            method: 'POST'
+                        });
+
+                        if (response.ok) {
+                            apiDismissedCount++;
+                            console.log(`🔔 Dismissed API notification ${notification.id}`);
+                        } else {
+                            console.warn(`⚠️ Failed to dismiss notification ${notification.id}: ${response.status}`);
+                        }
+                    } catch (error) {
+                        console.warn(`⚠️ Error dismissing notification ${notification.id}:`, error);
+                    }
+                }
             }
 
-            console.log(`📬 Marked ${unreadNotifications.length} notifications as read`);
-            await loadNotifications(); // Refresh
+            console.log(`🔔 Total dismissed: ${callbackDismissedCount} callback + ${apiDismissedCount} API notifications`);
+
+            // Update displays
+            if (window.CallbackNotifications && window.CallbackNotifications.updateNotificationDisplay) {
+                window.CallbackNotifications.updateNotificationDisplay();
+                window.CallbackNotifications.updateNotificationBadge();
+            }
+
+            // Reload API notifications to reflect changes
+            await loadNotifications();
+
         } catch (error) {
             console.error('❌ Error marking notifications as read:', error);
         }
@@ -333,6 +508,7 @@
             sidebar.classList.add('active');
             overlay.classList.add('active');
             document.body.style.overflow = 'hidden'; // Prevent body scroll when sidebar is open
+            injectGrantToggle();
         }
     };
 
@@ -400,6 +576,7 @@
         initializeNotificationButton();
         initializeKeyboardSupport();
         startNotificationPolling(); // Start loading notifications
+        injectGrantToggle();
 
         console.log('✅ Notification sidebar functionality loaded');
     }

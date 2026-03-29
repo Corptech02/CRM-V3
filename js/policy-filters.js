@@ -44,6 +44,12 @@ window.filterPolicies = function() {
     const rows = tbody.querySelectorAll('tr');
     let visibleCount = 0;
 
+    // Variables to track filtered stats
+    let visibleTotal = 0;
+    let visibleActive = 0;
+    let visiblePendingRenewal = 0;
+    let visibleTotalPremium = 0;
+
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         if (cells.length < 4) {
@@ -56,6 +62,7 @@ window.filterPolicies = function() {
         const policyTypeCell = cells[1]?.textContent?.toLowerCase() || '';
         const clientName = cells[2]?.textContent?.toLowerCase() || '';
         const carrier = cells[3]?.textContent?.toLowerCase() || '';
+        const premiumText = cells[6]?.textContent || '$0';
         const assignedAgent = cells[7]?.textContent?.trim() || '';
         const status = cells.length > 8 ? cells[8]?.textContent?.toLowerCase() || '' : '';
 
@@ -91,7 +98,7 @@ window.filterPolicies = function() {
             clientName.includes(searchValue) ||
             carrier.includes(searchValue);
 
-        // Agent filtering with special logic for Maureen
+        // Agent filtering with special logic
         let agentMatch = true;
         if (isMaureen) {
             // For Maureen: if no specific agent selected ("All My Policies"), still only show Maureen's policies
@@ -102,8 +109,13 @@ window.filterPolicies = function() {
                 agentMatch = assignedAgent === agentValue;
             }
         } else {
-            // Normal filtering for other users
-            agentMatch = !agentValue || assignedAgent === agentValue;
+            // For non-Maureen users: exclude Maureen policies when "All Agents" is selected
+            if (!agentValue) {
+                agentMatch = assignedAgent !== 'Maureen';
+                console.log(`🔍 "All Agents" filter: ${agentMatch ? 'SHOW' : 'HIDE'} policy assigned to "${assignedAgent}"`);
+            } else {
+                agentMatch = assignedAgent === agentValue;
+            }
         }
 
         // Show/hide row based on all filters
@@ -112,6 +124,28 @@ window.filterPolicies = function() {
         if (shouldShow) {
             row.style.display = '';
             visibleCount++;
+
+            // Track stats for visible policies
+            visibleTotal++;
+
+            // Count active policies (assuming status contains 'active')
+            if (status.includes('active')) {
+                visibleActive++;
+            }
+
+            // Count pending renewal policies
+            if (status.includes('pending') || status.includes('renewal')) {
+                visiblePendingRenewal++;
+            }
+
+            // Parse and sum premium amounts
+            const premiumMatch = premiumText.match(/[\d,]+\.?\d*/);
+            if (premiumMatch) {
+                const premiumValue = parseFloat(premiumMatch[0].replace(/,/g, ''));
+                if (!isNaN(premiumValue)) {
+                    visibleTotalPremium += premiumValue;
+                }
+            }
         } else {
             row.style.display = 'none';
         }
@@ -124,7 +158,48 @@ window.filterPolicies = function() {
     if (countDisplay) {
         countDisplay.textContent = `Showing ${visibleCount} policies`;
     }
+
+    // Update policy statistics with filtered data
+    updatePolicyStats(visibleTotal, visibleActive, visiblePendingRenewal, visibleTotalPremium);
 };
+
+// Function to update policy statistics display
+function updatePolicyStats(total, active, pendingRenewal, totalPremium) {
+    // Update total policies
+    const totalElement = document.querySelector('.mini-stat:nth-child(1) .mini-stat-value');
+    if (totalElement) {
+        totalElement.textContent = total;
+    }
+
+    // Update active policies
+    const activeElement = document.querySelector('.mini-stat:nth-child(2) .mini-stat-value');
+    if (activeElement) {
+        activeElement.textContent = active;
+    }
+
+    // Update pending renewal
+    const pendingElement = document.querySelector('.mini-stat:nth-child(3) .mini-stat-value');
+    if (pendingElement) {
+        pendingElement.textContent = pendingRenewal;
+    }
+
+    // Update total premium
+    const premiumElement = document.querySelector('.mini-stat:nth-child(4) .mini-stat-value');
+    if (premiumElement) {
+        // Format premium as $240K style for large numbers
+        let formattedPremium;
+        if (totalPremium >= 1000000) {
+            formattedPremium = `$${(totalPremium / 1000000).toFixed(1)}M`;
+        } else if (totalPremium >= 1000) {
+            formattedPremium = `$${Math.round(totalPremium / 1000)}K`;
+        } else {
+            formattedPremium = `$${totalPremium.toFixed(0)}`;
+        }
+        premiumElement.textContent = formattedPremium;
+    }
+
+    console.log(`📈 Policy stats updated: ${total} total, ${active} active, ${pendingRenewal} pending renewal, $${totalPremium.toFixed(2)} total premium`);
+}
 
 // Add search functionality to search input
 function initializePolicySearch() {
@@ -172,6 +247,9 @@ function initializePolicyFilters() {
         }
 
         console.log('🎯 Policy filters fully initialized');
+
+        // Apply auto-filter after initialization
+        applyMaureenAutoFilter();
     }, 500);
 }
 
@@ -192,6 +270,18 @@ function applyMaureenAutoFilter() {
                         console.log('✅ AUTO-FILTER (Policies): Applied Maureen "All My Policies" filter');
                     }
                 }, 300); // Allow time for DOM to update
+            } else {
+                // For non-Maureen users, apply "All Agents" filter which excludes Maureen
+                setTimeout(() => {
+                    const agentFilter = document.getElementById('policyAgentFilter');
+                    if (agentFilter) {
+                        agentFilter.value = '';
+                        console.log('🔒 AUTO-FILTER (Policies): Applied "All Agents" filter (excluding Maureen)');
+                        // Trigger the filter function immediately to hide Maureen policies
+                        filterPolicies();
+                        console.log('✅ AUTO-FILTER (Policies): Maureen policies hidden from view');
+                    }
+                }, 300);
             }
         } catch (error) {
             console.error('Error applying Maureen auto-filter for policies:', error);

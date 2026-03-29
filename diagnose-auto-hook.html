@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Diagnose Auto-Hook Issue</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; }
+        .button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; margin: 8px; }
+        .button.success { background: #28a745; }
+        .section { background: #f8f9fa; padding: 20px; border-radius: 6px; margin: 15px 0; }
+        .log { font-family: monospace; font-size: 13px; background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Diagnose Auto-Hook Issue</h1>
+        <p>This will help diagnose why the auto-hook isn't processing DOT lookups properly.</p>
+
+        <div class="section">
+            <button class="button" onclick="debugAutoHook()">🔍 Debug Auto-Hook Status</button>
+            <button class="button success" onclick="simulateLeadImport()">📥 Simulate Lead Import</button>
+            <button class="button" onclick="testProcessFunction()">🧪 Test Process Function</button>
+        </div>
+
+        <div id="log" class="log">Ready to diagnose auto-hook issues...\n</div>
+    </div>
+
+    <!-- Load auto-hook -->
+    <script src="js/auto-dot-lookup-hook.js?v=4"></script>
+
+    <script>
+        function log(message, color = '#333') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.style.color = color;
+            div.innerHTML = `[${timestamp}] ${message}`;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function debugAutoHook() {
+            log('🔍 Debugging auto-hook status...', '#0066cc');
+
+            // Check if functions exist
+            if (window.debugDOTLookupHook) {
+                const status = window.debugDOTLookupHook();
+                log('✅ debugDOTLookupHook available', '#28a745');
+                log(`📊 Status: ${JSON.stringify(status)}`, '#666');
+            } else {
+                log('❌ debugDOTLookupHook NOT available', '#dc3545');
+            }
+
+            // Check localStorage hook
+            const setItemStr = localStorage.setItem.toString();
+            if (setItemStr.includes('dotLookupInProgress')) {
+                log('✅ localStorage hook is active with recursion protection', '#28a745');
+            } else {
+                log('❌ localStorage hook may not be properly installed', '#dc3545');
+            }
+
+            // Check current leads with DOT numbers
+            try {
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const leadsWithDOT = leads.filter(lead => lead.dotNumber && lead.dotNumber.trim() !== '');
+
+                log(`📋 Total leads: ${leads.length}`, '#666');
+                log(`🚛 Leads with DOT numbers: ${leadsWithDOT.length}`, '#666');
+
+                leadsWithDOT.forEach((lead, index) => {
+                    if (index < 5) { // Show first 5
+                        const hasState = lead.state && lead.state.trim() !== '';
+                        const hasYears = lead.yearsInBusiness && lead.yearsInBusiness.trim() !== '';
+                        const hasCommodity = lead.commodityHauled && lead.commodityHauled.trim() !== '';
+
+                        const status = hasState && hasYears && hasCommodity ? '✅' : '❌';
+                        log(`  ${status} ${lead.name} (DOT: ${lead.dotNumber}) - State: ${lead.state || 'EMPTY'}`, hasState ? '#28a745' : '#dc3545');
+                    }
+                });
+
+                // Focus on lead 150401
+                const lead150401 = leads.find(l => l.id === '150401');
+                if (lead150401) {
+                    log('🎯 FOCUS: Lead 150401 analysis:', '#0066cc');
+                    log(`   Name: ${lead150401.name}`, '#666');
+                    log(`   DOT: ${lead150401.dotNumber}`, '#666');
+                    log(`   State: "${lead150401.state || 'EMPTY'}"`, lead150401.state ? '#28a745' : '#dc3545');
+                    log(`   Years: "${lead150401.yearsInBusiness || 'EMPTY'}"`, lead150401.yearsInBusiness ? '#28a745' : '#dc3545');
+                    log(`   Commodity: "${lead150401.commodityHauled || 'EMPTY'}"`, lead150401.commodityHauled ? '#28a745' : '#dc3545');
+                }
+
+            } catch (error) {
+                log(`❌ Error reading leads: ${error.message}`, '#dc3545');
+            }
+        }
+
+        function simulateLeadImport() {
+            log('📥 Simulating lead import to test auto-hook...', '#0066cc');
+
+            // Create a test lead
+            const testLead = {
+                id: 'test-' + Date.now(),
+                name: 'TEST TRUCKING COMPANY',
+                dotNumber: '3591601', // Same DOT as lead 150401
+                contact: 'Test Contact',
+                phone: '555-123-4567',
+                stage: 'New',
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                // Get current leads
+                let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+
+                // Add test lead
+                leads.push(testLead);
+
+                log('💾 Saving test lead to localStorage (should trigger auto-hook)...', '#666');
+
+                // This should trigger the auto-hook
+                localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+                log('✅ Test lead saved, auto-hook should process DOT 3591601...', '#28a745');
+
+                // Check after delay
+                setTimeout(() => {
+                    const updatedLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                    const updatedTestLead = updatedLeads.find(l => l.id === testLead.id);
+
+                    if (updatedTestLead) {
+                        log('🔍 Checking test lead after auto-hook processing:', '#0066cc');
+                        log(`   State: "${updatedTestLead.state || 'EMPTY'}"`, updatedTestLead.state ? '#28a745' : '#dc3545');
+                        log(`   Years: "${updatedTestLead.yearsInBusiness || 'EMPTY'}"`, updatedTestLead.yearsInBusiness ? '#28a745' : '#dc3545');
+                        log(`   Commodity: "${updatedTestLead.commodityHauled || 'EMPTY'}"`, updatedTestLead.commodityHauled ? '#28a745' : '#dc3545');
+
+                        if (updatedTestLead.state) {
+                            log('🎉 SUCCESS: Auto-hook processed the test lead!', '#28a745');
+                        } else {
+                            log('❌ FAILURE: Auto-hook did not process the test lead', '#dc3545');
+                        }
+                    }
+                }, 4000);
+
+            } catch (error) {
+                log(`❌ Error in simulation: ${error.message}`, '#dc3545');
+            }
+        }
+
+        function testProcessFunction() {
+            log('🧪 Testing processLeadsForDOTLookup function directly...', '#0066cc');
+
+            // Test if we can call the function directly
+            if (window.forceProcessAllDOTLeads) {
+                log('✅ forceProcessAllDOTLeads function available', '#28a745');
+                log('🎯 Calling forceProcessAllDOTLeads()...', '#666');
+
+                try {
+                    window.forceProcessAllDOTLeads();
+                    log('✅ forceProcessAllDOTLeads() called successfully', '#28a745');
+                    log('⏳ Waiting for processing to complete...', '#666');
+
+                    setTimeout(() => {
+                        log('🔍 Checking results after force processing...', '#0066cc');
+                        debugAutoHook(); // Re-check status
+                    }, 6000);
+
+                } catch (error) {
+                    log(`❌ Error calling forceProcessAllDOTLeads: ${error.message}`, '#dc3545');
+                }
+            } else {
+                log('❌ forceProcessAllDOTLeads function NOT available', '#dc3545');
+            }
+        }
+
+        // Monitor console for auto-hook messages
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+
+            if (message.includes('AUTO DOT') || message.includes('BUILT-IN DOT') || message.includes('processLeadsForDOTLookup')) {
+                log('🔍 CONSOLE: ' + message, '#0066cc');
+            }
+        };
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                debugAutoHook();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

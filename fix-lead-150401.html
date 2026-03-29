@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚛 Fix Lead 150401 DOT Lookup</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; }
+        .button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 6px; cursor: pointer; margin: 10px; font-size: 16px; }
+        .button.success { background: #28a745; }
+        .button.danger { background: #dc3545; }
+        .section { background: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0; }
+        .log { font-family: monospace; font-size: 14px; background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; height: 300px; overflow-y: auto; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .info { color: #0066cc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚛 Fix Lead 150401 DOT Lookup</h1>
+        <p>Lead: <strong>WALTA TRANSPORT LLC HAILEMARIAM HAGOSE</strong> (DOT: 3591601)</p>
+
+        <div class="section">
+            <h3>Quick Fix Actions:</h3>
+            <button class="button success" onclick="manualDOTLookup()">🎯 Manual DOT Lookup for Lead 150401</button>
+            <button class="button" onclick="checkCurrentData()">📋 Check Current Data</button>
+            <button class="button danger" onclick="forcePopulateData()">✏️ Force Populate DOT Data</button>
+        </div>
+
+        <div class="section">
+            <h3>Expected Results:</h3>
+            <p>After running DOT lookup, the lead should have:</p>
+            <ul>
+                <li><strong>State:</strong> IN (green background)</li>
+                <li><strong>Years in Business:</strong> 5-10 years (green background)</li>
+                <li><strong>Commodity Hauled:</strong> General Freight (green background)</li>
+            </ul>
+        </div>
+
+        <div id="log" class="log">Ready to fix lead 150401...\n</div>
+    </div>
+
+    <!-- Load auto-hook script -->
+    <script src="js/auto-dot-lookup-hook.js?v=4"></script>
+
+    <script>
+        function log(message, className = '') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const span = document.createElement('span');
+            span.className = className;
+            span.innerHTML = `[${timestamp}] ${message}\\n`;
+            logDiv.appendChild(span);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Monitor console messages
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            if (message.includes('DOT') || message.includes('BUILT-IN') || message.includes('150401')) {
+                log('🔍 ' + message, 'info');
+            }
+        };
+
+        async function manualDOTLookup() {
+            log('🎯 Triggering manual DOT lookup for lead 150401 with DOT 3591601...', 'info');
+
+            if (window.manualDOTLookupTrigger) {
+                try {
+                    log('📞 Calling manualDOTLookupTrigger(150401, 3591601)...', '');
+                    const result = await window.manualDOTLookupTrigger('150401', '3591601');
+
+                    if (result) {
+                        log('✅ Manual DOT lookup completed successfully!', 'success');
+                        log('📊 Result: ' + JSON.stringify(result), 'success');
+                    } else {
+                        log('⚠️ Manual DOT lookup returned null', 'error');
+                    }
+
+                    // Check results after delay
+                    setTimeout(() => {
+                        checkCurrentData();
+                    }, 3000);
+
+                } catch (error) {
+                    log('❌ Manual DOT lookup error: ' + error.message, 'error');
+                }
+            } else {
+                log('❌ manualDOTLookupTrigger function not available', 'error');
+                log('💡 Auto-hook script may not be loaded', 'error');
+            }
+        }
+
+        function checkCurrentData() {
+            log('📋 Checking current data for lead 150401...', '');
+
+            try {
+                const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                const lead = leads.find(l => l.id === '150401');
+
+                if (lead) {
+                    log('✅ Lead 150401 found:', 'success');
+                    log('   Name: ' + lead.name, '');
+                    log('   DOT: ' + (lead.dotNumber || 'NOT SET'), '');
+                    log('   State: "' + (lead.state || 'EMPTY') + '"', lead.state ? 'success' : 'error');
+                    log('   Years: "' + (lead.yearsInBusiness || 'EMPTY') + '"', lead.yearsInBusiness ? 'success' : 'error');
+                    log('   Commodity: "' + (lead.commodityHauled || 'EMPTY') + '"', lead.commodityHauled ? 'success' : 'error');
+
+                    if (lead.state && lead.yearsInBusiness && lead.commodityHauled) {
+                        log('🎉 SUCCESS: All DOT data is populated!', 'success');
+                        log('💡 Green backgrounds should now appear in the profile', 'success');
+                    } else {
+                        log('❌ DOT data is still missing', 'error');
+                    }
+                } else {
+                    log('❌ Lead 150401 not found in localStorage', 'error');
+                }
+            } catch (error) {
+                log('❌ Error reading localStorage: ' + error.message, 'error');
+            }
+        }
+
+        async function forcePopulateData() {
+            log('✏️ Force populating DOT data for lead 150401...', 'info');
+
+            try {
+                // First test the API directly
+                log('🌐 Testing API for DOT 3591601...', '');
+                const response = await fetch('/api/test-db/3591601');
+                const apiData = await response.json();
+
+                if (apiData.success && apiData.carrier) {
+                    log('✅ API working: ' + apiData.carrier.LEGAL_NAME + ', State: ' + apiData.carrier.PHY_STATE, 'success');
+
+                    // Calculate years from DOT
+                    const dotNum = parseInt(apiData.carrier.DOT_NUMBER);
+                    let years = '';
+                    if (dotNum < 1000000) years = '25+ years';
+                    else if (dotNum < 2000000) years = '15-20 years';
+                    else if (dotNum < 3000000) years = '10-15 years';
+                    else years = '5-10 years';
+
+                    // Force update the lead in localStorage
+                    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                    const leadIndex = leads.findIndex(l => l.id === '150401');
+
+                    if (leadIndex !== -1) {
+                        leads[leadIndex].state = apiData.carrier.PHY_STATE;
+                        leads[leadIndex].yearsInBusiness = years;
+                        leads[leadIndex].commodityHauled = 'General Freight';
+
+                        // Use the protected localStorage save method
+                        window.dotLookupInProgress = true;
+                        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+                        window.dotLookupInProgress = false;
+
+                        log('✅ Manually populated DOT data:', 'success');
+                        log('   State: ' + apiData.carrier.PHY_STATE, 'success');
+                        log('   Years: ' + years, 'success');
+                        log('   Commodity: General Freight', 'success');
+                        log('💡 Profile should now show green backgrounds!', 'success');
+                    } else {
+                        log('❌ Lead 150401 not found for update', 'error');
+                    }
+                } else {
+                    log('❌ API returned no data', 'error');
+                }
+            } catch (error) {
+                log('❌ Force populate error: ' + error.message, 'error');
+            }
+        }
+
+        // Check status on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🔧 Checking auto-hook status...', '');
+
+                if (window.manualDOTLookupTrigger) {
+                    log('✅ Manual trigger function available', 'success');
+                } else {
+                    log('❌ Manual trigger function NOT available', 'error');
+                }
+
+                checkCurrentData();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

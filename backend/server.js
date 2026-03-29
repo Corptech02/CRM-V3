@@ -1,4 +1,4 @@
-require('dotenv').config({ override: true });
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env'), override: true });
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -7,7 +7,90 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 
+// Plaid SDK
+const { PlaidApi, PlaidEnvironments, Configuration, Products, CountryCode } = require('plaid');
+const plaidConfig = new Configuration({
+    basePath: PlaidEnvironments[process.env.PLAID_ENV || 'production'],
+    baseOptions: {
+        headers: {
+            'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID || '',
+            'PLAID-SECRET': process.env.PLAID_SECRET || '',
+        },
+    },
+});
+const plaidClient = new PlaidApi(plaidConfig);
+
 const app = express();
+
+// PDF Conversion Function for server-side processing
+async function convertImageToPDF(imageBuffer, originalFilename) {
+    try {
+        console.log('📄 Starting server-side image to PDF conversion...');
+
+        const { jsPDF } = require('jspdf');
+        const { createCanvas, loadImage } = require('canvas');
+
+        // Create image from buffer
+        const image = await loadImage(imageBuffer);
+
+        // Create new PDF document
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        // Calculate dimensions to fit A4 properly while maintaining aspect ratio
+        const pageWidth = 210; // A4 width in mm
+        const pageHeight = 297; // A4 height in mm
+
+        // Calculate scaling to fit within A4 while maintaining aspect ratio
+        const imgAspectRatio = image.width / image.height;
+        const pageAspectRatio = pageWidth / pageHeight;
+
+        let width, height;
+        if (imgAspectRatio > pageAspectRatio) {
+            // Image is wider than page ratio - fit to width
+            width = pageWidth;
+            height = pageWidth / imgAspectRatio;
+        } else {
+            // Image is taller than page ratio - fit to height
+            height = pageHeight;
+            width = pageHeight * imgAspectRatio;
+        }
+
+        // Center the image on the page
+        const x = (pageWidth - width) / 2;
+        const y = (pageHeight - height) / 2;
+
+        // Convert image buffer to base64 data URL
+        const base64 = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+
+        // Add the image to PDF
+        pdf.addImage(base64, 'PNG', x, y, width, height);
+
+        // Get PDF as buffer
+        const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
+
+        // Generate new filename with .pdf extension
+        const newFilename = originalFilename.replace(/\.(png|jpg|jpeg)$/i, '.pdf');
+
+        console.log(`✅ Server-side PDF conversion complete: ${pdfBuffer.length} bytes`);
+
+        return {
+            success: true,
+            buffer: pdfBuffer,
+            filename: newFilename
+        };
+
+    } catch (error) {
+        console.error('❌ Server-side PDF conversion error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
 const PORT = process.env.PORT || 3001;
 
 // Global sync status tracker
@@ -159,6 +242,12 @@ function initializeDatabase() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Permanently deleted leads — prevents ViciDial sync from re-inserting them
+    db.run(`CREATE TABLE IF NOT EXISTS deleted_leads (
+        id TEXT PRIMARY KEY,
+        deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // Archived leads table
     db.run(`CREATE TABLE IF NOT EXISTS archived_leads (
         id TEXT PRIMARY KEY,
@@ -209,6 +298,14 @@ function initializeDatabase() {
         body TEXT,
         sent_date DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // State generation tracking table — tracks which states have been generated per month
+    db.run(`CREATE TABLE IF NOT EXISTS state_generation_tracking (
+        state TEXT NOT NULL,
+        month_key TEXT NOT NULL,
+        generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (state, month_key)
     )`);
 
     // Quote applications table
@@ -264,6 +361,109 @@ function initializeDatabase() {
         completed_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Plaid bank connections
+    db.run(`CREATE TABLE IF NOT EXISTS plaid_connections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_token TEXT NOT NULL,
+        item_id TEXT UNIQUE NOT NULL,
+        institution_id TEXT,
+        institution_name TEXT,
+        account_id TEXT,
+        account_name TEXT,
+        account_type TEXT,
+        account_subtype TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Commission payment tracking (mark commissions as received)
+    db.run(`CREATE TABLE IF NOT EXISTS commission_payments (
+        id TEXT PRIMARY KEY,
+        policy_id TEXT NOT NULL,
+        policy_number TEXT,
+        client_name TEXT,
+        carrier TEXT,
+        agent TEXT,
+        premium REAL NOT NULL,
+        commission_rate REAL NOT NULL DEFAULT 0.15,
+        commission_amount REAL NOT NULL,
+        payment_date TEXT,
+        payment_method TEXT DEFAULT 'direct_deposit',
+        notes TEXT,
+        marked_paid_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Per-carrier commission rates (overrides default 15%)
+    db.run(`CREATE TABLE IF NOT EXISTS commission_rates (
+        carrier TEXT PRIMARY KEY,
+        rate REAL NOT NULL DEFAULT 0.15,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_by TEXT
+    )`);
+
+    // General ledger — all financial transactions (CSV imports, manual entries)
+    db.run(`CREATE TABLE IF NOT EXISTS financial_transactions (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        description TEXT NOT NULL,
+        amount REAL NOT NULL,
+        category TEXT DEFAULT 'Uncategorized',
+        subcategory TEXT,
+        vendor TEXT,
+        client TEXT,
+        is_reconciled INTEGER DEFAULT 0,
+        notes TEXT,
+        source TEXT DEFAULT 'manual',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Invoices sent to carriers / clients
+    db.run(`CREATE TABLE IF NOT EXISTS invoices (
+        id TEXT PRIMARY KEY,
+        invoice_number TEXT UNIQUE,
+        client_name TEXT NOT NULL,
+        carrier TEXT,
+        policy_id TEXT,
+        subtotal REAL NOT NULL DEFAULT 0,
+        tax_amount REAL NOT NULL DEFAULT 0,
+        total REAL NOT NULL DEFAULT 0,
+        issue_date TEXT,
+        due_date TEXT,
+        paid_date TEXT,
+        status TEXT DEFAULT 'draft',
+        line_items TEXT,
+        notes TEXT,
+        created_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Contractor / agent payment records (1099 tracking)
+    db.run(`CREATE TABLE IF NOT EXISTS contractor_payments (
+        id TEXT PRIMARY KEY,
+        contractor_name TEXT NOT NULL,
+        contractor_type TEXT DEFAULT 'agent',
+        payment_date TEXT NOT NULL,
+        amount REAL NOT NULL,
+        description TEXT,
+        payment_method TEXT DEFAULT 'check',
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Budget entries (monthly targets by category)
+    db.run(`CREATE TABLE IF NOT EXISTS budget_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(year, month, category)
     )`);
 
     console.log('Database tables initialized');
@@ -684,6 +884,7 @@ app.get('/api/policies', (req, res) => {
 
                         // Always update map with newest version (records processed in desc order)
                         if (!policyMap.has(normalizedNumber)) {
+                            policy._clientId = row.client_id; // attach client_id for COI navigation
                             policyMap.set(normalizedNumber, policy);
                             console.log(`✅ SERVER: Added policy ${normalizedNumber} (${policyNumber}) - ${policy.insured_name} (status: ${policy.status || 'none'}) (includeInactive: ${includeInactive})`);
                         } else {
@@ -1383,12 +1584,18 @@ app.post('/api/coi/migrate', (req, res) => {
 
 // Get all leads
 app.get('/api/leads', (req, res) => {
-    db.all('SELECT * FROM leads', (err, rows) => {
+    db.all('SELECT l.* FROM leads l LEFT JOIN deleted_leads d ON l.id = d.id WHERE d.id IS NULL', (err, rows) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-        const leads = rows.map(row => JSON.parse(row.data));
+        const leads = rows.map(row => {
+            const lead = JSON.parse(row.data);
+            // Always expose the DB-level timestamps so reports can filter correctly
+            lead.created_at = row.created_at;
+            lead.updated_at = row.updated_at;
+            return lead;
+        });
         res.json(leads);
     });
 });
@@ -1417,20 +1624,64 @@ app.get('/api/leads/:id', (req, res) => {
 app.post('/api/leads', (req, res) => {
     const lead = req.body;
     const id = lead.id;
-    const data = JSON.stringify(lead);
 
-    db.run(`INSERT INTO leads (id, data) VALUES (?, ?)
-            ON CONFLICT(id) DO UPDATE SET data = ?, updated_at = CURRENT_TIMESTAMP`,
-        [id, data, data],
-        function(err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-                return;
-            }
-            res.json({ id: id, success: true });
+    // Reject if this lead was permanently deleted by a user
+    db.get('SELECT id FROM deleted_leads WHERE id = ?', [id], (delErr, delRow) => {
+        if (delRow) {
+            return res.json({ id: id, success: true, skipped: 'permanently deleted' });
         }
-    );
+        insertOrUpdateLead(id, lead, res);
+    });
 });
+
+function insertOrUpdateLead(id, lead, res) {
+    // Check if lead already exists — if so, merge to protect server-side fields
+    // (premium, callDuration, transcriptText, recordingPath, transcriptWords, etc.)
+    db.get('SELECT data FROM leads WHERE id = ?', [id], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        let merged;
+        if (row) {
+            try {
+                const existing = JSON.parse(row.data);
+                // Fields managed by user actions (PUT) — POST (ViciDial sync) must NEVER overwrite these
+                const USER_MANAGED_FIELDS = new Set([
+                    'stage', 'stageUpdatedAt', 'premium', 'confirmedPremium',
+                    'priority', 'notes', 'assignedTo', 'reachOut', 'appStage',
+                    'callDuration', 'transcriptText', 'transcriptWords',
+                    'recordingPath', 'callTimestamp', 'brokerTracking'
+                ]);
+                // Server data is base; incoming data fills in missing fields only
+                merged = { ...existing };
+                for (const [key, val] of Object.entries(lead)) {
+                    const serverVal = existing[key];
+                    const serverHasValue = serverVal !== '' && serverVal !== null && serverVal !== undefined;
+                    // Never let POST overwrite user-managed fields that already have a server value
+                    if (USER_MANAGED_FIELDS.has(key) && serverHasValue) continue;
+                    const isEmpty = val === '' || val === null || val === undefined;
+                    if (!isEmpty || !serverHasValue) {
+                        merged[key] = val;
+                    }
+                }
+            } catch (e) {
+                merged = lead;
+            }
+        } else {
+            merged = lead;
+        }
+
+        const data = JSON.stringify(merged);
+        db.run(
+            `INSERT INTO leads (id, data) VALUES (?, ?)
+             ON CONFLICT(id) DO UPDATE SET data = ?, updated_at = CURRENT_TIMESTAMP`,
+            [id, data, data],
+            function(saveErr) {
+                if (saveErr) return res.status(500).json({ error: saveErr.message });
+                res.json({ id: id, success: true });
+            }
+        );
+    });
+}
 
 // Update lead (partial update)
 app.put('/api/leads/:id', (req, res) => {
@@ -1452,6 +1703,9 @@ app.put('/api/leads/:id', (req, res) => {
         // Parse existing data and merge with updates
         let existingLead = JSON.parse(row.data);
         let updatedLead = { ...existingLead, ...updates };
+        if (updates.stage === 'app_sent' && !existingLead.appSentAt) {
+            updatedLead.appSentAt = new Date().toISOString();
+        }
         const data = JSON.stringify(updatedLead);
 
         // Save the updated lead
@@ -1477,6 +1731,8 @@ app.delete('/api/leads/:id', (req, res) => {
             res.status(500).json({ error: err.message });
             return;
         }
+        // Permanently record deletion so ViciDial sync can never re-insert
+        db.run('INSERT OR REPLACE INTO deleted_leads (id) VALUES (?)', [id], () => {});
         res.json({ success: true, deleted: this.changes });
     });
 });
@@ -1904,15 +2160,22 @@ app.post('/api/bulk-save', (req, res) => {
         });
     }
 
-    // Save leads
+    // Save leads (skip permanently deleted leads)
     if (leads && leads.length > 0) {
         leads.forEach(lead => {
-            const data = JSON.stringify(lead);
-            db.run(`INSERT INTO leads (id, data) VALUES (?, ?)
-                    ON CONFLICT(id) DO UPDATE SET data = ?, updated_at = CURRENT_TIMESTAMP`,
-                [lead.id, data, data],
-                checkComplete
-            );
+            db.get('SELECT id FROM deleted_leads WHERE id = ?', [lead.id], (delErr, delRow) => {
+                if (delRow) {
+                    // This lead was permanently deleted — do not re-insert
+                    checkComplete();
+                    return;
+                }
+                const data = JSON.stringify(lead);
+                db.run(`INSERT INTO leads (id, data) VALUES (?, ?)
+                        ON CONFLICT(id) DO UPDATE SET data = ?, updated_at = CURRENT_TIMESTAMP`,
+                    [lead.id, data, data],
+                    checkComplete
+                );
+            });
         });
     }
 
@@ -2167,156 +2430,128 @@ app.get('/api/vicidial/lists', async (req, res) => {
     try {
         console.log('🔍 Getting Vicidial lists directly from ViciDial API...');
 
-        const { spawn } = require('child_process');
-        const fs = require('fs');
-        const path = require('path');
+        const https = require('https');
+        const querystring = require('querystring');
 
-        // Create Python script to fetch ViciDial lists
-        const pythonScript = `
-import requests
-import urllib3
-import json
-import sys
+        const VICI_HOST = '204.13.233.29';
+        const VICI_USER = '6666';
+        const VICI_PASS = 'corp06';
+        const KNOWN_LISTS = ['998', '999', '1000', '1001', '1002', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025'];
 
-# Disable SSL warnings
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        // Fetch a single list's info via Node.js HTTPS (no Python subprocess needed)
+        function fetchListInfo(listId) {
+            return new Promise((resolve) => {
+                const postData = querystring.stringify({
+                    source: 'vanguard_crm',
+                    user: VICI_USER,
+                    pass: VICI_PASS,
+                    function: 'list_info',
+                    list_id: listId
+                });
 
-# ViciDial Configuration
-VICIDIAL_HOST = "204.13.233.29"
-VICIDIAL_USER = "6666"
-VICIDIAL_PASS = "corp06"
-VICIDIAL_SOURCE = "vanguard_crm"
+                const options = {
+                    hostname: VICI_HOST,
+                    port: 443,
+                    path: '/vicidial/non_agent_api.php',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Content-Length': Buffer.byteLength(postData)
+                    },
+                    rejectUnauthorized: false,
+                    timeout: 8000
+                };
 
-def get_vicidial_lists():
-    """Get all ViciDial lists"""
-    api_url = f"https://{VICIDIAL_HOST}/vicidial/non_agent_api.php"
-
-    # Get list of all lists
-    lists_params = {
-        "source": VICIDIAL_SOURCE,
-        "user": VICIDIAL_USER,
-        "pass": VICIDIAL_PASS,
-        "function": "list_custom_fields"
-    }
-
-    all_lists = []
-
-    # Check specific lists that we know exist
-    known_lists = ["998", "999", "1000", "1001", "1002", "1005", "1006", "1007", "1008", "1009"]
-
-    for list_id in known_lists:
-        try:
-            params = {
-                "source": VICIDIAL_SOURCE,
-                "user": VICIDIAL_USER,
-                "pass": VICIDIAL_PASS,
-                "function": "list_info",
-                "list_id": list_id
-            }
-
-            response = requests.post(api_url, data=params, timeout=15, verify=False)
-
-            if response.status_code == 200:
-                data = response.text.strip()
-                if data and "|" in data:
-                    parts = data.split("|")
-                    if len(parts) >= 4:
-                        list_info = {
-                            "list_id": parts[0],
-                            "list_name": parts[1] if len(parts[1]) > 0 else f"List {parts[0]}",
-                            "leads": int(parts[7]) if len(parts) > 7 and parts[7].isdigit() else 0,
-                            "active": parts[3] if len(parts) > 3 else "Y"
+                const reqHttp = https.request(options, (resp) => {
+                    let data = '';
+                    resp.on('data', (chunk) => { data += chunk; });
+                    resp.on('end', () => {
+                        const text = data.trim();
+                        if (text && text.includes('|')) {
+                            const parts = text.split('|');
+                            if (parts.length >= 4) {
+                                resolve({
+                                    list_id: parts[0],
+                                    list_name: parts[1] || `List ${parts[0]}`,
+                                    leads: (parts[7] && /^\d+$/.test(parts[7])) ? parseInt(parts[7]) : 0,
+                                    active: parts[3] || 'Y'
+                                });
+                                return;
+                            }
                         }
-                        all_lists.append(list_info)
-
-        except Exception as e:
-            # Skip failed lists
-            pass
-
-    return all_lists
-
-if __name__ == "__main__":
-    lists = get_vicidial_lists()
-    print(json.dumps(lists))
-`;
-
-        // Write Python script to temp file
-        const tempScript = `/tmp/get_vicidial_lists_${Date.now()}.py`;
-        fs.writeFileSync(tempScript, pythonScript);
-
-        // Execute Python script
-        const python = spawn('python3', [tempScript]);
-
-        let output = '';
-        let error = '';
-
-        python.stdout.on('data', (data) => {
-            output += data.toString();
-        });
-
-        python.stderr.on('data', (data) => {
-            error += data.toString();
-        });
-
-        python.on('close', (code) => {
-            // Clean up temp file
-            try {
-                fs.unlinkSync(tempScript);
-            } catch (e) {
-                // Ignore cleanup errors
-            }
-
-            if (code === 0) {
-                try {
-                    const lists = JSON.parse(output.trim());
-                    console.log(`📋 Retrieved ${lists.length} ViciDial lists directly from API`);
-
-                    res.json({
-                        success: true,
-                        lists: lists
+                        resolve(null);
                     });
-                } catch (parseError) {
-                    console.error('Error parsing ViciDial lists response:', parseError);
-                    console.log('Raw output:', output);
-                    res.json({
-                        success: false,
-                        error: 'Failed to parse ViciDial response',
-                        lists: []
-                    });
-                }
-            } else {
-                console.error('Python script failed:', error);
-                res.json({
-                    success: false,
-                    error: `Failed to fetch ViciDial lists: ${error}`,
-                    lists: []
                 });
-            }
-        });
 
-        // Set timeout for the Python script
-        setTimeout(() => {
-            if (!res.headersSent) {
-                python.kill();
-                res.json({
-                    success: false,
-                    error: 'Timeout fetching ViciDial lists',
-                    lists: []
-                });
-            }
-        }, 30000);
+                reqHttp.on('error', () => resolve(null));
+                reqHttp.on('timeout', () => { reqHttp.destroy(); resolve(null); });
+                reqHttp.write(postData);
+                reqHttp.end();
+            });
+        }
+
+        // Fetch all lists in parallel
+        const results = await Promise.all(KNOWN_LISTS.map(fetchListInfo));
+        const lists = results
+            .filter(Boolean)
+            .sort((a, b) => parseInt(a.list_id) - parseInt(b.list_id));
+
+        console.log(`📋 Retrieved ${lists.length} ViciDial lists`);
+        res.json({ success: true, lists });
 
     } catch (error) {
         console.error('Error getting Vicidial lists:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            lists: []
-        });
+        res.status(500).json({ success: false, error: error.message, lists: [] });
     }
 });
 
 // Test Vicidial connection endpoint
+// ViciDial Agent Performance Report proxy
+app.get('/api/vicidial/performance-report', async (req, res) => {
+    const axios = require('axios');
+    const VICI_HOST = '204.13.233.29';
+    const VICI_USER = '6666';
+    const VICI_PASS = 'corp06';
+
+    const today = new Date().toISOString().slice(0, 10);
+    const queryDate  = req.query.query_date  || today;
+    const queryTime  = req.query.query_time  || '00:00:00';
+    const endDate    = req.query.end_date    || today;
+    const endTime    = req.query.end_time    || '23:59:59';
+    const users      = req.query.users       || '--ALL--';
+    const shift      = req.query.shift       || '--';
+
+    // Build query string — always fetch all campaigns/user groups
+    const params = new URLSearchParams({
+        DB: '0',
+        query_date: queryDate,
+        query_time: queryTime,
+        end_date: endDate,
+        end_time: endTime,
+        report_display_type: 'TEXT',
+        shift,
+        SUBMIT: 'SUBMIT'
+    });
+    params.append('group[]',      '--ALL--');
+    params.append('user_group[]', '--ALL--');
+    users.split(',').map(u => u.trim()).filter(Boolean).forEach(u => params.append('users[]', u));
+
+    const url = `http://${VICI_HOST}/vicidial/AST_agent_performance_detail.php?${params}`;
+    console.log('📊 Fetching ViciDial performance report:', url);
+
+    try {
+        const response = await axios.get(url, {
+            auth: { username: VICI_USER, password: VICI_PASS },
+            timeout: 20000,
+            responseType: 'text'
+        });
+        res.json({ success: true, html: response.data });
+    } catch (error) {
+        console.error('❌ ViciDial performance report error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.get('/api/vicidial/test', (req, res) => {
     console.log('🔍 Testing Vicidial connection...');
 
@@ -2417,6 +2652,16 @@ app.post('/api/vicidial/quick-import', async (req, res) => {
 
         console.log(`⚡ Processing ${selectedLeads.length} selected leads for quick import`);
         console.log(`📋 Selected lead IDs:`, selectedLeads.map(l => l.id || l.name));
+
+        // Clear tombstones for explicitly user-selected leads — intentional import overrides deletion
+        const leadIds = selectedLeads.map(l => String(l.id || l.leadId || '')).filter(Boolean);
+        if (leadIds.length > 0) {
+            const placeholders = leadIds.map(() => '?').join(',');
+            await new Promise(resolve => {
+                db.run(`DELETE FROM deleted_leads WHERE id IN (${placeholders})`, leadIds, () => resolve());
+            });
+            console.log(`🔓 Cleared tombstones for ${leadIds.length} explicitly imported leads`);
+        }
 
         // Use the selective sync Python script with full extraction logic
         console.log('🐍 Running selective ViciDial sync with full extraction...');
@@ -3119,7 +3364,8 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
                 // PRESERVE EXISTING STAGE - don't reset to "new" if lead already has a stage
                 stage: existingLead ? (existingLead.stage || "new") : "new",
                 status: existingLead ? (existingLead.status || "hot_lead") : "hot_lead",
-                assignedTo: assignedAgent, // Use list-based assignment
+                // Preserve manual reassignment — only use list-based agent for new leads
+                assignedTo: existingLead ? (existingLead.assignedTo || assignedAgent) : assignedAgent,
                 // PRESERVE creation date for existing leads
                 created: existingLead ? (existingLead.created || existingLead.createdAt) : new Date().toLocaleDateString("en-US", {
                     month: "numeric",
@@ -3131,7 +3377,7 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
                 premium: lead.calculatedPremium || (existingLead ? existingLead.premium : 0),
                 dotNumber: lead.dotNumber || (existingLead ? existingLead.dotNumber : ''),
                 mcNumber: lead.mcNumber || (existingLead ? existingLead.mcNumber : ''),
-                yearsInBusiness: existingLead ? (existingLead.yearsInBusiness || "Unknown") : "Unknown",
+                yearsInBusiness: existingLead ? (existingLead.yearsInBusiness && existingLead.yearsInBusiness !== 'Unknown' ? existingLead.yearsInBusiness : '') : '',
                 fleetSize: lead.fleetSize || (existingLead ? existingLead.fleetSize : "Unknown"),
                 insuranceCompany: lead.insuranceCompany || (existingLead ? existingLead.insuranceCompany : ""),
                 address: "",
@@ -3176,7 +3422,39 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
                 structuredData: transcriptionData.structured_data || (existingLead ? existingLead.structuredData : {}) || {},
                 // PRESERVE original creation timestamp
                 createdAt: existingLead ? (existingLead.createdAt || new Date().toISOString()) : new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                // Build reachOut with call log so talk time bar shows correctly
+                reachOut: (() => {
+                    const existing = existingLead?.reachOut || {};
+                    const existingLogs = Array.isArray(existing.callLogs) ? existing.callLogs : [];
+                    // Only add a ViciDial call log if none already present from this source
+                    const hasVDLog = existingLogs.some(l => l.notes && l.notes.includes('ViciDial'));
+                    const callSeconds = parseInt(lead.length_in_sec) || 0;
+                    const fmtDur = (s) => {
+                        if (s <= 0) return '< 1 min';
+                        if (s < 60) return `${s} sec`;
+                        const m = Math.floor(s / 60), r = s % 60;
+                        return r > 0 ? `${m} min ${r} sec` : `${m} min`;
+                    };
+                    const newLog = hasVDLog ? null : {
+                        timestamp: lead.last_local_call_time
+                            ? new Date(lead.last_local_call_time).toISOString()
+                            : new Date().toISOString(),
+                        connected: true,
+                        duration: fmtDur(callSeconds),
+                        leftVoicemail: false,
+                        notes: `ViciDial SALE call${callSeconds > 0 ? ` — ${fmtDur(callSeconds)}` : ''}`
+                    };
+                    const logs = newLog ? [...existingLogs, newLog] : existingLogs;
+                    return {
+                        callAttempts: Math.max(existing.callAttempts || 0, logs.length),
+                        callsConnected: Math.max(existing.callsConnected || 0, logs.filter(l => l.connected).length),
+                        emailCount: existing.emailCount || 0,
+                        textCount: existing.textCount || 0,
+                        voicemailCount: existing.voicemailCount || 0,
+                        callLogs: logs
+                    };
+                })()
             };
 
             // Save to database (using await for sequential processing)
@@ -3205,23 +3483,35 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
             });
 
             await new Promise((resolve, reject) => {
-                db.run(`INSERT INTO leads (id, data, created_at, updated_at)
-                        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        ON CONFLICT(id) DO UPDATE SET
-                        data = excluded.data,
-                        updated_at = CURRENT_TIMESTAMP`,
-                    [leadId, data],
-                    function(err) {
+                // Skip permanently deleted leads
+                db.get('SELECT id FROM deleted_leads WHERE id = ?', [leadId], (delErr, delRow) => {
+                    if (delRow) {
+                        console.log(`🚫 Skipping deleted lead ${leadId} during ViciDial sync`);
                         processed++;
-                        if (err) {
-                            console.error(`Error saving lead ${leadId}:`, err);
-                            errors.push({ leadId: leadId, error: err.message });
-                            syncStatus.errors.push({ leadId: leadId, error: err.message });
-                        } else {
-                            imported++;
-                            console.log(`✅ Lead ${leadId} (${leadToSave.name}) saved successfully to database`);
-                            console.log(`📊 Database stats: ${imported} imported so far`);
-                        }
+                        syncStatus.processedLeads = processed;
+                        const progressPercentage = 50 + Math.floor((processed / selectedLeads.length) * 45);
+                        syncStatus.percentage = progressPercentage;
+                        syncStatus.message = `Processing lead ${processed} of ${selectedLeads.length}: ${leadToSave.name}`;
+                        resolve();
+                        return;
+                    }
+                    db.run(`INSERT INTO leads (id, data, created_at, updated_at)
+                            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            ON CONFLICT(id) DO UPDATE SET
+                            data = excluded.data,
+                            updated_at = CURRENT_TIMESTAMP`,
+                        [leadId, data],
+                        function(err) {
+                            processed++;
+                            if (err) {
+                                console.error(`Error saving lead ${leadId}:`, err);
+                                errors.push({ leadId: leadId, error: err.message });
+                                syncStatus.errors.push({ leadId: leadId, error: err.message });
+                            } else {
+                                imported++;
+                                console.log(`✅ Lead ${leadId} (${leadToSave.name}) saved successfully to database`);
+                                console.log(`📊 Database stats: ${imported} imported so far`);
+                            }
 
                         // Update progress for each lead
                         syncStatus.processedLeads = processed;
@@ -3232,6 +3522,7 @@ app.post('/api/vicidial/sync-sales', async (req, res) => {
                         resolve();
                     }
                 );
+                }); // closes db.get deleted_leads check
             });
 
         } catch (error) {
@@ -3306,6 +3597,7 @@ app.get('/api/matched-carriers-leads', async (req, res) => {
         if (req.query.min_fleet) params.append('min_fleet', req.query.min_fleet);
         if (req.query.max_fleet) params.append('max_fleet', req.query.max_fleet);
         if (req.query.insurance_companies) params.append('insurance_companies', req.query.insurance_companies);
+        if (req.query.exclude_insurance_companies) params.append('exclude_insurance_companies', req.query.exclude_insurance_companies);
 
         const targetUrl = `http://localhost:5002/api/matched-carriers-leads?${params}`;
         console.log('🔗 Proxying to:', targetUrl);
@@ -3358,7 +3650,9 @@ app.get('/api/carriers/expiring', async (req, res) => {
             unitTypes,
             insuranceCompanies,
             insurance_companies,
+            exclude_insurance_companies,
             commodities,
+            safetyMinPercent,
             safetyMaxPercent,
             requireInspections,
             limit = 50000
@@ -3496,6 +3790,25 @@ app.get('/api/carriers/expiring', async (req, res) => {
             }
         }
 
+        // Add insurance company exclusion filter for "Others" option
+        if (exclude_insurance_companies && exclude_insurance_companies.length > 0) {
+            // Split comma-separated insurance companies to exclude
+            const excludeCompanies = exclude_insurance_companies.split(',').map(c => c.trim()).filter(c => c);
+            if (excludeCompanies.length > 0) {
+                // Use NOT LIKE for exclusion - exclude carriers with these insurance companies
+                const notLikeConditions = excludeCompanies.map(() => 'UPPER(TRIM(ip.INSURANCE_COMPANY)) NOT LIKE ?').join(' AND ');
+                query += ` AND (${notLikeConditions})`;
+
+                // Create LIKE patterns with % wildcards for exclusion matching
+                excludeCompanies.forEach(company => {
+                    const pattern = `%${company.toUpperCase()}%`;
+                    params.push(pattern);
+                });
+
+                console.log(`🚫 Insurance exclusion filter applied: Excluding ${excludeCompanies.join(', ')}`);
+            }
+        }
+
         // Add commodities filter
         if (commodities && commodities !== '[]') {
             try {
@@ -3610,7 +3923,15 @@ app.get('/api/carriers/expiring', async (req, res) => {
             params.push(status);
         }
 
-        // Add safety percentage filter (OOS rate filter)
+        // Add safety percentage filters (OOS rate filters)
+        if (safetyMinPercent) {
+            const minPercent = parseInt(safetyMinPercent);
+            if (minPercent >= 0 && minPercent <= 100) {
+                // Only include carriers with OOS rate >= minPercent
+                // We'll calculate this using inspection data later in processing since it requires subquery
+                console.log(`🛡️ Safety filter: Min OOS rate ${minPercent}%`);
+            }
+        }
         if (safetyMaxPercent) {
             const maxPercent = parseInt(safetyMaxPercent);
             if (maxPercent >= 0 && maxPercent <= 100) {
@@ -3951,20 +4272,41 @@ app.get('/api/carriers/expiring', async (req, res) => {
             // Process carriers and return response
             let carriers = await processCarriers();
 
-            // Apply safety percentage filter if specified (post-processing since it needs calculated OOS rates)
-            if (safetyMaxPercent) {
-                const maxPercent = parseInt(safetyMaxPercent);
-                if (maxPercent >= 0 && maxPercent <= 100) {
+            // Apply safety percentage filters if specified (post-processing since it needs calculated OOS rates)
+            if (safetyMinPercent || safetyMaxPercent) {
+                const minPercent = safetyMinPercent ? parseInt(safetyMinPercent) : 0;
+                const maxPercent = safetyMaxPercent ? parseInt(safetyMaxPercent) : 100;
+
+                if ((minPercent >= 0 && minPercent <= 100) || (maxPercent >= 0 && maxPercent <= 100)) {
                     const beforeCount = carriers.length;
                     carriers = carriers.filter(carrier => {
+                        // If carrier has no inspections, include them UNLESS "Require Inspections" is checked
                         if (carrier.total_inspections === 0) {
-                            // If no inspections, consider as 0% OOS rate (safest assumption)
-                            return 0 <= maxPercent;
+                            // Always include carriers with no inspections when safety filters are applied
+                            // (they will be filtered out separately if "Require Inspections" is checked)
+                            return true;
                         }
+
+                        // For carriers with inspections, calculate OOS rate and apply safety filters
                         const oosRate = Math.round((carrier.oos_inspections / carrier.total_inspections) * 100);
-                        return oosRate <= maxPercent;
+
+                        // Check both min and max range
+                        const meetsMin = !safetyMinPercent || (oosRate >= minPercent);
+                        const meetsMax = !safetyMaxPercent || (oosRate <= maxPercent);
+
+                        return meetsMin && meetsMax;
                     });
-                    console.log(`🛡️ Safety filter applied: ${beforeCount} → ${carriers.length} carriers (removed ${beforeCount - carriers.length} with OOS > ${maxPercent}%)`);
+
+                    let filterDescription = '';
+                    if (safetyMinPercent && safetyMaxPercent) {
+                        filterDescription = `OOS rate ${minPercent}%-${maxPercent}% (carriers with no inspections included)`;
+                    } else if (safetyMinPercent) {
+                        filterDescription = `OOS rate >= ${minPercent}% (carriers with no inspections included)`;
+                    } else if (safetyMaxPercent) {
+                        filterDescription = `OOS rate <= ${maxPercent}% (carriers with no inspections included)`;
+                    }
+
+                    console.log(`🛡️ Safety filter applied: ${beforeCount} → ${carriers.length} carriers (${filterDescription}, removed ${beforeCount - carriers.length})`);
                 }
             }
 
@@ -5147,20 +5489,55 @@ app.post('/api/coi/send-request', (req, res, next) => {
             }
         });
 
-        // Prepare attachments from uploaded files
+        // Prepare attachments from uploaded files with PDF conversion
         const attachments = [];
         if (req.files && req.files.length > 0) {
             console.log(`📎 Processing ${req.files.length} uploaded files`);
 
-            req.files.forEach((file, index) => {
-                attachments.push({
-                    filename: file.originalname || `document_${index + 1}`,
-                    content: file.buffer,
-                    contentType: file.mimetype
-                });
+            for (const [index, file] of req.files.entries()) {
+                try {
+                    // Check if file is a PNG/JPG image that should be converted to PDF
+                    if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg') {
+                        console.log(`🔄 Converting ${file.originalname} to PDF...`);
 
-                console.log(`📎 Added attachment: ${file.originalname} (${file.buffer.length} bytes, ${file.mimetype})`);
-            });
+                        const pdfResult = await convertImageToPDF(file.buffer, file.originalname);
+                        if (pdfResult.success) {
+                            attachments.push({
+                                filename: pdfResult.filename,
+                                content: pdfResult.buffer,
+                                contentType: 'application/pdf'
+                            });
+                            console.log(`📎 Added PDF attachment: ${pdfResult.filename} (${pdfResult.buffer.length} bytes)`);
+                        } else {
+                            // Fallback to original file if conversion fails
+                            console.log(`⚠️ PDF conversion failed, using original: ${pdfResult.error}`);
+                            attachments.push({
+                                filename: file.originalname || `document_${index + 1}`,
+                                content: file.buffer,
+                                contentType: file.mimetype
+                            });
+                            console.log(`📎 Added original attachment: ${file.originalname} (${file.buffer.length} bytes, ${file.mimetype})`);
+                        }
+                    } else {
+                        // Non-image files are added as-is
+                        attachments.push({
+                            filename: file.originalname || `document_${index + 1}`,
+                            content: file.buffer,
+                            contentType: file.mimetype
+                        });
+                        console.log(`📎 Added attachment: ${file.originalname} (${file.buffer.length} bytes, ${file.mimetype})`);
+                    }
+                } catch (error) {
+                    console.error(`❌ Error processing file ${file.originalname}:`, error);
+                    // Fallback to original file
+                    attachments.push({
+                        filename: file.originalname || `document_${index + 1}`,
+                        content: file.buffer,
+                        contentType: file.mimetype
+                    });
+                    console.log(`📎 Added fallback attachment: ${file.originalname} (${file.buffer.length} bytes, ${file.mimetype})`);
+                }
+            }
         }
 
         // Add server files if specified
@@ -8725,12 +9102,13 @@ app.post('/api/callbacks', (req, res) => {
 });
 
 
-// Complete/delete scheduled callback
+// Complete/delete scheduled callback — matches by callback_id string OR integer id
 app.delete('/api/callbacks/:callback_id', (req, res) => {
     const { callback_id } = req.params;
 
-    db.run(`UPDATE scheduled_callbacks SET completed = 1 WHERE callback_id = ?`,
-        [callback_id],
+    db.run(
+        `UPDATE scheduled_callbacks SET completed = 1 WHERE callback_id = ? OR CAST(id AS TEXT) = ?`,
+        [callback_id, callback_id],
         function(err) {
             if (err) {
                 console.error('Error completing callback:', err);
@@ -8740,7 +9118,7 @@ app.delete('/api/callbacks/:callback_id', (req, res) => {
                 });
             }
 
-            console.log('✅ Callback completed:', callback_id);
+            console.log('✅ Callback completed/deleted:', callback_id, '— rows affected:', this.changes);
             res.json({
                 success: true,
                 changes: this.changes
@@ -8824,19 +9202,24 @@ app.get('/api/callbacks', (req, res) => {
             }
         );
     } else {
-        // Get all active (non-completed) callbacks
+        // Get all active (non-completed) callbacks with lead names and assigned agents
         db.all(
-            'SELECT * FROM scheduled_callbacks WHERE completed = 0 ORDER BY date_time ASC',
+            `SELECT
+                sc.*,
+                json_extract(l.data, '$.name') as lead_name,
+                json_extract(l.data, '$.phoneNumber') as lead_phone,
+                json_extract(l.data, '$.assignedTo') as assigned_agent
+             FROM scheduled_callbacks sc
+             LEFT JOIN leads l ON sc.lead_id = l.id
+             WHERE sc.completed = 0
+             ORDER BY sc.date_time ASC`,
             (err, rows) => {
                 if (err) {
                     console.error('Error fetching all callbacks:', err);
                     res.status(500).json({ error: err.message });
                     return;
                 }
-                res.json({
-                    success: true,
-                    callbacks: rows || []
-                });
+                res.json(rows || []);
             }
         );
     }
@@ -8999,6 +9382,211 @@ app.post('/api/notifications/create', (req, res) => {
         console.error('Error creating notification:', err);
         res.status(500).json({ error: err.message });
     }
+});
+
+// Calendar Events API endpoints
+app.get('/api/calendar-events', (req, res) => {
+    const userId = req.query.userId;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    db.all(`
+        SELECT * FROM calendar_events
+        WHERE created_by = ?
+        ORDER BY date ASC, time ASC
+    `, [userId], (err, events) => {
+        if (err) {
+            console.error('Error fetching calendar events:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        res.json(events);
+    });
+});
+
+app.post('/api/calendar-events', (req, res) => {
+    const { title, date, time, description, userId } = req.body;
+
+    if (!title || !date || !userId) {
+        return res.status(400).json({ error: 'Title, date, and user ID are required' });
+    }
+
+    const stmt = db.prepare(`
+        INSERT INTO calendar_events (title, date, time, description, created_by)
+        VALUES (?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(title, date, time || null, description || null, userId, function(err) {
+        if (err) {
+            console.error('Error creating calendar event:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        const newEvent = {
+            id: this.lastID,
+            title,
+            date,
+            time,
+            description,
+            created_by: userId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        console.log(`📅 Created calendar event: ${title} on ${date} for user ${userId}`);
+        res.json(newEvent);
+    });
+
+    stmt.finalize();
+});
+
+app.put('/api/calendar-events/:id', (req, res) => {
+    const eventId = req.params.id;
+    const { title, date, time, description, userId } = req.body;
+
+    if (!title || !date || !userId) {
+        return res.status(400).json({ error: 'Title, date, and user ID are required' });
+    }
+
+    const stmt = db.prepare(`
+        UPDATE calendar_events
+        SET title = ?, date = ?, time = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND created_by = ?
+    `);
+
+    stmt.run(title, date, time || null, description || null, eventId, userId, function(err) {
+        if (err) {
+            console.error('Error updating calendar event:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (this.changes === 0) {
+            res.status(404).json({ error: 'Event not found or access denied' });
+            return;
+        }
+
+        console.log(`📅 Updated calendar event ${eventId} for user ${userId}`);
+        res.json({ success: true });
+    });
+
+    stmt.finalize();
+});
+
+app.delete('/api/calendar-events/:id', (req, res) => {
+    const eventId = req.params.id;
+    const userId = req.query.userId;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const stmt = db.prepare(`
+        DELETE FROM calendar_events
+        WHERE id = ? AND created_by = ?
+    `);
+
+    stmt.run(eventId, userId, function(err) {
+        if (err) {
+            console.error('Error deleting calendar event:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (this.changes === 0) {
+            res.status(404).json({ error: 'Event not found or access denied' });
+            return;
+        }
+
+        console.log(`📅 Deleted calendar event ${eventId} for user ${userId}`);
+        res.json({ success: true });
+    });
+
+    stmt.finalize();
+});
+
+// ===== TODO SYNC ENDPOINTS FOR NOTIFICATIONS =====
+
+// Sync todos to backend for notification tracking
+app.post('/api/sync-todos', (req, res) => {
+    const { userId, todos } = req.body;
+
+    if (!userId || !Array.isArray(todos)) {
+        return res.status(400).json({ error: 'User ID and todos array are required' });
+    }
+
+    console.log(`📋 Syncing ${todos.length} todos for user ${userId}`);
+
+    // Clear existing tracked todos for this user first
+    db.run(`DELETE FROM tracked_todos WHERE user_id = ?`, [userId], (err) => {
+        if (err) {
+            console.error('Error clearing old todos:', err);
+            return res.status(500).json({ error: err.message });
+        }
+
+        // Insert new todos that have target dates
+        const stmt = db.prepare(`
+            INSERT INTO tracked_todos (id, user_id, text, target_date, completed, todo_type, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        let insertCount = 0;
+        const todosWithDates = todos.filter(todo => todo.targetDate && todo.targetDate !== todo.date);
+
+        todosWithDates.forEach(todo => {
+            stmt.run(
+                todo.id,
+                userId,
+                todo.text,
+                todo.targetDate,
+                todo.completed ? 1 : 0,
+                'personal', // Could be extended to support agency todos
+                'manual'
+            );
+            insertCount++;
+        });
+
+        stmt.finalize((err) => {
+            if (err) {
+                console.error('Error inserting todos:', err);
+                return res.status(500).json({ error: err.message });
+            }
+
+            console.log(`✅ Synced ${insertCount} todos with dates for notifications`);
+            res.json({
+                success: true,
+                syncedCount: insertCount,
+                totalTodos: todos.length
+            });
+        });
+    });
+});
+
+// Get tracked todos for a user
+app.get('/api/tracked-todos', (req, res) => {
+    const userId = req.query.userId;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    db.all(`
+        SELECT * FROM tracked_todos
+        WHERE user_id = ?
+        ORDER BY target_date ASC
+    `, [userId], (err, todos) => {
+        if (err) {
+            console.error('Error fetching tracked todos:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        res.json(todos);
+    });
 });
 
 // Simple test endpoint for DB-V3
@@ -9305,6 +9893,1259 @@ function extractYearFromVIN(vin) {
     };
     return yearCodes[yearCode] || '';
 }
+
+// Placeholder Status API Endpoints
+app.post('/api/placeholder-status', (req, res) => {
+    const { leadId, carrier, status, timestamp } = req.body;
+
+    if (!leadId || !carrier || !status) {
+        return res.status(400).json({
+            success: false,
+            error: 'Missing required fields: leadId, carrier, status'
+        });
+    }
+
+    console.log(`💾 Saving placeholder status: ${carrier} = ${status} for lead ${leadId}`);
+
+    const sql = `INSERT OR REPLACE INTO placeholder_status (lead_id, carrier, status, timestamp)
+                 VALUES (?, ?, ?, ?)`;
+
+    db.run(sql, [leadId, carrier, status, timestamp || new Date().toISOString()], function(err) {
+        if (err) {
+            console.error('Error saving placeholder status:', err);
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to save placeholder status'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Placeholder status saved for ${carrier}`,
+            data: { leadId, carrier, status, timestamp }
+        });
+    });
+});
+
+app.get('/api/placeholder-status/:leadId', (req, res) => {
+    const { leadId } = req.params;
+
+    if (!leadId) {
+        return res.status(400).json({
+            success: false,
+            error: 'Lead ID is required'
+        });
+    }
+
+    console.log(`📋 Loading placeholder statuses for lead ${leadId}`);
+
+    const sql = `SELECT * FROM placeholder_status WHERE lead_id = ?`;
+
+    db.all(sql, [leadId], (err, rows) => {
+        if (err) {
+            console.error('Error loading placeholder statuses:', err);
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to load placeholder statuses'
+            });
+        }
+
+        // Convert rows to object keyed by carrier name
+        const statuses = {};
+        rows.forEach(row => {
+            statuses[row.carrier] = {
+                status: row.status,
+                timestamp: row.timestamp
+            };
+        });
+
+        res.json({
+            success: true,
+            leadId: leadId,
+            statuses: statuses,
+            count: rows.length
+        });
+    });
+});
+
+// Create placeholder_status table if it doesn't exist
+db.run(`CREATE TABLE IF NOT EXISTS placeholder_status (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lead_id TEXT NOT NULL,
+    carrier TEXT NOT NULL,
+    status TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    UNIQUE(lead_id, carrier)
+)`, (err) => {
+    if (err) {
+        console.error('Error creating placeholder_status table:', err);
+    } else {
+        console.log('✅ Placeholder status table ready');
+    }
+});
+
+// Transcribe a single recording on demand
+app.post('/api/transcribe-recording', async (req, res) => {
+    const { leadId, recordingPath } = req.body;
+    if (!leadId || !recordingPath) {
+        return res.status(400).json({ error: 'leadId and recordingPath required' });
+    }
+
+    // Build absolute path from the URL path (e.g. /recordings/recording_123.mp3)
+    const absolutePath = path.join(__dirname, '..', recordingPath);
+    if (!fs.existsSync(absolutePath)) {
+        return res.status(404).json({ error: 'Recording file not found: ' + absolutePath });
+    }
+
+    try {
+        const { execFile } = require('child_process');
+        const scriptPath = path.join(__dirname, '..', 'backend', 'transcribe-single.py');
+
+        const result = await new Promise((resolve, reject) => {
+            execFile('python3', [scriptPath, absolutePath], { timeout: 120000 }, (err, stdout, stderr) => {
+                // Always try to parse stdout first — Python outputs JSON even on handled errors
+                if (stdout && stdout.trim()) {
+                    try { return resolve(JSON.parse(stdout)); } catch (e) {}
+                }
+                if (err) return reject(new Error(stderr || err.message));
+                reject(new Error('No output from transcription script'));
+            });
+        });
+
+        if (result.transcript) {
+            // Save transcript into the JSON data column
+            await new Promise((resolve) => {
+                db.get('SELECT data FROM leads WHERE id = ?', [leadId], (err, row) => {
+                    if (err || !row) return resolve();
+                    try {
+                        const leadData = JSON.parse(row.data);
+                        leadData.transcriptText = result.transcript;
+                        if (result.words) leadData.transcriptWords = result.words;
+                        db.run(
+                            'UPDATE leads SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                            [JSON.stringify(leadData), leadId],
+                            resolve
+                        );
+                    } catch (e) { resolve(); }
+                });
+            });
+        }
+
+        res.json(result);
+    } catch (err) {
+        console.error('Transcription error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// PLAID BANK INTEGRATION
+// ============================================================
+
+// Helper: get the stored Plaid access token (single-account setup)
+function getPlaidConnection() {
+    return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM plaid_connections ORDER BY created_at DESC LIMIT 1', (err, row) => {
+            if (err) reject(err);
+            else resolve(row || null);
+        });
+    });
+}
+
+// Check if Plaid is configured and connected
+app.get('/api/plaid/status', async (req, res) => {
+    const configured = !!(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET);
+    try {
+        const conn = await getPlaidConnection();
+        res.json({
+            configured,
+            connected: !!conn,
+            institution: conn ? conn.institution_name : null,
+            accountName: conn ? conn.account_name : null,
+            accountType: conn ? conn.account_subtype : null,
+            env: process.env.PLAID_ENV || 'production'
+        });
+    } catch (err) {
+        res.json({ configured, connected: false, institution: null, accountName: null });
+    }
+});
+
+// Create a Plaid Link token (step 1 of OAuth flow)
+app.post('/api/plaid/create-link-token', async (req, res) => {
+    if (!process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET) {
+        return res.status(400).json({ error: 'Plaid credentials not configured. Add PLAID_CLIENT_ID and PLAID_SECRET to backend/.env' });
+    }
+    try {
+        const response = await plaidClient.linkTokenCreate({
+            user: { client_user_id: 'vanguard-agency-owner' },
+            client_name: 'Vanguard Insurance CRM',
+            products: [Products.Transactions],
+            country_codes: [CountryCode.Us],
+            language: 'en',
+            redirect_uri: 'https://162-220-14-239.nip.io',
+        });
+        res.json({ link_token: response.data.link_token });
+    } catch (err) {
+        console.error('Plaid link token error:', err.response?.data || err.message);
+        res.status(500).json({ error: err.response?.data?.error_message || err.message });
+    }
+});
+
+// Exchange public token for access token and store it (step 2)
+app.post('/api/plaid/exchange-token', async (req, res) => {
+    const { public_token } = req.body;
+    if (!public_token) return res.status(400).json({ error: 'public_token required' });
+    try {
+        // Exchange for access token
+        const exchangeRes = await plaidClient.itemPublicTokenExchange({ public_token });
+        const accessToken = exchangeRes.data.access_token;
+        const itemId = exchangeRes.data.item_id;
+
+        // Get institution and account details
+        const itemRes = await plaidClient.itemGet({ access_token: accessToken });
+        const institutionId = itemRes.data.item.institution_id;
+        let institutionName = 'Your Bank';
+        try {
+            const instRes = await plaidClient.institutionsGetById({
+                institution_id: institutionId,
+                country_codes: [CountryCode.Us]
+            });
+            institutionName = instRes.data.institution.name;
+        } catch (e) {}
+
+        // Get account details
+        const accountsRes = await plaidClient.accountsGet({ access_token: accessToken });
+        // Prefer checking account
+        const account = accountsRes.data.accounts.find(a => a.subtype === 'checking') || accountsRes.data.accounts[0];
+
+        // Remove any existing connections and store new one
+        await new Promise((resolve, reject) => {
+            db.run('DELETE FROM plaid_connections', (err) => {
+                if (err) reject(err); else resolve();
+            });
+        });
+
+        await new Promise((resolve, reject) => {
+            db.run(
+                `INSERT INTO plaid_connections (access_token, item_id, institution_id, institution_name, account_id, account_name, account_type, account_subtype)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [accessToken, itemId, institutionId, institutionName,
+                 account?.account_id || '', account?.name || 'Account',
+                 account?.type || 'depository', account?.subtype || 'checking'],
+                (err) => { if (err) reject(err); else resolve(); }
+            );
+        });
+
+        res.json({ success: true, institution: institutionName, account: account?.name });
+    } catch (err) {
+        console.error('Plaid exchange error:', err.response?.data || err.message);
+        res.status(500).json({ error: err.response?.data?.error_message || err.message });
+    }
+});
+
+// Get real-time balance from Plaid
+app.get('/api/plaid/balance', async (req, res) => {
+    try {
+        const conn = await getPlaidConnection();
+        if (!conn) return res.status(404).json({ error: 'No bank account connected' });
+
+        const response = await plaidClient.accountsBalanceGet({ access_token: conn.access_token });
+        const account = response.data.accounts.find(a => a.account_id === conn.account_id) || response.data.accounts[0];
+
+        res.json({
+            current: account?.balances?.current || 0,
+            available: account?.balances?.available || 0,
+            currency: account?.balances?.iso_currency_code || 'USD',
+            accountName: account?.name || conn.account_name,
+            institution: conn.institution_name,
+            lastUpdated: new Date().toISOString()
+        });
+    } catch (err) {
+        console.error('Plaid balance error:', err.response?.data || err.message);
+        res.status(500).json({ error: err.response?.data?.error_message || err.message });
+    }
+});
+
+// Get transactions from Plaid
+app.get('/api/plaid/transactions', async (req, res) => {
+    try {
+        const conn = await getPlaidConnection();
+        if (!conn) return res.status(404).json({ error: 'No bank account connected' });
+
+        // Default: last 90 days
+        const endDate = req.query.end || new Date().toISOString().split('T')[0];
+        const startDefault = new Date();
+        startDefault.setDate(startDefault.getDate() - 90);
+        const startDate = req.query.start || startDefault.toISOString().split('T')[0];
+
+        let allTransactions = [];
+        let cursor = null;
+
+        // Use transactions sync for complete data
+        try {
+            const syncRes = await plaidClient.transactionsSync({
+                access_token: conn.access_token,
+            });
+            allTransactions = syncRes.data.added || [];
+        } catch (syncErr) {
+            // Fallback to classic get
+            const response = await plaidClient.transactionsGet({
+                access_token: conn.access_token,
+                start_date: startDate,
+                end_date: endDate,
+                options: { count: 500, offset: 0 }
+            });
+            allTransactions = response.data.transactions;
+        }
+
+        // Filter to date range
+        allTransactions = allTransactions.filter(t => {
+            const d = t.date || t.authorized_date;
+            return d >= startDate && d <= endDate;
+        });
+
+        // Sort newest first
+        allTransactions.sort((a, b) => (b.date || b.authorized_date || '').localeCompare(a.date || a.authorized_date || ''));
+
+        res.json({
+            transactions: allTransactions,
+            count: allTransactions.length,
+            dateRange: { start: startDate, end: endDate }
+        });
+    } catch (err) {
+        console.error('Plaid transactions error:', err.response?.data || err.message);
+        res.status(500).json({ error: err.response?.data?.error_message || err.message });
+    }
+});
+
+// Disconnect Plaid account
+app.delete('/api/plaid/disconnect', async (req, res) => {
+    try {
+        const conn = await getPlaidConnection();
+        if (conn) {
+            try { await plaidClient.itemRemove({ access_token: conn.access_token }); } catch (e) {}
+            await new Promise((resolve, reject) => {
+                db.run('DELETE FROM plaid_connections', (err) => { if (err) reject(err); else resolve(); });
+            });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// ACCOUNTING SUMMARY — Real data from policies + Plaid
+// ============================================================
+
+app.get('/api/accounting/summary', async (req, res) => {
+    try {
+        const now = new Date();
+        const yearStart = `${now.getFullYear()}-01-01`;
+        const defaultRate = parseFloat(process.env.DEFAULT_COMMISSION_RATE || '0.15');
+
+        // --- Load all policies ---
+        const policies = await new Promise((resolve, reject) => {
+            db.all('SELECT id, data, created_at FROM policies', (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            });
+        });
+
+        // --- Load commission rates by carrier ---
+        const carrierRates = await new Promise((resolve, reject) => {
+            db.all('SELECT carrier, rate FROM commission_rates', (err, rows) => {
+                if (err) reject(err);
+                else resolve(Object.fromEntries((rows || []).map(r => [r.carrier.toLowerCase(), r.rate])));
+            });
+        });
+
+        // --- Load which policies have been marked paid ---
+        const paidPolicies = await new Promise((resolve, reject) => {
+            db.all('SELECT policy_id, commission_amount, payment_date FROM commission_payments', (err, rows) => {
+                if (err) reject(err);
+                else resolve(Object.fromEntries((rows || []).map(r => [r.policy_id, r])));
+            });
+        });
+
+        // --- Parse all policy records ---
+        const allPolicies = [];
+        for (const row of policies) {
+            try {
+                const data = JSON.parse(row.data);
+                const pList = Array.isArray(data.policies) ? data.policies : [data];
+                for (const p of pList) {
+                    if (!p.premium && !p.annualPremium) continue;
+                    const rawPremium = (p.premium || p.annualPremium || '0').toString().replace(/[^0-9.]/g, '');
+                    const premium = parseFloat(rawPremium) || 0;
+                    if (premium <= 0) continue;
+                    const carrier = (p.carrier || p.insurance_company || 'Unknown').trim();
+                    const rate = carrierRates[carrier.toLowerCase()] ?? defaultRate;
+                    const commission = premium * rate;
+                    const policyId = p.id || row.id;
+                    const isPaid = !!paidPolicies[policyId];
+                    const createdDate = p.effective_date || p.created_date || row.created_at || '';
+                    // Determine if YTD (policy created this calendar year)
+                    const policyYear = new Date(createdDate).getFullYear();
+                    const isYTD = policyYear === now.getFullYear() || !createdDate;
+                    allPolicies.push({
+                        id: policyId,
+                        policyNumber: p.policyNumber || p.policy_number || policyId,
+                        client: p.insured_name || p.name || 'Unknown',
+                        carrier,
+                        agent: p.agent || 'Unassigned',
+                        premium,
+                        commissionRate: rate,
+                        commission,
+                        isPaid,
+                        paymentDate: isPaid ? paidPolicies[policyId].payment_date : null,
+                        effectiveDate: p.effective_date || '',
+                        expirationDate: p.expiration_date || '',
+                        createdDate,
+                        isYTD
+                    });
+                }
+            } catch (e) { continue; }
+        }
+
+        // --- Aggregate KPIs ---
+        const ytd = allPolicies.filter(p => p.isYTD);
+        const ytdPremium = ytd.reduce((s, p) => s + p.premium, 0);
+        const ytdCommission = ytd.reduce((s, p) => s + p.commission, 0);
+        const ytdCollected = ytd.filter(p => p.isPaid).reduce((s, p) => s + p.commission, 0);
+        const ytdPending = ytd.filter(p => !p.isPaid).reduce((s, p) => s + p.commission, 0);
+
+        // --- Per-agent breakdown ---
+        const agentMap = {};
+        for (const p of allPolicies) {
+            const a = p.agent || 'Unassigned';
+            if (!agentMap[a]) agentMap[a] = { agent: a, premiumYTD: 0, commissionYTD: 0, paidYTD: 0, pendingYTD: 0, policyCount: 0 };
+            if (p.isYTD) {
+                agentMap[a].premiumYTD += p.premium;
+                agentMap[a].commissionYTD += p.commission;
+                if (p.isPaid) agentMap[a].paidYTD += p.commission;
+                else agentMap[a].pendingYTD += p.commission;
+                agentMap[a].policyCount++;
+            }
+        }
+
+        // --- Monthly premium/commission trend (current year) ---
+        const months = Array.from({ length: 12 }, (_, i) => ({
+            month: i + 1,
+            label: new Date(now.getFullYear(), i, 1).toLocaleString('en-US', { month: 'short' }),
+            premium: 0, commission: 0, paidCommission: 0
+        }));
+        for (const p of allPolicies) {
+            if (!p.isYTD) continue;
+            const m = new Date(p.createdDate).getMonth(); // 0-based
+            if (m >= 0 && m < 12) {
+                months[m].premium += p.premium;
+                months[m].commission += p.commission;
+                if (p.isPaid) months[m].paidCommission += p.commission;
+            }
+        }
+
+        // --- Per-carrier breakdown ---
+        const carrierMap = {};
+        for (const p of allPolicies) {
+            if (!p.isYTD) continue;
+            const c = p.carrier;
+            if (!carrierMap[c]) carrierMap[c] = { carrier: c, premium: 0, commission: 0, count: 0, rate: p.commissionRate };
+            carrierMap[c].premium += p.premium;
+            carrierMap[c].commission += p.commission;
+            carrierMap[c].count++;
+        }
+
+        res.json({
+            kpi: {
+                ytdPremium,
+                ytdCommission,
+                ytdCollected,
+                ytdPending,
+                totalPolicies: allPolicies.length,
+                ytdPolicies: ytd.length,
+                collectionRate: ytdCommission > 0 ? Math.round((ytdCollected / ytdCommission) * 100) : 0
+            },
+            policies: allPolicies.sort((a, b) => (b.createdDate || '').localeCompare(a.createdDate || '')),
+            agentSummary: Object.values(agentMap).sort((a, b) => b.commissionYTD - a.commissionYTD),
+            carrierSummary: Object.values(carrierMap).sort((a, b) => b.premium - a.premium),
+            monthlyTrend: months
+        });
+    } catch (err) {
+        console.error('Accounting summary error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Mark a policy commission as paid
+app.post('/api/accounting/commissions/:policyId/mark-paid', (req, res) => {
+    const { policyId } = req.params;
+    const { policyNumber, clientName, carrier, agent, premium, commissionRate, commissionAmount, paymentDate, paymentMethod, notes, markedBy } = req.body;
+    const id = `CP-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    db.run(
+        `INSERT OR REPLACE INTO commission_payments (id, policy_id, policy_number, client_name, carrier, agent, premium, commission_rate, commission_amount, payment_date, payment_method, notes, marked_paid_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, policyId, policyNumber, clientName, carrier, agent, premium, commissionRate, commissionAmount, paymentDate || new Date().toISOString().split('T')[0], paymentMethod || 'direct_deposit', notes || '', markedBy || 'admin'],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, id });
+        }
+    );
+});
+
+// Mark commission as unpaid (reverse)
+app.delete('/api/accounting/commissions/:policyId/mark-paid', (req, res) => {
+    db.run('DELETE FROM commission_payments WHERE policy_id = ?', [req.params.policyId], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+// Get/set commission rate for a carrier
+app.get('/api/accounting/commission-rates', (req, res) => {
+    db.all('SELECT * FROM commission_rates ORDER BY carrier', (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ rates: rows || [], defaultRate: parseFloat(process.env.DEFAULT_COMMISSION_RATE || '0.15') });
+    });
+});
+
+app.post('/api/accounting/commission-rates', (req, res) => {
+    const { carrier, rate, updatedBy } = req.body;
+    if (!carrier || rate === undefined) return res.status(400).json({ error: 'carrier and rate required' });
+    db.run(
+        `INSERT INTO commission_rates (carrier, rate, updated_by) VALUES (?, ?, ?)
+         ON CONFLICT(carrier) DO UPDATE SET rate = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ?`,
+        [carrier, rate, updatedBy || 'admin', rate, updatedBy || 'admin'],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
+});
+
+// ============================================================
+// FINANCE — General Ledger, Invoices, Contractors, Reports
+// ============================================================
+
+// Helper: parse numeric amount from various formats
+function parseAmount(v) { return parseFloat((v || '0').toString().replace(/[$,\s]/g, '')) || 0; }
+
+// ---- Transactions (General Ledger) ----
+
+app.get('/api/finance/transactions', (req, res) => {
+    const { start, end, category, source } = req.query;
+    let sql = 'SELECT * FROM financial_transactions WHERE 1=1';
+    const params = [];
+    if (start) { sql += ' AND date >= ?'; params.push(start); }
+    if (end)   { sql += ' AND date <= ?'; params.push(end); }
+    if (category) { sql += ' AND category = ?'; params.push(category); }
+    if (source)   { sql += ' AND source = ?'; params.push(source); }
+    sql += ' ORDER BY date DESC, created_at DESC';
+    db.all(sql, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows || []);
+    });
+});
+
+app.post('/api/finance/transactions', (req, res) => {
+    const { date, description, amount, category, subcategory, vendor, client, notes, source } = req.body;
+    if (!date || !description || amount === undefined) return res.status(400).json({ error: 'date, description, amount required' });
+    const id = `TXN-${Date.now()}-${Math.random().toString(36).substr(2,6)}`;
+    db.run(
+        `INSERT INTO financial_transactions (id,date,description,amount,category,subcategory,vendor,client,notes,source)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [id, date, description, parseAmount(amount.toString()), category||'Uncategorized', subcategory||'', vendor||'', client||'', notes||'', source||'manual'],
+        function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ id, success: true }); }
+    );
+});
+
+app.put('/api/finance/transactions/:id', (req, res) => {
+    const { date, description, amount, category, subcategory, vendor, client, notes, is_reconciled } = req.body;
+    db.run(
+        `UPDATE financial_transactions SET date=COALESCE(?,date), description=COALESCE(?,description),
+         amount=COALESCE(?,amount), category=COALESCE(?,category), subcategory=COALESCE(?,subcategory),
+         vendor=COALESCE(?,vendor), client=COALESCE(?,client), notes=COALESCE(?,notes),
+         is_reconciled=COALESCE(?,is_reconciled), updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        [date||null, description||null, amount!==undefined?parseAmount(amount.toString()):null,
+         category||null, subcategory||null, vendor||null, client||null, notes||null,
+         is_reconciled!==undefined?is_reconciled:null, req.params.id],
+        function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }
+    );
+});
+
+app.delete('/api/finance/transactions/:id', (req, res) => {
+    db.run('DELETE FROM financial_transactions WHERE id=?', [req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message }); res.json({ success: true });
+    });
+});
+
+// Bulk import from CSV (persistent)
+app.post('/api/finance/transactions/bulk', (req, res) => {
+    const { transactions, source } = req.body;
+    if (!Array.isArray(transactions) || !transactions.length) return res.status(400).json({ error: 'transactions array required' });
+    let imported = 0, skipped = 0;
+    const stmt = db.prepare(
+        `INSERT OR IGNORE INTO financial_transactions (id,date,description,amount,category,subcategory,vendor,client,source)
+         VALUES (?,?,?,?,?,?,?,?,?)`
+    );
+    for (const t of transactions) {
+        const id = `TXN-${t.date}-${Math.abs(t.amount).toFixed(2)}-${(t.name||'').slice(0,20).replace(/\s/g,'')}`.replace(/[^a-zA-Z0-9\-_.]/g,'');
+        stmt.run([id, t.date, t.name||t.description||'Unknown', t.amount,
+                  t.category||'Uncategorized', t.subcategory||'', t.merchant_name||t.name||'', '', source||'csv'],
+                 function(err) { if (!err && this.changes > 0) imported++; else skipped++; });
+    }
+    stmt.finalize(() => res.json({ success: true, imported, skipped, total: transactions.length }));
+});
+
+// ---- P&L Statement ----
+app.get('/api/finance/pl', async (req, res) => {
+    try {
+        const year = parseInt(req.query.year) || new Date().getFullYear();
+        const startDate = `${year}-01-01`, endDate = `${year}-12-31`;
+        const defaultRate = parseFloat(process.env.DEFAULT_COMMISSION_RATE || '0.15');
+
+        // Transactions for the year
+        const txns = await new Promise((resolve, reject) => {
+            db.all('SELECT * FROM financial_transactions WHERE date>=? AND date<=?', [startDate, endDate], (err,rows) => err ? reject(err) : resolve(rows||[]));
+        });
+
+        // Commission income (marked paid)
+        const paidComm = await new Promise((resolve, reject) => {
+            db.all('SELECT * FROM commission_payments WHERE payment_date>=? AND payment_date<=?', [startDate, endDate], (err,rows) => err ? reject(err) : resolve(rows||[]));
+        });
+
+        // Policies for commission tracking
+        const allPolicies = await new Promise((resolve, reject) => {
+            db.all('SELECT id, data, created_at FROM policies', (err,rows) => err ? reject(err) : resolve(rows||[]));
+        });
+
+        // Contractor payments (cost of revenue)
+        const contractors = await new Promise((resolve, reject) => {
+            db.all('SELECT * FROM contractor_payments WHERE payment_date>=? AND payment_date<=?', [startDate, endDate], (err,rows) => err ? reject(err) : resolve(rows||[]));
+        });
+
+        // Build income items
+        const income = [];
+        // Commission income from paid commissions
+        const commIncome = paidComm.reduce((s,c) => s + (c.commission_amount||0), 0);
+        if (commIncome > 0) income.push({ category: 'Commission Income', amount: commIncome });
+
+        // Other income from positive transactions
+        const txnIncome = txns.filter(t => t.amount > 0);
+        const txnIncomeCats = {};
+        for (const t of txnIncome) {
+            const cat = t.category || 'Other Income';
+            txnIncomeCats[cat] = (txnIncomeCats[cat]||0) + t.amount;
+        }
+        for (const [cat, amt] of Object.entries(txnIncomeCats)) {
+            income.push({ category: cat, amount: amt });
+        }
+
+        // Cost of Revenue
+        const costOfRevenue = [];
+        const agentPayouts = contractors.reduce((s,c) => s + c.amount, 0);
+        if (agentPayouts > 0) costOfRevenue.push({ category: 'Agent Commissions Paid', amount: agentPayouts });
+
+        // Operating expenses from negative transactions
+        const expenses = {};
+        for (const t of txns.filter(t => t.amount < 0)) {
+            const cat = t.category || 'Other Expenses';
+            expenses[cat] = (expenses[cat]||0) + Math.abs(t.amount);
+        }
+        const expenseItems = Object.entries(expenses).map(([category, amount]) => ({ category, amount })).sort((a,b) => b.amount - a.amount);
+
+        const totalRevenue = income.reduce((s,i) => s + i.amount, 0);
+        const totalCOR = costOfRevenue.reduce((s,i) => s + i.amount, 0);
+        const grossProfit = totalRevenue - totalCOR;
+        const totalExpenses = expenseItems.reduce((s,i) => s + i.amount, 0);
+        const netIncome = grossProfit - totalExpenses;
+
+        // Monthly breakdown
+        const monthly = Array.from({length:12}, (_,i) => ({ month: i+1, label: new Date(year,i,1).toLocaleString('en-US',{month:'short'}), income:0, expenses:0, net:0 }));
+        for (const t of txns) {
+            const m = parseInt(t.date.split('-')[1]) - 1;
+            if (m < 0 || m > 11) continue;
+            if (t.amount > 0) monthly[m].income += t.amount;
+            else monthly[m].expenses += Math.abs(t.amount);
+        }
+        for (const c of paidComm) {
+            const d = new Date(c.payment_date); if (isNaN(d)) continue;
+            const m = d.getMonth();
+            monthly[m].income += c.commission_amount || 0;
+        }
+        for (const m of monthly) m.net = m.income - m.expenses;
+
+        // Commission pipeline (from policies, not yet paid)
+        let pipelineArr = [];
+        const paidPolicyIds = new Set(paidComm.map(p => p.policy_id));
+        for (const row of allPolicies) {
+            try {
+                const data = JSON.parse(row.data);
+                const pList = Array.isArray(data.policies) ? data.policies : [data];
+                for (const p of pList) {
+                    if (!p.premium && !p.annualPremium) continue;
+                    const premium = parseFloat((p.premium||p.annualPremium||'0').toString().replace(/[^0-9.]/g,'')) || 0;
+                    if (premium <= 0) continue;
+                    const pId = p.id || row.id;
+                    if (!paidPolicyIds.has(pId)) {
+                        pipelineArr.push({ id: pId, client: p.insured_name||p.name||'Unknown', carrier: p.carrier||'Unknown', premium, commission: premium * defaultRate });
+                    }
+                }
+            } catch(e) {}
+        }
+        const pipelineTotal = pipelineArr.reduce((s,p) => s + p.commission, 0);
+
+        res.json({
+            year, income, costOfRevenue, expenseItems,
+            totals: { totalRevenue, totalCOR, grossProfit, totalExpenses, netIncome },
+            monthly, pipeline: { items: pipelineArr.slice(0,20), total: pipelineTotal }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---- Cash Flow ----
+app.get('/api/finance/cashflow', (req, res) => {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const startDate = `${year}-01-01`, endDate = `${year}-12-31`;
+    db.all('SELECT date, amount FROM financial_transactions WHERE date>=? AND date<=? ORDER BY date', [startDate, endDate], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const monthly = Array.from({length:12}, (_,i) => ({
+            month: i+1, label: new Date(year,i,1).toLocaleString('en-US',{month:'short'}),
+            inflow:0, outflow:0, net:0, runningBalance:0
+        }));
+        let running = 0;
+        for (const r of rows||[]) {
+            const m = parseInt(r.date.split('-')[1]) - 1;
+            if (m<0||m>11) continue;
+            if (r.amount > 0) monthly[m].inflow += r.amount;
+            else monthly[m].outflow += Math.abs(r.amount);
+        }
+        for (const m of monthly) {
+            m.net = m.inflow - m.outflow;
+            running += m.net;
+            m.runningBalance = running;
+        }
+        const totalIn = monthly.reduce((s,m) => s+m.inflow, 0);
+        const totalOut = monthly.reduce((s,m) => s+m.outflow, 0);
+        res.json({ monthly, totals: { totalIn, totalOut, net: totalIn-totalOut, endingBalance: running } });
+    });
+});
+
+// ---- Invoices ----
+app.get('/api/finance/invoices', (req, res) => {
+    db.all('SELECT * FROM invoices ORDER BY created_at DESC', (err,rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows||[]);
+    });
+});
+
+app.post('/api/finance/invoices', (req, res) => {
+    const { client_name, carrier, policy_id, subtotal, tax_amount, issue_date, due_date, line_items, notes, created_by } = req.body;
+    if (!client_name) return res.status(400).json({ error: 'client_name required' });
+    const id = `INV-${Date.now()}-${Math.random().toString(36).substr(2,5)}`;
+    const sub = parseAmount((subtotal||'0').toString());
+    const tax = parseAmount((tax_amount||'0').toString());
+    const total = sub + tax;
+    // Auto-generate invoice number
+    db.get('SELECT COUNT(*) as cnt FROM invoices', (err, row) => {
+        const num = `INV-${year()}-${String((row?.cnt||0)+1).padStart(4,'0')}`;
+        db.run(
+            `INSERT INTO invoices (id,invoice_number,client_name,carrier,policy_id,subtotal,tax_amount,total,issue_date,due_date,line_items,notes,created_by)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [id, num, client_name, carrier||'', policy_id||'', sub, tax, total,
+             issue_date||new Date().toISOString().split('T')[0],
+             due_date||'', JSON.stringify(line_items||[]), notes||'', created_by||'admin'],
+            function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ id, invoice_number: num, success: true }); }
+        );
+    });
+});
+
+app.put('/api/finance/invoices/:id', (req, res) => {
+    const fields = req.body;
+    const allowed = ['status','paid_date','due_date','notes','client_name','subtotal','tax_amount','total'];
+    const sets = [], params = [];
+    for (const f of allowed) {
+        if (fields[f] !== undefined) { sets.push(`${f}=?`); params.push(fields[f]); }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    sets.push('updated_at=CURRENT_TIMESTAMP');
+    params.push(req.params.id);
+    db.run(`UPDATE invoices SET ${sets.join(',')} WHERE id=?`, params, function(err) {
+        if (err) return res.status(500).json({ error: err.message }); res.json({ success: true });
+    });
+});
+
+app.delete('/api/finance/invoices/:id', (req, res) => {
+    db.run('DELETE FROM invoices WHERE id=?', [req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message }); res.json({ success: true });
+    });
+});
+
+function year() { return new Date().getFullYear(); }
+
+// ---- Contractor / Agent Payments ----
+app.get('/api/finance/contractors', (req, res) => {
+    const curYear = new Date().getFullYear();
+    db.all(`SELECT contractor_name, contractor_type,
+            SUM(CASE WHEN payment_date>='${curYear}-01-01' THEN amount ELSE 0 END) as ytd_total,
+            COUNT(CASE WHEN payment_date>='${curYear}-01-01' THEN 1 END) as ytd_payments,
+            MAX(payment_date) as last_payment
+            FROM contractor_payments GROUP BY contractor_name, contractor_type ORDER BY ytd_total DESC`, (err,rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows||[]);
+    });
+});
+
+app.get('/api/finance/contractors/:name/payments', (req, res) => {
+    db.all('SELECT * FROM contractor_payments WHERE contractor_name=? ORDER BY payment_date DESC', [req.params.name], (err,rows) => {
+        if (err) return res.status(500).json({ error: err.message }); res.json(rows||[]);
+    });
+});
+
+app.post('/api/finance/contractors/payment', (req, res) => {
+    const { contractor_name, contractor_type, payment_date, amount, description, payment_method, notes } = req.body;
+    if (!contractor_name || !payment_date || !amount) return res.status(400).json({ error: 'contractor_name, payment_date, amount required' });
+    const id = `PAY-${Date.now()}-${Math.random().toString(36).substr(2,5)}`;
+    db.run(
+        `INSERT INTO contractor_payments (id,contractor_name,contractor_type,payment_date,amount,description,payment_method,notes)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [id, contractor_name, contractor_type||'agent', payment_date, parseAmount(amount.toString()), description||'', payment_method||'check', notes||''],
+        function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ id, success: true }); }
+    );
+});
+
+app.delete('/api/finance/contractors/payment/:id', (req, res) => {
+    db.run('DELETE FROM contractor_payments WHERE id=?', [req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message }); res.json({ success: true });
+    });
+});
+
+// ---- Tax Summary ----
+app.get('/api/finance/tax-summary', async (req, res) => {
+    try {
+        const year = parseInt(req.query.year) || new Date().getFullYear();
+        const start = `${year}-01-01`, end = `${year}-12-31`;
+
+        // Net income
+        const txns = await new Promise((resolve,reject) => db.all('SELECT amount FROM financial_transactions WHERE date>=? AND date<=?', [start,end], (err,rows) => err?reject(err):resolve(rows||[])));
+        const paidComm = await new Promise((resolve,reject) => db.all('SELECT commission_amount FROM commission_payments WHERE payment_date>=? AND payment_date<=?', [start,end], (err,rows) => err?reject(err):resolve(rows||[])));
+        const contractors = await new Promise((resolve,reject) => db.all('SELECT amount FROM contractor_payments WHERE payment_date>=? AND payment_date<=?', [start,end], (err,rows) => err?reject(err):resolve(rows||[])));
+
+        const grossIncome = txns.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0)
+                          + paidComm.reduce((s,c)=>s+(c.commission_amount||0),0);
+        const totalExpenses = txns.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0)
+                            + contractors.reduce((s,c)=>s+c.amount,0);
+        const netIncome = grossIncome - totalExpenses;
+        const netSE = Math.max(netIncome, 0);
+
+        // Self-employment tax (2026)
+        const seTax = netSE * 0.9235 * 0.153;
+        const seDeduction = seTax / 2; // Deductible half
+        const adjustedIncome = Math.max(netSE - seDeduction, 0);
+
+        // Federal income tax estimate (single/MFJ 2026 brackets, simplified)
+        let fedTax = 0;
+        const brackets = [[23200,0.10],[94300,0.12],[201050,0.22],[383900,0.24],[487450,0.32],[731200,0.35],[Infinity,0.37]];
+        let remaining = adjustedIncome, prev = 0;
+        for (const [top, rate] of brackets) {
+            const taxable = Math.min(remaining, top - prev);
+            if (taxable <= 0) break;
+            fedTax += taxable * rate;
+            remaining -= taxable;
+            prev = top;
+            if (remaining <= 0) break;
+        }
+
+        const stateTax = adjustedIncome * 0.0399; // Ohio default
+        const totalTax = seTax + fedTax + stateTax;
+        const quarterlyPayment = totalTax / 4;
+
+        const now = new Date();
+        const quarterDates = [
+            { quarter: 1, due: `${year}-04-15`, label: 'Q1 (Jan–Mar)', paid: now > new Date(`${year}-04-15`) },
+            { quarter: 2, due: `${year}-06-16`, label: 'Q2 (Apr–May)', paid: now > new Date(`${year}-06-16`) },
+            { quarter: 3, due: `${year}-09-15`, label: 'Q3 (Jun–Aug)', paid: now > new Date(`${year}-09-15`) },
+            { quarter: 4, due: `${year+1}-01-15`, label: 'Q4 (Sep–Dec)', paid: false },
+        ];
+
+        res.json({
+            year, grossIncome, totalExpenses, netIncome,
+            seTax, seDeduction, adjustedIncome, fedTax, stateTax, totalTax, quarterlyPayment,
+            effectiveRate: netIncome > 0 ? totalTax / netIncome : 0,
+            quarters: quarterDates.map(q => ({ ...q, amount: quarterlyPayment }))
+        });
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---- Client Profitability ----
+app.get('/api/finance/client-profitability', (req, res) => {
+    db.all('SELECT id, data, created_at FROM policies', (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const defaultRate = parseFloat(process.env.DEFAULT_COMMISSION_RATE || '0.15');
+        const clients = {};
+        for (const row of rows||[]) {
+            try {
+                const data = JSON.parse(row.data);
+                const pList = Array.isArray(data.policies) ? data.policies : [data];
+                for (const p of pList) {
+                    const premium = parseFloat((p.premium||p.annualPremium||'0').toString().replace(/[^0-9.]/g,'')) || 0;
+                    if (!premium) continue;
+                    const client = (p.insured_name||p.name||'Unknown').trim();
+                    if (!clients[client]) clients[client] = { client, policyCount:0, totalPremium:0, totalCommission:0, carriers:new Set(), agents:new Set() };
+                    clients[client].policyCount++;
+                    clients[client].totalPremium += premium;
+                    clients[client].totalCommission += premium * (p.commission_rate || defaultRate);
+                    if (p.carrier) clients[client].carriers.add(p.carrier);
+                    if (p.agent) clients[client].agents.add(p.agent);
+                }
+            } catch(e) {}
+        }
+        const result = Object.values(clients)
+            .map(c => ({ ...c, carriers: [...c.carriers].join(', '), agents: [...c.agents].join(', ') }))
+            .sort((a,b) => b.totalPremium - a.totalPremium);
+        res.json(result);
+    });
+});
+
+// ---- Budget ----
+app.get('/api/finance/budget', (req, res) => {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    db.all('SELECT * FROM budget_entries WHERE year=? ORDER BY month, category', [year], (err,rows) => {
+        if (err) return res.status(500).json({ error: err.message }); res.json(rows||[]);
+    });
+});
+
+app.post('/api/finance/budget', (req, res) => {
+    const { year, month, category, amount } = req.body;
+    if (!year || !category || amount === undefined) return res.status(400).json({ error: 'year, category, amount required' });
+    db.run(
+        `INSERT INTO budget_entries (year,month,category,amount) VALUES (?,?,?,?)
+         ON CONFLICT(year,month,category) DO UPDATE SET amount=?, updated_at=CURRENT_TIMESTAMP`,
+        [year, month||null, category, parseAmount(amount.toString()), parseAmount(amount.toString())],
+        function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }
+    );
+});
+
+// Goals config - GET
+app.get('/api/goals-config', (req, res) => {
+    db.get('SELECT value FROM settings WHERE key = ?', ['goals_config'], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.json({});
+        try { res.json(JSON.parse(row.value)); } catch(e) { res.json({}); }
+    });
+});
+
+// Goals config - POST
+app.post('/api/goals-config', (req, res) => {
+    const cfg = req.body;
+    if (!cfg || typeof cfg !== 'object') return res.status(400).json({ error: 'Invalid config' });
+    db.run(
+        `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+        ['goals_config', JSON.stringify(cfg)],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
+});
+
+// Auto-delete callbacks that are 10+ days overdue
+function cleanupOverdueCallbacks() {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 10);
+    const cutoffStr = cutoff.toISOString();
+    db.run(
+        `UPDATE scheduled_callbacks SET completed = 1 WHERE completed = 0 AND date_time < ?`,
+        [cutoffStr],
+        function(err) {
+            if (err) {
+                console.error('Error cleaning up overdue callbacks:', err);
+            } else if (this.changes > 0) {
+                console.log(`🧹 Auto-completed ${this.changes} callback(s) overdue by 10+ days`);
+            }
+        }
+    );
+}
+// Run once on startup, then every 24 hours
+cleanupOverdueCallbacks();
+setInterval(cleanupOverdueCallbacks, 24 * 60 * 60 * 1000);
+
+// State generation tracking endpoints
+app.get('/api/state-generation-status', (req, res) => {
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    db.all('SELECT state FROM state_generation_tracking WHERE month_key = ?', [monthKey], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ closedStates: rows.map(r => r.state), month: monthKey });
+    });
+});
+
+app.post('/api/state-generation-status', (req, res) => {
+    const { state } = req.body;
+    if (!state) return res.status(400).json({ error: 'state required' });
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    db.run(
+        'INSERT OR IGNORE INTO state_generation_tracking (state, month_key) VALUES (?, ?)',
+        [state, monthKey],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, state, month: monthKey });
+        }
+    );
+});
+
+// ─── Commercial Lead Generation Routes ───────────────────────────────────────
+const clEngine = require('./commercial-leads');
+
+// POST /api/commercial-leads/generate
+// Body: { sources, state, naicsPrefix, industry, employeesMin, employeesMax,
+//         daysBack, targetLines, verticals, minScore, maxResults, socrataEndpoint }
+app.post('/api/commercial-leads/generate', async (req, res) => {
+    try {
+        // Inject server-side env token if client didn't provide one
+        const body = Object.assign({}, req.body || {});
+        if (!body.ocApiToken && process.env.OPENCORPORATES_API_TOKEN) {
+            body.ocApiToken = process.env.OPENCORPORATES_API_TOKEN;
+        }
+        const result = await clEngine.generateCommercialLeads(body);
+        res.json(result);
+    } catch (err) {
+        console.error('Commercial leads generate error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/commercial-leads/source-status
+app.get('/api/commercial-leads/source-status', async (req, res) => {
+    try {
+        const status = await clEngine.getSourceStatus();
+        res.json(status);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/commercial-leads/import-osha   (multipart: file=osha_csv, state=OH)
+// Accepts OSHA enforcement CSV from enforcedata.dol.gov
+const oshaUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
+    fileFilter: (req, file, cb) => {
+        if (file.originalname.match(/\.(csv|txt)$/i)) cb(null, true);
+        else cb(new Error('Only CSV files accepted'));
+    }
+});
+
+app.post('/api/commercial-leads/import-osha', oshaUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const csvText = req.file.buffer.toString('utf-8');
+        const stateFilter = req.body.state || null;
+        const result = await clEngine.importOSHACSV(csvText, stateFilter);
+        res.json({ success: true, ...result, message: `Imported ${result.imported} records, skipped ${result.skipped}` });
+    } catch (err) {
+        console.error('OSHA import error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// In-memory job store for background OSHA syncs (single-process, survives restarts via PM2)
+const _oshaSyncJobs = new Map();
+
+// POST /api/commercial-leads/sync-osha-api
+// Returns immediately with a jobId — client polls /sync-status/:jobId for progress
+app.post('/api/commercial-leads/sync-osha-api', (req, res) => {
+    const { apiKey, states, daysBack, maxRecords } = req.body || {};
+    const jobId = `osha_${Date.now()}`;
+
+    const job = {
+        status: 'running',
+        progress: [],
+        imported: 0,
+        skipped: 0,
+        started: Date.now(),
+    };
+    _oshaSyncJobs.set(jobId, job);
+
+    // Purge jobs older than 2 hours
+    for (const [id, j] of _oshaSyncJobs) {
+        if (Date.now() - j.started > 7200000) _oshaSyncJobs.delete(id);
+    }
+
+    // Fire-and-forget — DO NOT await
+    clEngine.syncOSHAFromAPI({
+        apiKey: apiKey || process.env.DOL_API_KEY,
+        states: Array.isArray(states) ? states : (states ? [states] : []),
+        daysBack: parseInt(daysBack) || 365,
+        maxRecords: parseInt(maxRecords) || 50000,
+        onProgress: (update) => {
+            job.progress.push(update.message);
+            job.imported = update.imported;
+            job.skipped  = update.skipped;
+        },
+    }).then((result) => {
+        job.status   = 'done';
+        job.imported = result.imported;
+        job.skipped  = result.skipped;
+        job.pages    = result.pages;
+        job.message  = result.message;
+        job.log      = result.log;
+        job.finished = Date.now();
+    }).catch((err) => {
+        console.error('OSHA API sync error:', err);
+        job.status  = 'error';
+        job.error   = err.message;
+        job.finished = Date.now();
+    });
+
+    res.json({ jobId, status: 'running', message: 'Sync started in background' });
+});
+
+// GET /api/commercial-leads/sync-status/:jobId
+app.get('/api/commercial-leads/sync-status/:jobId', (req, res) => {
+    const job = _oshaSyncJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found or expired' });
+    res.json(job);
+});
+
+// GET /api/commercial-leads/naics-map  — returns classification reference
+app.get('/api/commercial-leads/naics-map', (req, res) => {
+    res.json(clEngine.NAICS_MAP);
+});
+
+// POST /api/commercial-leads/enrich  — Google Places phone lookup for one or more businesses
+// Body: { businesses: [{name, city, state, sourceId?}] }
+// Cache-first: checks cl_businesses by source_id before calling Google.
+// Saves enriched phone/website back to cl_businesses so repeat enrichments are free.
+app.post('/api/commercial-leads/enrich', async (req, res) => {
+    const PLACES_KEY = process.env.GOOGLE_PLACES_API_KEY;
+    if (!PLACES_KEY) return res.status(500).json({ error: 'GOOGLE_PLACES_API_KEY not configured' });
+
+    const list = req.body.businesses
+        ? req.body.businesses
+        : [{ name: req.body.name, city: req.body.city, state: req.body.state, sourceId: req.body.sourceId }];
+
+    // Helper: read cached enrichment from DB by source_id
+    function getCached(sourceId) {
+        return new Promise(resolve => {
+            if (!sourceId) return resolve(null);
+            db.get('SELECT phone, website, email, address FROM cl_businesses WHERE source_id=? AND phone IS NOT NULL AND phone != ""', [sourceId], (err, row) => {
+                resolve(err || !row ? null : { phone: row.phone, website: row.website, email: row.email, streetAddress: row.address || null });
+            });
+        });
+    }
+
+    // Helper: persist enriched data back to DB
+    function saveEnriched(sourceId, phone, website, email) {
+        if (!sourceId || !phone) return;
+        db.run('UPDATE cl_businesses SET phone=?, website=?, email=? WHERE source_id=?', [phone, website || null, email || null, sourceId]);
+    }
+
+    // Helper: scrape a website homepage for email addresses (3s timeout)
+    async function scrapeEmail(websiteUrl) {
+        if (!websiteUrl) return null;
+        try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 3000);
+            const res = await fetch(websiteUrl, {
+                signal: ctrl.signal,
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VanguardCRM/1.0)' },
+            });
+            clearTimeout(timer);
+            if (!res.ok) return null;
+            const html = await res.text();
+            const mailtoMatch = html.match(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
+            if (mailtoMatch) return mailtoMatch[1].toLowerCase();
+            const emailMatch = html.match(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g);
+            if (emailMatch) {
+                const filtered = emailMatch.filter(e =>
+                    !e.match(/\.(png|jpg|gif|svg|css|js|woff|ttf)$/i) &&
+                    !e.includes('sentry') && !e.includes('example') && !e.includes('noreply') && !e.includes('no-reply')
+                );
+                if (filtered.length) return filtered[0].toLowerCase();
+            }
+        } catch (_) { /* timeout or network error — skip */ }
+        return null;
+    }
+
+    // Process one business: cache check → Google Places → website scrape
+    async function enrichOne(biz) {
+        try {
+            const cached = await getCached(biz.sourceId);
+            if (cached) return { ...biz, phone: cached.phone, website: cached.website, email: cached.email, streetAddress: cached.streetAddress, cached: true };
+
+            const searchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': PLACES_KEY,
+                    'X-Goog-FieldMask': 'places.id,places.displayName,places.nationalPhoneNumber,places.websiteUri,places.formattedAddress',
+                },
+                body: JSON.stringify({ textQuery: `${biz.name} ${biz.city} ${biz.state}` }),
+            });
+            const searchData = await searchRes.json();
+            const place   = (searchData.places || [])[0];
+            const phone   = place?.nationalPhoneNumber || null;
+            const website = place?.websiteUri || null;
+            const email   = await scrapeEmail(website);
+            // Street address only (everything before the first comma)
+            const streetAddress = place?.formattedAddress
+                ? place.formattedAddress.split(',')[0].trim()
+                : null;
+
+            saveEnriched(biz.sourceId, phone, website, email);
+            return { ...biz, phone, website, email, streetAddress, cached: false };
+        } catch (e) {
+            return { ...biz, phone: null, website: null, email: null, error: e.message };
+        }
+    }
+
+    // Run in parallel batches of 10 to stay within Google QPS limits
+    const BATCH = 10;
+    const results = new Array(list.length);
+    for (let i = 0; i < list.length; i += BATCH) {
+        const batch = list.slice(i, i + BATCH);
+        const batchResults = await Promise.all(batch.map(enrichOne));
+        batchResults.forEach((r, j) => { results[i + j] = r; });
+        // Brief pause between batches
+        if (i + BATCH < list.length) await new Promise(r => setTimeout(r, 200));
+    }
+    res.json({ results });
+});
+
+// ─── Settings File Manager ────────────────────────────────────────────────────
+const UPLOADS_DIR = '/home/corp06/uploads';
+const fileUpload = multer({ storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => cb(null, file.originalname),
+}) });
+
+app.post('/api/files/upload', fileUpload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file received' });
+    res.json({ filename: req.file.originalname, size: req.file.size, path: `${UPLOADS_DIR}/${req.file.originalname}` });
+});
+
+app.get('/api/files/list', (req, res) => {
+    const fs = require('fs');
+    try {
+        const files = fs.readdirSync(UPLOADS_DIR).map(name => {
+            const stat = fs.statSync(`${UPLOADS_DIR}/${name}`);
+            return { name, size: stat.size, path: `${UPLOADS_DIR}/${name}`, modified: stat.mtime.toLocaleDateString() };
+        }).sort((a, b) => b.modified - a.modified);
+        res.json({ files });
+    } catch (e) { res.json({ files: [] }); }
+});
+
+app.post('/api/files/delete', (req, res) => {
+    const fs = require('fs');
+    const { filename } = req.body || {};
+    if (!filename || filename.includes('/') || filename.includes('..')) return res.status(400).json({ error: 'Invalid filename' });
+    try { fs.unlinkSync(`${UPLOADS_DIR}/${filename}`); res.json({ ok: true }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // Export database for use in other modules
 module.exports = { db };

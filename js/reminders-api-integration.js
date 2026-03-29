@@ -6,44 +6,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeRemindersAPIIntegration() {
-    console.log('Reminders API Integration Ready');
-
-    // Override todo loading
-    if (window.loadTodos) {
-        const originalLoadTodos = window.loadTodos;
-        window.loadTodos = async function() {
-            console.log('Loading todos/reminders from comprehensive API...');
-
-            try {
-                // Use API service to get reminders
-                if (window.apiService && window.apiService.getReminders) {
-                    const reminders = await window.apiService.getReminders();
-                    console.log(`Loaded ${reminders.length} reminders from API`);
-
-                    // Convert reminders to todo format and store in localStorage
-                    const personalTodos = reminders.filter(r => r.type === 'personal' || !r.type);
-                    const agencyTodos = reminders.filter(r => r.type === 'agency');
-
-                    localStorage.setItem('personalTodos', JSON.stringify(personalTodos));
-                    localStorage.setItem('agencyTodos', JSON.stringify(agencyTodos));
-
-                    // Update the todo display
-                    displayTodosFromData(personalTodos, agencyTodos);
-
-                } else {
-                    // Fall back to original function
-                    originalLoadTodos();
-                }
-            } catch (error) {
-                console.error('Failed to load reminders from API:', error);
-                // Fall back to original function
-                originalLoadTodos();
-            }
-        };
-    }
-
-    // Override todo creation
-    const originalAddTodo = window.addTodo;
+    console.log('⚠️ Reminders API Integration DISABLED - using simple todo system');
+    // All API integration disabled to prevent conflicts with simple synchronized todo system
+    return;
     if (originalAddTodo) {
         window.addTodo = async function(type) {
             const input = document.getElementById(`${type}TodoInput`);

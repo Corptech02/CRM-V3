@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚛 Vicidial Import DOT Auto-Lookup Fixed!</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; }
+        .success { color: #16a34a; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .info { color: #2563eb; font-weight: bold; }
+        .step { background: #f8f9fa; padding: 15px; border-radius: 6px; margin: 10px 0; border-left: 4px solid #16a34a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚛 Vicidial Import DOT Auto-Lookup FIXED!</h1>
+
+        <div class="step">
+            <h3>🐛 Problem Identified:</h3>
+            <p class="error">Vicidial imports weren't triggering DOT lookups automatically</p>
+            <ul>
+                <li>✅ Import detection was working</li>
+                <li>❌ But DOT lookup wasn't happening for imported leads</li>
+                <li>✅ Manual DOT button worked fine</li>
+                <li>❌ Auto-lookup for imports was failing</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>✅ Fixes Applied (v10):</h3>
+            <ul>
+                <li>✅ <strong>Enhanced Import Detection:</strong> Now catches multiple import message formats</li>
+                <li>✅ <strong>Faster Processing:</strong> Reduced delay from 3s to 1s for quicker response</li>
+                <li>✅ <strong>Better Lead Analysis:</strong> More detailed logging to track what's happening</li>
+                <li>✅ <strong>Immediate DOT Lookup:</strong> Processes imported leads with DOT numbers instantly</li>
+                <li>✅ <strong>Smart Detection:</strong> Only processes leads that need DOT data</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>🎯 How It Now Works:</h3>
+            <ol>
+                <li class="info"><strong>Import Lead:</strong> Import any Vicidial lead with a DOT number</li>
+                <li class="info"><strong>Auto-Detection:</strong> System detects "Selective import initiated" or "Successfully quick imported" messages</li>
+                <li class="info"><strong>Immediate Processing:</strong> Within 1 second, scans the newly imported lead</li>
+                <li class="info"><strong>DOT Lookup:</strong> If lead has DOT number but missing data, triggers automatic lookup</li>
+                <li class="info"><strong>Data Population:</strong> Fills state, years in business, commodity, AND vehicles</li>
+                <li class="info"><strong>Server Sync:</strong> Saves everything to database permanently</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>🧪 Console Messages You'll Now See:</h3>
+            <pre style="background: #f0f0f0; padding: 10px; border-radius: 4px; font-size: 12px;">
+🚛 AUTO DOT: New Vicidial import detected - will scan ONLY new imports
+🚛 AUTO DOT: Processing ONLY the 1 most recently imported leads
+🔍 AUTO DOT: Examining newly imported lead: WALTA TRANSPORT LLC (ID: 150401)
+🔍 AUTO DOT: DOT Number: "3591601"
+🔍 AUTO DOT: Missing data check: yearsInBusiness="", state="", commodityHauled="" → Missing: true
+🚛 AUTO DOT: ✅ New import WALTA TRANSPORT LLC has DOT 3591601 and missing data - triggering lookup NOW
+🔍 BUILT-IN DOT: Looking up DOT 3591601 for lead 150401
+✅ AUTO DOT: Successfully processed import WALTA TRANSPORT LLC with DOT data
+            </pre>
+        </div>
+
+        <div class="step">
+            <h3>🎯 Test It Now:</h3>
+            <p class="success">Import any Vicidial lead that has a DOT number!</p>
+            <ul>
+                <li>✅ DOT data should populate automatically during/after import</li>
+                <li>✅ Vehicles should be created automatically</li>
+                <li>✅ All data should persist after refresh</li>
+                <li>✅ Only the newly imported leads will be processed (no spam)</li>
+            </ul>
+        </div>
+
+        <button onclick="window.open('/#vicidial', '_blank')" style="background: #16a34a; color: white; padding: 15px 30px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold;">
+            🚛 Test Import DOT Auto-Lookup Now
+        </button>
+    </div>
+</body>
+</html>

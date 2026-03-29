@@ -354,9 +354,6 @@ window.createRealACORDViewer = async function(policyId, policyData = null) {
                     <button onclick="realPrintCOI()" class="btn-secondary" style="background: white; color: #0066cc; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
                         <i class="fas fa-print"></i> Print
                     </button>
-                    <button onclick="emailACORD('${policyId}')" class="btn-primary" style="background: rgba(255,255,255,0.2); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                        <i class="fas fa-envelope"></i> Email COI
-                    </button>
                     <button onclick="backToPolicyView('${policyId}')" class="btn-secondary" style="background: rgba(255,255,255,0.1); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">
                         <i class="fas fa-arrow-left"></i> Back
                     </button>
@@ -989,50 +986,79 @@ function createRealFormFields(policyId, policyData) {
               return '';
           })() },
 
-        // === NON OWNED TRAILER PHYSICAL DAMAGE ROW (y: 718) ===
-        { id: 'nonOwnedTrailerInsurer', x: 23, y: 718, width: 23, height: 16,
+        // === LAST ROW (y: 718) — Trailer Interchange if present, else Non-Owned Trailer ===
+        // Helper values computed once for this row
+        { id: 'lastRowInsurer', x: 23, y: 718, width: 23, height: 16,
           value: (function() {
-              const nonOwnedTrailer = policyData?.coverage?.non_owned_trailer || '';
-              const nonOwnedTrailerDed = policyData?.coverage?.non_owned_trailer_deductible || '';
-              console.log('🚛 NON OWNED TRAILER DEBUG: trailer =', nonOwnedTrailer, 'deductible =', nonOwnedTrailerDed);
-              return (nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailer !== 'None' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '' && nonOwnedTrailerDed !== 'None') ? 'A' : '';
+              const ti = policyData?.coverage?.['Trailer Interchange Limit'] || policyData?.coverage?.trailer_interchange_limit || '';
+              const not = policyData?.coverage?.non_owned_trailer || policyData?.coverage?.['Non-Owned Trailer Phys Dam'] || policyData?.coverage?.['Non-Owned Trailer Physical Damage'] || '';
+              const hasTI = ti && ti !== '0' && ti !== 'No Coverage' && ti !== 'None';
+              const hasNOT = not && not !== 'None' && not !== 'Not Included';
+              console.log('🚛 LAST ROW DEBUG: TI =', ti, '| Non-Owned Trailer =', not);
+              return (hasTI || hasNOT) ? 'A' : '';
           })() },
-        { id: 'nonOwnedTrailerText', x: 52, y: 718, width: 173, height: 16,
+        { id: 'lastRowText', x: 52, y: 718, width: 173, height: 16,
           value: (function() {
-              const nonOwnedTrailer = policyData?.coverage?.non_owned_trailer || '';
-              const nonOwnedTrailerDed = policyData?.coverage?.non_owned_trailer_deductible || '';
-              console.log('🚛 NON OWNED TRAILER TEXT DEBUG: show?', nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '');
-              return (nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailer !== 'None' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '' && nonOwnedTrailerDed !== 'None') ? 'NON OWNED TRAIL PHYS DAMAGE' : '';
+              const ti = policyData?.coverage?.['Trailer Interchange Limit'] || policyData?.coverage?.trailer_interchange_limit || '';
+              const not = policyData?.coverage?.non_owned_trailer || policyData?.coverage?.['Non-Owned Trailer Phys Dam'] || policyData?.coverage?.['Non-Owned Trailer Physical Damage'] || '';
+              const hasTI = ti && ti !== '0' && ti !== 'No Coverage' && ti !== 'None';
+              const hasNOT = not && not !== 'None' && not !== 'Not Included';
+              if (hasTI) return 'TRAILER INTERCHANGE';
+              if (hasNOT) return 'NON OWNED TRAIL PHYS DAMAGE';
+              return '';
           })() },
-        { id: 'nonOwnedTrailerPolicyNum', x: 281, y: 718, width: 146, height: 16,
+        { id: 'lastRowPolicyNum', x: 281, y: 718, width: 146, height: 16,
           value: (function() {
-              const nonOwnedTrailer = policyData?.coverage?.non_owned_trailer || '';
-              const nonOwnedTrailerDed = policyData?.coverage?.non_owned_trailer_deductible || '';
-              return (nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailer !== 'None' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '' && nonOwnedTrailerDed !== 'None') ? (policyData?.policy_number || policyData?.policyNumber || '') : '';
+              const ti = policyData?.coverage?.['Trailer Interchange Limit'] || policyData?.coverage?.trailer_interchange_limit || '';
+              const not = policyData?.coverage?.non_owned_trailer || policyData?.coverage?.['Non-Owned Trailer Phys Dam'] || policyData?.coverage?.['Non-Owned Trailer Physical Damage'] || '';
+              const hasTI = ti && ti !== '0' && ti !== 'No Coverage' && ti !== 'None';
+              const hasNOT = not && not !== 'None' && not !== 'Not Included';
+              return (hasTI || hasNOT) ? (policyData?.policy_number || policyData?.policyNumber || '') : '';
           })() },
-        { id: 'nonOwnedTrailerEffDate', x: 430, y: 718, width: 61, height: 16,
+        { id: 'lastRowEffDate', x: 430, y: 718, width: 61, height: 16,
           value: (function() {
-              const nonOwnedTrailer = policyData?.coverage?.non_owned_trailer || '';
-              const nonOwnedTrailerDed = policyData?.coverage?.non_owned_trailer_deductible || '';
-              return (nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailer !== 'None' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '' && nonOwnedTrailerDed !== 'None') ? formatDateForACORD(policyData?.effective_date) : '';
+              const ti = policyData?.coverage?.['Trailer Interchange Limit'] || policyData?.coverage?.trailer_interchange_limit || '';
+              const not = policyData?.coverage?.non_owned_trailer || policyData?.coverage?.['Non-Owned Trailer Phys Dam'] || policyData?.coverage?.['Non-Owned Trailer Physical Damage'] || '';
+              const hasTI = ti && ti !== '0' && ti !== 'No Coverage' && ti !== 'None';
+              const hasNOT = not && not !== 'None' && not !== 'Not Included';
+              return (hasTI || hasNOT) ? formatDateForACORD(policyData?.effective_date) : '';
           })() },
-        { id: 'nonOwnedTrailerExpDate', x: 491, y: 718, width: 61, height: 16,
+        { id: 'lastRowExpDate', x: 491, y: 718, width: 61, height: 16,
           value: (function() {
-              const nonOwnedTrailer = policyData?.coverage?.non_owned_trailer || '';
-              const nonOwnedTrailerDed = policyData?.coverage?.non_owned_trailer_deductible || '';
-              return (nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailer !== 'None' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '' && nonOwnedTrailerDed !== 'None') ? formatDateForACORD(policyData?.expiration_date) : '';
+              const ti = policyData?.coverage?.['Trailer Interchange Limit'] || policyData?.coverage?.trailer_interchange_limit || '';
+              const not = policyData?.coverage?.non_owned_trailer || policyData?.coverage?.['Non-Owned Trailer Phys Dam'] || policyData?.coverage?.['Non-Owned Trailer Physical Damage'] || '';
+              const hasTI = ti && ti !== '0' && ti !== 'No Coverage' && ti !== 'None';
+              const hasNOT = not && not !== 'None' && not !== 'Not Included';
+              return (hasTI || hasNOT) ? formatDateForACORD(policyData?.expiration_date) : '';
           })() },
-        { id: 'nonOwnedTrailerLimits', x: 552, y: 718, width: 83, height: 16,
+        { id: 'lastRowLimits', x: 552, y: 718, width: 83, height: 16,
           value: (function() {
-              const nonOwnedTrailer = policyData?.coverage?.non_owned_trailer || '';
-              const nonOwnedTrailerDed = policyData?.coverage?.non_owned_trailer_deductible || '';
-              return (nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailer !== 'None' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '' && nonOwnedTrailerDed !== 'None') ? `LIMIT ${nonOwnedTrailer}` : '';
+              const ti = policyData?.coverage?.['Trailer Interchange Limit'] || policyData?.coverage?.trailer_interchange_limit || '';
+              const not = policyData?.coverage?.non_owned_trailer || policyData?.coverage?.['Non-Owned Trailer Phys Dam'] || policyData?.coverage?.['Non-Owned Trailer Physical Damage'] || '';
+              const hasTI = ti && ti !== '0' && ti !== 'No Coverage' && ti !== 'None';
+              if (hasTI) {
+                  // Parse '60000/2000ded' → '$60,000'
+                  if (ti.toLowerCase().includes('/')) {
+                      const limit = parseInt(ti.split('/')[0]);
+                      return isNaN(limit) ? '' : `$${limit.toLocaleString()}`;
+                  }
+                  const num = parseInt(ti);
+                  return isNaN(num) ? ti : `$${num.toLocaleString()}`;
+              }
+              const hasNOT = not && not !== 'None' && not !== 'Not Included';
+              return hasNOT ? not : '';
           })() },
-        { id: 'nonOwnedTrailerDeductible', x: 684, y: 718, width: 83, height: 16,
+        { id: 'lastRowDeductible', x: 684, y: 718, width: 83, height: 16,
           value: (function() {
-              const nonOwnedTrailer = policyData?.coverage?.non_owned_trailer || '';
+              const ti = policyData?.coverage?.['Trailer Interchange Limit'] || policyData?.coverage?.trailer_interchange_limit || '';
+              const hasTI = ti && ti !== '0' && ti !== 'No Coverage' && ti !== 'None';
+              if (hasTI && ti.toLowerCase().includes('/')) {
+                  // Parse '60000/2000ded' → '$2,000 Ded.'
+                  const ded = parseInt(ti.toLowerCase().replace(/ded/g, '').split('/')[1]);
+                  return isNaN(ded) ? '' : `$${ded.toLocaleString()} Ded.`;
+              }
               const nonOwnedTrailerDed = policyData?.coverage?.non_owned_trailer_deductible || '';
-              return (nonOwnedTrailer && nonOwnedTrailer !== '' && nonOwnedTrailer !== 'None' && nonOwnedTrailerDed && nonOwnedTrailerDed !== '' && nonOwnedTrailerDed !== 'None') ? `DED. ${nonOwnedTrailerDed}` : '';
+              return nonOwnedTrailerDed ? `DED. ${nonOwnedTrailerDed}` : '';
           })() },
 
 
@@ -1677,7 +1703,7 @@ window.showSignAsModal = function(policyId) {
     const modal = document.createElement('div');
     modal.className = 'sign-as-modal';
     modal.id = 'signAsModal';
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 10000;';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000000;';
 
     const modalContainer = document.createElement('div');
     modalContainer.style.cssText = 'background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 500px; max-width: 90vw;';
@@ -1772,7 +1798,7 @@ window.showSignAsModal = function(policyId) {
         }
 
         // Hover effects
-        [option1, option2, option3].forEach(option => {
+        [option1, option2, option3, option4].forEach(option => {
             if (option) {
                 option.addEventListener('mouseenter', function() {
                     this.style.borderColor = '#8b5cf6';
@@ -1865,6 +1891,15 @@ window.updateCompanyInfo = function(companyData) {
         producerField.dispatchEvent(new Event('input', { bubbles: true }));
         window.realPdfState.formData['producer'] = companyData.producer;
         console.log('✅ Updated producer to:', companyData.producer);
+    }
+
+    // Update contact name field (right side of producer area)
+    const contactNameField = document.getElementById('field_contactName');
+    if (contactNameField && companyData.producer) {
+        contactNameField.value = companyData.producer;
+        contactNameField.dispatchEvent(new Event('input', { bubbles: true }));
+        window.realPdfState.formData['contactName'] = companyData.producer;
+        console.log('✅ Updated contactName to:', companyData.producer);
     }
 
     // Update email field

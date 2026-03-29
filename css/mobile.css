@@ -708,357 +708,226 @@
         line-height: 1.5 !important; /* Better line spacing */
     }
 
-    /* WORKING LEAD CARD LAYOUT - 1/3 THICKER */
+    /* ── MOBILE LEAD CARD LAYOUT ──────────────────────────────────────────────
+       Column map (actual HTML order):
+         td:1  checkbox            → HIDDEN
+         td:2  name                → row 1 left
+         td:3  circle indicator    → HIDDEN
+         td:4  contact (phone/email)→ row 1 right
+         td:5  interest bar        → row 2 full-width
+         td:6  premium             → row 3 left
+         td:7  stage badge         → row 3 right
+         td:8  assign-stage/todo   → HIDDEN
+         td:9  renewal date        → row 4 left
+         td:10 agent               → HIDDEN
+         td:11 insurance company   → row 4 right
+         td:12 created date        → HIDDEN
+         td:13 action buttons      → row 5 right
+
+       Specificity note: all per-cell rules use
+       "#leadsTable tr:not(.lead-divider) td:nth-child(X)" to match or
+       beat the base td rule, preventing !important conflicts.
+    ──────────────────────────────────────────────────────────────────────── */
+
+    /* Card shell */
     #leadsTable tr:not(.lead-divider),
     .leads-table tr:not(.lead-divider) {
-        margin-bottom: 8px !important;
-        background: var(--white) !important;
-        border-radius: 8px !important;
-        padding: 14px !important;
-        height: 133px !important; /* 1/3 thicker than 100px */
-        min-height: 133px !important;
-        max-height: none !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
         display: block !important;
         position: relative !important;
+        margin-bottom: 8px !important;
+        background: #ffffff !important;
+        border-radius: 10px !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.10) !important;
+        border-left: 3px solid #3b82f6 !important;
+        height: 150px !important;
+        min-height: 150px !important;
+        max-height: 150px !important;
         overflow: hidden !important;
+        padding: 0 !important;
     }
 
-    /* Subtle category accent */
-    #leadsTable tr:not(.lead-divider)[style*="background-color"] {
-        border-left: 3px solid rgba(251, 146, 60, 0.6) !important;
-    }
-
-    /* Reset all cells for absolute positioning */
+    /* Base: all cells become absolutely positioned with no default spacing.
+       width:auto overrides the earlier width:100% rule. */
     #leadsTable tr:not(.lead-divider) td {
         position: absolute !important;
         padding: 0 !important;
         margin: 0 !important;
         border: none !important;
-        line-height: 1.2 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        line-height: 1.3 !important;
+        box-sizing: border-box !important;
+        width: auto !important;
     }
 
-    /* ROW 1: Name (top left) */
-    #leadsTable td:nth-child(2) {
-        top: 14px !important;
-        left: 14px !important;
-        right: 60px !important;
+    /* ── HIDDEN columns (specificity matches base rule) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(1),
+    #leadsTable tr:not(.lead-divider) td:nth-child(3),
+    #leadsTable tr:not(.lead-divider) td:nth-child(8),
+    #leadsTable tr:not(.lead-divider) td:nth-child(10),
+    #leadsTable tr:not(.lead-divider) td:nth-child(12) {
+        display: none !important;
+    }
+
+    /* ── ROW 1: Name (full width) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(2) {
+        top: 10px !important;
+        left: 12px !important;
+        right: 12px !important;
         font-size: 13px !important;
-        font-weight: 600 !important;
-        color: #1f2937 !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+        white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        white-space: nowrap !important;
+    }
+    #leadsTable tr:not(.lead-divider) td:nth-child(2) strong {
+        font-size: 13px !important;
+        color: #3b82f6 !important;
+        font-weight: 700 !important;
     }
 
-    /* ROW 1: Contact icons (top right) */
-    #leadsTable td:nth-child(3) {
-        top: 14px !important;
-        right: 14px !important;
-        width: 45px !important;
+    /* ── ROW 5: Contact icons bottom-left (📞 ✉) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(4) {
+        top: 118px !important;
+        left: 12px !important;
+        width: auto !important;
     }
-
-    #leadsTable .contact-info {
+    #leadsTable tr:not(.lead-divider) td:nth-child(4) .contact-info {
         display: flex !important;
         gap: 6px !important;
         align-items: center !important;
-        justify-content: flex-end !important;
     }
-
-    #leadsTable .contact-info a {
-        width: 18px !important;
-        height: 18px !important;
+    #leadsTable tr:not(.lead-divider) td:nth-child(4) a {
+        width: 26px !important;
+        height: 26px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        background: #f8fafc !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 4px !important;
-        font-size: 10px !important;
-        color: #64748b !important;
+        background: #eff6ff !important;
+        border: 1px solid #bfdbfe !important;
+        border-radius: 5px !important;
+        font-size: 12px !important;
+        color: #3b82f6 !important;
         text-decoration: none !important;
     }
 
-    #leadsTable .contact-info a:hover {
-        background: #3b82f6 !important;
-        color: white !important;
-    }
-
-    /* ROW 2: Interest Bar (progress bar) - full width again since buttons moved */
-    #leadsTable td:nth-child(4) {
-        display: block !important; /* Show interest bar again */
-        top: 38px !important;
-        left: 14px !important;
-        right: 14px !important; /* Full width since buttons moved down */
+    /* ── ROW 2: Interest / time bar (full width) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(5) {
+        top: 36px !important;
+        left: 12px !important;
+        right: 12px !important;
         height: 20px !important;
+        width: auto !important;
     }
 
-    /* ROW 3: Premium (below progress bar, left) + Stage (right) */
-    #leadsTable td:nth-child(5) {
-        top: 65px !important;
-        left: 14px !important;
-        width: 55% !important; /* Increased width so premium doesn't get cut off */
-        font-size: 14px !important; /* Increased text size for premium */
-        font-weight: 700 !important; /* Made bolder */
+    /* ── ROW 3: Premium (left) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(6) {
+        top: 64px !important;
+        left: 12px !important;
+        width: 56% !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
         color: #059669 !important;
-        display: block !important;
-        overflow: visible !important; /* Prevent cutoff */
-        white-space: nowrap !important; /* Prevent wrapping */
+        white-space: nowrap !important;
+        overflow: hidden !important;
     }
-
-    #leadsTable td:nth-child(5):before {
+    #leadsTable tr:not(.lead-divider) td:nth-child(6)::before {
         content: "Premium: " !important;
-        font-size: 14px !important; /* Same size as the number */
-        color: #059669 !important; /* Same color as the number */
-        font-weight: 700 !important; /* Same weight as the number */
-        margin-right: 4px !important;
+        font-size: 11px !important;
+        font-weight: 400 !important;
+        color: #6b7280 !important;
     }
 
-    /* Stage (right side, same row as premium) - FORCE VISIBLE */
-    #leadsTable td:nth-child(6) {
-        top: 65px !important;
-        right: 14px !important;
-        width: 30% !important; /* Reduced width to give premium more space */
+    /* ── ROW 3: Stage badge (right) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(7) {
+        top: 62px !important;
+        right: 12px !important;
+        width: 40% !important;
         text-align: right !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        position: absolute !important;
-        z-index: 9999 !important;
     }
-
-
-    /* MOBILE STAGE BADGE FOR LEAD CARDS */
-    #leadsTable .stage-badge {
-        background: #e5e7eb !important;
-        color: #374151 !important;
-        padding: 4px 8px !important;
-        border-radius: 12px !important;
+    #leadsTable tr:not(.lead-divider) td:nth-child(7) .stage-badge,
+    #leadsTable tr:not(.lead-divider) td:nth-child(7) span.stage-badge {
+        display: inline-block !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
         font-size: 10px !important;
         font-weight: 600 !important;
         text-transform: uppercase !important;
-        display: inline-block !important;
-        border: 1px solid #d1d5db !important;
         white-space: nowrap !important;
+        border: 1px solid transparent !important;
+    }
+    #leadsTable tr:not(.lead-divider) td:nth-child(7) .stage-badge.stage-new       { background:#dbeafe !important; color:#1e40af !important; border-color:#93c5fd !important; }
+    #leadsTable tr:not(.lead-divider) td:nth-child(7) .stage-badge.stage-quoted    { background:#d1fae5 !important; color:#065f46 !important; border-color:#6ee7b7 !important; }
+    #leadsTable tr:not(.lead-divider) td:nth-child(7) .stage-badge.stage-qualified { background:#fef3c7 !important; color:#92400e !important; border-color:#fcd34d !important; }
+    #leadsTable tr:not(.lead-divider) td:nth-child(7) .stage-badge.stage-closed    { background:#dcfce7 !important; color:#14532d !important; border-color:#86efac !important; }
+
+    /* ── ROW 4: Renewal/Expires (left) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(9) {
+        top: 90px !important;
+        left: 12px !important;
+        width: 52% !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        color: #374151 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+    }
+    #leadsTable tr:not(.lead-divider) td:nth-child(9)::before {
+        content: "Exp: " !important;
+        font-size: 10px !important;
+        font-weight: 400 !important;
+        color: #9ca3af !important;
     }
 
-    #leadsTable .stage-badge.stage-new {
-        background: #dbeafe !important;
-        color: #1e40af !important;
-        border-color: #93c5fd !important;
+    /* ── ROW 4: Insurance company (right) ── */
+    #leadsTable tr:not(.lead-divider) td:nth-child(11) {
+        top: 87px !important;
+        right: 12px !important;
+        width: 44% !important;
+        text-align: right !important;
     }
-
-    #leadsTable .stage-badge.stage-quoted {
-        background: #d1fae5 !important;
-        color: #065f46 !important;
-        border-color: #86efac !important;
-    }
-
-    #leadsTable .stage-badge.stage-qualified {
-        background: #fef3c7 !important;
-        color: #92400e !important;
-        border-color: #fcd34d !important;
-    }
-
-    /* REMOVE TD STYLING TO ELIMINATE OUTSIDE BUBBLE */
-    #leadsTable tr:not(.lead-divider) td:nth-child(6) {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-
-    /* LEAD STAGE COLORS - ONLY TARGET LEADSTABLE */
-    #leadsTable span.stage-badge.stage-new {
-        background: #dbeafe !important;
-        color: #1e40af !important;
-        border-color: #3b82f6 !important;
-    }
-
-    #leadsTable span.stage-badge.stage-qualified {
-        background: #fef3c7 !important;
-        color: #92400e !important;
-        border-color: #f59e0b !important;
-    }
-
-    #leadsTable span.stage-badge.stage-quoted {
-        background: #d1fae5 !important;
-        color: #065f46 !important;
-        border-color: #10b981 !important;
-    }
-
-    /* FORCE STAGE BADGE TO SHOW - EXACT TARGETING */
-    #leadsTable span.stage-badge.stage-new,
-    #leadsTable .stage-badge.stage-new,
-    #leadsTable span.stage-badge,
-    #leadsTable .stage-badge,
-    span.stage-badge.stage-new,
-    span.stage-badge {
+    #leadsTable tr:not(.lead-divider) td:nth-child(11) span {
         display: inline-block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        background: #dbeafe !important;
-        color: #1e40af !important;
-        padding: 4px 8px !important;
-        border-radius: 12px !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
         font-size: 10px !important;
         font-weight: 500 !important;
-        text-transform: uppercase !important;
-        border: 1px solid #3b82f6 !important;
         white-space: nowrap !important;
-        position: relative !important;
-        z-index: 9999 !important;
-        max-width: none !important;
-        width: auto !important;
-    }
-
-    /* ROW 4: Renewal Date (under premium) */
-    #leadsTable td:nth-child(8) {
-        top: 90px !important;
-        left: 14px !important;
-        width: 55% !important;
-        font-size: 11px !important;
-        color: #6b7280 !important;
-        overflow: visible !important;
-        white-space: nowrap !important;
-    }
-
-    #leadsTable td:nth-child(8):before {
-        content: "Expires: " !important;
-        font-size: 11px !important;
-        color: #000000 !important;
-        font-weight: 500 !important;
-        margin-right: 4px !important;
-    }
-
-    /* FORCE RENEWAL DATE TO SHOW - VERY HIGH PRIORITY */
-    #leadsTable tr:not(.lead-divider) td:nth-child(8) {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        position: absolute !important;
-        top: 90px !important;
-        left: 14px !important;
-        width: 55% !important;
-        font-size: 11px !important;
-        color: #000000 !important;
-        overflow: visible !important;
-        white-space: nowrap !important;
-        z-index: 999 !important;
-    }
-
-    /* ROW 4: Todo (moved to row 5) */
-    #leadsTable td:nth-child(7) {
-        top: 115px !important;
-        left: 14px !important;
-        width: 25% !important;
-        font-size: 9px !important;
-        color: #6b7280 !important;
+        max-width: 100% !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        white-space: nowrap !important;
     }
 
-    /* Show Agent column (moved to row 5) */
-    #leadsTable td:nth-child(9) {
-        display: block !important;
-        top: 115px !important;
-        left: 27% !important;
-        width: 15% !important;
-        font-size: 9px !important;
-        color: #6b7280 !important;
-        text-align: center !important;
-    }
-
-    /* Insurance Company - under expiration date - FORCE VISIBLE */
-    #leadsTable td:nth-child(10) {
-        display: block !important;
-        top: 108px !important;
-        left: 14px !important;
-        width: 55% !important;
-        font-size: 10px !important;
-        color: #000000 !important;
-        text-align: left !important;
-        overflow: visible !important;
-        white-space: nowrap !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        position: absolute !important;
-        z-index: 9999 !important;
-    }
-
-    #leadsTable td:nth-child(10):before {
-        content: "Company: " !important;
-        font-size: 10px !important;
-        color: #000000 !important;
-        font-weight: 500 !important;
-        margin-right: 4px !important;
-    }
-
-    /* FORCE INSURANCE COMPANY SPAN TO SHOW */
-    #leadsTable td:nth-child(10) span,
-    #leadsTable span[style*="background: #6b7280"],
-    #leadsTable span[style*="color: white"] {
-        display: inline-block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        background: #6b7280 !important;
-        color: white !important;
-        padding: 4px 8px !important;
-        border-radius: 12px !important;
-        font-size: 10px !important;
-        font-weight: 500 !important;
-        white-space: nowrap !important;
-        position: relative !important;
-        z-index: 9999 !important;
-        max-width: none !important;
+    /* ── ROW 5: Action buttons bottom-right (👁 🗄 🗑) ── */
+    #leadsTable tr:not(.lead-divider) td:last-child {
+        top: 92px !important;
+        right: 12px !important;
         width: auto !important;
     }
-
-    /* Action buttons - positioned higher */
-    #leadsTable td:last-child {
-        top: 65px !important;
-        right: 14px !important;
-        width: 120px !important;
-        text-align: center !important;
-        display: block !important;
-    }
-
-    /* Remove the hide rule - we want to show the interest bar */
-
-    #leadsTable .action-buttons {
+    #leadsTable tr:not(.lead-divider) .action-buttons {
         display: flex !important;
-        gap: 3px !important;
-        justify-content: center !important;
-        flex-wrap: wrap !important; /* Allow wrapping for compact layout */
+        gap: 4px !important;
+        justify-content: flex-end !important;
     }
-
-    #leadsTable .action-buttons .btn-icon {
-        width: 20px !important;
-        height: 20px !important;
+    #leadsTable tr:not(.lead-divider) .action-buttons .btn-icon {
+        width: 26px !important;
+        height: 26px !important;
         padding: 0 !important;
         background: #f8fafc !important;
         border: 1px solid #e2e8f0 !important;
-        border-radius: 4px !important;
-        font-size: 10px !important;
+        border-radius: 5px !important;
+        font-size: 12px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         color: #64748b !important;
-        margin: 1px !important; /* Small margin for spacing */
+        cursor: pointer !important;
     }
-
-    #leadsTable .action-buttons .btn-icon:hover {
-        background: #e2e8f0 !important;
-    }
-
-    /* Hide unused columns - only hide checkbox and last unused column */
-    #leadsTable td:nth-child(1),
-    #leadsTable td:nth-child(11) {
-        display: none !important;
+    #leadsTable tr:not(.lead-divider) .action-buttons .btn-icon-danger {
+        background: #fff1f2 !important;
+        border-color: #fecdd3 !important;
+        color: #ef4444 !important;
     }
 
     /* Lead Divider Row - Mobile Fix - NORMAL HEIGHT */
@@ -1125,27 +994,9 @@
         margin: 0 !important;
     }
 
-    /* Hide other columns */
-    #leadsTable th:nth-child(n+6),
-    #leadsTable td:nth-child(n+6):not(:last-child),
-    .data-table th:nth-child(n+6),
-    .data-table td:nth-child(n+6):not(:last-child) {
-        display: none !important;
-    }
+    /* NOTE: lead card columns are managed individually above — no blanket hide */
 
-    /* Lead name specific */
-    #leadsTableBody .lead-name {
-        max-width: 60px !important;
-        font-size: 7px !important;
-    }
-
-    /* Contact icons tiny */
-    #leadsTableBody .contact-info a {
-        width: 14px !important;
-        height: 14px !important;
-        font-size: 6px !important;
-        padding: 2px !important;
-    }
+    /* Lead name / contact styles handled by card layout above */
 
     /* Status badges tiny */
     .status-badge {
@@ -2907,22 +2758,7 @@
 
 /* Floating Action Button (FAB) */
 .fab {
-    position: fixed;
-    bottom: 80px;
-    right: 20px;
-    width: 56px;
-    height: 56px;
-    background: var(--primary);
-    color: var(--white);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    font-size: 24px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    z-index: 900;
+    display: none !important;
 }
 
 .fab:hover {
@@ -3147,25 +2983,24 @@
         overflow-wrap: break-word !important;
     }
 
-    /* COI Document buttons - override inline styles completely */
+    /* COI Document buttons - side by side */
     div.coi-document-card[style] > div[style]:last-child {
         display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
         gap: 8px !important;
         width: 100% !important;
         margin-top: 8px !important;
-        justify-content: space-between !important;
-        flex-wrap: wrap !important;
     }
 
     div.coi-document-card[style] button[style] {
         flex: 1 !important;
-        padding: 8px 12px !important;
+        min-width: 0 !important;
+        padding: 8px 10px !important;
         font-size: 11px !important;
         border-radius: 6px !important;
         min-height: 36px !important;
         white-space: nowrap !important;
-        max-width: calc(50% - 4px) !important;
-        min-width: calc(50% - 4px) !important;
         box-sizing: border-box !important;
     }
 
@@ -3275,18 +3110,21 @@
 
     .modal-overlay#policyViewModal .modal-body > div:first-child > div:last-child[style] {
         display: flex !important;
+        flex-direction: row !important;
         gap: 8px !important;
         width: 100% !important;
-        flex-wrap: wrap !important;
+        flex-wrap: nowrap !important;
     }
 
     .modal-overlay#policyViewModal .btn-secondary[style] {
         flex: 1 !important;
-        min-width: calc(50% - 4px) !important;
-        padding: 10px 12px !important;
+        min-width: 0 !important;
+        padding: 10px 8px !important;
         font-size: 12px !important;
         text-align: center !important;
         white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
     /* Policy Tabs - Horizontal scroll on mobile */
@@ -3848,15 +3686,53 @@
 
     .client-profile-view .header-actions {
         display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
+        flex-direction: row !important;
+        gap: 6px !important;
         margin-top: 12px !important;
     }
 
     .client-profile-view .header-actions button {
-        width: 100% !important;
-        padding: 12px !important;
-        font-size: 14px !important;
+        flex: 1 !important;
+        padding: 8px 10px !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+    }
+
+    /* "Go to Client Portal" → show as "Portal" only */
+    .client-profile-view span[style*="cursor: not-allowed"],
+    .client-profile-view a[href*="portal"] {
+        font-size: 0 !important;
+        padding: 6px 10px !important;
+    }
+    .client-profile-view span[style*="cursor: not-allowed"]::after,
+    .client-profile-view a[href*="portal"]::after {
+        content: "Portal" !important;
+        font-size: 12px !important;
+    }
+    .client-profile-view span[style*="cursor: not-allowed"] i,
+    .client-profile-view a[href*="portal"] i {
+        font-size: 11px !important;
+    }
+
+    /* Policy view/delete buttons — row, View Details large, delete trash small */
+    .client-profile-view div[style*="display: flex"][style*="gap: 8px"] {
+        flex-direction: row !important;
+        gap: 6px !important;
+    }
+    .client-profile-view div[style*="display: flex"][style*="gap: 8px"] button[onclick*="viewPolicy"] {
+        flex: 1 !important;
+        font-size: 13px !important;
+        padding: 8px 10px !important;
+    }
+    .client-profile-view div[style*="display: flex"][style*="gap: 8px"] button[onclick*="viewPolicy"]::after {
+        content: none !important;
+    }
+    .client-profile-view div[style*="display: flex"][style*="gap: 8px"] button[onclick*="deletePolicy"] {
+        flex: none !important;
+        width: 36px !important;
+        min-width: 36px !important;
+        padding: 8px 0 !important;
+        font-size: 13px !important;
     }
 
     /* Client Portal Box - Full Width on Mobile */
@@ -3867,6 +3743,25 @@
     .client-profile-view > div:first-child > div:first-child {
         margin: 0 0 16px 0 !important;
         padding: 16px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+    /* Portal email/password rows — stack vertically on mobile to prevent overflow */
+    .client-profile-view div[style*="background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0"] {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        box-sizing: border-box !important;
+    }
+    /* Left side of portal row — allow it to shrink */
+    .client-profile-view div[style*="background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0"] > div:first-child {
+        min-width: 0 !important;
+        flex: 1 !important;
+        overflow: hidden !important;
+    }
+    /* Email text inside portal row */
+    .client-profile-view div[style*="background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0"] p {
+        word-break: break-all !important;
+        white-space: normal !important;
     }
 
     /* Two Column Grid -> Single Column */
@@ -3880,6 +3775,21 @@
         margin: 0 12px 16px 12px !important;
         padding: 16px !important;
         border-radius: 8px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        max-width: calc(100vw - 24px) !important;
+    }
+    /* Info rows - prevent content overflow */
+    .client-profile-view div[style*="grid-template-columns: 1fr 1fr"] > div:first-child div[style*="padding: 16px"] {
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        word-break: break-word !important;
+    }
+    /* Phone/email anchor links - allow wrap */
+    .client-profile-view div[style*="grid-template-columns: 1fr 1fr"] > div:first-child a {
+        min-width: 0 !important;
+        overflow: hidden !important;
+        word-break: break-all !important;
     }
 
     .client-profile-view div[style*="grid-template-columns: 1fr 1fr"] > div:first-child h2 {
@@ -3968,15 +3878,10 @@
         font-size: 14px !important;
     }
 
-    /* Policy Toggle and Actions */
+    /* Policy Toggle and Actions — keep row layout, view/delete handled above */
     .client-profile-view div[style*="display: flex; gap: 8px; margin-top: 12px"] {
-        flex-direction: column !important;
-        gap: 8px !important;
-    }
-
-    .client-profile-view div[style*="display: flex; gap: 8px; margin-top: 12px"] button {
-        width: 100% !important;
-        padding: 12px !important;
+        flex-direction: row !important;
+        gap: 6px !important;
     }
 
     /* COI Modal Full Screen on Mobile */
@@ -4033,30 +3938,53 @@
     }
 
     .coi-modal .radio-group {
-        flex-direction: column !important;
-        gap: 12px !important;
+        flex-direction: row !important;
+        gap: 16px !important;
+        flex-wrap: wrap !important;
     }
 
     .coi-modal .radio-option {
-        margin-bottom: 8px !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* COI form full width */
+    .coi-modal #crmCOIModalForm,
+    .coi-modal .form-group {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Email Recipients header — wrap on mobile */
+    .coi-modal .form-group > div[style*="justify-content: space-between"] {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    .coi-modal .form-group > div[style*="justify-content: space-between"] > div {
+        flex-wrap: wrap !important;
+        gap: 6px !important;
     }
 
     /* COI Email Recipients Mobile */
     .coi-modal .crm-coi-email-recipient-row {
-        flex-direction: column !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
         gap: 8px !important;
-        margin-bottom: 12px !important;
+        margin-bottom: 8px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .coi-modal .crm-coi-email-recipient-row input {
-        width: 100% !important;
-        margin-bottom: 8px !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+        width: auto !important;
     }
 
     .coi-modal .crm-coi-email-recipient-row button {
-        width: 100% !important;
-        padding: 12px !important;
-        font-size: 14px !important;
+        flex: none !important;
+        white-space: nowrap !important;
+        padding: 10px 12px !important;
+        font-size: 13px !important;
     }
 
     /* COI Form Actions Mobile */

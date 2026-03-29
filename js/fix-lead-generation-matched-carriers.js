@@ -17,6 +17,7 @@ window.generateLeadsFromForm = async function() {
     // No limit - fetch all available leads
     const minFleet = document.getElementById('genMinFleet')?.value || '1';
     const maxFleet = document.getElementById('genMaxFleet')?.value || '9999';
+    const safetyMinPercent = document.getElementById('genSafetyMin')?.value || '';
     const safetyMaxPercent = document.getElementById('genSafety')?.value || '';
     const requireInspections = document.getElementById('requireInspections')?.checked || false;
 
@@ -60,7 +61,7 @@ window.generateLeadsFromForm = async function() {
     console.log(`   📅  Years in business: ${yearsInBusinessMin || '0'} - ${yearsInBusinessMax || '100'} years`);
 
     if (hasOthersSelected) {
-        console.log(`   🔍  "Others" selected - API will get ALL companies (no insurance filter applied)`);
+        console.log(`   🔍  "Others" selected - API will EXCLUDE predefined companies and get only carriers with unlisted insurance companies`);
     } else {
         console.log(`   🔍  API will filter by: ${specificInsurance.length > 0 ? specificInsurance.join(', ') : 'ALL (no specific filter)'}`);
     }
@@ -87,7 +88,10 @@ window.generateLeadsFromForm = async function() {
             limit: 50000
         });
 
-        // Add safety percentage filter if specified
+        // Add safety percentage filters if specified
+        if (safetyMinPercent) {
+            params.append('safetyMinPercent', safetyMinPercent);
+        }
         if (safetyMaxPercent) {
             params.append('safetyMaxPercent', safetyMaxPercent);
         }
@@ -97,9 +101,27 @@ window.generateLeadsFromForm = async function() {
             params.append('requireInspections', 'true');
         }
 
-        // Add insurance companies ONLY if "Others" is NOT selected AND specific companies are selected
-        if (!hasOthersSelected && specificInsurance.length > 0) {
+        // Handle insurance company filtering - "Others" is additive, not exclusive
+        if (hasOthersSelected && specificInsurance.length > 0) {
+            // Both specific companies AND "Others" selected - get ALL carriers (no insurance filtering)
+            // This gives us the union of: carriers with specific companies + carriers with other companies
+            console.log('🔍 Both specific companies AND "Others" selected - getting ALL carriers (no insurance filtering for maximum leads)');
+        } else if (hasOthersSelected) {
+            // Only "Others" selected - exclude predefined companies
+            const predefinedCompanies = [
+                'PROGRESSIVE', 'GEICO', 'GREAT_WEST', 'CANAL', 'ACUITY', 'NORTHLAND',
+                'CINCINNATI', 'AUTO_OWNERS', 'SENTRY', 'ERIE', 'TRAVELERS', 'BITCO',
+                'CAROLINA', 'STATE_FARM', 'ALLSTATE', 'NATIONWIDE', 'FARMERS',
+                'LIBERTY_MUTUAL', 'AMERICAN_FAMILY', 'USAA', 'SAFECO', 'HARTFORD',
+                'ZURICH', 'CNA', 'BERKSHIRE_HATHAWAY', 'AIG', 'CHUBB', 'MERCURY',
+                'ENCOMPASS', 'ESURANCE', 'METLIFE', 'AMERICAN_NATIONAL', 'OCCIDENTAL'
+            ];
+            params.append('exclude_insurance_companies', predefinedCompanies.join(','));
+            console.log('🔍 "Others" only selected - excluding predefined companies');
+        } else if (specificInsurance.length > 0) {
+            // Only specific companies selected - include only those
             params.append('insurance_companies', specificInsurance.join(','));
+            console.log('🔍 Specific companies only selected - including only those');
         }
 
         // Add unit types filter if specified

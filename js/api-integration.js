@@ -251,7 +251,7 @@ function updateDashboardStats(stats) {
             statCards[1].textContent = (stats.total_policies || 0).toLocaleString();
         }
 
-        // All Time Premium
+        // Last 2 Month New Premium
         if (statCards[2]) {
             const premium = stats.total_premium || 0;
             statCards[2].textContent = `$${premium.toLocaleString()}`;

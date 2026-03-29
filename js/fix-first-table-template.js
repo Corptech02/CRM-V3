@@ -85,7 +85,7 @@ console.log('🔧 FIX FIRST TABLE TEMPLATE - Loading...');
             let fixedCount = 0;
 
             rows.forEach(row => {
-                const todoCell = row.querySelectorAll('td')[6]; // TODO column
+                const todoCell = row.querySelectorAll('td')[7]; // TODO column
                 if (!todoCell) return;
 
                 const todoText = todoCell.textContent.trim();

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚫 FORCE CACHE CLEAR - DOT Spam Still Happening</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #dc2626; color: white; }
+        .container { max-width: 800px; margin: 0 auto; background: #1f1f1f; padding: 30px; border-radius: 8px; }
+        .error { color: #fca5a5; font-weight: bold; }
+        .warning { color: #fbbf24; font-weight: bold; }
+        .info { color: #93c5fd; font-weight: bold; }
+        .step { background: #374151; padding: 15px; border-radius: 6px; margin: 10px 0; border-left: 4px solid #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚫 YOUR BROWSER IS USING OLD CACHED VERSION!</h1>
+
+        <div class="step">
+            <h3 class="error">🐛 Problem: You're Still Using v7 (Not v9)</h3>
+            <p class="error">Console shows: auto-dot-lookup-hook.js?v=7:354</p>
+            <p class="warning">But we updated to v9 which has ALL auto-scanning disabled!</p>
+        </div>
+
+        <div class="step">
+            <h3 class="warning">🔄 FORCE CLEAR BROWSER CACHE NOW:</h3>
+            <ol>
+                <li class="info"><strong>Chrome/Edge:</strong> Ctrl+Shift+R or F12 → Network tab → "Disable cache" → Refresh</li>
+                <li class="info"><strong>Firefox:</strong> Ctrl+F5 or Ctrl+Shift+R</li>
+                <li class="info"><strong>Safari:</strong> Cmd+Option+R</li>
+                <li class="info"><strong>Or:</strong> Open Developer Tools → Application/Storage → Clear Storage → Clear site data</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3 class="info">✅ After Cache Clear, You Should See:</h3>
+            <pre style="background: #000; color: #00ff00; padding: 10px; border-radius: 4px;">
+✅ Auto DOT Lookup Hook v9 - ALL AUTO-SCANNING DISABLED
+🚫 DOT lookup ONLY works on: 1) Manual button clicks, 2) New Vicidial imports
+🔧 Debug functions available: debugDOTLookupHook(), manualDOTLookupTrigger(leadId, dotNumber)
+</pre>
+        </div>
+
+        <div class="step">
+            <h3 class="error">🚫 What's Now Completely Disabled in v9:</h3>
+            <ul>
+                <li>❌ localStorage auto-scanning</li>
+                <li>❌ addLead auto-hooks</li>
+                <li>❌ Form submission monitoring</li>
+                <li>❌ Input field monitoring</li>
+                <li>❌ processLeadsForDOTLookup mass scanning</li>
+                <li>❌ forceProcessAllDOTLeads function</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3 class="info">✅ What Still Works (Manual Only):</h3>
+            <ul>
+                <li>✅ Manual "DOT Lookup" button clicks</li>
+                <li>✅ New Vicidial imports (limited to new leads only)</li>
+                <li>✅ manualDOTLookupTrigger() debug function</li>
+            </ul>
+        </div>
+
+        <p class="warning" style="text-align: center; font-size: 18px; margin-top: 30px;">
+            ⚠️ CLEAR YOUR CACHE NOW TO STOP THE SPAM! ⚠️
+        </p>
+    </div>
+</body>
+</html>

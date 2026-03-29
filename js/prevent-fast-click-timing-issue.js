@@ -1,6 +1,15 @@
 // Prevent Fast Click Timing Issue - Stops wrong lead loading when clicking too fast after page refresh
 console.log('🚨 TIMING FIX: Preventing fast-click timing issues...');
 
+// Debug flag - set to true to enable verbose logging
+const SAFE_VIEWLEAD_DEBUG = false;
+
+// Capture original viewLead function before overriding
+const originalViewLead = window.viewLead;
+
+// Recursion prevention flag
+let isInViewLead = false;
+
 let isSystemReady = false;
 let clickQueue = [];
 
@@ -53,65 +62,83 @@ function waitForSystemReady() {
 
 // Safe viewLead wrapper
 function safeViewLead(leadId) {
-    console.log(`🛡️ SAFE VIEWLEAD: Called with ID=${leadId}, System Ready=${isSystemReady}`);
-
-    // Validate the lead ID
-    if (!leadId || leadId === 'undefined' || leadId === 'null') {
-        console.error('❌ SAFE VIEWLEAD: Invalid lead ID provided');
+    // Prevent infinite recursion
+    if (isInViewLead) {
+        console.warn('⚠️ SAFE VIEWLEAD: Preventing recursion - already in viewLead call');
         return;
     }
+    isInViewLead = true;
 
-    // Check if this is the problematic default ID
-    if (String(leadId) === '8126662') {
-        console.warn('⚠️ SAFE VIEWLEAD: Detected hardcoded 8126662 - investigating...');
+    try {
+        // Only log debug info if debug flag is enabled
+        if (SAFE_VIEWLEAD_DEBUG) {
+            console.log(`🛡️ SAFE VIEWLEAD: Called with ID=${leadId}, System Ready=${isSystemReady}`);
+        }
 
-        // If system isn't ready, this might be a timing issue
+        // Validate the lead ID
+        if (!leadId || leadId === 'undefined' || leadId === 'null') {
+            console.error('❌ SAFE VIEWLEAD: Invalid lead ID provided');
+            return;
+        }
+
+        // Check if this is the problematic default ID
+        if (String(leadId) === '8126662') {
+            console.warn('⚠️ SAFE VIEWLEAD: Detected hardcoded 8126662 - investigating...');
+
+            // If system isn't ready, this might be a timing issue
+            if (!isSystemReady) {
+                console.warn('⚠️ SAFE VIEWLEAD: System not ready - queuing click');
+                clickQueue.push({ leadId, callback: safeViewLead });
+                return;
+            }
+        }
+
         if (!isSystemReady) {
-            console.warn('⚠️ SAFE VIEWLEAD: System not ready - queuing click');
+            if (SAFE_VIEWLEAD_DEBUG) {
+                console.log('⏳ SAFE VIEWLEAD: System not ready - queuing click for', leadId);
+            }
             clickQueue.push({ leadId, callback: safeViewLead });
             return;
         }
-    }
 
-    if (!isSystemReady) {
-        console.log('⏳ SAFE VIEWLEAD: System not ready - queuing click');
-        clickQueue.push({ leadId, callback: safeViewLead });
-        return;
-    }
+        // Verify the lead exists in localStorage (only log errors unless debugging)
+        try {
+            const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const lead = leads.find(l => String(l.id) === String(leadId));
 
-    // Verify the lead exists in localStorage
-    try {
-        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
-        const lead = leads.find(l => String(l.id) === String(leadId));
+            if (!lead) {
+                console.error(`❌ SAFE VIEWLEAD: Lead ${leadId} not found in localStorage`);
+                console.log('Available lead IDs:', leads.map(l => l.id).slice(0, 10));
+                return;
+            }
 
-        if (!lead) {
-            console.error(`❌ SAFE VIEWLEAD: Lead ${leadId} not found in localStorage`);
-            console.log('Available lead IDs:', leads.map(l => l.id).slice(0, 10));
+            // Only log successful lead finding in debug mode
+            if (SAFE_VIEWLEAD_DEBUG) {
+                console.log(`✅ SAFE VIEWLEAD: Found lead ${leadId} - ${lead.name}`);
+            }
+        } catch (error) {
+            console.error('❌ SAFE VIEWLEAD: Error accessing localStorage:', error);
             return;
         }
 
-        console.log(`✅ SAFE VIEWLEAD: Found lead ${leadId} - ${lead.name}`);
-    } catch (error) {
-        console.error('❌ SAFE VIEWLEAD: Error accessing localStorage:', error);
-        return;
-    }
-
-    // Call the actual viewLead function
-    try {
+        // Call the actual viewLead function (use original, not window.viewLead to avoid recursion)
         if (window.protectedFunctions && typeof window.protectedFunctions.viewLead === 'function') {
             window.protectedFunctions.viewLead(leadId);
-        } else if (typeof window.viewLead === 'function') {
-            window.viewLead(leadId);
+        } else if (typeof originalViewLead === 'function') {
+            originalViewLead(leadId);
         } else {
-            console.error('❌ SAFE VIEWLEAD: No viewLead function found');
+            console.error('❌ SAFE VIEWLEAD: No original viewLead function found');
         }
+
     } catch (error) {
-        console.error('❌ SAFE VIEWLEAD: Error calling viewLead:', error);
+        console.error('❌ SAFE VIEWLEAD: Error in safeViewLead:', error);
+    } finally {
+        // Always reset recursion flag
+        isInViewLead = false;
     }
 }
 
 // Override the global viewLead function with our safe wrapper
-const originalViewLead = window.viewLead;
 window.viewLead = function(leadId) {
     return safeViewLead(leadId);
 };
@@ -129,3 +156,4 @@ window.addEventListener('load', waitForSystemReady);
 
 console.log('✅ TIMING FIX: Fast-click protection active');
 console.log('🎯 System will queue clicks until fully ready to prevent wrong lead loading');
+console.log('🔇 TIMING FIX: Verbose logging disabled (set SAFE_VIEWLEAD_DEBUG=true to enable)');

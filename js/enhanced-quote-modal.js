@@ -446,7 +446,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Effective Date:</label>
-                        <input type="date" value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <input type="date" value="${(() => { const rd = lead.renewalDate || ''; if (rd) { const p = rd.split('/'); if (p.length === 3) return '2026-' + p[0].padStart(2,'0') + '-' + p[1].padStart(2,'0'); } return new Date().toISOString().split('T')[0]; })()}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Insured's Name (including DBA):</label>
@@ -535,6 +535,20 @@ window.createQuoteApplicationSimple = function(leadId) {
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dumptruck:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dump Trailer:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Tanker:</label>
                         <div style="display: flex; align-items: center;">
                             <input type="text" value="" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
                             <span style="margin-left: 3px;">%</span>
@@ -719,6 +733,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured/Underinsured Bodily Injury:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="$100,000">$100,000</option>
                             <option value="$500,000">$500,000</option>
                             <option value="$750,000">$750,000</option>
                             <option value="$1,000,000" selected>$1,000,000</option>
@@ -765,10 +780,17 @@ window.createQuoteApplicationSimple = function(leadId) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Non-Owned Trailer Phys Dam:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="$20,000/$1,000 Ded.">$20,000/$1,000 Ded.</option>
+                            <option value="$20,000/$2,000 Ded.">$20,000/$2,000 Ded.</option>
                             <option value="$25,000">$25,000</option>
+                            <option value="$30,000/$1,000 Ded.">$30,000/$1,000 Ded.</option>
+                            <option value="$40,000/$1,000 Ded.">$40,000/$1,000 Ded.</option>
+                            <option value="$40,000/$2,000 Ded.">$40,000/$2,000 Ded.</option>
                             <option value="$50,000" selected>$50,000</option>
+                            <option value="$60,000/$2,000 Ded.">$60,000/$2,000 Ded.</option>
                             <option value="$75,000">$75,000</option>
                             <option value="$100,000">$100,000</option>
+                            <option value="$145,000/$1,000 Ded.">$145,000/$1,000 Ded.</option>
                             <option value="$150,000">$150,000</option>
                             <option value="Not Included">Not Included</option>
                         </select>
@@ -777,6 +799,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="$25,000">$25,000</option>
+                            <option value="$30,000/$1,000 Ded.">$30,000/$1,000 Ded.</option>
                             <option value="$50,000" selected>$50,000</option>
                             <option value="$75,000">$75,000</option>
                             <option value="$100,000">$100,000</option>
@@ -788,6 +811,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                             <option value="Included">Included</option>
+                            <option value="$250 DED.">$250 DED.</option>
                             <option value="Not Included">Not Included</option>
                         </select>
                     </div>
@@ -834,7 +858,15 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$25,000">$25,000</option>
                             <option value="$50,000">$50,000</option>
                             <option value="Included DED. $2500">Included DED. $2500</option>
+                            <option value="$150,000/$2,500 DED.">$150,000/$2,500 DED.</option>
                             <option value="Not Included">Not Included</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental with Downtime:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="$400 per day, $12,000 Max">$400 per day, $12,000 Max</option>
+                            <option value="Not Included" selected>Not Included</option>
                         </select>
                     </div>
                 </div>
@@ -1041,6 +1073,9 @@ window.createQuoteApplicationSimple = function(leadId) {
             console.error('❌ Error during auto-population:', error);
         });
 
+        // Inject "Custom..." option into all coverage dropdowns
+        _injectCustomOptions(content);
+
     }, 300);
 
     // Check if we're viewing/editing an existing application
@@ -1100,7 +1135,7 @@ function prefillApplicationForm(applicationData) {
             const parentDiv = input.closest('div');
             const foundLabel = parentDiv?.querySelector('label')?.textContent?.trim().replace(':', '') ||
                              parentDiv?.previousElementSibling?.textContent?.trim().replace(':', '') ||
-                             parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer|Dumptruck)/)?.[1];
+                             parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer|Dumptruck|Dump Trailer|Tanker)/)?.[1];
             if (foundLabel) {
                 label = foundLabel;
             }
@@ -1135,6 +1170,8 @@ function prefillApplicationForm(applicationData) {
             'Box Truck': formData['Box Truck'],
             'Reefer': formData['Reefer'],
             'Dumptruck': formData['Dumptruck'],
+            'Dump Trailer': formData['Dump Trailer'],
+            'Tanker': formData['Tanker'],
 
             // Coverage fields
             'Auto Liability': formData['Auto Liability'],
@@ -1429,7 +1466,7 @@ window.saveQuoteApplication = async function() {
                     // Try to find the label within the same container
                     const label = parentDiv?.querySelector('label')?.textContent?.trim().replace(':', '') ||
                                  parentDiv?.previousElementSibling?.textContent?.trim().replace(':', '') ||
-                                 parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer|Dumptruck)/)?.[1];
+                                 parentDiv?.textContent?.match(/(Dry Van|Flatbed|Heavy Haul|Auto Hauler|Box Truck|Reefer|Dumptruck|Dump Trailer|Tanker)/)?.[1];
 
                     if (label) {
                         rawLabel = label;
@@ -1461,7 +1498,7 @@ window.saveQuoteApplication = async function() {
 
                 // Log Class of Risk fields specifically for debugging
                 if (rawLabel.includes('Dry Van') || rawLabel.includes('Flatbed') || rawLabel.includes('Heavy Haul') ||
-                    rawLabel.includes('Auto Hauler') || rawLabel.includes('Box Truck') || rawLabel.includes('Reefer') || rawLabel.includes('Dumptruck')) {
+                    rawLabel.includes('Auto Hauler') || rawLabel.includes('Box Truck') || rawLabel.includes('Reefer') || rawLabel.includes('Dumptruck') || rawLabel.includes('Dump Trailer') || rawLabel.includes('Tanker')) {
                     console.log(`🔍 Class of Risk field: "${rawLabel}" = "${value}"`);
                 }
             }
@@ -1600,6 +1637,12 @@ window.saveQuoteApplication = async function() {
             } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
                 formData['Dumptruck'] = value;
                 console.log(`🎯 Explicitly captured Dumptruck: "${value}"`);
+            } else if (parentText.includes('Dump Trailer') || grandparentText.includes('Dump Trailer')) {
+                formData['Dump Trailer'] = value;
+                console.log(`🎯 Explicitly captured Dump Trailer: "${value}"`);
+            } else if (parentText.includes('Tanker') || grandparentText.includes('Tanker')) {
+                formData['Tanker'] = value;
+                console.log(`🎯 Explicitly captured Tanker: "${value}"`);
             }
         });
 
@@ -1931,9 +1974,12 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
     // Helper function to get saved value or default
     // Helper function to generate dropdown options with correct selection
     function generateDropdownOptions(options, selectedValue) {
-        return options.map(option =>
+        const isCustom = selectedValue && !options.includes(selectedValue);
+        const opts = options.map(option =>
             `<option value="${option}" ${option === selectedValue ? 'selected' : ''}>${option}</option>`
         ).join('');
+        const customOpt = `<option value="__custom__" ${isCustom ? 'selected' : ''}>Custom...</option>`;
+        return opts + customOpt;
     }
 
     function getSavedValue(key, defaultValue = '') {
@@ -1963,7 +2009,7 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Effective Date:</label>
-                        <input type="date" value="${getSavedValue('Effective Date', new Date().toISOString().split('T')[0])}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <input type="date" value="${(() => { const saved = getSavedValue('Effective Date', ''); if (saved) return saved.replace(/^\d{4}/, '2026'); const rd = lead.renewalDate || ''; if (rd) { const p = rd.split('/'); if (p.length === 3) return '2026-' + p[0].padStart(2,'0') + '-' + p[1].padStart(2,'0'); } return new Date().toISOString().split('T')[0]; })()}" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Insured's Name (including DBA):</label>
@@ -2054,6 +2100,20 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                         <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dumptruck:</label>
                         <div style="display: flex; align-items: center;">
                             <input type="text" value="${getSavedValue('Dumptruck', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Dump Trailer:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="${getSavedValue('Dump Trailer', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
+                            <span style="margin-left: 3px;">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-size: 12px;">Tanker:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" value="${getSavedValue('Tanker', '')}" style="width: 60px; padding: 3px; border: 1px solid #ccc; border-radius: 3px;">
                             <span style="margin-left: 3px;">%</span>
                         </div>
                     </div>
@@ -2223,7 +2283,7 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured/Underinsured Bodily Injury:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$500,000', '$750,000', '$1,000,000', '$1,500,000', '$2,000,000'], getSavedValue('Uninsured/Underinsured Bodily Injury', '$1,000,000'))}
+                            ${generateDropdownOptions(['$100,000', '$500,000', '$750,000', '$1,000,000', '$1,500,000', '$2,000,000'], getSavedValue('Uninsured/Underinsured Bodily Injury', '$1,000,000'))}
                         </select>
                     </div>
                     <div>
@@ -2247,19 +2307,19 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Non-Owned Trailer Phys Dam:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Non-Owned Trailer Phys Dam', '$50,000'))}
+                            ${generateDropdownOptions(['$20,000/$1,000 Ded.', '$20,000/$2,000 Ded.', '$25,000', '$30,000/$1,000 Ded.', '$40,000/$1,000 Ded.', '$40,000/$2,000 Ded.', '$50,000', '$60,000/$2,000 Ded.', '$75,000', '$100,000', '$145,000/$1,000 Ded.', '$150,000', 'Not Included'], getSavedValue('Non-Owned Trailer Phys Dam', '$50,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Trailer Interchange:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$25,000', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Trailer Interchange', '$50,000'))}
+                            ${generateDropdownOptions(['$25,000', '$30,000/$1,000 Ded.', '$50,000', '$75,000', '$100,000', '$150,000', 'Not Included'], getSavedValue('Trailer Interchange', '$50,000'))}
                         </select>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Roadside Assistance:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['Included', 'Not Included'], getSavedValue('Roadside Assistance', 'Included'))}
+                            ${generateDropdownOptions(['Included', '$250 DED.', 'Not Included'], getSavedValue('Roadside Assistance', 'Included'))}
                         </select>
                     </div>
                     <div>
@@ -2283,7 +2343,13 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Reefer Breakdown:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$5,000', '$10,000', '$15,000', '$25,000', '$50,000', 'Included DED. $2500', 'Not Included'], getSavedValue('Reefer Breakdown', '$15,000'))}
+                            ${generateDropdownOptions(['$5,000', '$10,000', '$15,000', '$25,000', '$50,000', 'Included DED. $2500', '$150,000/$2,500 DED.', 'Not Included'], getSavedValue('Reefer Breakdown', '$15,000'))}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Rental with Downtime:</label>
+                        <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            ${generateDropdownOptions(['$400 per day, $12,000 Max', 'Not Included'], getSavedValue('Rental with Downtime', 'Not Included'))}
                         </select>
                     </div>
                 </div>
@@ -2314,6 +2380,9 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
         console.log('🔄 Populating array data from saved application...');
         populateArrayDataFromSaved(savedData);
     }, 100);
+
+    // Inject "Custom..." option into all coverage dropdowns
+    _injectCustomOptions(content);
 
     console.log('Enhanced modal with saved data created and added to DOM');
 
@@ -2615,6 +2684,12 @@ window.downloadQuoteApplicationPDF = function() {
             } else if (parentText.includes('Dumptruck') || grandparentText.includes('Dumptruck')) {
                 formData['Dumptruck'] = value;
                 console.log(`🎯 Download: Captured Dumptruck: "${value}"`);
+            } else if (parentText.includes('Dump Trailer') || grandparentText.includes('Dump Trailer')) {
+                formData['Dump Trailer'] = value;
+                console.log(`🎯 Download: Captured Dump Trailer: "${value}"`);
+            } else if (parentText.includes('Tanker') || grandparentText.includes('Tanker')) {
+                formData['Tanker'] = value;
+                console.log(`🎯 Download: Captured Tanker: "${value}"`);
             }
         });
 
@@ -3701,3 +3776,82 @@ function populateClassOfRisk(modal, commodities) {
 }
 
 console.log('✅ Enhanced Quote Application Modal Loaded');
+
+// ─── Coverage dropdown → custom text input swap ───────────────────────────────
+function _injectCustomOptions(container) {
+    (container || document).querySelectorAll('select').forEach(function(sel) {
+        if (!Array.from(sel.options).find(function(o) { return o.value === '__custom__'; })) {
+            var opt = document.createElement('option');
+            opt.value = '__custom__';
+            opt.text = 'Custom...';
+            sel.appendChild(opt);
+        }
+    });
+}
+
+document.addEventListener('change', function(e) {
+    var sel = e.target;
+    if (sel.tagName !== 'SELECT' || sel.value !== '__custom__') return;
+    // Only act on selects inside the quote modal
+    if (!sel.closest('#quoteApplicationModal, #enhancedQuoteModal, [id*="quote"], [id*="Quote"]')) return;
+    _coverageToCustomInput(sel);
+});
+
+function _coverageToCustomInput(sel) {
+    // Serialize the select's current options so we can restore it
+    var optionsHtml = Array.from(sel.options).map(function(o) {
+        return '<option value="' + o.value + '">' + o.text + '</option>';
+    }).join('');
+    var selectHtml = sel.outerHTML.replace(' value="__custom__"', '');
+
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex;gap:3px;align-items:stretch;';
+    wrapper.setAttribute('data-coverage-custom', '1');
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Enter custom value';
+    input.style.cssText = sel.style.cssText + ';flex:1;padding:5px;border:1px solid #0066cc;border-radius:3px 0 0 3px;font-size:12px;';
+    // Copy name/data attrs
+    if (sel.name) input.name = sel.name;
+    input.setAttribute('data-select-html', selectHtml);
+
+    var restoreBtn = document.createElement('button');
+    restoreBtn.type = 'button';
+    restoreBtn.innerHTML = '&#9660;';
+    restoreBtn.title = 'Show dropdown options';
+    restoreBtn.style.cssText = 'padding:0 8px;border:1px solid #0066cc;border-left:none;border-radius:0 3px 3px 0;background:white;cursor:pointer;font-size:11px;color:#0066cc;';
+    restoreBtn.onclick = function() { _coverageRestoreSelect(this); };
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(restoreBtn);
+    sel.parentNode.replaceChild(wrapper, sel);
+    input.focus();
+}
+
+function _coverageRestoreSelect(btn) {
+    var wrapper = btn.closest('[data-coverage-custom]');
+    var input = wrapper.querySelector('input');
+    var customValue = input.value.trim();
+    var selectHtml = input.getAttribute('data-select-html');
+
+    var tmp = document.createElement('div');
+    tmp.innerHTML = selectHtml;
+    var newSel = tmp.firstChild;
+
+    // If user typed something, add it as a selected option
+    if (customValue) {
+        var existing = Array.from(newSel.options).find(function(o) { return o.value === customValue; });
+        if (!existing) {
+            var customOpt = document.createElement('option');
+            customOpt.value = customValue;
+            customOpt.text = customValue;
+            // Insert before the "Custom..." option
+            var customPlaceholder = Array.from(newSel.options).find(function(o) { return o.value === '__custom__'; });
+            newSel.insertBefore(customOpt, customPlaceholder || null);
+        }
+        newSel.value = customValue;
+    }
+
+    wrapper.parentNode.replaceChild(newSel, wrapper);
+}

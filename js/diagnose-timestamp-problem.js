@@ -43,7 +43,7 @@
             const cells = row.querySelectorAll('td');
             if (cells.length >= 7) {
                 const nameCell = cells[1];
-                const todoCell = cells[6];
+                const todoCell = cells[7];
 
                 const name = (nameCell.textContent || '').trim();
                 const todo = (todoCell.textContent || '').trim();
@@ -110,7 +110,7 @@
 
             const cells = row.querySelectorAll('td');
             if (cells.length >= 7) {
-                const todoCell = cells[6];
+                const todoCell = cells[7];
                 const todo = (todoCell.textContent || '').trim();
 
                 if (todo && todo.length > 0) {

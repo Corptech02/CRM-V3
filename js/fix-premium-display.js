@@ -76,7 +76,8 @@ function renderClientsViewWithFreshData(allPolicies) {
                         ${currentUser && currentUser.toLowerCase() === 'maureen' ? '<option value="Maureen">Maureen</option>' : `
                         <option value="Grant">Grant</option>
                         <option value="Carson">Carson</option>
-                        <option value="Hunter">Hunter</option>`}
+                        <option value="Hunter">Hunter</option>
+                        <option value="Maureen" style="color: #2563eb;">MAUREEN</option>`}
                     </select>` : ''}
                     <button class="btn-filter">
                         <i class="fas fa-filter"></i> More Filters
@@ -105,18 +106,20 @@ function renderClientsViewWithFreshData(allPolicies) {
         </div>
     `;
 
-    // AUTO-FILTER FOR MAUREEN: Apply filter immediately after rendering
+    // AUTO-FILTER: Apply filter immediately after rendering
     setTimeout(() => {
-        if (currentUser && currentUser.toLowerCase() === 'maureen') {
-            const agentFilter = document.getElementById('clientAgentFilter');
-            if (agentFilter) {
-                agentFilter.value = '';
+        const agentFilter = document.getElementById('clientAgentFilter');
+        if (agentFilter) {
+            agentFilter.value = '';
+            if (currentUser && currentUser.toLowerCase() === 'maureen') {
                 console.log('🔒 IMMEDIATE AUTO-FILTER: Set client filter to "All My Clients" for Maureen');
-                // Trigger the filter function
-                if (typeof filterClients === 'function') {
-                    filterClients();
-                    console.log('✅ IMMEDIATE AUTO-FILTER: Applied Maureen "All My Clients" filter');
-                }
+            } else {
+                console.log('🔒 IMMEDIATE AUTO-FILTER: Set client filter to "All Agents" (excluding Maureen)');
+            }
+            // Trigger the filter function
+            if (typeof filterClients === 'function') {
+                filterClients();
+                console.log('✅ IMMEDIATE AUTO-FILTER: Applied client auto-filter');
             }
         }
     }, 100); // Small delay to ensure DOM is updated

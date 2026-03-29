@@ -7,14 +7,51 @@
         // Check if we're on the policies view
         const policyStats = document.querySelector('.policy-stats');
         if (!policyStats) return false;
-        
+
+        // Check if policy filters are active (don't override filtered stats)
+        const agentFilter = document.getElementById('policyAgentFilter');
+        const typeFilter = document.getElementById('policyTypeFilter');
+        const carrierFilter = document.getElementById('policyCarrierFilter');
+        const statusFilter = document.getElementById('policyStatusFilter');
+        const searchInput = document.querySelector('.policies-view .filters-bar .search-box input');
+
+        // Get current user session
+        const sessionData = sessionStorage.getItem('vanguard_user');
+
+        // Check if current user is non-Maureen (which means "All Agents" is actually a filter)
+        let isAllAgentsFilter = false;
+        if (sessionData) {
+            try {
+                const user = JSON.parse(sessionData);
+                const currentUser = user.username;
+                // For non-Maureen users, "All Agents" (empty value) excludes Maureen policies, so it's an active filter
+                if (currentUser && currentUser.toLowerCase() !== 'maureen' && agentFilter && agentFilter.value === '') {
+                    isAllAgentsFilter = true;
+                    console.log('📊 Detected "All Agents" filter for non-Maureen user - this excludes Maureen policies');
+                }
+            } catch (error) {
+                console.error('Error checking user for filter detection:', error);
+            }
+        }
+
+        const hasActiveFilters = (agentFilter && agentFilter.value) ||
+                               (typeFilter && typeFilter.value) ||
+                               (carrierFilter && carrierFilter.value) ||
+                               (statusFilter && statusFilter.value) ||
+                               (searchInput && searchInput.value.trim()) ||
+                               isAllAgentsFilter;
+
+        if (hasActiveFilters) {
+            console.log('📊 Skipping stats override - policy filters are active');
+            return false;
+        }
+
         console.log('📊 Recalculating policy statistics...');
 
         // Get all policies from localStorage
         let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
 
-        // Get current user and check if they are admin - filter policies for non-admin users
-        const sessionData = sessionStorage.getItem('vanguard_user');
+        // Parse session data for user info (already retrieved above)
         let currentUser = null;
         let isAdmin = false;
 

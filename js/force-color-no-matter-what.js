@@ -18,7 +18,7 @@
             if (cells.length < 7) return;
 
             // Get TO DO text
-            const todoCell = cells[6];
+            const todoCell = cells[7];
             const todoText = (todoCell.textContent || '').trim();
 
             // Get name for matching

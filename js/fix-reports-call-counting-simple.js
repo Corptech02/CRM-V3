@@ -4,26 +4,28 @@ console.log('🔧 SIMPLE FIX: Patching call counts without changing UI...');
 // Let the original function run, then patch the displayed numbers
 document.addEventListener('DOMContentLoaded', function() {
     // Monitor for modal creation
+    // Tags that can never be a modal container — skip immediately to avoid console spam
+    const SKIP_TAGS = new Set(['LI','UL','I','SPAN','A','INPUT','BUTTON','TD','TH','TR','SMALL','STRONG','EM','IMG','SVG','PATH']);
+
     const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             mutation.addedNodes.forEach(function(node) {
-                if (node.nodeType === 1) {
-                    console.log('🔍 Node added:', node.className, node.tagName);
+                if (node.nodeType !== 1) return;
+                if (SKIP_TAGS.has(node.tagName)) return; // fast skip for non-modal elements
 
-                    // Look for agent performance modals with multiple detection methods
-                    const agentModal = node.querySelector && (
-                        node.querySelector('.agent-performance-content') ||
-                        node.classList.contains('agent-profile-modal') ||
-                        (node.classList.contains('modal-overlay') && node.innerHTML && node.innerHTML.includes('Performance Profile'))
-                    );
+                // Look for agent performance modals with multiple detection methods
+                const agentModal = node.querySelector && (
+                    node.querySelector('.agent-performance-content') ||
+                    node.classList.contains('agent-profile-modal') ||
+                    (node.classList.contains('modal-overlay') && node.innerHTML && node.innerHTML.includes('Performance Profile'))
+                );
 
-                    if (agentModal) {
-                        console.log('🔧 Found agent modal, fixing call counts...');
-                        setTimeout(() => fixCallCountsInModal(node), 100);
-                    } else if (node.innerHTML && node.innerHTML.includes('Performance Profile')) {
-                        console.log('🔧 Found Performance Profile text, trying fix...');
-                        setTimeout(() => fixCallCountsInModal(node), 100);
-                    }
+                if (agentModal) {
+                    console.log('🔧 Found agent modal, fixing call counts...');
+                    setTimeout(() => fixCallCountsInModal(node), 100);
+                } else if (node.innerHTML && node.innerHTML.includes('Performance Profile')) {
+                    console.log('🔧 Found Performance Profile text, trying fix...');
+                    setTimeout(() => fixCallCountsInModal(node), 100);
                 }
             });
         });

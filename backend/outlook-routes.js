@@ -3,7 +3,11 @@ const router = express.Router();
 const OutlookService = require('./outlook-service');
 const sqlite3 = require('sqlite3').verbose();
 const nodemailer = require('nodemailer');
-const db = new sqlite3.Database('./vanguard.db');
+const db = new sqlite3.Database('/var/www/vanguard/vanguard.db');
+
+// Ensure coi_emails has dismissed and is_unread columns (safe to run each startup)
+db.run(`ALTER TABLE coi_emails ADD COLUMN dismissed INTEGER DEFAULT 0`, () => {});
+db.run(`ALTER TABLE coi_emails ADD COLUMN is_unread INTEGER DEFAULT 0`, () => {});
 
 // Initialize Outlook Service
 const outlookService = new OutlookService();
@@ -463,6 +467,206 @@ router.post('/messages/:id/read', async (req, res) => {
     }
 });
 
+const COI_KEYWORDS = ['coi', 'certificate of insurance', 'certificate', 'acord', 'additional insured', 'liability certificate', 'proof of insurance'];
+
+/**
+ * Scan IMAP for COI-related emails and save new ones to the database.
+ * Emails already dismissed are never re-added. Deduped by Message-ID.
+ */
+function syncCOIEmailsFromIMAP() {
+    return new Promise((resolve, reject) => {
+        const Imap = require('imap');
+        const { simpleParser } = require('mailparser');
+
+        const imap = new Imap({
+            user: process.env.OUTLOOK_EMAIL || 'contact@vigagency.com',
+            password: process.env.OUTLOOK_PASSWORD || '25nickc124!',
+            host: process.env.OUTLOOK_IMAP_HOST || 'imap.secureserver.net',
+            port: parseInt(process.env.OUTLOOK_IMAP_PORT) || 993,
+            tls: true,
+            tlsOptions: { rejectUnauthorized: false, servername: process.env.OUTLOOK_IMAP_HOST || 'imap.secureserver.net' },
+            connTimeout: 12000,
+            authTimeout: 10000
+        });
+
+        imap.once('ready', () => {
+            imap.openBox('INBOX', true, (err, box) => {
+                if (err) { imap.end(); return reject(err); }
+                if (!box.messages.total) { imap.end(); return resolve(0); }
+
+                const numToFetch = Math.min(100, box.messages.total);
+                const startSeq = Math.max(1, box.messages.total - numToFetch + 1);
+                const fetchRange = `${startSeq}:*`;
+
+                // Phase 1: fetch headers only to find COI candidates by subject
+                const headerFetch = imap.seq.fetch(fetchRange, {
+                    bodies: 'HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)',
+                    struct: false
+                });
+
+                const candidates = []; // { seqno, messageId, from, subject, date, isUnread }
+                let headerDone = false;
+                let pendingHeaders = 0;
+
+                function proceedToPhase2() {
+                    if (!headerDone || pendingHeaders > 0) return;
+
+                    // Filter to COI candidates by subject only
+                    const coiCandidates = candidates.filter(c =>
+                        COI_KEYWORDS.some(kw => c.subject.toLowerCase().includes(kw))
+                    );
+
+                    if (coiCandidates.length === 0) { imap.end(); return resolve(0); }
+
+                    // Phase 2: fetch text-only body for COI candidates (no attachments)
+                    const seqnos = coiCandidates.map(c => c.seqno).join(',');
+                    const bodyFetch = imap.seq.fetch(seqnos, { bodies: 'TEXT', struct: false });
+
+                    const snippetMap = {};
+                    let bodyDone = false;
+                    let pendingBodies = 0;
+
+                    function saveResults() {
+                        if (!bodyDone || pendingBodies > 0) return;
+                        imap.end();
+                        let saved = 0;
+                        let pending = coiCandidates.length;
+                        coiCandidates.forEach(c => {
+                            const snippet = snippetMap[c.seqno] || '';
+                            db.get('SELECT id FROM coi_emails WHERE id = ?', [c.messageId], (err, row) => {
+                                if (row) { if (--pending === 0) resolve(saved); return; }
+                                db.run(
+                                    `INSERT INTO coi_emails (id, from_email, subject, date, snippet, is_unread, dismissed) VALUES (?, ?, ?, ?, ?, ?, 0)`,
+                                    [c.messageId, c.from, c.subject, c.date, snippet, c.isUnread],
+                                    (err) => { if (!err) saved++; if (--pending === 0) resolve(saved); }
+                                );
+                            });
+                        });
+                    }
+
+                    bodyFetch.on('message', (msg, seqno) => {
+                        let buf = '';
+                        msg.on('body', (stream) => { stream.on('data', (chunk) => { buf += chunk.toString('utf8'); }); });
+                        msg.once('end', () => {
+                            pendingBodies++;
+                            const { simpleParser } = require('mailparser');
+                            simpleParser(buf, (err, parsed) => {
+                                pendingBodies--;
+                                if (!err && parsed) {
+                                    snippetMap[seqno] = (parsed.text || '').substring(0, 300).replace(/\s+/g, ' ').trim();
+                                }
+                                saveResults();
+                            });
+                        });
+                    });
+
+                    bodyFetch.once('error', (err) => console.error('COI body fetch error:', err));
+                    bodyFetch.once('end', () => { bodyDone = true; saveResults(); });
+                }
+
+                headerFetch.on('message', (msg, seqno) => {
+                    let headerBuf = '';
+                    let msgAttrs = null;
+                    msg.once('attributes', (a) => { msgAttrs = a; });
+                    msg.on('body', (stream) => { stream.on('data', (chunk) => { headerBuf += chunk.toString('utf8'); }); });
+                    msg.once('end', () => {
+                        pendingHeaders++;
+                        const { simpleParser } = require('mailparser');
+                        simpleParser(headerBuf, (err, parsed) => {
+                            pendingHeaders--;
+                            if (!err && parsed) {
+                                const subject = parsed.subject || '(No Subject)';
+                                const messageId = parsed.messageId || `noid-${Date.now()}-${Math.random()}`;
+                                const fromText = parsed.from ? parsed.from.text : '';
+                                const date = parsed.date ? parsed.date.toISOString() : new Date().toISOString();
+                                const isUnread = msgAttrs && msgAttrs.flags && !msgAttrs.flags.includes('\\Seen') ? 1 : 0;
+                                candidates.push({ seqno, messageId, from: fromText, subject, date, isUnread });
+                            }
+                            proceedToPhase2();
+                        });
+                    });
+                });
+
+                headerFetch.once('error', (err) => console.error('COI header fetch error:', err));
+                headerFetch.once('end', () => { headerDone = true; proceedToPhase2(); });
+            });
+        });
+
+        imap.once('error', (err) => reject(err));
+        imap.connect();
+    });
+}
+
+/**
+ * GET /api/outlook/coi-requests
+ * Returns saved COI emails from DB instantly (no IMAP wait).
+ */
+router.get('/coi-requests', (req, res) => {
+    db.all(
+        `SELECT id, from_email AS "from", subject, date, snippet, is_unread AS isUnread
+         FROM coi_emails WHERE dismissed = 0 ORDER BY date DESC`,
+        [],
+        (err, rows) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            res.json({ success: true, emails: rows || [], totalCount: (rows || []).length });
+        }
+    );
+});
+
+/**
+ * POST /api/outlook/coi-requests/sync
+ * Responds immediately, runs IMAP scan in background.
+ */
+router.post('/coi-requests/sync', (req, res) => {
+    res.json({ success: true, queued: true });
+    // Run IMAP scan after response is sent
+    setImmediate(() => {
+        syncCOIEmailsFromIMAP()
+            .then(saved => { if (saved > 0) console.log(`COI on-demand sync: saved ${saved} new emails`); })
+            .catch(err => console.error('COI on-demand sync error:', err.message));
+    });
+});
+
+/**
+ * DELETE /api/outlook/coi-requests/:id
+ * Marks a COI email as dismissed — it will never be shown or re-added.
+ */
+router.delete('/coi-requests/:id', (req, res) => {
+    db.run('UPDATE coi_emails SET dismissed = 1 WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+        res.json({ success: true });
+    });
+});
+
+// Returns true if current time is within business hours (8:30am–7:00pm America/New_York)
+function isBusinessHours() {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+    }).formatToParts(now);
+    const hour = parseInt(parts.find(p => p.type === 'hour').value);
+    const minute = parseInt(parts.find(p => p.type === 'minute').value);
+    const totalMinutes = hour * 60 + minute;
+    return totalMinutes >= 8 * 60 + 30 && totalMinutes < 19 * 60; // 8:30–19:00
+}
+
+// Background IMAP sync every 3 minutes, business hours only (8:30am–7:00pm ET)
+setInterval(() => {
+    if (!isBusinessHours()) return;
+    syncCOIEmailsFromIMAP()
+        .then(saved => { if (saved > 0) console.log(`COI background sync: saved ${saved} new emails`); })
+        .catch(err => console.error('COI background sync error:', err.message));
+}, 3 * 60 * 1000);
+
+// Initial sync 8 seconds after startup (only if within business hours)
+setTimeout(() => {
+    if (!isBusinessHours()) return;
+    syncCOIEmailsFromIMAP().catch(err => console.error('COI initial sync error:', err.message));
+}, 8000);
+
 /**
  * Test IMAP connection
  * GET /api/outlook/test-connection
@@ -579,6 +783,49 @@ router.post('/send-smtp', async (req, res) => {
             error: error.message,
             details: 'Failed to send email via SMTP'
         });
+    }
+});
+
+/**
+ * POST /api/outlook/send-coi
+ * Send a COI email with optional PDF attachment (multipart/form-data)
+ */
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+router.post('/send-coi', upload.single('attachment'), async (req, res) => {
+    try {
+        const { to, subject, body } = req.body;
+        if (!to) return res.status(400).json({ success: false, error: 'Recipient required' });
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.OUTLOOK_SMTP_HOST || 'smtpout.secureserver.net',
+            port: parseInt(process.env.OUTLOOK_SMTP_PORT) || 465,
+            secure: true,
+            auth: {
+                user: process.env.OUTLOOK_EMAIL || 'contact@vigagency.com',
+                pass: process.env.OUTLOOK_PASSWORD || '25nickc124!'
+            },
+            tls: { rejectUnauthorized: false }
+        });
+
+        const mailOptions = {
+            from: process.env.OUTLOOK_EMAIL || 'contact@vigagency.com',
+            to,
+            subject: subject || 'Certificate of Insurance',
+            html: body || '',
+            attachments: req.file ? [{
+                filename: req.file.originalname,
+                content: req.file.buffer,
+                contentType: req.file.mimetype
+            }] : []
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+        res.json({ success: true, messageId: result.messageId });
+    } catch (err) {
+        console.error('COI send error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

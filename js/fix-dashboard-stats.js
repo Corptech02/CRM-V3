@@ -166,7 +166,7 @@ console.log('🔧 Fixing dashboard stats calculation...');
                 console.log('Updated policies:', policiesElement.textContent);
             }
 
-            // Update All Time Premium (from policies)
+            // Update Last 2 Month New Premium (from policies)
             const premiumElement = document.querySelector('.stat-card:nth-child(3) .stat-value');
             if (premiumElement) {
                 premiumElement.textContent = this.formatCurrency(this.stats.allTimePremium);

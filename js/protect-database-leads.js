@@ -142,6 +142,24 @@
         }
     };
 
+    // Debounced batch save — collects ViciDial leads changed within 2s and saves them together
+    let pendingSave = null;
+    const pendingLeads = new Map(); // id → lead object
+
+    function flushPendingLeads() {
+        pendingSave = null;
+        const leadsToSave = Array.from(pendingLeads.values());
+        pendingLeads.clear();
+        if (leadsToSave.length === 0) return;
+        // Save sequentially with a small gap to stay under rate limit
+        (async () => {
+            for (const lead of leadsToSave) {
+                await saveLeadToDatabase(lead);
+                await new Promise(r => setTimeout(r, 120)); // ~8 req/s, under nginx 10r/s limit
+            }
+        })();
+    }
+
     // Override setItem to sync important lead changes to database
     const originalSetItem = localStorage.setItem;
     localStorage.setItem = function(key, value) {
@@ -173,16 +191,10 @@
                     });
 
                     if (viciDialLeads.length > 0) {
-                        console.log(`💾 Auto-saving ${viciDialLeads.length} ViciDial leads to database...`);
-
-                        // Save leads with consolidated logging
-                        let savedCount = 0;
-                        for (const lead of viciDialLeads) {
-                            const saved = await saveLeadToDatabase(lead);
-                            if (saved) savedCount++;
-                        }
-
-                        console.log(`✅ Successfully saved ${savedCount}/${viciDialLeads.length} ViciDial leads to database`);
+                        // Queue leads for debounced batch save (avoids flooding the API)
+                        viciDialLeads.forEach(lead => pendingLeads.set(String(lead.id), lead));
+                        if (pendingSave) clearTimeout(pendingSave);
+                        pendingSave = setTimeout(flushPendingLeads, 2000);
                     }
 
                     // DISABLED: This cleanup logic was causing hundreds of 404s when editing leads
@@ -238,18 +250,21 @@
         const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
         const deletedLeadIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
 
-        for (const lead of leads) {
-            // Validate lead ID before saving
+        const leadsToSync = leads.filter(lead => {
             if (!lead.id || String(lead.id).trim() === '' || String(lead.id) === 'undefined') {
                 console.log(`🚫 Skipping sync save for lead with invalid ID: ${lead.id} (name: ${lead.name})`);
-                continue;
+                return false;
             }
+            return (lead.source === 'ViciDial' || lead.listId) &&
+                   !deletedLeadIds.includes(String(lead.id));
+        });
 
-            if ((lead.source === 'ViciDial' || lead.listId) &&
-                !deletedLeadIds.includes(String(lead.id))) {
-                await saveLeadToDatabase(lead);
-            }
+        console.log(`📤 Syncing ${leadsToSync.length} ViciDial leads to database (rate-limited)...`);
+        for (const lead of leadsToSync) {
+            await saveLeadToDatabase(lead);
+            await new Promise(r => setTimeout(r, 120)); // ~8 req/s, under nginx 10r/s limit
         }
+        console.log(`✅ ViciDial sync complete - ${leadsToSync.length} leads saved`);
     });
 
     // Cleanup function to remove any deleted leads that accidentally got re-saved to database

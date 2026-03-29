@@ -85,7 +85,7 @@
             if (cells.length < 7) return;
 
             // Get TO DO text
-            const todoCell = cells[6];
+            const todoCell = cells[7];
             const todoText = (todoCell.textContent || '').trim();
 
             // Clear existing highlights first
@@ -198,7 +198,7 @@
             const cells = row.querySelectorAll('td');
             if (cells.length < 7) return;
 
-            const todoCell = cells[6];
+            const todoCell = cells[7];
             const todoText = (todoCell.textContent || '').trim();
 
             if (!todoText) return; // Skip empty TODOs

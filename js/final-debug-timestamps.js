@@ -24,7 +24,7 @@
             const hasHighlight = bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent';
 
             // Get TO DO
-            const todoCell = cells[6];
+            const todoCell = cells[7];
             const todoText = (todoCell.textContent || '').trim();
 
             // Skip empty TODOs (those should be green)

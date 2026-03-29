@@ -22,6 +22,100 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 24px;
+        }
+
+        .updates-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 600px;
+            padding: 40px;
+            animation: slideIn 0.4s ease-out 0.1s both;
+        }
+
+        .updates-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 2px solid #2563eb;
+        }
+
+        .updates-header .updates-icon {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .updates-header h2 {
+            color: #1f2937;
+            font-size: 17px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .update-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .update-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .update-badge {
+            width: 22px;
+            height: 22px;
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .update-text {
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.4;
+            font-weight: 500;
+        }
+
+        .update-new-tag {
+            display: inline-block;
+            background: #dcfce7;
+            color: #16a34a;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+            margin-left: 6px;
+            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        @media (max-width: 768px) {
+            .updates-container {
+                display: none;
+            }
         }
 
         .login-container {
@@ -269,6 +363,29 @@
 
         <div class="login-footer">
             <p>&copy; 2024 Vanguard Insurance Group LLC. All rights reserved.</p>
+        </div>
+    </div>
+
+    <div class="updates-container">
+        <div class="updates-header">
+            <div class="updates-icon"><i class="fas fa-bolt"></i></div>
+            <h2>New Updates</h2>
+        </div>
+        <div class="update-item">
+            <div class="update-badge"><i class="fas fa-phone-alt"></i></div>
+            <span class="update-text">Call Swapper: New States (IL, NJ, GA, FL) <span class="update-new-tag">New</span></span>
+        </div>
+        <div class="update-item">
+            <div class="update-badge"><i class="fas fa-clock"></i></div>
+            <span class="update-text">Fixed Avg Call Time &amp; Scheduled Callback Reports <span class="update-new-tag">New</span></span>
+        </div>
+        <div class="update-item">
+            <div class="update-badge"><i class="fas fa-map-marker-alt"></i></div>
+            <span class="update-text">Lead Gen Tab: Improved State Lead Organization <span class="update-new-tag">New</span></span>
+        </div>
+        <div class="update-item">
+            <div class="update-badge"><i class="fas fa-chart-bar"></i></div>
+            <span class="update-text">Fixed Goals Bug <span class="update-new-tag">New</span></span>
         </div>
     </div>
 

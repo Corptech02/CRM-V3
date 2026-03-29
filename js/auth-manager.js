@@ -257,9 +257,9 @@
             // Hide dashboard stats for non-admin users
             const adminOnlyStats = [
                 'Active Clients',
-                'Active Policies',
-                'All Time Premium',
-                'Monthly Lead Premium'
+                'App Sents',
+                'Last 2 Month New Premium',
+                'Current Month Lead Premium'
             ];
 
             const statCards = document.querySelectorAll('.stat-card');

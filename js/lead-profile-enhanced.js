@@ -153,7 +153,7 @@ function showLeadProfile(leadId) {
                                             <select onchange="updateVehicle(${leadId}, ${idx}, 'type', this.value)">
                                                 <option value="">Select Type</option>
                                                 <option value="Box Truck" ${vehicle.type === 'Box Truck' ? 'selected' : ''}>Box Truck</option>
-                                                <option value="Semi Truck" ${vehicle.type === 'Semi Truck' ? 'selected' : ''}>Semi Truck</option>
+                                                <option value="Truck Tractor" ${vehicle.type === 'Truck Tractor' || vehicle.type === 'Semi Truck' ? 'selected' : ''}>Truck Tractor</option>
                                                 <option value="Flatbed" ${vehicle.type === 'Flatbed' ? 'selected' : ''}>Flatbed</option>
                                                 <option value="Pickup" ${vehicle.type === 'Pickup' ? 'selected' : ''}>Pickup</option>
                                                 <option value="Van" ${vehicle.type === 'Van' ? 'selected' : ''}>Van</option>

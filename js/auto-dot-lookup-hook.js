@@ -7,11 +7,54 @@
     // Store the original localStorage.setItem method
     const originalSetItem = localStorage.setItem;
 
-    // DISABLED: Auto localStorage monitoring - was causing too much spam
-    // DOT lookup now only happens:
-    // 1. Manual button click
-    // 2. New lead import (detected by specific import events)
-    console.log('🚛 AUTO DOT: localStorage auto-scanning DISABLED - manual/import only');
+    // Track which lead IDs have already had DOT lookup queued (prevents spam/re-triggering)
+    const dotLookupQueued = new Set();
+
+    // Hook localStorage.setItem to detect new leads needing DOT lookup (auto-sync path)
+    localStorage.setItem = function(key, value) {
+        originalSetItem.apply(this, arguments);
+
+        if (key !== 'insurance_leads') return;
+
+        try {
+            const leads = JSON.parse(value || '[]');
+            // Only consider leads created/updated in the last 48 hours to avoid bulk-processing old leads
+            const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+            let queued = 0;
+            const MAX_PER_UPDATE = 5; // Safety cap per localStorage update
+            for (const lead of leads) {
+                if (queued >= MAX_PER_UPDATE) break;
+                if (!lead.id || !lead.dotNumber || !lead.dotNumber.trim()) continue;
+                const nameNeedsUpdate = !lead.name || lead.name === 'Unknown Company' || lead.name === 'Unknown' || lead.name === '';
+                if (lead.yearsInBusiness && lead.state && lead.commodityHauled && !nameNeedsUpdate) continue; // Already populated
+                if (dotLookupQueued.has(String(lead.id))) continue; // Already queued this session
+                // Only process recent leads (created or last active within 48h)
+                const lastActive = lead.lastActivity ? new Date(lead.lastActivity).getTime() : 0;
+                const created = lead.created ? new Date(lead.created).getTime() : 0;
+                const mostRecent = Math.max(lastActive, created);
+                if (mostRecent && mostRecent < cutoff) continue;
+                dotLookupQueued.add(String(lead.id));
+                const delay = queued * 800 + 500;
+                queued++;
+                setTimeout(() => {
+                    if (typeof performBuiltInDOTLookup === 'function') {
+                        console.log(`🚛 AUTO DOT (storage hook): Triggering DOT lookup for ${lead.name} (DOT: ${lead.dotNumber})`);
+                        performBuiltInDOTLookup(lead.id, lead.dotNumber);
+                    } else if (window.manualDOTLookupTrigger) {
+                        console.log(`🚛 AUTO DOT (storage hook): Triggering DOT lookup for ${lead.name} (DOT: ${lead.dotNumber})`);
+                        window.manualDOTLookupTrigger(lead.id, lead.dotNumber);
+                    }
+                }, delay);
+            }
+            if (queued > 0) {
+                console.log(`🚛 AUTO DOT: storage hook queued DOT lookup for ${queued} lead(s)`);
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+    };
+
+    console.log('🚛 AUTO DOT: localStorage hook ENABLED - will trigger DOT lookup for new leads with DOT numbers');
 
     // Built-in DOT lookup function since the main one isn't loading
     async function performBuiltInDOTLookup(leadId, dotNumber) {
@@ -46,6 +89,22 @@
                     leads[leadIndex].phone = data.carrier.phone || carrierDetails.PHONE || leads[leadIndex].phone;
                     leads[leadIndex].email = data.carrier.email || carrierDetails.EMAIL_ADDRESS || leads[leadIndex].email;
 
+                    // Update company name from DOT legal name (fixes "Unknown" names from ViciDial)
+                    const dotLegalName = data.carrier.legal_name || carrierDetails.LEGAL_NAME || data.carrier.dba_name || '';
+                    if (dotLegalName && dotLegalName.trim()) {
+                        leads[leadIndex].name = dotLegalName.trim();
+                        console.log(`🏢 AUTO DOT: Updated company name: ${dotLegalName.trim()}`);
+                    }
+
+                    // Extract and populate owner name from contact information
+                    const ownerName = extractOwnerNameFromDOTData(data.carrier, carrierDetails);
+                    if (ownerName && ownerName.trim()) {
+                        leads[leadIndex].ownerName = ownerName.trim();
+                        leads[leadIndex].contact = ownerName.trim(); // Also populate contact field
+                        console.log(`👤 AUTO DOT: Extracted owner name: ${ownerName}`);
+                        console.log(`👤 AUTO DOT: Also populated contact field: ${ownerName}`);
+                    }
+
                     // Save updated leads (set flag to prevent recursion)
                     window.dotLookupInProgress = true;
 
@@ -72,6 +131,18 @@
                         if (leads[leadIndex].commodityHauled) {
                             window.updateLeadField(leadId, 'commodityHauled', leads[leadIndex].commodityHauled);
                             console.log(`💾 AUTO DOT: Saved commodityHauled to server: ${leads[leadIndex].commodityHauled}`);
+                        }
+                        if (leads[leadIndex].ownerName) {
+                            window.updateLeadField(leadId, 'ownerName', leads[leadIndex].ownerName);
+                            console.log(`💾 AUTO DOT: Saved ownerName to server: ${leads[leadIndex].ownerName}`);
+                        }
+                        if (leads[leadIndex].contact) {
+                            window.updateLeadField(leadId, 'contact', leads[leadIndex].contact);
+                            console.log(`💾 AUTO DOT: Saved contact to server: ${leads[leadIndex].contact}`);
+                        }
+                        if (leads[leadIndex].name) {
+                            window.updateLeadField(leadId, 'name', leads[leadIndex].name);
+                            console.log(`💾 AUTO DOT: Saved name to server: ${leads[leadIndex].name}`);
                         }
 
                         // Save vehicles, trailers, AND drivers to server if any were created
@@ -160,7 +231,7 @@
                     vin: inspection.VIN,
                     value: estimateValueFromVIN(inspection.VIN).toString(),
                     deductible: '2500',
-                    type: 'Semi Truck',
+                    type: 'Truck Tractor',
                     gvwr: '80000',
                     license: inspection.Unit_License,
                     state: inspection.Unit_License_State,
@@ -424,6 +495,171 @@
 
         // Return exactly as carrier search does: comma-separated list or default
         return commodities.length > 0 ? commodities.join(', ') : 'General Freight';
+    }
+
+    // Helper function to extract owner name from DOT data
+    function extractOwnerNameFromDOTData(carrier, carrierDetails) {
+        console.log(`👤 OWNER NAME: Extracting owner name from DOT data...`);
+        console.log(`👤 OWNER NAME: Available carrier data:`, carrier);
+        console.log(`👤 OWNER NAME: Available carrier details:`, carrierDetails);
+
+        // Debug: Look for any field containing contact or name information
+        console.log(`👤 OWNER NAME: Searching for contact/name fields...`);
+        if (carrier) {
+            Object.keys(carrier).forEach(key => {
+                if (key.toLowerCase().includes('contact') || key.toLowerCase().includes('name') || key.toLowerCase().includes('owner') || key.toLowerCase().includes('officer')) {
+                    console.log(`👤 OWNER NAME: carrier.${key} = "${carrier[key]}"`);
+                }
+            });
+        }
+        if (carrierDetails) {
+            Object.keys(carrierDetails).forEach(key => {
+                if (key.toLowerCase().includes('contact') || key.toLowerCase().includes('name') || key.toLowerCase().includes('owner') || key.toLowerCase().includes('officer')) {
+                    console.log(`👤 OWNER NAME: carrierDetails.${key} = "${carrierDetails[key]}"`);
+                }
+            });
+        }
+
+        let ownerName = '';
+
+        // Try various fields that might contain contact/owner information
+        // Priority order: explicit contact fields, then legal name, then business name
+
+        // 1. Try contact name from the comprehensive API (highest priority)
+        if (carrier?.contact_name && carrier.contact_name.trim()) {
+            ownerName = carrier.contact_name.trim();
+            console.log(`👤 OWNER NAME: Found contact_name from carrier: ${ownerName}`);
+        }
+        // 2. Try contact person fields
+        else if (carrierDetails?.CONTACT_PERSON && carrierDetails.CONTACT_PERSON.trim()) {
+            ownerName = carrierDetails.CONTACT_PERSON.trim();
+            console.log(`👤 OWNER NAME: Found contact person: ${ownerName}`);
+        }
+        // 3. Try other contact fields
+        else if (carrier?.contact && carrier.contact.trim()) {
+            ownerName = carrier.contact.trim();
+            console.log(`👤 OWNER NAME: Found carrier contact: ${ownerName}`);
+        }
+        // 4. Try owner/officer fields
+        else if (carrierDetails?.OFFICER_NAME && carrierDetails.OFFICER_NAME.trim()) {
+            ownerName = carrierDetails.OFFICER_NAME.trim();
+            console.log(`👤 OWNER NAME: Found officer name: ${ownerName}`);
+        }
+        // 4.5. Try company officer fields (COMPANY_OFFICER_1, etc.)
+        else if (carrierDetails?.COMPANY_OFFICER_1 && carrierDetails.COMPANY_OFFICER_1.trim()) {
+            ownerName = carrierDetails.COMPANY_OFFICER_1.trim();
+            console.log(`👤 OWNER NAME: Found COMPANY_OFFICER_1: ${ownerName}`);
+        }
+        else if (carrierDetails?.COMPANY_OFFICER_2 && carrierDetails.COMPANY_OFFICER_2.trim()) {
+            ownerName = carrierDetails.COMPANY_OFFICER_2.trim();
+            console.log(`👤 OWNER NAME: Found COMPANY_OFFICER_2: ${ownerName}`);
+        }
+        // 5. Try contact info fields that might exist in carrier object
+        else if (carrier?.contact_info?.name && carrier.contact_info.name.trim()) {
+            ownerName = carrier.contact_info.name.trim();
+            console.log(`👤 OWNER NAME: Found contact_info.name: ${ownerName}`);
+        }
+        // 6. Try various other contact name fields from carrier details
+        else if (carrierDetails?.CONTACT_NAME && carrierDetails.CONTACT_NAME.trim()) {
+            ownerName = carrierDetails.CONTACT_NAME.trim();
+            console.log(`👤 OWNER NAME: Found CONTACT_NAME from details: ${ownerName}`);
+        }
+        else if (carrierDetails?.OWNER_NAME && carrierDetails.OWNER_NAME.trim()) {
+            ownerName = carrierDetails.OWNER_NAME.trim();
+            console.log(`👤 OWNER NAME: Found OWNER_NAME from details: ${ownerName}`);
+        }
+        // 7. Try legal name if it looks like a person's name (not company)
+        else if (carrier?.legal_name && carrier.legal_name.trim() && isPersonName(carrier.legal_name)) {
+            ownerName = carrier.legal_name.trim();
+            console.log(`👤 OWNER NAME: Using legal name as person: ${ownerName}`);
+        }
+        // 8. Try DBA name if it looks like a person's name
+        else if (carrier?.dba_name && carrier.dba_name.trim() && isPersonName(carrier.dba_name)) {
+            ownerName = carrier.dba_name.trim();
+            console.log(`👤 OWNER NAME: Using DBA name as person: ${ownerName}`);
+        }
+        // 9. Try extracting name from legal name even if it has business suffixes
+        else if (carrier?.legal_name && carrier.legal_name.trim()) {
+            const legalName = carrier.legal_name.trim();
+            console.log(`👤 OWNER NAME: Attempting to extract name from legal name: ${legalName}`);
+
+            // Look for patterns like "JOHN SMITH TRUCKING", "SMITH TRANSPORT LLC", or "MANDALAWY TRUCKING LLC"
+            const nameMatch = legalName.match(/^([A-Z]+(?:\s+[A-Z]+)*)(?:\s+(?:TRUCKING|TRANSPORT|LLC|INC|CORP|LTD|LOGISTICS|FREIGHT|HAULING|COMPANY|ENTERPRISES))/i);
+            if (nameMatch && nameMatch[1] && nameMatch[1].trim().length > 0) {
+                const extractedName = nameMatch[1].trim();
+                console.log(`👤 OWNER NAME: Extracted potential name: "${extractedName}"`);
+
+                // Check if the extracted part looks like a name
+                const words = extractedName.split(/\s+/);
+                if (words.length >= 1 && words.length <= 4) {
+                    // Even if it's just one word, if it doesn't look like a company name, use it
+                    const businessWords = ['TRUCKING', 'TRANSPORT', 'LOGISTICS', 'FREIGHT', 'HAULING', 'COMPANY', 'ENTERPRISES', 'SOLUTIONS', 'SERVICES', 'GROUP'];
+                    const looksLikeName = words.every(word => /^[A-Z][a-z]*$/i.test(word) && !businessWords.includes(word.toUpperCase()));
+                    if (looksLikeName) {
+                        ownerName = extractedName;
+                        console.log(`👤 OWNER NAME: Accepted extracted name: ${ownerName}`);
+                    }
+                }
+            }
+
+            // Special case: if legal name is short and doesn't have obvious business words at the start, try it
+            if (!ownerName && legalName.length < 30) {
+                const words = legalName.split(/\s+/);
+                if (words.length >= 2 && words.length <= 4) {
+                    // Check if first few words look like names
+                    const firstTwoWords = words.slice(0, 2).join(' ');
+                    if (words.every(word => /^[A-Z][a-z]*$/i.test(word))) {
+                        ownerName = firstTwoWords;
+                        console.log(`👤 OWNER NAME: Using short legal name as owner: ${ownerName}`);
+                    }
+                }
+            }
+        }
+
+        // Clean up the name if found
+        if (ownerName) {
+            // Remove common business suffixes that might be included
+            ownerName = ownerName.replace(/\b(LLC|INC|CORP|LTD|LP|TRANSPORT|TRUCKING|LOGISTICS|FREIGHT|HAULING|COMPANY|CO\.?)\b/gi, '').trim();
+            // Remove extra whitespace
+            ownerName = ownerName.replace(/\s+/g, ' ').trim();
+
+            if (ownerName.length > 2) {
+                console.log(`👤 OWNER NAME: Final cleaned name: ${ownerName}`);
+                return ownerName;
+            }
+        }
+
+        console.log(`👤 OWNER NAME: No suitable owner name found in DOT data`);
+        return '';
+    }
+
+    // Helper function to determine if a name looks like a person's name vs company name
+    function isPersonName(name) {
+        if (!name || name.trim().length === 0) return false;
+
+        const upperName = name.toUpperCase().trim();
+
+        // If it contains obvious business words, it's likely a company (unless we're extracting from it)
+        const businessWords = ['LLC', 'INC', 'CORP', 'LTD', 'LP', 'TRANSPORT', 'TRUCKING', 'LOGISTICS', 'FREIGHT', 'HAULING', 'COMPANY', 'ENTERPRISES', 'SOLUTIONS', 'SERVICES', 'GROUP'];
+        if (businessWords.some(word => upperName.includes(word))) {
+            return false;
+        }
+
+        // If it has 2-4 words and doesn't contain business indicators, likely a person
+        const words = name.trim().split(/\s+/);
+
+        // Allow more flexibility - even single names or longer names could be people
+        if (words.length >= 2 && words.length <= 6) {
+            // Additional checks for person names
+            // Names with numbers or strange characters are likely not person names
+            if (/[0-9]/.test(name)) return false;
+
+            // If each word looks like a name (starts with capital letter)
+            const wordsLookLikeNames = words.every(word => /^[A-Z][a-z]*$/i.test(word));
+            if (wordsLookLikeNames) return true;
+        }
+
+        return false;
     }
 
     // Process ONLY newly imported leads (limited scope)

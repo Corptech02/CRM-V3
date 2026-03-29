@@ -9,12 +9,12 @@
     <!-- Cache buster: 2026-02-22-DOT-SPAM-COMPLETELY-DISABLED-V9 -->
     <title>Vanguard Insurance Software - All-in-One Agency Management Platform</title>
     <link rel="icon" type="image/png" href="images/V-Logo.png">
-    <link rel="stylesheet" href="css/styles.css?v=37_POPUP_NOTIFICATIONS">
+    <link rel="stylesheet" href="css/styles.css?v=38_WHITE_CLOSE_BTN">
     <link rel="stylesheet" href="css/carrier-profile.css?v=2">
     <link rel="stylesheet" href="css/carrier-profile-display.css?v=1">
     <link rel="stylesheet" href="css/policy-modal.css?v=4_BADGE_FIX">
     <link rel="stylesheet" href="css/coi-upload-styles.css?v=1">
-    <link rel="stylesheet" href="css/mobile.css?v=5_COI_FULLSCREEN">
+    <link rel="stylesheet" href="css/mobile.css?v=COI_FIX_v13">
     <link rel="stylesheet" href="css/fix-sidebar-text.css?v=1">
     <!-- Enhanced Lead Management Action Button Fixes -->
     <link rel="stylesheet" href="css/enhanced-lead-actions.css?v=1">
@@ -39,7 +39,7 @@
     <script src="js/jssip.min.js"></script>
     <!-- Twilio Voice SDK for browser-based calling -->
     <script src="https://sdk.twilio.com/js/voice/releases/2.12.0/twilio.min.js"></script>
-    <script src="js/performance-critical-fix.js?v=VIEW_LEAD_FIX"></script>
+    <script src="js/performance-critical-fix.js?v=QUOTA_SAFE_V2"></script>
     <script src="js/fix-localStorage-quota.js?v=1"></script>
     <script src="js/disable-heavy-scripts.js?v=1"></script>
     <script>
@@ -144,66 +144,80 @@
             max-width: 140px !important;
         }
 
-        /* Contact column - centered icons */
+        /* X icon column */
         #leadsTable th:nth-child(3),
         #leadsTable td:nth-child(3) {
+            width: 28px !important;
+            padding: 4px !important;
+            text-align: center !important;
+        }
+
+        /* Contact column - centered icons */
+        #leadsTable th:nth-child(4),
+        #leadsTable td:nth-child(4) {
             width: 80px !important;
             text-align: center !important;
         }
 
         /* Value Level */
-        #leadsTable th:nth-child(4),
-        #leadsTable td:nth-child(4) {
+        #leadsTable th:nth-child(5),
+        #leadsTable td:nth-child(5) {
             width: 160px !important;
         }
 
         /* Premium */
-        #leadsTable th:nth-child(5),
-        #leadsTable td:nth-child(5) {
+        #leadsTable th:nth-child(6),
+        #leadsTable td:nth-child(6) {
             width: 90px !important;
         }
 
         /* Stage */
-        #leadsTable th:nth-child(6),
-        #leadsTable td:nth-child(6) {
+        #leadsTable th:nth-child(7),
+        #leadsTable td:nth-child(7) {
             width: 100px !important;
         }
 
-        /* To Do - NEW COLUMN that was missing */
-        #leadsTable th:nth-child(7),
-        #leadsTable td:nth-child(7) {
+        /* To Do */
+        #leadsTable th:nth-child(8),
+        #leadsTable td:nth-child(8) {
             width: 130px !important;
             max-width: 130px !important;
         }
 
-        /* Renewal Date - needs more space for header + sort arrow */
-        #leadsTable th:nth-child(8),
-        #leadsTable td:nth-child(8) {
+        /* Renewal Date */
+        #leadsTable th:nth-child(9),
+        #leadsTable td:nth-child(9) {
             width: 110px !important;
         }
 
-        #leadsTable th:nth-child(8) {
+        #leadsTable th:nth-child(9) {
             white-space: nowrap !important;
             overflow: hidden !important;
         }
 
         /* Assigned To */
-        #leadsTable th:nth-child(9),
-        #leadsTable td:nth-child(9) {
+        #leadsTable th:nth-child(10),
+        #leadsTable td:nth-child(10) {
+            width: 100px !important;
+        }
+
+        /* Carrier */
+        #leadsTable th:nth-child(11),
+        #leadsTable td:nth-child(11) {
             width: 100px !important;
         }
 
         /* Created */
-        #leadsTable th:nth-child(10),
-        #leadsTable td:nth-child(10) {
+        #leadsTable th:nth-child(12),
+        #leadsTable td:nth-child(12) {
             width: 90px !important;
         }
 
         /* Actions */
-        #leadsTable th:nth-child(11),
-        #leadsTable td:nth-child(11) {
-            width: 110px !important;
-            min-width: 110px !important;
+        #leadsTable th:nth-child(13),
+        #leadsTable td:nth-child(13) {
+            width: 130px !important;
+            min-width: 130px !important;
             text-align: center !important;
         }
 
@@ -236,7 +250,7 @@
         }
 
         /* Ensure Value Level text doesn't wrap unnecessarily */
-        #leadsTableBody td:nth-child(4) {
+        #leadsTableBody td:nth-child(5) {
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
@@ -631,12 +645,11 @@
                     <li class="dropdown">
                         <a href="#" class="nav-link">Tools <i class="fas fa-chevron-down"></i></a>
                         <div class="dropdown-menu">
-                            <a href="#" onclick="openPhoneTool(); return false;"><i class="fas fa-phone"></i> Phone</a>
-                            <a href="#" onclick="openEmailTool(); return false;"><i class="fas fa-envelope"></i> Email</a>
                             <a href="#" onclick="openNotepad(); return false;"><i class="fas fa-sticky-note"></i> Notepad</a>
+                            <a href="#" onclick="openTodoList(); return false;"><i class="fas fa-tasks"></i> Todo List</a>
+                            <a href="#" onclick="openCalendar(); return false;"><i class="fas fa-calendar-alt"></i> Calendar</a>
                         </div>
                     </li>
-                    <li><a href="#analytics" class="nav-link">Analytics</a></li>
                     <li><a href="#integrations" class="nav-link">Integrations</a></li>
                 </ul>
                 <div class="nav-actions">
@@ -805,9 +818,9 @@
                             // Hide dashboard stats for non-admin users
                             const adminOnlyStats = [
                                 'Active Clients',
-                                'Active Policies',
-                                'All Time Premium',
-                                'Monthly Lead Premium'
+                                'App Sents',
+                                'Last 2 Month New Premium',
+                                'Current Month Lead Premium'
                             ];
 
                             const statCards = document.querySelectorAll('.stat-card');
@@ -943,12 +956,6 @@
                 </a>
             </li>
             <li class="mobile-nav-item">
-                <a href="#coi-management" class="mobile-nav-link" onclick="setActiveTab('coi-management'); closeMobileMenu();">
-                    <i class="fas fa-certificate"></i>
-                    COI Management
-                </a>
-            </li>
-            <li class="mobile-nav-item">
                 <a href="#communications" class="mobile-nav-link" onclick="setActiveTab('communications'); closeMobileMenu();">
                     <i class="fas fa-comments"></i>
                     Communications
@@ -966,9 +973,9 @@
                 </a>
             </li>
             <li class="mobile-nav-item">
-                <a href="#producers" class="mobile-nav-link" onclick="setActiveTab('producers'); closeMobileMenu();">
-                    <i class="fas fa-user-friends"></i>
-                    Producers
+                <a href="#compliance" class="mobile-nav-link" onclick="setActiveTab('compliance'); closeMobileMenu();">
+                    <i class="fas fa-shield-alt"></i>
+                    Compliance
                 </a>
             </li>
             <li class="mobile-nav-item">
@@ -1068,12 +1075,6 @@
                             </a>
                         </li>
                         <li>
-                            <a href="#coi" data-tooltip="COI Management">
-                                <i class="fas fa-certificate"></i>
-                                <span>COI Management</span>
-                            </a>
-                        </li>
-                        <li>
                             <a href="#communications" data-tooltip="Communications">
                                 <i class="fas fa-envelope"></i>
                                 <span>Communications</span>
@@ -1097,9 +1098,9 @@
                             </a>
                         </li>
                         <li>
-                            <a href="#producers" data-tooltip="Producers">
-                                <i class="fas fa-user-tie"></i>
-                                <span>Producers</span>
+                            <a href="#compliance" data-tooltip="Compliance">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Compliance</span>
                             </a>
                         </li>
                         <li>
@@ -1121,6 +1122,33 @@
                             </a>
                         </li>
                     </ul>
+                </div>
+
+                <!-- Notification Permission Button -->
+                <div style="padding: 12px 8px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px;">
+                    <button id="sidebar-notif-btn" onclick="handleSidebarNotifClick()" style="
+                        width: 100%;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        padding: 10px 12px;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 13px;
+                        font-weight: 600;
+                        transition: background 0.2s;
+                        background: rgba(255,255,255,0.07);
+                        color: rgba(255,255,255,0.75);
+                        text-align: left;
+                    ">
+                        <span id="sidebar-notif-icon" style="width:20px; text-align:center; font-size:15px;">🔔</span>
+                        <span id="sidebar-notif-label">Enable Notifications</span>
+                        <span id="sidebar-notif-dot" style="
+                            width: 8px; height: 8px; border-radius: 50%;
+                            background: #f59e0b; margin-left: auto; flex-shrink: 0;
+                        "></span>
+                    </button>
                 </div>
             </div>
         </aside>
@@ -1158,7 +1186,7 @@
                         <i class="fas fa-dollar-sign"></i>
                     </div>
                     <div class="stat-details">
-                        <h3>All Time Premium</h3>
+                        <h3>Last 2 Month New Premium</h3>
                         <p class="stat-number stat-value">$0</p>
                         <span class="stat-change positive">
                             <i class="fas fa-arrow-up"></i> 0% from last month
@@ -1628,13 +1656,13 @@
     <script src="js/vanguard-softphone.js?v=9"></script>
     <script src="js/sip-integration-bridge.js?v=1"></script>
     <script src="js/force-policies-refresh.js?v=1"></script>
-    <script src="js/app.js?v=2026021402_GREEN_PREMIUM_TABLE_v4"></script>
+    <script src="js/app.js?v=STATE_LABELS_V5"></script>
 
     <!-- Vicidial Stage Sync - Bidirectional synchronization -->
     <script src="js/vicidial-stage-sync.js?v=1"></script>
 
     <!-- Callback Notifications - 30-minute callback alerts -->
-    <script src="js/callback-notifications.js?v=POPUP_SOUND_DUE_v1"></script>
+    <script src="js/callback-notifications.js?v=GRANT_TOGGLE_v1"></script>
 
     <!-- Console-Based Stats Tracker - LIVE SITE FIX -->
     <script>
@@ -1780,7 +1808,7 @@
     <!-- Universal Live Stats Fix - MUST load after app.js -->
     <script src="js/fix-all-agent-live-stats.js?v=5"></script>
     <!-- Enhanced Lead Management with DELETE functionality - MUST load after app.js -->
-    <script src="js/enhanced-lead-management.js?v=2"></script>
+    <script src="js/enhanced-lead-management.js?v=3"></script>
 
     <!-- Emergency fixes for hardcoded button IDs -->
     <!-- <script src="js/emergency-viewlead-fix.js?v=1"></script> DISABLED - Breaking other tabs -->
@@ -1803,7 +1831,7 @@
     <!-- <script src="js/nuclear-highlighting-fix.js?v=6"></script> DISABLED - Intercepting viewLead -->
 
     <!-- Protect ViciDial leads stored in database from localStorage clearing -->
-    <script src="js/protect-database-leads.js?v=6_CLEAN_LOGGING"></script>
+    <script src="js/protect-database-leads.js?v=8_RATE_LIMITED_SYNC"></script>
     <!-- Protect campaign modals from global click handler interference -->
     <script src="js/protect-campaign-modal.js?v=1"></script>
 
@@ -1821,7 +1849,7 @@
     <script src="js/fix-archived-leads-permanent.js?v=2"></script>
     <script src="js/ai-functions-fallback.js"></script>
     <script src="debug-agent-save.js"></script>
-    <script src="js/policy-modal.js?v=30"></script>
+    <script src="js/policy-modal.js?v=33"></script>
     <script src="js/policy-quickfill.js?v=1"></script>
     <script src="js/fix-policy-server-save.js?v=1"></script>
     <script src="js/policy-to-client-auto-sync.js?v=1"></script>
@@ -1958,7 +1986,7 @@
     <!-- <script src="js/lead-archive-system.js?v=2"></script> -->
     
     <!-- Deduplication System - Prevents duplicates across leads, clients, archives -->
-    <script src="js/deduplication-system.js?v=2"></script>
+    <script src="js/deduplication-system.js?v=3"></script>
     
     <!-- Bulk Client Import - 21 clients ready to import -->
     <script src="js/bulk-import-clients.js?v=2"></script>
@@ -2031,10 +2059,10 @@
     <!-- <script src="js/notification-manager.js?v=CRITICAL_PRIORITY_v1"></script> -->
 
     <!-- MARKET FUNCTIONS - Load before profile to ensure auto-import functions are available -->
-    <script src="js/market-functions.js?v=FIXED_ELIGIBILITY_CHECK_v1"></script>
+    <script src="js/market-functions.js?v=AUTO_IMPORT_EMPTY_MARKET_v2"></script>
 
     <!-- FINAL PROFILE FIX PROTECTED - MUST BE ABSOLUTELY LAST - Cannot be overridden -->
-    <script src="js/final-profile-fix-protected-FIXED.js?v=AUTO_IMPORT_MARKET_v3_FIXED_ICON"></script>
+    <script src="js/final-profile-fix-protected-FIXED.js?v=PHONE_BTN_POPUP_v1"></script>
 
     <!-- CONTINUOUS CALLBACK MONITOR - Maintains "Reach out: CALL" buttons independently -->
     <script src="js/continuous-callback-monitor.js?v=3"></script>
@@ -2158,7 +2186,7 @@
     <!-- Save to Profile functionality - MUST load before ACORD viewers -->
     <script src="js/save-to-profile.js?v=14"></script>
     <!-- Load ACORD Real Viewer for PDF with fillable fields overlay -->
-    <script src="js/acord-real-viewer-vigagency.js?v=2026021302_DATE_FIX"></script>
+    <script src="js/acord-real-viewer-vigagency.js?v=2026021302_TI_FIX_ROW"></script>
     <!-- Load the ACORD 25 Display with download/print functions -->
     <!-- Disabled because it conflicts with real viewer -->
     <!-- <script src="js/acord-25-display.js?v=2"></script> -->
@@ -2289,13 +2317,13 @@
     <!-- <script src="js/counts-only-lead-generation.js?v=3"></script> -->
 
     <!-- Complete Lead Generation with Day Skip feature -->
-    <script src="js/complete-lead-generation-restoration.js?v=18_DB_V3_CONNECTION_FILTERS"></script>
+    <script src="js/complete-lead-generation-restoration.js?v=21_STATE_LABELS_V3"></script>
 
     <!-- Fix Lead Generation to use DB-V3 Database - MUST LOAD AFTER COMPLETE RESTORATION -->
     <script src="js/fix-lead-generation-matched-carriers.js?v=11_DB_V3_CONNECTION"></script>
 
     <!-- Selective Vicidial Sync - Choose which leads to import - MUST BE ABSOLUTELY LAST -->
-    <script src="js/selective-vicidial-sync-clean.js?v=21"></script>
+    <script src="js/selective-vicidial-sync-clean.js?v=22"></script>
 
     <!-- Fix ViciDial Deleted Filter - Clear ViciDial leads from deleted list -->
     <script src="js/fix-vicidial-deleted-filter.js?v=1"></script>
@@ -2583,7 +2611,7 @@
     <script src="js/force-freeze-timestamps.js"></script>
     <script src="js/force-quote-modal-front.js"></script>
     <script src="js/enhanced-quote-form.js"></script>
-    <script src="js/enhanced-quote-modal.js?v=YEARS_BUSINESS_FIX_v27"></script>
+    <script src="js/enhanced-quote-modal.js?v=NOT_40K_1K_v33"></script>
 
     <!-- Independent Agent Tracking System - Load Early -->
     <script src="js/independent-agent-tracking.js"></script>
@@ -3591,40 +3619,6 @@
     <!-- DEBUG ALASKA LEAD ISSUE -->
     <script src="js/debug-alaska-lead.js?v=1"></script>
 
-    <!-- SIMPLE AUTO REFRESH - Just call loadLeadsView after 5 seconds -->
-    <script>
-        console.log('🔄 AGGRESSIVE AUTO REFRESH: Script starting...');
-
-        function tryRefresh(attempt) {
-            console.log(`🔄 ATTEMPT ${attempt}: Trying refresh...`);
-            console.log('Current location hash:', window.location.hash);
-            console.log('loadLeadsView available?', typeof window.loadLeadsView);
-
-            if (window.loadLeadsView && typeof window.loadLeadsView === 'function') {
-                console.log(`✅ ATTEMPT ${attempt}: FOUND loadLeadsView - calling it!`);
-                try {
-                    window.loadLeadsView();
-                    console.log(`✅ ATTEMPT ${attempt}: loadLeadsView() called successfully!`);
-                    return true;
-                } catch (error) {
-                    console.error(`❌ ATTEMPT ${attempt}: Error calling loadLeadsView:`, error);
-                }
-            } else {
-                console.log(`❌ ATTEMPT ${attempt}: loadLeadsView not available yet`);
-                console.log('Available window functions:', Object.keys(window).filter(key => key.includes('load')));
-            }
-            return false;
-        }
-
-        // Try multiple times at different intervals
-        setTimeout(() => tryRefresh(1), 1000);   // 1 second
-        setTimeout(() => tryRefresh(2), 3000);   // 3 seconds
-        setTimeout(() => tryRefresh(3), 5000);   // 5 seconds
-        setTimeout(() => tryRefresh(4), 8000);   // 8 seconds
-        setTimeout(() => tryRefresh(5), 12000);  // 12 seconds
-
-        console.log('✅ AGGRESSIVE AUTO REFRESH: Multiple refresh attempts scheduled');
-    </script>
 
     <!-- COMPREHENSIVE TODO/HIGHLIGHTING FIX - Load last to override everything -->
     <script src="js/comprehensive-final-fix.js?v=CACHE_BUST_2"></script>
@@ -3635,8 +3629,7 @@
     <!-- DIRECT HIGHLIGHT BUTTON CLICK INTERCEPTOR -->
     <script src="js/highlight-button-interceptor.js?v=2"></script>
 
-    <!-- NOTIFICATION SIDEBAR -->
-    <script src="js/notification-sidebar.js?v=API_INTEGRATION_v1"></script>
+
 
     <!-- APP SENT TODO OVERRIDE - Force empty TODO for app sent stage -->
     <script src="js/app-sent-todo-override.js?v=2"></script>
@@ -3703,20 +3696,24 @@
     <!-- <script src="js/fix-expired-highlight-table-display.js?v=1"></script> -->
 
     <!-- SIMPLIFIED: Callback-only TO DO logic (overrides complex highlight tracking) -->
-    <script src="js/simplified-todo-logic.js?v=1"></script>
+    <script src="js/simplified-todo-logic.js?v=3"></script>
 
     <!-- ULTIMATE OVERRIDE: Nuclear option to disable ALL competing TO DO systems -->
-    <script src="js/ultimate-callback-only-override.js?v=1"></script>
+    <script src="js/ultimate-callback-only-override.js?v=3"></script>
 
     <!-- ENHANCED CLIENT MANAGEMENT: Search, filtering, and bulk operations -->
     <script src="js/enhanced-client-management.js?v=2026021302_AGENT_FILTER_WORKING"></script>
     <script src="js/client-bulk-operations.js?v=2025021001"></script>
     <script src="js/validate-client-enhancements.js?v=2025021001"></script>
+    <!-- CLIENT FILTERS: Auto-filter Maureen clients and initialization -->
+    <script src="js/client-filters.js?v=1"></script>
     <!-- Mobile Navigation JavaScript -->
     <script src="js/mobile.js?v=1"></script>
     <!-- Fix for clickable phone/email elements - DISABLED: Conflicts with fix-clients-view.js -->
     <!-- <script src="js/fix-clickable-elements.js?v=1"></script> -->
 
     <!-- REMOVED: Scripts moved earlier to ensure loading -->
+    <!-- Plaid Link SDK -->
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 </body>
 </html>

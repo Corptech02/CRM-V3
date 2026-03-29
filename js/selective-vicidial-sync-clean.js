@@ -683,17 +683,7 @@ async function importSelectedLeads(quickMode = false) {
         if (quickMode && result.success) {
             console.log('✅ Quick Import completed immediately');
 
-            // IMMEDIATELY clear imported ViciDial leads from deleted list
-            try {
-                const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
-                const importedLeadIds = selectedLeads.map(lead => lead.id);
-                const updatedDeletedLeads = deletedLeads.filter(id => !importedLeadIds.includes(id));
-                localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(updatedDeletedLeads));
-                console.log(`🧹 IMMEDIATE: Cleared ${deletedLeads.length - updatedDeletedLeads.length} imported leads from deleted list`);
-                console.log(`🧹 IMMEDIATE: Removed IDs: ${importedLeadIds.join(', ')}`);
-            } catch (error) {
-                console.error('❌ Error clearing deleted leads immediately:', error);
-            }
+            // NOTE: DELETED_LEAD_IDS is intentionally preserved — deleted leads must stay deleted across syncs
 
             if (window.updateTranscriptionProgress) {
                 window.updateTranscriptionProgress(100, 'Quick Import complete!');
@@ -709,29 +699,49 @@ async function importSelectedLeads(quickMode = false) {
                 setTimeout(async () => {
                     console.log('📅 VICIDIAL IMPORT: Callbacks processed server-side during import - now reloading leads...');
 
-                    // Try to reload leads (this may fail due to SSL errors but callbacks were already processed server-side)
+                    // Clear imported lead IDs from frontend DELETED_LEAD_IDS so they aren't filtered out
+                    try {
+                        const importedIds = selectedLeads.map(l => String(l.id || l.leadId || '')).filter(Boolean);
+                        if (importedIds.length > 0) {
+                            const deletedIds = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
+                            const cleaned = deletedIds.filter(id => !importedIds.includes(String(id)));
+                            if (cleaned.length !== deletedIds.length) {
+                                localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(cleaned));
+                                console.log(`🔓 Cleared ${deletedIds.length - cleaned.length} imported lead(s) from DELETED_LEAD_IDS`);
+                            }
+                        }
+                    } catch (e) { /* ignore */ }
+
+                    // Reload leads using relative URL (avoids HTTPS/HTTP mismatch on port 3001)
                     console.log('🔄 Reloading leads after Quick Import...');
                     try {
-                        const baseUrl = window.location.hostname === 'localhost'
-                            ? 'http://localhost:3001'
-                            : `${window.location.protocol}//${window.location.hostname}:3001`;
-
-                        const response = await fetch(`${baseUrl}/api/leads`);
+                        const response = await fetch('/api/leads');
                         if (response.ok) {
                             const freshLeads = await response.json();
                             localStorage.setItem('insurance_leads', JSON.stringify(freshLeads));
 
-                            // Clear deleted leads list for newly imported ViciDial leads
-                            const deletedLeads = JSON.parse(localStorage.getItem('DELETED_LEAD_IDS') || '[]');
-                            const importedLeadIds = freshLeads
-                                .filter(lead => lead.source === 'ViciDial')
-                                .map(lead => lead.id);
-
-                            const updatedDeletedLeads = deletedLeads.filter(id => !importedLeadIds.includes(id));
-                            localStorage.setItem('DELETED_LEAD_IDS', JSON.stringify(updatedDeletedLeads));
-
                             console.log('✅ Leads reloaded after Quick Import');
-                            console.log(`🧹 Cleared ${deletedLeads.length - updatedDeletedLeads.length} ViciDial leads from deleted list`);
+
+                            // Auto-trigger DOT lookup for newly imported leads that have a DOT number
+                            if (window.manualDOTLookupTrigger) {
+                                const importedNames = (selectedLeads || []).map(l => (l.name || '').toLowerCase());
+                                let dotLookupIdx = 0;
+                                freshLeads.forEach(lead => {
+                                    if (!lead.dotNumber || !lead.dotNumber.trim()) return;
+                                    const nameMatch = importedNames.some(n => n && lead.name && lead.name.toLowerCase().includes(n));
+                                    if (!nameMatch) return;
+                                    if (lead.yearsInBusiness && lead.state && lead.commodityHauled) return; // Already has DOT data
+                                    const delay = dotLookupIdx * 800 + 300;
+                                    dotLookupIdx++;
+                                    setTimeout(() => {
+                                        console.log(`🚛 AUTO DOT: Triggering DOT lookup for imported lead ${lead.name} (DOT: ${lead.dotNumber})`);
+                                        window.manualDOTLookupTrigger(lead.id, lead.dotNumber);
+                                    }, delay);
+                                });
+                                if (dotLookupIdx > 0) {
+                                    console.log(`🚛 AUTO DOT: Queued DOT lookup for ${dotLookupIdx} imported lead(s)`);
+                                }
+                            }
                         } else {
                             console.warn('⚠️ Failed to reload leads after import - but callbacks were already processed');
                         }

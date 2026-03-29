@@ -429,8 +429,8 @@ body {
 .dashboard-content {
     flex: 1;
     padding: 1.5rem;
-    max-width: 1400px;
     width: 100%;
+    min-width: 0;
 }
 
 /* Stats Grid */
@@ -1335,6 +1335,8 @@ body {
     display: flex;
     flex-direction: column;
     transition: transform 0.2s ease;
+    resize: both;
+    overflow: hidden;
 }
 
 .tool-window.minimized {
@@ -1389,6 +1391,93 @@ body {
     overflow: auto;
     background: white;
     border-radius: 0 0 7px 7px;
+}
+
+/* Resize handles */
+.resize-handle {
+    position: absolute;
+    background: transparent;
+}
+
+.resize-handle-n {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    cursor: n-resize;
+}
+
+.resize-handle-s {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    cursor: s-resize;
+}
+
+.resize-handle-e {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 5px;
+    cursor: e-resize;
+}
+
+.resize-handle-w {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 5px;
+    cursor: w-resize;
+}
+
+.resize-handle-nw {
+    top: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    cursor: nw-resize;
+}
+
+.resize-handle-ne {
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    cursor: ne-resize;
+}
+
+.resize-handle-sw {
+    bottom: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    cursor: sw-resize;
+}
+
+.resize-handle-se {
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    cursor: se-resize;
+}
+
+/* Visual resize indicator in bottom-right corner */
+.resize-handle-se::after {
+    content: '';
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 5px;
+    height: 5px;
+    border-right: 2px solid #cbd5e1;
+    border-bottom: 2px solid #cbd5e1;
+}
+
+.resize-handle-se:hover::after {
+    border-right-color: #3b82f6;
+    border-bottom-color: #3b82f6;
 }
 
 /* Taskbar for minimized windows */
@@ -5089,6 +5178,10 @@ input:checked + .slider:before {
 .close-btn:hover {
     background: #f3f4f6;
     color: #333;
+}
+
+#profile-close-btn {
+    color: white !important;
 }
 
 .attachment-preview {

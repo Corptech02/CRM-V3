@@ -115,7 +115,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
         <div class="modal-content" style="background: white; border-radius: 12px; max-width: 1200px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px; position: relative; transform: none; top: auto; left: auto;">
             <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
                 <h2 style="margin: 0; font-size: 24px;"><i class="fas fa-truck"></i> Commercial Auto Lead Profile</h2>
-                <button class="close-btn" id="profile-close-btn" onclick="(function(){const modal=document.getElementById('lead-profile-container');if(modal&&modal._idProtectionObserver){modal._idProtectionObserver.disconnect();}modal.remove();})();" style="position: absolute; top: 20px; right: 20px; font-size: 30px; background: none; border: none; cursor: pointer;">×</button>
+                <button class="close-btn" id="profile-close-btn" onclick="(function(){const modal=document.getElementById('lead-profile-container');if(modal&&modal._idProtectionObserver){modal._idProtectionObserver.disconnect();}modal.remove();})();" style="position: absolute; top: 20px; right: 20px; font-size: 30px; background: none; border: none; cursor: pointer; color: white;">×</button>
             </div>
 
             <div style="padding: 20px;">
@@ -124,7 +124,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     <h3><i class="fas fa-chart-line"></i> Lead Stage</h3>
                     <div>
                         <label style="font-weight: 600; font-size: 12px;">Current Stage:</label>
-                        <select id="lead-stage-${lead.id}" onchange="updateLeadStage('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                        <select id="lead-stage-${lead.id}" onchange="handleStageChange('${lead.id}', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
                             <option value="new" ${lead.stage === 'new' ? 'selected' : ''}>New</option>
                             <option value="contact_attempted" ${lead.stage === 'contact_attempted' ? 'selected' : ''}>Contact Attempted</option>
                             <option value="info_requested" ${lead.stage === 'info_requested' ? 'selected' : ''}>Info Requested</option>
@@ -132,11 +132,30 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             <option value="loss_runs_requested" ${lead.stage === 'loss_runs_requested' ? 'selected' : ''}>Loss Runs Requested</option>
                             <option value="loss_runs_received" ${lead.stage === 'loss_runs_received' ? 'selected' : ''}>Loss Runs Received</option>
                             <option value="app_prepared" ${lead.stage === 'app_prepared' ? 'selected' : ''}>App Prepared</option>
-                            <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>App Sent</option>
+                            <option value="app_sent" ${lead.stage === 'app_sent' ? 'selected' : ''}>Waiting on Markets</option>
                             <option value="quote_sent" ${lead.stage === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
                             <option value="sale" ${lead.stage === 'sale' ? 'selected' : ''}>Sale</option>
                             <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
+                            ${(function() {
+                                // Check if current stage is a custom stage (not in predefined list)
+                                const predefinedStages = ['new', 'contact_attempted', 'info_requested', 'info_received', 'loss_runs_requested', 'loss_runs_received', 'app_prepared', 'app_sent', 'quote_sent', 'sale', 'closed'];
+                                const isCustomStage = lead.stage && !predefinedStages.includes(lead.stage);
+                                if (isCustomStage) {
+                                    return `<option value="${lead.stage}" selected>${lead.stage}</option>`;
+                                }
+                                return '';
+                            })()}
+                            <option value="custom">Custom</option>
                         </select>
+                        <input type="text" id="lead-stage-custom-${lead.id}" placeholder="Enter custom stage" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; display: none; margin-top: 5px;" onblur="saveCustomStage('${lead.id}', this.value)" onkeypress="if(event.key==='Enter') saveCustomStage('${lead.id}', this.value)">
+                        <button id="toggle-stage-${lead.id}" onclick="toggleStageInput('${lead.id}')" style="background: #6b7280; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; display: none; margin-top: 5px; font-size: 12px;" title="Switch back to dropdown">
+                            <i class="fas fa-chevron-down"></i> Dropdown
+                        </button>
+                        <div id="todo-field-${lead.id}" style="display: none; margin-top: 10px;">
+                            <label style="font-weight: 600; font-size: 12px; color: #374151;">TO DO (Optional):</label>
+                            <textarea id="todo-text-${lead.id}" placeholder="Enter optional to-do notes..." style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 5px; resize: vertical; min-height: 60px;" onblur="saveTodoText('${lead.id}', this.value)" onkeypress="if(event.key==='Enter' && event.shiftKey) saveTodoText('${lead.id}', this.value)"></textarea>
+                            <small style="color: #6b7280; font-size: 11px;">Press Shift+Enter to save, or click outside to save automatically</small>
+                        </div>
                     </div>
                     <!-- Stage Timestamp with Color Coding -->
                     <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; text-align: center;">
@@ -265,7 +284,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                         <!-- Called Section - Now at top -->
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" id="call-made-${lead.id}" onchange="console.log('🔍 CHECKBOX CLICKED: leadId=${lead.id}'); updateReachOut('${lead.id}', 'call', this.checked)" style="width: 20px; height: 20px; cursor: pointer;" data-debug-lead="${lead.id}">
+                                <input type="checkbox" id="call-made-${lead.id}" onchange="console.log('🔍 CHECKBOX CLICKED: leadId=${lead.id}'); console.log('🔍 CHECKBOX STATE: checked=' + this.checked); if(window.updateReachOut) { window.updateReachOut('${lead.id}', 'call', this.checked); } else { console.error('❌ window.updateReachOut not found!'); }" style="width: 20px; height: 20px; cursor: pointer;" data-debug-lead="${lead.id}">
                                 <label for="call-made-${lead.id}" style="font-weight: 600; cursor: pointer;">Called</label>
                             </div>
                             <div style="display: flex; align-items: center; gap: 20px;">
@@ -351,33 +370,6 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                 </div>
 
-                <!-- Owner Details -->
-                <div class="profile-section" style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3><i class="fas fa-user-circle"></i> Owner Details</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Name:</label>
-                            <input type="text"
-                                value="${lead.ownerName || ''}"
-                                onchange="updateLeadField('${lead.id}', 'ownerName', this.value); updateNameFieldColor(this);"
-                                oninput="updateNameFieldColor(this);"
-                                placeholder="Enter owner name"
-                                style="width: 100%; padding: 8px; border: 1px solid ${(lead.ownerName && lead.ownerName.trim()) ? '#d1d5db' : '#ef4444'}; border-radius: 6px; background-color: ${(lead.ownerName && lead.ownerName.trim()) ? 'white' : '#fef2f2'};">
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Interest:</label>
-                            <input type="text" value="${lead.ownerInterest || ''}" onchange="updateLeadField('${lead.id}', 'ownerInterest', this.value)" placeholder="Enter interests" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Dislikes:</label>
-                            <input type="text" value="${lead.ownerDislikes || ''}" onchange="updateLeadField('${lead.id}', 'ownerDislikes', this.value)" placeholder="Enter dislikes" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                        </div>
-                        <div>
-                            <label style="font-weight: 600; font-size: 12px;">Personality:</label>
-                            <input type="text" value="${lead.ownerPersonality || ''}" onchange="updateLeadField('${lead.id}', 'ownerPersonality', this.value)" placeholder="Enter personality traits" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Notes -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
@@ -389,9 +381,14 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3 style="margin: 0;">Company Information</h3>
-                        <button id="dot-lookup-btn-${lead.id}" onclick="triggerManualDOTLookup('${lead.id}', document.getElementById('dot-input-${lead.id}')?.value || '${lead.dotNumber || ''}')" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;" title="Manual DOT lookup - reads DOT from input field">
-                            <i class="fas fa-search"></i> DOT Lookup
-                        </button>
+                        <div style="display:flex;gap:8px;">
+                            <button id="dot-lookup-btn-${lead.id}" onclick="triggerManualDOTLookup('${lead.id}', document.getElementById('dot-input-${lead.id}')?.value || '${lead.dotNumber || ''}')" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;" title="Rescan DOT data from FMCSA">
+                                <i class="fas fa-sync-alt"></i> Rescan DOT
+                            </button>
+                            <button onclick="acctGoToDOTLookup('${lead.id}')" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;" title="Open DOT in lead generation search">
+                                <i class="fas fa-search"></i> DOT Lookup
+                            </button>
+                        </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
                         <div>
@@ -402,13 +399,23 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             <label style="font-weight: 600; font-size: 12px;">Contact:</label>
                             <input type="text" value="${lead.contact || ''}" onchange="updateLeadField('${lead.id}', 'contact', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         </div>
-                        <div>
+                        <div style="position: relative;">
                             <label style="font-weight: 600; font-size: 12px;">Phone:</label>
-                            <input type="text" value="${lead.phone || ''}" onchange="updateLeadField('${lead.id}', 'phone', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="text" value="${lead.phone || ''}" onchange="updateLeadField('${lead.id}', 'phone', this.value)" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <button onclick="window.open('tel:${lead.phone || ''}'); if(window.updateReachOut) { var cb = document.getElementById('call-made-${lead.id}'); if(cb){ cb.checked = true; } window.updateReachOut('${lead.id}', 'call', true); }" title="Call ${lead.phone || ''}" style="background: #10b981; color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                                    <i class="fas fa-phone" style="margin: 0;"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div>
+                        <div style="position: relative;">
                             <label style="font-weight: 600; font-size: 12px;">Email:</label>
-                            <input type="text" value="${lead.email || ''}" onchange="updateLeadField('${lead.id}', 'email', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="text" value="${lead.email || ''}" onchange="updateLeadField('${lead.id}', 'email', this.value)" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <button onclick="window.open('mailto:${lead.email || ''}')" title="Compose email to ${lead.email || ''}" style="background: #3b82f6; color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
+                                    <i class="fas fa-envelope" style="margin: 0;"></i>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">DOT Number:</label>
@@ -496,7 +503,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                                             <select onchange="updateVehicle('${lead.id}', ${index}, 'type', this.value)" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
                                                 <option value="">Select Type</option>
                                                 <option value="Box Truck" ${vehicle.type === 'Box Truck' ? 'selected' : ''}>Box Truck</option>
-                                                <option value="Semi Truck" ${vehicle.type === 'Semi Truck' ? 'selected' : ''}>Semi Truck</option>
+                                                <option value="Truck Tractor" ${vehicle.type === 'Truck Tractor' || vehicle.type === 'Semi Truck' ? 'selected' : ''}>Truck Tractor</option>
                                                 <option value="Flatbed" ${vehicle.type === 'Flatbed' ? 'selected' : ''}>Flatbed</option>
                                                 <option value="Pickup" ${vehicle.type === 'Pickup' ? 'selected' : ''}>Pickup</option>
                                                 <option value="Van" ${vehicle.type === 'Van' ? 'selected' : ''}>Van</option>
@@ -616,14 +623,21 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 <div class="profile-section" style="background: #fff; border: 2px solid ${lead.recordingPath && lead.hasRecording ? '#10b981' : '#f3f4f6'}; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3><i class="fas fa-${lead.recordingPath && lead.hasRecording ? 'play-circle' : 'microphone-alt'}"></i> Call Recording</h3>
-                        ${!(lead.recordingPath && lead.hasRecording) ? `
-                            <button onclick="openCallRecordingUpload('${lead.id}')" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                <i class="fas fa-upload"></i> Upload Recording
-                            </button>
-                        ` : ''}
+                        <div style="display: flex; gap: 8px;">
+                            ${lead.recordingPath && lead.hasRecording ? `
+                                <button onclick="transcribeRecording('${lead.id}', '${lead.recordingPath}')" id="transcribe-btn-${lead.id}" style="background: #7c3aed; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    <i class="fas fa-file-alt"></i> Transcribe Recording
+                                </button>
+                            ` : ''}
+                            ${!(lead.recordingPath && lead.hasRecording) ? `
+                                <button onclick="openCallRecordingUpload('${lead.id}')" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    <i class="fas fa-upload"></i> Upload Recording
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                     ${lead.recordingPath && lead.hasRecording ? `
-                        <audio controls style="width: 100%; height: 40px;" preload="none">
+                        <audio id="recording-audio-${lead.id}" controls style="width: 100%; height: 40px;" preload="none">
                             <source src="${lead.recordingPath}" type="audio/mpeg">
                             <source src="${lead.recordingPath}" type="audio/wav">
                             Your browser does not support the audio element.
@@ -636,7 +650,12 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 <!-- Call Transcript -->
                 <div class="profile-section" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h3><i class="fas fa-microphone"></i> Call Transcript</h3>
-                    <textarea onchange="updateLeadField('${lead.id}', 'transcriptText', this.value)" style="width: 100%; min-height: 150px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace;">${lead.transcriptText || ''}</textarea>
+                    <div id="transcript-display-${lead.id}" style="width: 100%; min-height: 150px; max-height: 350px; overflow-y: auto; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 13px; line-height: 1.9; background: white;">
+                        ${(lead.transcriptWords && lead.transcriptWords.length)
+                            ? buildTranscriptSpans(lead.transcriptWords)
+                            : `<span style="color:#9ca3af;">${lead.transcriptText ? lead.transcriptText.replace(/\n/g, '<br>') : 'No transcript yet. Click Transcribe Recording above.'}</span>`
+                        }
+                    </div>
                 </div>
 
                 <!-- Quote Submissions -->
@@ -654,7 +673,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                     </div>
                     <div id="quote-submissions-container">
                         <div id="quotes-container-${lead.id}" style="padding: 20px; text-align: center;">
-                            <p style="color: #9ca3af; text-align: center; padding: 20px;">No quotes submitted yet</p>
+                            <p style="color: #9ca3af; text-align: center; padding: 20px;">Loading quotes...</p>
                         </div>
                     </div>
                 </div>
@@ -769,6 +788,104 @@ protectedFunctions.createEnhancedProfile = function(lead) {
     `;
 
     document.body.appendChild(modalContainer);
+
+    // Init transcript sync if words already stored
+    if (lead.transcriptWords && lead.transcriptWords.length) {
+        setTimeout(() => initTranscriptSync(lead.id), 100);
+    }
+
+    // Add custom stage functions
+    window.handleStageChange = function(leadId, value) {
+        if (value === 'custom') {
+            // Switch to text input
+            const select = document.getElementById('lead-stage-' + leadId);
+            const input = document.getElementById('lead-stage-custom-' + leadId);
+            const toggle = document.getElementById('toggle-stage-' + leadId);
+            const todoField = document.getElementById('todo-field-' + leadId);
+
+            select.style.display = 'none';
+            input.style.display = 'block';
+            toggle.style.display = 'block';
+            if (todoField) todoField.style.display = 'block';
+            input.focus();
+        } else {
+            // Regular stage update
+            updateLeadStage(leadId, value);
+        }
+    };
+
+    window.saveCustomStage = function(leadId, customValue) {
+        if (customValue.trim()) {
+            updateLeadStage(leadId, customValue.trim());
+
+            // Add the custom stage as a new option in the dropdown and select it
+            const select = document.getElementById('lead-stage-' + leadId);
+            const customOption = document.createElement('option');
+            customOption.value = customValue.trim();
+            customOption.textContent = customValue.trim();
+            customOption.selected = true;
+
+            // Insert before the "Custom" option
+            const customEntry = select.querySelector('option[value="custom"]');
+            select.insertBefore(customOption, customEntry);
+
+            // Switch back to dropdown and hide TO DO field
+            const input = document.getElementById('lead-stage-custom-' + leadId);
+            const toggle = document.getElementById('toggle-stage-' + leadId);
+            const todoField = document.getElementById('todo-field-' + leadId);
+
+            select.style.display = 'block';
+            input.style.display = 'none';
+            toggle.style.display = 'none';
+            if (todoField) todoField.style.display = 'none';
+            input.value = '';
+        }
+    };
+
+    window.toggleStageInput = function(leadId) {
+        const select = document.getElementById('lead-stage-' + leadId);
+        const input = document.getElementById('lead-stage-custom-' + leadId);
+        const toggle = document.getElementById('toggle-stage-' + leadId);
+        const todoField = document.getElementById('todo-field-' + leadId);
+        const todoText = document.getElementById('todo-text-' + leadId);
+
+        if (input.style.display === 'none' || !input.style.display) {
+            // Switch to text input
+            select.style.display = 'none';
+            input.style.display = 'block';
+            toggle.style.display = 'block';
+            if (todoField) todoField.style.display = 'block';
+            input.focus();
+        } else {
+            // Switch back to dropdown
+            select.style.display = 'block';
+            input.style.display = 'none';
+            toggle.style.display = 'none';
+            if (todoField) todoField.style.display = 'none';
+            input.value = ''; // Clear input
+            if (todoText) todoText.value = ''; // Clear to-do text
+        }
+    };
+
+    window.saveTodoText = function(leadId, todoValue) {
+        if (todoValue && todoValue.trim()) {
+            // Update the reach-out TO DO section with the custom text
+            const todoDiv = document.getElementById(`reach-out-todo-${leadId}`);
+            if (todoDiv) {
+                todoDiv.innerHTML = `<span style="color: #dc2626; font-weight: bold; font-size: 18px;">TO DO: ${todoValue.trim()}</span>`;
+                todoDiv.style.display = 'block';
+                console.log(`📝 Custom TO DO saved for lead ${leadId}: ${todoValue.trim()}`);
+            }
+        } else {
+            // Clear the TO DO section if no text provided
+            const todoDiv = document.getElementById(`reach-out-todo-${leadId}`);
+            if (todoDiv) {
+                todoDiv.innerHTML = '';
+                todoDiv.style.display = 'none';
+                console.log(`🗑️ Custom TO DO cleared for lead ${leadId}`);
+            }
+        }
+    };
 
     // Load existing quotes for this lead
     loadQuotesForLead(lead.id);
@@ -1027,7 +1144,10 @@ protectedFunctions.openEmailDocumentation = async function(leadId) {
 
     // Prepare subject with lead data (use NULL if not found)
     const companyName = lead.name || 'NULL';
-    const renewalDate = lead.renewalDate || 'NULL';
+    const rawRenewalDate = lead.renewalDate || 'NULL';
+    const renewalDate = rawRenewalDate !== 'NULL'
+        ? rawRenewalDate.replace(/\/\d{4}$/, '/2026').replace(/-\d{4}$/, '-2026')
+        : 'NULL';
     const usdot = lead.dotNumber || 'NULL';
     const subject = `Renewal: ${renewalDate} - USDOT: ${usdot} - ${companyName}`;
 
@@ -1090,6 +1210,18 @@ protectedFunctions.openEmailDocumentation = async function(leadId) {
     protectedFunctions.createEmailComposer(lead, subject, allFiles);
 };
 
+// Agent email map
+const AGENT_EMAILS = {
+    'grant':   'Grant@vigagency.com',
+    'carson':  'Carson@vigagency.com',
+    'hunter':  'Hunter@vigagency.com',
+    'maureen': 'Maureen@vigagency.com'
+};
+function getAgentEmail(assignedTo) {
+    if (!assignedTo) return '';
+    return AGENT_EMAILS[assignedTo.toLowerCase()] || '';
+}
+
 // NEW: Create dedicated email composer modal
 protectedFunctions.createEmailComposer = function(lead, subject, attachments) {
     console.log('✉️ Creating email composer for:', lead.name);
@@ -1119,7 +1251,13 @@ protectedFunctions.createEmailComposer = function(lead, subject, attachments) {
     `;
 
     // Broker-focused email body template
-    const emailBody = `Hello,
+    const agentName = lead.assignedTo || 'NULL';
+    const agentEmail = getAgentEmail(lead.assignedTo);
+    const agentLine = `ASSIGNED AGENT: ${agentName}${agentEmail ? ' | ' + agentEmail : ''}`;
+
+    const emailBody = `${agentLine}
+
+Hello,
 
 We are looking to get a quote for the following commercial auto account:
 
@@ -1146,7 +1284,13 @@ Thank you,`;
                 <!-- To Field -->
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; color: #374151;">To:</label>
-                    <input type="email" id="email-to-field" value="Grant@vigagency.com" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    <input type="email" id="email-to-field" value="amanda_miller@rpsins.com" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+
+                <!-- Agent CC Field -->
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; color: #374151;">Agent (CC):</label>
+                    <input type="email" id="email-agent-cc-field" value="${getAgentEmail(lead.assignedTo)}" placeholder="agent@vigagency.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                 </div>
 
                 <!-- Subject Field -->
@@ -1689,8 +1833,14 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
         }
     } else if (type === 'call') {
         if (checked) {
-            // Show popup when call checkbox is checked
-            showCallOutcomePopup(leadId);
+            // Show popup when call checkbox is checked manually (not auto-checked)
+            console.log(`🔥 MANUAL CALL CHECKBOX: About to show popup for lead ${leadId}`);
+            if (typeof showCallOutcomePopup === 'function') {
+                showCallOutcomePopup(leadId);
+                console.log(`✅ MANUAL CALL CHECKBOX: Popup function called successfully`);
+            } else {
+                console.error(`❌ MANUAL CALL CHECKBOX: showCallOutcomePopup function not found!`);
+            }
             return; // Exit early - let popup handle everything
         } else {
             leads[leadIndex].reachOut.callAttempts = Math.max(0, leads[leadIndex].reachOut.callAttempts - 1);
@@ -1756,6 +1906,21 @@ protectedFunctions.updateReachOut = function(leadId, type, checked) {
                 applyReachOutStyling(leadId, true);
             }
         }
+    }
+
+    // CRITICAL FIX: Refresh table after all reach-out updates (except text completion which has its own refresh)
+    if (type !== 'text' || !checked) {
+        console.log(`🔄 CHECKBOX FIX: Refreshing table after ${type} checkbox update (checked=${checked})`);
+        setTimeout(() => {
+            if (typeof refreshLeadsTable === 'function') {
+                refreshLeadsTable();
+            } else if (window.displayLeads) {
+                window.displayLeads();
+            } else if (window.loadLeadsView) {
+                window.loadLeadsView();
+            }
+            console.log('✅ CHECKBOX FIX: Table refresh completed');
+        }, 100);
     }
 };
 
@@ -2102,72 +2267,563 @@ function saveReachOutToServer(leadId, reachOutData) {
 
 // Function to show call duration popup
 function showCallDurationPopup(leadId) {
-    console.log(`📞 Showing call duration popup for lead: ${leadId}`);
+    console.log(`📞 Starting call timer for lead: ${leadId}`);
 
-    // Remove existing popups
+    // Remove existing popups AND their backdrops
     const existingPopup = document.getElementById('call-outcome-popup');
     if (existingPopup) {
         existingPopup.remove();
     }
 
-    // Create new popup for duration
-    const popup = document.createElement('div');
-    popup.id = 'call-duration-popup';
-    popup.style.cssText = `
+    // Remove popup backdrop to allow page interaction
+    const existingBackdrop = document.getElementById('popup-backdrop');
+    if (existingBackdrop) {
+        existingBackdrop.remove();
+    }
+
+    // Remove any existing timer
+    const existingTimer = document.getElementById('call-timer-widget');
+    if (existingTimer) {
+        clearInterval(window.callTimerInterval);
+        existingTimer.remove();
+    }
+
+    // Create timer widget in top right corner (NO BACKDROP)
+    const timerWidget = document.createElement('div');
+    timerWidget.id = 'call-timer-widget';
+    timerWidget.style.cssText = `
         position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-        z-index: 1000002;
-        min-width: 400px;
+        top: 20px;
+        right: 20px;
+        background: #1f2937;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        z-index: 1000003;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        min-width: 180px;
+        text-align: center;
+        pointer-events: auto;
     `;
 
-    popup.innerHTML = `
-        <div style="text-align: center;">
-            <h3 style="margin-top: 0;">Call Duration</h3>
-            <p style="font-size: 16px; margin: 20px 0;">How long was the call?</p>
-            <div style="margin: 20px 0;">
-                <input type="number" id="duration-minutes" placeholder="0" min="0" max="999"
-                       style="width: 80px; padding: 10px; border: 2px solid #e5e7eb; border-radius: 5px; font-size: 16px; text-align: center;">
-                <span style="font-size: 16px; margin-left: 10px;">minutes</span>
+    timerWidget.innerHTML = `
+        <div style="margin-bottom: 10px;">
+            <div style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px;">Call in Progress</div>
+        </div>
+        <div style="font-size: 24px; font-weight: bold; margin: 8px 0; font-variant-numeric: tabular-nums;" id="timer-display">00:00</div>
+        <button onclick="showManualTimeLogPopup('${leadId}')" style="
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 8px;
+        " onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">Manual Log Time</button>
+        <button onclick="endCall('${leadId}')" style="
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">End Call</button>
+    `;
+
+    // Append directly to body (NO backdrop or modal container)
+    document.body.appendChild(timerWidget);
+
+    // Start the timer
+    const startTime = Date.now();
+    window.callTimerStartTime = startTime;
+    window.callTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const display = document.getElementById('timer-display');
+        if (display) {
+            display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+    }, 1000);
+
+    console.log(`🎯 Call timer started - page interaction enabled, timer in corner`);
+}
+
+// Function to show manual time logging popup
+window.showManualTimeLogPopup = function(leadId) {
+    console.log(`⏱️ Opening manual time log popup for lead: ${leadId}`);
+
+    // Permanently remove the call timer widget and clear the timer
+    const timerWidget = document.getElementById('call-timer-widget');
+    if (timerWidget) {
+        timerWidget.remove();
+    }
+
+    // Clear the timer interval
+    if (window.callTimerInterval) {
+        clearInterval(window.callTimerInterval);
+        window.callTimerInterval = null;
+    }
+
+    // Get lead data for display
+    const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = leads.find(l => String(l.id) === String(leadId));
+    const leadName = lead ? lead.name : `Lead ${leadId}`;
+
+    // Remove any existing popup
+    const existingPopup = document.getElementById('manual-time-log-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+
+    // Create modal backdrop
+    const modal = document.createElement('div');
+    modal.id = 'manual-time-log-popup';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10000001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            min-width: 400px;
+            max-width: 500px;
+        ">
+            <h3 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
+                Manual Time Log
+            </h3>
+            <p style="margin: 0 0 20px 0; color: #6b7280; font-size: 14px;">
+                Log call time for: <strong>${leadName}</strong>
+            </p>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151; font-size: 14px;">
+                    Call Duration (minutes):
+                </label>
+                <input type="number" id="manual-time-input" min="1" max="999"
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 16px;"
+                    placeholder="Enter minutes" autofocus>
             </div>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                <button onclick="handleCallDuration('${leadId}', document.getElementById('duration-minutes').value)" style="
-                    background: #10b981;
-                    color: white;
-                    border: none;
-                    padding: 10px 30px;
-                    border-radius: 5px;
-                    font-size: 16px;
-                    cursor: pointer;
-                ">Save</button>
-                <button onclick="cancelCallDuration('${leadId}')" style="
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #374151; font-size: 14px;">
+                    Notes (optional):
+                </label>
+                <textarea id="manual-time-notes" rows="3"
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"
+                    placeholder="Add any notes about this call..."></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="closeManualTimeLogPopup()" style="
                     background: #6b7280;
                     color: white;
                     border: none;
-                    padding: 10px 30px;
-                    border-radius: 5px;
-                    font-size: 16px;
+                    padding: 10px 20px;
+                    border-radius: 6px;
                     cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
                 ">Cancel</button>
+                <button onclick="saveManualTimeLog('${leadId}')" style="
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                ">Log Time</button>
             </div>
         </div>
     `;
 
-    document.body.appendChild(popup);
+    document.body.appendChild(modal);
 
-    // Focus on input field
+    // Focus on the input field
     setTimeout(() => {
-        const input = document.getElementById('duration-minutes');
-        if (input) {
-            input.focus();
-        }
+        const input = document.getElementById('manual-time-input');
+        if (input) input.focus();
     }, 100);
 }
+
+// Function to close manual time log popup
+window.closeManualTimeLogPopup = function() {
+    const popup = document.getElementById('manual-time-log-popup');
+    if (popup) {
+        popup.remove();
+    }
+    // Note: Timer widget is permanently removed when manual logging is chosen
+}
+
+// Function to save manual time log
+window.saveManualTimeLog = function(leadId) {
+    const timeInput = document.getElementById('manual-time-input');
+    const notesInput = document.getElementById('manual-time-notes');
+
+    if (!timeInput) {
+        console.error('❌ Time input field not found');
+        return;
+    }
+
+    const minutes = parseInt(timeInput.value);
+    const notes = notesInput ? notesInput.value.trim() : '';
+
+    if (!minutes || minutes < 1) {
+        alert('Please enter a valid number of minutes (minimum 1).');
+        timeInput.focus();
+        return;
+    }
+
+    console.log(`⏱️ Saving manual time log: ${minutes} minutes for lead ${leadId}`);
+
+    // Update lead data with manual time
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        // Format duration for display
+        const durationText = `${minutes} min${minutes !== 1 ? 's' : ''}`;
+
+        // Create call log entry
+        const callLogEntry = {
+            timestamp: new Date().toISOString(),
+            connected: true, // Manual logging assumes successful connection
+            duration: durationText,
+            notes: notes ? `Manual Entry: ${notes}` : 'Manual Entry - Connected call',
+            leftVoicemail: false,
+            source: 'manual'
+        };
+
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {
+                lastUpdate: new Date().toISOString(),
+                attempts: 1,
+                callAttempts: 1,
+                callsConnected: 1,
+                callMinutes: minutes,
+                voicemailCount: 0,
+                callLogs: [callLogEntry],
+                notes: notes || undefined
+            };
+        } else {
+            // Add to existing call minutes
+            const existingMinutes = leads[leadIndex].reachOut.callMinutes || 0;
+            leads[leadIndex].reachOut.callMinutes = existingMinutes + minutes;
+            leads[leadIndex].reachOut.lastUpdate = new Date().toISOString();
+            leads[leadIndex].reachOut.attempts = (leads[leadIndex].reachOut.attempts || 0) + 1;
+
+            // Update call stats
+            leads[leadIndex].reachOut.callAttempts = (leads[leadIndex].reachOut.callAttempts || 0) + 1;
+            leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
+
+            // Add to call logs array
+            if (!leads[leadIndex].reachOut.callLogs) {
+                leads[leadIndex].reachOut.callLogs = [];
+            }
+            leads[leadIndex].reachOut.callLogs.push(callLogEntry);
+
+            // Append notes if provided
+            if (notes) {
+                const existingNotes = leads[leadIndex].reachOut.notes || '';
+                leads[leadIndex].reachOut.notes = existingNotes ?
+                    `${existingNotes}\n${new Date().toLocaleString()}: ${notes}` :
+                    `${new Date().toLocaleString()}: ${notes}`;
+            }
+        }
+
+        // Save updated leads
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+        console.log(`✅ Logged ${minutes} minutes for lead ${leadId}. Total call time: ${leads[leadIndex].reachOut.callMinutes} minutes`);
+
+        // Save to server
+        const updateData = {
+            reachOut: leads[leadIndex].reachOut
+        };
+
+        fetch(`/api/leads/${leadId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Manual time log saved to server successfully');
+                // Refresh data from server to ensure consistency
+                setTimeout(() => {
+                    if (typeof loadLeadsFromServerAndRefresh === 'function') {
+                        loadLeadsFromServerAndRefresh();
+                        console.log('🔄 Data refreshed after manual time log');
+                    }
+                }, 300);
+            } else {
+                console.error('❌ Failed to save manual time log to server:', data.error || 'Unknown error');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Server save error for manual time log:', error.message);
+        });
+
+        // Close popup
+        closeManualTimeLogPopup();
+
+        // Show success message briefly
+        const successMsg = document.createElement('div');
+        successMsg.style.cssText = `
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            z-index: 10000002;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        `;
+        successMsg.textContent = `✅ Logged ${minutes} minutes successfully`;
+        document.body.appendChild(successMsg);
+
+        setTimeout(() => {
+            if (successMsg.parentNode) {
+                successMsg.remove();
+            }
+            // Show call completed popup after success message disappears
+            showCallCompletedPopup(leadId);
+        }, 3000);
+
+    } else {
+        console.error(`❌ Lead ${leadId} not found for manual time logging`);
+        alert('Error: Lead not found. Please try again.');
+        closeManualTimeLogPopup(); // Close popup
+    }
+}
+
+// Function to end call and show callback scheduling popup
+window.endCall = function(leadId) {
+    console.log(`📞 Ending call for lead: ${leadId}`);
+
+    // Calculate call duration
+    const duration = window.callTimerStartTime ? Math.floor((Date.now() - window.callTimerStartTime) / 1000 / 60) : 0;
+
+    // Clear timer
+    if (window.callTimerInterval) {
+        clearInterval(window.callTimerInterval);
+        window.callTimerInterval = null;
+    }
+
+    // Remove timer widget
+    const timerWidget = document.getElementById('call-timer-widget');
+    if (timerWidget) {
+        timerWidget.remove();
+    }
+
+    // Update lead data with call info (same as original handleCallDuration)
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1) {
+        if (!leads[leadIndex].reachOut) {
+            leads[leadIndex].reachOut = {
+                emailCount: 0,
+                textCount: 0,
+                callAttempts: 0,
+                callsConnected: 0,
+                voicemailCount: 0,
+                callLogs: []
+            };
+        }
+
+        // Initialize callLogs array if it doesn't exist
+        if (!leads[leadIndex].reachOut.callLogs) {
+            leads[leadIndex].reachOut.callLogs = [];
+        }
+
+        // Increment connected counter
+        leads[leadIndex].reachOut.callsConnected = (leads[leadIndex].reachOut.callsConnected || 0) + 1;
+        leads[leadIndex].reachOut.callAttempts = (leads[leadIndex].reachOut.callAttempts || 0) + 1;
+
+        // Add call log entry
+        leads[leadIndex].reachOut.callLogs.push({
+            timestamp: new Date().toISOString(),
+            duration: duration,
+            type: 'call',
+            notes: `Call duration: ${duration} minutes`,
+            outcome: 'connected'
+        });
+
+        // Save to localStorage
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        // Update display counters
+        const attemptsDisplay = document.getElementById(`call-attempts-${leadId}`);
+        if (attemptsDisplay) {
+            attemptsDisplay.textContent = leads[leadIndex].reachOut.callAttempts;
+        }
+
+        const connectedDisplay = document.getElementById(`calls-connected-${leadId}`);
+        if (connectedDisplay) {
+            connectedDisplay.textContent = leads[leadIndex].reachOut.callsConnected;
+        }
+
+        // Update checkbox to checked and set called property
+        const checkbox = document.getElementById(`call-made-${leadId}`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+
+        // Set called property for reachout logic
+        leads[leadIndex].reachOut.called = true;
+
+        // Save again to ensure called property is saved
+        localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+        console.log(`📞 Call completed for lead ${leadId} with duration: ${duration} minutes`);
+
+        // Show the callback scheduling popup
+        showCallCompletedPopup(leadId);
+    }
+};
+
+// Function to show call completed popup
+function showCallCompletedPopup(leadId) {
+    console.log(`✅ Showing call completed popup for lead: ${leadId}`);
+
+    // Remove any existing popups
+    const existingBackdrop = document.getElementById('popup-backdrop');
+    if (existingBackdrop) {
+        existingBackdrop.remove();
+    }
+
+    // Create modal backdrop
+    const modalBackdrop = document.createElement('div');
+    modalBackdrop.id = 'popup-backdrop';
+    modalBackdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000001;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    `;
+
+    // Create modal content
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-width: 400px;
+        margin: 0 20px;
+    `;
+
+    modalContent.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="width: 60px; height: 60px; background: #dcfce7; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-calendar-plus" style="font-size: 24px; color: #10b981;"></i>
+            </div>
+            <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px; font-weight: 600;">Call Completed!</h3>
+            <p style="margin: 0; color: #6b7280; font-size: 16px; line-height: 1.5;">
+                Would you like to schedule the next callback for this lead?
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="schedule-next-callback" onclick="scheduleCallbackFromPopup('${leadId}')" style="
+                background: #10b981;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 120px;
+                transition: all 0.2s;
+            ">Schedule Next Call</button>
+            <button id="no-callback-needed" onclick="completeCallWithoutCallback('${leadId}')" style="
+                background: #f3f4f6;
+                color: #374151;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                min-width: 120px;
+                transition: all 0.2s;
+            ">Not Needed</button>
+        </div>
+    `;
+
+    modalBackdrop.appendChild(modalContent);
+    document.body.appendChild(modalBackdrop);
+}
+
+// Function to schedule callback from call completed popup
+window.scheduleCallbackFromPopup = function(leadId) {
+    // Close the call completed popup
+    const backdrop = document.getElementById('popup-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+
+    // Show callback scheduler (if it exists)
+    if (typeof showCallbackScheduler === 'function') {
+        showCallbackScheduler(leadId);
+    } else {
+        console.error('❌ showCallbackScheduler function not found');
+        alert('Callback scheduling function not available');
+    }
+};
+
+// Function to complete call without callback
+window.completeCallWithoutCallback = function(leadId) {
+    console.log(`✅ Call completed without callback for lead: ${leadId}`);
+
+    // Close the popup
+    const backdrop = document.getElementById('popup-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+
+    // Show notification
+    if (typeof showNotification === 'function') {
+        showNotification('Call completed successfully', 'success');
+    }
+};
 
 // Function to handle call duration submission
 window.handleCallDuration = function(leadId, duration) {
@@ -2684,7 +3340,7 @@ function rescanGreenHighlightingAfterCallbacks() {
             return;
         }
 
-        const todoCell = cells[6]; // TODO column
+        const todoCell = cells[7]; // TODO column
         const todoText = todoCell.textContent || '';
 
         rescannedCount++;
@@ -2933,29 +3589,32 @@ protectedFunctions.showCallLogs = function(leadId) {
     let lead = allLeads.find(l => normalizeId(l.id) === targetId);
     console.log(`🔍 LOOKUP RESULT: Looking for "${targetId}", found:`, lead ? `${lead.name} (${lead.id})` : 'NOT FOUND');
 
-    // If not found in localStorage, try to fetch from server
-    if (!lead) {
-        console.log(`🌐 Lead not found in localStorage, attempting server fetch for ${leadId}...`);
+    // ALWAYS fetch fresh data from server first to ensure we have the latest call logs
+    console.log(`🌐 Fetching fresh call log data from server for ${leadId}...`);
 
-        // Try to fetch from the API
-        fetch(`/api/leads/${leadId}`)
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                }
-                throw new Error(`HTTP ${response.status}`);
-            })
-            .then(data => {
-                console.log(`✅ Server fetch successful for lead ${leadId}:`, data.name);
-                // Recreate the modal with server data
-                protectedFunctions.showCallLogsWithData(data);
-            })
-            .catch(error => {
-                console.log(`❌ Server fetch failed for lead ${leadId}:`, error.message);
+    fetch(`/api/leads/${leadId}`)
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            throw new Error(`HTTP ${response.status}`);
+        })
+        .then(data => {
+            console.log(`✅ Server fetch successful for lead ${leadId}:`, data.name);
+            // Use fresh server data which includes saved manual call logs
+            protectedFunctions.showCallLogsWithData(data);
+        })
+        .catch(error => {
+            console.log(`❌ Server fetch failed for lead ${leadId}:`, error.message);
+            // Fall back to localStorage data if server fails
+            if (lead) {
+                console.log(`🔄 Using localStorage data as fallback for ${leadId}`);
+                protectedFunctions.showCallLogsWithData(lead);
+            } else {
                 alert(`Lead not found in local storage or server! ID: ${leadId}`);
-            });
-        return; // Exit early, server fetch will handle the modal
-    }
+            }
+        });
+    return; // Exit early, server fetch will handle the modal
 
     // Create modal for call logs
     const modal = document.createElement('div');
@@ -3106,7 +3765,7 @@ protectedFunctions.showCallLogsWithData = function(lead) {
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 9999;
+        z-index: 10000003;
     `;
 
     const callLogs = lead.reachOut?.callLogs || [];
@@ -3115,27 +3774,51 @@ protectedFunctions.showCallLogsWithData = function(lead) {
         <div style="background: white; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80%; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);">
             <div style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-phone-alt"></i> Call Logs - ${lead.name || 'Unknown'} (Server Data)</h2>
+                    <h2 style="margin: 0; color: #1f2937;"><i class="fas fa-phone-alt"></i> Call Logs - ${lead.name || 'Unknown'}</h2>
                     <button onclick="this.closest('.call-logs-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
             </div>
             <div style="padding: 20px;">
                 ${callLogs.length > 0 ? `
+                    <!-- Statistics Boxes -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #10b981;">${callLogs.filter(log => log.connected).length}</div>
+                            <div style="font-size: 14px; color: #6b7280;">Connected</div>
+                        </div>
+                        <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">${callLogs.filter(log => !log.connected).length}</div>
+                            <div style="font-size: 14px; color: #6b7280;">Attempted</div>
+                        </div>
+                        <div style="text-align: center; background: #f3f4f6; padding: 15px; border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #8b5cf6;" id="avg-duration-display">0:00</div>
+                            <div style="font-size: 14px; color: #6b7280;">Avg Duration</div>
+                        </div>
+                    </div>
+
+                    <!-- Call Logs -->
                     <div style="space-y: 12px;">
-                        ${callLogs.map(log => `
+                        ${callLogs.map((log, index) => `
                             <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <span style="font-weight: 600; color: ${log.connected ? '#10b981' : '#f59e0b'};">
-                                        ${log.connected ? '✅ Connected' : '📞 Attempted'}
-                                    </span>
-                                    <span style="color: #6b7280; font-size: 14px;">
-                                        ${log.timestamp ? new Date(log.timestamp).toLocaleString() : 'No timestamp'}
-                                    </span>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="font-weight: 600; color: ${log.connected ? '#10b981' : '#f59e0b'};">
+                                            ${log.connected ? 'Connected' : 'Attempted'}
+                                        </span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="color: #6b7280; font-size: 14px;">
+                                            ${log.timestamp ? new Date(log.timestamp).toLocaleString() : 'No timestamp'}
+                                        </span>
+                                        <button onclick="deleteIndividualCallLog('${lead.id}', ${index})" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px; border-radius: 4px;" title="Delete this call log">
+                                            <i class="fas fa-trash" style="font-size: 14px;"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div style="color: #374151; margin-bottom: 4px;">
                                     <strong>Duration:</strong> ${log.duration || 'Not recorded'}
                                 </div>
-                                ${log.leftVoicemail ? '<div style="color: #f59e0b; font-size: 14px;">📧 Left Voicemail</div>' : ''}
+                                ${log.leftVoicemail ? '<div style="color: #f59e0b; font-size: 14px;">Left Voicemail</div>' : ''}
                                 ${log.notes ? `<div style="color: #6b7280; font-size: 14px; font-style: italic;">${log.notes}</div>` : ''}
                             </div>
                         `).join('')}
@@ -3157,6 +3840,158 @@ protectedFunctions.showCallLogsWithData = function(lead) {
 
     modal.className = 'call-logs-modal';
     document.body.appendChild(modal);
+
+    // Calculate and display average duration
+    setTimeout(() => {
+        const avgDisplay = document.getElementById('avg-duration-display');
+        if (avgDisplay && callLogs.length > 0) {
+            let totalMinutes = 0;
+            let connectedCalls = 0;
+
+            callLogs.forEach(log => {
+                if (log.connected && log.duration) {
+                    const durationStr = log.duration;
+                    let minutes = 0;
+                    let seconds = 0;
+
+                    if (durationStr.includes('min')) {
+                        const minMatch = durationStr.match(/(\d+)\s*min/);
+                        const secMatch = durationStr.match(/(\d+)\s*sec/);
+                        if (minMatch) minutes = parseInt(minMatch[1]);
+                        if (secMatch) seconds = parseInt(secMatch[1]);
+                    } else if (durationStr.includes(':')) {
+                        const parts = durationStr.split(':');
+                        minutes = parseInt(parts[0]) || 0;
+                        seconds = parseInt(parts[1]) || 0;
+                    }
+
+                    if (minutes > 0 || seconds > 0) {
+                        totalMinutes += minutes + (seconds / 60);
+                        connectedCalls++;
+                    }
+                }
+            });
+
+            if (connectedCalls === 0) {
+                avgDisplay.textContent = '0:00';
+            } else {
+                const avgMinutes = totalMinutes / connectedCalls;
+                const minutes = Math.floor(avgMinutes);
+                const seconds = Math.round((avgMinutes - minutes) * 60);
+                avgDisplay.textContent = minutes + ':' + seconds.toString().padStart(2, '0');
+            }
+        }
+    }, 100);
+};
+
+// Function to delete an individual call log entry
+window.deleteIndividualCallLog = function(leadId, logIndex) {
+    if (!confirm('Are you sure you want to delete this call log entry? This action cannot be undone.')) {
+        return;
+    }
+
+    console.log(`🗑️ Deleting call log entry ${logIndex} for lead: ${leadId}`);
+
+    // Get leads from localStorage
+    let leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
+
+    if (leadIndex !== -1 && leads[leadIndex].reachOut && leads[leadIndex].reachOut.callLogs) {
+        const callLogs = leads[leadIndex].reachOut.callLogs;
+
+        if (logIndex >= 0 && logIndex < callLogs.length) {
+            const logToDelete = callLogs[logIndex];
+
+            // Remove the specific call log entry
+            callLogs.splice(logIndex, 1);
+
+            // Recalculate statistics based on remaining logs
+            const connectedCalls = callLogs.filter(log => log.connected).length;
+            const attemptedCalls = callLogs.filter(log => !log.connected).length;
+            const voicemailCalls = callLogs.filter(log => log.leftVoicemail).length;
+
+            // Calculate total minutes from remaining logs
+            let totalMinutes = 0;
+            callLogs.forEach(log => {
+                if (log.connected && log.duration) {
+                    const durationStr = log.duration;
+                    let minutes = 0;
+                    let seconds = 0;
+
+                    if (durationStr.includes('min')) {
+                        const minMatch = durationStr.match(/(\d+)\s*min/);
+                        const secMatch = durationStr.match(/(\d+)\s*sec/);
+                        if (minMatch) minutes = parseInt(minMatch[1]);
+                        if (secMatch) seconds = parseInt(secMatch[1]);
+                    } else if (durationStr.includes(':')) {
+                        const parts = durationStr.split(':');
+                        minutes = parseInt(parts[0]) || 0;
+                        seconds = parseInt(parts[1]) || 0;
+                    }
+
+                    totalMinutes += minutes + (seconds / 60);
+                }
+            });
+
+            // Update reachOut statistics
+            leads[leadIndex].reachOut.callLogs = callLogs;
+            leads[leadIndex].reachOut.callAttempts = connectedCalls + attemptedCalls;
+            leads[leadIndex].reachOut.callsConnected = connectedCalls;
+            leads[leadIndex].reachOut.callMinutes = Math.round(totalMinutes);
+            leads[leadIndex].reachOut.voicemailCount = voicemailCalls;
+            leads[leadIndex].reachOut.lastUpdate = new Date().toISOString();
+
+            // Save to localStorage
+            localStorage.setItem('insurance_leads', JSON.stringify(leads));
+
+            // Save to server
+            const updateData = {
+                reachOut: leads[leadIndex].reachOut
+            };
+
+            fetch(`/api/leads/${leadId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ Call log entry deleted from server successfully');
+                    // Refresh the modal with updated data
+                    setTimeout(() => {
+                        if (typeof loadLeadsFromServerAndRefresh === 'function') {
+                            loadLeadsFromServerAndRefresh();
+                            console.log('🔄 Data refreshed after deleting call log entry');
+                        }
+                        // Refresh the call logs modal
+                        const modal = document.querySelector('.call-logs-modal');
+                        if (modal) {
+                            modal.remove();
+                            // Reopen the modal with fresh data
+                            setTimeout(() => protectedFunctions.showCallLogs(leadId), 100);
+                        }
+                    }, 300);
+                } else {
+                    console.error('❌ Failed to delete call log entry from server:', data.error || 'Unknown error');
+                    alert('Failed to delete call log entry from server. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Server error while deleting call log entry:', error.message);
+                alert('Server error while deleting call log entry. Please try again.');
+            });
+
+        } else {
+            console.error(`❌ Invalid log index ${logIndex} for lead ${leadId}`);
+            alert('Invalid call log entry. Please refresh and try again.');
+        }
+    } else {
+        console.error(`❌ Lead ${leadId} not found or has no call logs`);
+        alert('Lead not found or has no call logs. Please refresh the page and try again.');
+    }
 };
 
 // Function to show call status modal
@@ -4118,6 +4953,7 @@ window.confirmCallScheduled = function(leadId) {
 
     callbacks[leadId].push(newCallback);
     localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+    if (window.CallbackNotifications && window.CallbackNotifications.refresh) window.CallbackNotifications.refresh();
 
     console.log(`📅 Callback scheduled and saved to localStorage:`, newCallback);
 
@@ -4440,6 +5276,7 @@ window.handleEmailConfirmation = function(leadId, confirmed) {
 
         callbacks[leadId].push(newCallback);
         localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+        if (window.CallbackNotifications && window.CallbackNotifications.refresh) window.CallbackNotifications.refresh();
 
         console.log(`📅 Scheduled callback for ${days} days at 2 PM:`, newCallback);
 
@@ -4796,6 +5633,17 @@ function showCallbackScheduler(leadId) {
             </p>
         </div>
 
+        <div style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                Quick Schedule:
+            </label>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" onclick="(function(){var d=new Date();d.setDate(d.getDate()+1);d.setHours(10,0,0,0);document.getElementById('callback-datetime').value=d.toISOString().slice(0,16);this.parentElement.querySelectorAll('button').forEach(b=>b.style.background='#f3f4f6');this.style.background='#dbeafe';}).call(this)" style="flex:1;padding:8px;border:2px solid #e5e7eb;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;background:#f3f4f6;color:#374151;">+1 Day</button>
+                <button type="button" onclick="(function(){var d=new Date();d.setDate(d.getDate()+2);d.setHours(10,0,0,0);document.getElementById('callback-datetime').value=d.toISOString().slice(0,16);this.parentElement.querySelectorAll('button').forEach(b=>b.style.background='#f3f4f6');this.style.background='#dbeafe';}).call(this)" style="flex:1;padding:8px;border:2px solid #e5e7eb;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;background:#f3f4f6;color:#374151;">+2 Days</button>
+                <button type="button" onclick="(function(){var d=new Date();d.setDate(d.getDate()+3);d.setHours(10,0,0,0);document.getElementById('callback-datetime').value=d.toISOString().slice(0,16);this.parentElement.querySelectorAll('button').forEach(b=>b.style.background='#f3f4f6');this.style.background='#dbeafe';}).call(this)" style="flex:1;padding:8px;border:2px solid #e5e7eb;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;background:#f3f4f6;color:#374151;">+3 Days</button>
+            </div>
+        </div>
+
         <div style="margin-bottom: 25px;">
             <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
                 Callback Date & Time:
@@ -4824,17 +5672,6 @@ function showCallbackScheduler(leadId) {
                 font-size: 14px;
                 min-width: 100px;
             ">Schedule</button>
-            <button id="cancel-callback" style="
-                background: #f3f4f6;
-                color: #374151;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 500;
-                font-size: 14px;
-                min-width: 100px;
-            ">Cancel</button>
         </div>
     `;
 
@@ -4856,10 +5693,6 @@ function showCallbackScheduler(leadId) {
         document.body.removeChild(modalOverlay);
     });
 
-    // Handle cancel
-    modal.querySelector('#cancel-callback').addEventListener('click', () => {
-        document.body.removeChild(modalOverlay);
-    });
 }
 
 // Function to save callback
@@ -4917,6 +5750,7 @@ async function saveCallbackToLocalStorageAndServer(leadId, dateTime, notes) {
 
     callbacks[leadId].push(newCallback);
     localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+    if (window.CallbackNotifications && window.CallbackNotifications.refresh) window.CallbackNotifications.refresh();
     console.log('✅ CALLBACK ADDED: New callback added to localStorage');
 
     // Save to server
@@ -4967,7 +5801,23 @@ async function saveCallbackToLocalStorageAndServer(leadId, dateTime, notes) {
 
     // Refresh the callback display to show the new callback and remove any old ones
     if (typeof displayScheduledCallbacks === 'function') {
-        displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
+        // FORCE CLEAR container first to prevent stuck UI from rescheduling
+        const container = document.getElementById(`scheduled-callbacks-${leadId}`);
+        if (container) {
+            container.innerHTML = '';
+            container.style.display = 'none';
+            // Force reflow to ensure clearing takes effect
+            container.offsetHeight;
+            container.style.display = 'block';
+            console.log('🧹 RESCHEDULE FIX: Force cleared callback container before refresh');
+        }
+
+        // Use force refresh to ensure stuck UI is cleared
+        if (typeof forceRefreshCallbackDisplay === 'function') {
+            forceRefreshCallbackDisplay(leadId);
+        } else {
+            displayScheduledCallbacks(leadId); // Fallback
+        }
         console.log('🔄 DISPLAY REFRESHED: Updated callback display after scheduling');
     }
 }
@@ -5265,6 +6115,7 @@ function continueStageUpdate(leadId, stage, contactAttemptedCompleted) {
         // Update stage and timestamp
         leads[leadIndex].stage = stage;
         leads[leadIndex].stageUpdatedAt = now;
+        if (stage === 'app_sent') leads[leadIndex].appSentAt = now;
 
         // Reset reach-out data when stage changes
         // Check for email confirmations as valid completions
@@ -5417,34 +6268,28 @@ protectedFunctions.viewLead = async function(leadId) {
                 console.log('🔍 SERVER DATA emailConfirmed:', serverLead.reachOut?.emailConfirmed);
                 console.log('🔍 LOCAL DATA emailConfirmed:', lead.reachOut?.emailConfirmed);
 
-                // Update localStorage lead with server data, preserving DOT data
+                // Merge: server is the base (has authoritative server-side fields like
+                // transcriptText, transcriptWords, premium, recordingPath, etc.).
+                // Local non-empty values win on top (preserving user-made changes like stage, notes, reachOut).
                 const leadIndex = leads.findIndex(l => String(l.id) === String(leadId));
                 if (leadIndex !== -1) {
-                    // Preserve DOT-related data from localStorage before server sync
-                    const preservedData = {
-                        state: leads[leadIndex].state,
-                        yearsInBusiness: leads[leadIndex].yearsInBusiness,
-                        commodityHauled: leads[leadIndex].commodityHauled
-                    };
+                    const localLead = leads[leadIndex];
 
-                    console.log('🔧 SYNC: Preserving DOT data before server sync:', preservedData);
+                    // Start with server data (authoritative base), filter out empty values
+                    const cleanServerData = Object.fromEntries(
+                        Object.entries(serverLead).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+                    );
 
-                    // Use server data but preserve DOT fields if they exist locally
-                    leads[leadIndex] = {
-                        ...serverLead,
-                        ...(preservedData.state && { state: preservedData.state }),
-                        ...(preservedData.yearsInBusiness && { yearsInBusiness: preservedData.yearsInBusiness }),
-                        ...(preservedData.commodityHauled && { commodityHauled: preservedData.commodityHauled })
-                    };
+                    // Local non-empty values win (user-made changes survive the sync)
+                    const cleanLocalData = Object.fromEntries(
+                        Object.entries(localLead).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+                    );
+
+                    leads[leadIndex] = { ...cleanServerData, ...cleanLocalData };
 
                     localStorage.setItem('insurance_leads', JSON.stringify(leads));
                     lead = leads[leadIndex]; // Use merged data
-                    console.log('✅ Lead synced with server data (DOT data preserved)');
-                    console.log('🎯 FINAL LEAD DATA:', {
-                        state: lead.state,
-                        yearsInBusiness: lead.yearsInBusiness,
-                        commodityHauled: lead.commodityHauled
-                    });
+                    console.log('✅ Lead synced with server data (local changes preserved)');
                 }
             }
         } catch (error) {
@@ -6512,6 +7357,34 @@ window.saveQuoteSubmission = async function(leadId) {
         // Refresh the quotes display
         await refreshQuotesDisplay(leadId);
 
+        // Auto-trigger market import when 2+ quotes exist
+        (async () => {
+            try {
+                const qRes = await fetch(`/api/quotes/${leadId}`);
+                if (!qRes.ok) return;
+                const qData = await qRes.json();
+                const totalQuotes = (qData.quotes || []).length;
+                if (totalQuotes >= 2 && typeof autoImportToMarket === 'function') {
+                    // Resolve lead name from DOM (button already has it) or localStorage
+                    let leadName = '';
+                    const importBtn = document.querySelector(`.auto-import-market-btn[onclick*="'${leadId}'"]`);
+                    if (importBtn) {
+                        const match = importBtn.getAttribute('onclick').match(/autoImportToMarket\('[^']+',\s*'([^']+)'\)/);
+                        if (match) leadName = match[1];
+                    }
+                    if (!leadName) {
+                        const leads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+                        const lead = leads.find(l => String(l.id) === String(leadId));
+                        leadName = lead ? (lead.companyName || lead.name || '') : '';
+                    }
+                    console.log(`Auto-triggering market import for lead ${leadId} (${totalQuotes} quotes)`);
+                    autoImportToMarket(leadId, leadName);
+                }
+            } catch (e) {
+                console.warn('Auto-import check failed:', e);
+            }
+        })();
+
     } catch (error) {
         console.error('Error saving quote to server:', error);
 
@@ -6592,67 +7465,256 @@ window.refreshQuotesDisplay = async function(leadId) {
         leadQuotes = allQuotes.filter(quote => String(quote.leadId) === String(leadId));
     }
 
-    if (leadQuotes.length === 0) {
-        quotesContainer.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">No quotes submitted yet</p>';
-        return;
-    }
+    // Separate quotes by carrier
+    const progressiveQuote = leadQuotes.find(quote =>
+        (quote.insuranceCarrier || quote.carrier || '').toLowerCase().includes('progressive')
+    );
+    const geicoQuote = leadQuotes.find(quote =>
+        (quote.insuranceCarrier || quote.carrier || '').toLowerCase().includes('geico')
+    );
+    const otherQuotes = leadQuotes.filter(quote => {
+        const carrier = (quote.insuranceCarrier || quote.carrier || '').toLowerCase();
+        return !carrier.includes('progressive') && !carrier.includes('geico');
+    });
 
-    // Generate HTML for each quote
-    const quotesHTML = leadQuotes.map((quote, index) => `
-        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: white;">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                <h4 style="margin: 0; color: #374151; font-size: 16px; font-weight: 600;">
-                    <i class="fas fa-file-contract" style="color: #3b82f6; margin-right: 8px;"></i>Quote #${index + 1} - ${quote.insuranceCarrier || quote.carrier || 'No Carrier'}
-                </h4>
-                <div style="display: flex; gap: 8px;">
-                    ${(quote.fileName || quote.documentName) ? `
-                        <button onclick="viewQuoteDocument('${quote.id}')" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            <i class="fas fa-eye"></i> View Document
+    // Function to create quote HTML
+    function createQuoteHTML(quote, quoteNumber) {
+        return `
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: white;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: #374151; font-size: 16px; font-weight: 600;">
+                        <i class="fas fa-file-contract" style="color: #3b82f6; margin-right: 8px;"></i>Quote #${quoteNumber} - ${quote.insuranceCarrier || quote.carrier || 'No Carrier'}
+                    </h4>
+                    <div style="display: flex; gap: 8px;">
+                        ${(quote.fileName || quote.documentName) ? `
+                            <button onclick="viewQuoteDocument('${quote.id}')" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                <i class="fas fa-eye"></i> View Document
+                            </button>
+                        ` : ''}
+                        <button onclick="deleteQuoteFromServer('${quote.id}', '${leadId}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-trash"></i> Delete
                         </button>
-                    ` : ''}
-                    <button onclick="deleteQuoteFromServer('${quote.id}', '${leadId}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
+                    </div>
                 </div>
-            </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px;">
-                <div>
-                    <strong style="color: #374151;">Physical Coverage:</strong><br>
-                    <span style="color: #6b7280;">${quote.physicalCoverage || 'Not specified'}</span>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px;">
+                    <div>
+                        <strong style="color: #374151;">Physical Coverage:</strong><br>
+                        <span style="color: #6b7280;">${quote.physicalCoverage || 'Not specified'}</span>
+                    </div>
+                    <div>
+                        <strong style="color: #374151;">Cargo Cost:</strong><br>
+                        <span style="color: #6b7280;">$${quote.cargoCost ? parseInt(quote.cargoCost).toLocaleString() : 'Not specified'}</span>
+                    </div>
+                    <div>
+                        <strong style="color: #374151;">Liability:</strong><br>
+                        <span style="color: #6b7280;">$${quote.liability ? parseInt(quote.liability).toLocaleString() : 'Not specified'}</span>
+                    </div>
+                    <div>
+                        <strong style="color: #374151;">Total Premium:</strong><br>
+                        <span style="color: #dc2626; font-weight: 600; font-size: 14px;">$${quote.totalPremium ? parseInt(quote.totalPremium).toLocaleString() : 'Not specified'}</span>
+                    </div>
                 </div>
-                <div>
-                    <strong style="color: #374151;">Cargo Cost:</strong><br>
-                    <span style="color: #6b7280;">$${quote.cargoCost ? parseInt(quote.cargoCost).toLocaleString() : 'Not specified'}</span>
-                </div>
-                <div>
-                    <strong style="color: #374151;">Liability:</strong><br>
-                    <span style="color: #6b7280;">$${quote.liability ? parseInt(quote.liability).toLocaleString() : 'Not specified'}</span>
-                </div>
-                <div>
-                    <strong style="color: #374151;">Total Premium:</strong><br>
-                    <span style="color: #dc2626; font-weight: 600; font-size: 14px;">$${quote.totalPremium ? parseInt(quote.totalPremium).toLocaleString() : 'Not specified'}</span>
-                </div>
-            </div>
 
-            ${quote.documentName ? `
+                ${quote.documentName ? `
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f3f4f6;">
+                        <small style="color: #6b7280;">
+                            <i class="fas fa-paperclip" style="margin-right: 4px;"></i>Document: ${quote.documentName}
+                        </small>
+                    </div>
+                ` : ''}
+
                 <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f3f4f6;">
-                    <small style="color: #6b7280;">
-                        <i class="fas fa-paperclip" style="margin-right: 4px;"></i>Document: ${quote.documentName}
+                    <small style="color: #9ca3af;">
+                        Created: ${new Date(quote.created_date || quote.dateCreated || Date.now()).toLocaleDateString()} ${new Date(quote.created_date || quote.dateCreated || Date.now()).toLocaleTimeString()}
                     </small>
                 </div>
-            ` : ''}
-
-            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f3f4f6;">
-                <small style="color: #9ca3af;">
-                    Created: ${new Date(quote.created_date || quote.dateCreated || Date.now()).toLocaleDateString()} ${new Date(quote.created_date || quote.dateCreated || Date.now()).toLocaleTimeString()}
-                </small>
             </div>
-        </div>
-    `).join('');
+        `;
+    }
+
+    // Get current insurance company for this lead (to auto-flag current carrier)
+    let currentInsuranceCompany = '';
+    try {
+        const allLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const thisLead = allLeads.find(l => String(l.id) === String(leadId));
+        currentInsuranceCompany = (thisLead?.insuranceCompany || '').toLowerCase().trim();
+    } catch (e) { /* ignore */ }
+
+    // Function to create placeholder HTML
+    function createPlaceholderHTML(carrier, savedStatus = null) {
+        // Check if this carrier is the lead's current insurance company → auto-flag
+        const carrierKey = carrier.toLowerCase();
+        const isCurrentCarrier = currentInsuranceCompany && currentInsuranceCompany.includes(carrierKey);
+
+        // Set initial styling based on saved status
+        let bgColor = '#f3f4f6';
+        let borderColor = '#d1d5db';
+        let opacity = '0.85';
+        let statusDisplay = 'none';
+        let statusText = '';
+        let statusColor = '';
+
+        // Determine effective status: current carrier auto-overrides unless already marked eligible
+        let effectiveStatus = savedStatus;
+        if (isCurrentCarrier && (!savedStatus || savedStatus.status !== 'eligible')) {
+            effectiveStatus = { status: carrierKey === 'progressive' ? 'aor_required' : 'ineligible' };
+        }
+
+        if (effectiveStatus) {
+            if (effectiveStatus.status === 'eligible') {
+                bgColor = '#dcfce7';
+                borderColor = '#10b981';
+                opacity = '1';
+                statusDisplay = 'block';
+                statusText = 'Eligible';
+                statusColor = '#059669';
+            } else if (effectiveStatus.status === 'ineligible') {
+                bgColor = '#fef2f2';
+                borderColor = '#ef4444';
+                opacity = '1';
+                statusDisplay = 'block';
+                statusText = 'Ineligible';
+                statusColor = '#dc2626';
+            } else if (effectiveStatus.status === 'aor_required') {
+                bgColor = '#fef2f2';
+                borderColor = '#ef4444';
+                opacity = '1';
+                statusDisplay = 'block';
+                statusText = 'AOR Required';
+                statusColor = '#dc2626';
+            }
+        }
+
+        return `
+            <div id="${carrier.toLowerCase()}-placeholder-${leadId}" style="border: 2px solid ${borderColor}; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: ${bgColor}; opacity: ${opacity};">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: #6b7280; font-size: 16px; font-weight: 600;">
+                        <i class="fas fa-file-contract" style="color: #9ca3af; margin-right: 8px;"></i>${carrier}
+                    </h4>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="handlePlaceholderAction('${carrier.toLowerCase()}', '${leadId}', 'reject')" style="background: #9ca3af; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s;" onmouseover="this.style.background='#6b7280'" onmouseout="this.style.background='#9ca3af'">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button onclick="handlePlaceholderAction('${carrier.toLowerCase()}', '${leadId}', 'accept')" style="background: #9ca3af; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s;" onmouseover="this.style.background='#6b7280'" onmouseout="this.style.background='#9ca3af'">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="${carrier.toLowerCase()}-status-${leadId}" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; display: ${statusDisplay};">
+                    <small id="${carrier.toLowerCase()}-status-text-${leadId}" style="font-weight: 600; color: ${statusColor};">${statusText}</small>
+                </div>
+            </div>
+        `;
+    }
+
+    // Load saved placeholder states from server
+    let placeholderStates = {};
+    try {
+        const statusResponse = await fetch(`/api/placeholder-status/${leadId}`);
+        if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            placeholderStates = statusData.statuses || {};
+            console.log('Loaded placeholder states:', placeholderStates);
+        }
+    } catch (error) {
+        console.error('Error loading placeholder states:', error);
+    }
+
+    // Build the HTML content
+    let quotesHTML = '';
+    let quoteCounter = 0;
+
+    // Progressive (either real quote or placeholder)
+    if (progressiveQuote) {
+        quotesHTML += createQuoteHTML(progressiveQuote, ++quoteCounter);
+    } else {
+        const progressiveStatus = placeholderStates.progressive || null;
+        quotesHTML += createPlaceholderHTML('Progressive', progressiveStatus);
+    }
+
+    // Geico (either real quote or placeholder)
+    if (geicoQuote) {
+        quotesHTML += createQuoteHTML(geicoQuote, ++quoteCounter);
+    } else {
+        const geicoStatus = placeholderStates.geico || null;
+        quotesHTML += createPlaceholderHTML('Geico', geicoStatus);
+    }
+
+    // Other quotes
+    otherQuotes.forEach(quote => {
+        quotesHTML += createQuoteHTML(quote, ++quoteCounter);
+    });
 
     quotesContainer.innerHTML = quotesHTML;
     console.log(`Displayed ${leadQuotes.length} quotes for lead ${leadId}`);
+};
+
+// Function to handle placeholder button actions
+window.handlePlaceholderAction = async function(carrier, leadId, action) {
+    console.log(`Placeholder action: ${action} for ${carrier} on lead ${leadId}`);
+
+    const placeholder = document.getElementById(`${carrier}-placeholder-${leadId}`);
+    const statusDiv = document.getElementById(`${carrier}-status-${leadId}`);
+    const statusText = document.getElementById(`${carrier}-status-text-${leadId}`);
+
+    if (!placeholder || !statusDiv || !statusText) {
+        console.error('Could not find placeholder elements');
+        return;
+    }
+
+    // Update UI immediately
+    if (action === 'accept') {
+        // Highlight green and show "Eligible"
+        placeholder.style.background = '#dcfce7';
+        placeholder.style.borderColor = '#10b981';
+        placeholder.style.opacity = '1';
+
+        statusDiv.style.display = 'block';
+        statusText.style.color = '#059669';
+        statusText.textContent = 'Eligible';
+
+        console.log(`Marked ${carrier} as eligible for lead ${leadId}`);
+
+    } else if (action === 'reject') {
+        // Highlight red and show "Ineligible"
+        placeholder.style.background = '#fef2f2';
+        placeholder.style.borderColor = '#ef4444';
+        placeholder.style.opacity = '1';
+
+        statusDiv.style.display = 'block';
+        statusText.style.color = '#dc2626';
+        statusText.textContent = 'Ineligible';
+
+        console.log(`Marked ${carrier} as ineligible for lead ${leadId}`);
+    }
+
+    // Save to server
+    try {
+        const response = await fetch('/api/placeholder-status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                leadId: leadId,
+                carrier: carrier.toLowerCase(),
+                status: action === 'accept' ? 'eligible' : 'ineligible',
+                timestamp: new Date().toISOString()
+            })
+        });
+
+        if (!response.ok) {
+            console.error('Failed to save placeholder status:', response.status);
+            // Could show user notification here
+        } else {
+            const result = await response.json();
+            console.log(`✅ Saved ${carrier} status for lead ${leadId}:`, result);
+        }
+    } catch (error) {
+        console.error('Error saving placeholder status:', error);
+        // Could show user notification here
+    }
 };
 
 // Function to view quote document
@@ -6919,10 +7981,21 @@ protectedFunctions.sendEmail = async function(leadId) {
     const toField = document.getElementById('email-to-field');
     const subjectField = document.getElementById('email-subject-field');
     const bodyField = document.getElementById('email-body-field');
+    const agentCcField = document.getElementById('email-agent-cc-field');
 
-    const to = toField ? toField.value : '';
+    const to = toField ? toField.value.trim() : '';
     const subject = subjectField ? subjectField.value : '';
     const body = bodyField ? bodyField.value : '';
+
+    // Build CC: visible agent field + always Grant@vigagency.com (hidden)
+    const ALWAYS_CC = 'Grant@vigagency.com';
+    const agentCcRaw = agentCcField ? agentCcField.value.trim() : '';
+    const ccAddresses = [];
+    if (agentCcRaw && agentCcRaw.toLowerCase() !== ALWAYS_CC.toLowerCase()) {
+        ccAddresses.push(agentCcRaw);
+    }
+    ccAddresses.push(ALWAYS_CC);
+    const cc = ccAddresses.join(',');
 
     if (!to) {
         alert('Please enter a recipient email address');
@@ -6940,7 +8013,7 @@ protectedFunctions.sendEmail = async function(leadId) {
     const attachmentCount = attachmentElements.length;
 
     // Show confirmation
-    const confirmMsg = `Send email via Vanguard Insurance?\n\nTo: ${to}\nSubject: ${subject}\nAttachments: ${attachmentCount} files\n\nProceed?`;
+    const confirmMsg = `Send email via Vanguard Insurance?\n\nTo: ${to}\nCC: ${cc}\nSubject: ${subject}\nAttachments: ${attachmentCount} files\n\nProceed?`;
 
     if (!confirm(confirmMsg)) {
         return;
@@ -7165,7 +8238,7 @@ protectedFunctions.sendEmail = async function(leadId) {
             },
             body: JSON.stringify({
                 to: to,
-                cc: '', // CC field not implemented yet
+                cc: cc,
                 bcc: 'contact@vigagency.com', // Always BCC ourselves
                 subject: subject,
                 body: htmlBody,
@@ -7352,10 +8425,10 @@ function enforceGreenHighlightRule() {
             }
         }
 
-        // If no specific TO DO cell found, check around column 6 (common TO DO column)
-        if (!todoCell && cells[6]) {
-            todoCell = cells[6];
-            todoText = (cells[6]?.textContent || '').trim();
+        // If no specific TO DO cell found, check around column 7 (common TO DO column)
+        if (!todoCell && cells[7]) {
+            todoCell = cells[7];
+            todoText = (cells[7]?.textContent || '').trim();
         }
 
         console.log(`Row ${index}: Lead ${leadId}, TO DO: "${todoText}" (length: ${todoText.length})`);
@@ -8729,6 +9802,7 @@ window.viewLead = protectedFunctions.viewLead;
 window.createEnhancedProfile = protectedFunctions.createEnhancedProfile;
 window.showLeadProfile = protectedFunctions.showLeadProfile;
 window.updateReachOut = protectedFunctions.updateReachOut;
+console.log('✅ ASSIGNMENT: window.updateReachOut assigned:', typeof window.updateReachOut);
 window.showCallLogs = protectedFunctions.showCallLogs;
 window.showCallStatus = protectedFunctions.showCallStatus;
 
@@ -9037,13 +10111,22 @@ window.displayScheduledCallbacks = async function(leadId) {
     console.log('📋 CALLBACK DISPLAY: Lead', leadId, 'has', allCallbacks.length, 'total callbacks,', activeCallbacks.length, 'active (showing most recent only)');
     console.log('📋 CALLBACK DETAILS:', activeCallbacks.map(cb => ({ id: cb.id, dateTime: cb.dateTime, notes: cb.notes?.substring(0, 50) })));
 
+    // FORCE CLEAR: Always clear the container first to prevent stuck UI
+    container.innerHTML = '';
+    // Additional aggressive clearing for rescheduling issues
+    container.style.display = 'none';
+    container.offsetHeight; // Force reflow
+    container.style.display = 'block';
+    console.log('🧹 FORCE CLEAR: Aggressively cleared callback container for lead', leadId);
+
     if (activeCallbacks.length === 0) {
-        container.innerHTML = '';
         console.log('📋 CALLBACK DISPLAY: No active callbacks to show for lead', leadId);
         return;
     }
 
     const now = new Date();
+    const sessionUser = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const isGrant = (sessionUser.username || '').toLowerCase() === 'grant';
     let html = '<div style="border-top: 1px solid #0277bd; padding-top: 15px;"><h4 style="margin: 0 0 10px 0; color: #0277bd; font-size: 14px;"><i class="fas fa-clock"></i> Scheduled Callbacks</h4>';
 
     // Sort callbacks by date/time
@@ -9067,17 +10150,113 @@ window.displayScheduledCallbacks = async function(leadId) {
                         </div>
                         ${callback.notes ? `<div style="font-size: 12px; color: #6b7280; margin-top: 5px;">${callback.notes}</div>` : ''}
                     </div>
-                    <button onclick="showCallbackScheduler('${leadId}')"
-                            style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                        <i class="fas fa-calendar-alt"></i> Reschedule
-                    </button>
+                    <div style="display: flex; gap: 6px;">
+                        <button onclick="showCallbackScheduler('${leadId}')"
+                                style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                            <i class="fas fa-calendar-alt"></i> Reschedule
+                        </button>
+                        <button onclick="forceRefreshCallbackDisplay('${leadId}')"
+                                style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;" title="Refresh display if stuck">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        ${isGrant ? `<button onclick="deleteScheduledCallback('${callback.id}', '${leadId}')"
+                                style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;" title="Delete this callback">
+                            <i class="fas fa-trash"></i>
+                        </button>` : ''}
+                    </div>
                 </div>
             </div>
         `;
     });
 
     html += '</div>';
+
+    // Set the HTML and force a DOM refresh
     container.innerHTML = html;
+
+    // Force DOM to refresh by triggering a reflow
+    container.offsetHeight;
+
+    console.log('✅ CALLBACK UI: Successfully refreshed callback display for lead', leadId);
+};
+
+// Force refresh callback display (for stuck UI issues)
+window.forceRefreshCallbackDisplay = function(leadId) {
+    console.log('🔄 FORCE REFRESH: Forcing callback display refresh for lead', leadId);
+
+    // Find and clear the callback container
+    const container = document.getElementById(`scheduled-callbacks-${leadId}`);
+    if (container) {
+        // Clear immediately
+        container.innerHTML = '';
+        container.style.display = 'none';
+
+        // Force reflow
+        container.offsetHeight;
+
+        // Show again and refresh
+        container.style.display = 'block';
+
+        // Delay the refresh slightly to ensure DOM is ready
+        setTimeout(() => {
+            displayScheduledCallbacks(leadId);
+            console.log('✅ FORCE REFRESH: Completed forced refresh for lead', leadId);
+        }, 100);
+    } else {
+        console.log('⚠️ FORCE REFRESH: No callback container found for lead', leadId);
+    }
+}
+
+window.deleteScheduledCallback = async function(callbackId, leadId) {
+    if (!confirm('Delete this scheduled callback?')) return;
+
+    // Remove from server
+    try {
+        await fetch(`/api/callbacks/${callbackId}`, { method: 'DELETE' });
+        console.log('🗑️ Deleted callback from server:', callbackId);
+    } catch (e) {
+        console.warn('⚠️ Failed to delete callback from server:', e);
+    }
+
+    // Remove from localStorage
+    try {
+        const callbacksKey = 'scheduled_callbacks';
+        const localCallbacks = JSON.parse(localStorage.getItem(callbacksKey) || '{}');
+        if (localCallbacks[leadId]) {
+            localCallbacks[leadId] = localCallbacks[leadId].filter(cb => String(cb.id) !== String(callbackId));
+            localStorage.setItem(callbacksKey, JSON.stringify(localCallbacks));
+        }
+    } catch (e) {
+        console.warn('⚠️ Failed to remove callback from localStorage:', e);
+    }
+
+    // Refresh lead profile callback display if open
+    const profileContainer = document.getElementById(`scheduled-callbacks-${leadId}`);
+    if (profileContainer) {
+        forceRefreshCallbackDisplay(leadId);
+    }
+
+    // Reload server callbacks then re-render calendar so the event disappears
+    if (typeof loadServerCallbacks === 'function') {
+        try {
+            await loadServerCallbacks();
+        } catch (e) { /* ignore */ }
+    }
+    const calState = window.calendarState;
+    const calendarGrid = document.getElementById('calendarGrid');
+    if (calendarGrid && calState && typeof generateCalendarGrid === 'function') {
+        calendarGrid.innerHTML = generateCalendarGrid(calState.currentYear, calState.currentMonth);
+    }
+    // Refresh right panel (selected date or today)
+    const todaysEventsEl = document.getElementById('todaysEvents');
+    if (todaysEventsEl) {
+        const sel = calState?.selectedDate;
+        if (sel && typeof generateEventsForDate === 'function') {
+            todaysEventsEl.innerHTML = generateEventsForDate(sel.getFullYear(), sel.getMonth(), sel.getDate());
+        } else if (typeof generateTodaysEvents === 'function') {
+            todaysEventsEl.innerHTML = generateTodaysEvents();
+        }
+    }
 };
 
 window.completeCallback = async function(leadId, callbackId) {
@@ -9294,8 +10473,12 @@ async function completeCallbackAfterOutcome(leadId, callbackId, outcome) {
         console.log('✅ LOCAL REMOVAL: Removed callback', callbackId, 'from localStorage. Count:', originalCount, '->', callbacks[leadId].length);
     }
 
-    // Always refresh display immediately
-    displayScheduledCallbacks(leadId); // Note: intentionally not awaited to avoid blocking
+    // Always refresh display immediately using force refresh
+    if (typeof forceRefreshCallbackDisplay === 'function') {
+        forceRefreshCallbackDisplay(leadId);
+    } else {
+        displayScheduledCallbacks(leadId); // Fallback
+    }
     console.log('✅ DISPLAY REFRESHED: Callback display updated for lead', leadId);
 
     // Update the table cell to remove the "Reach out: CALL" message
@@ -9340,7 +10523,7 @@ function updateTableAfterCallbackComplete(leadId) {
         const rowLeadId = checkbox.value;
         if (String(rowLeadId) === String(leadId)) {
             // Get the TODO cell (7th column, index 6)
-            const todoCell = row.querySelectorAll('td')[6];
+            const todoCell = row.querySelectorAll('td')[7];
             if (!todoCell) return;
 
             // Check if there are any remaining callbacks for this lead
@@ -9613,9 +10796,9 @@ function updateTableForDueCallback(leadId, lead) {
             const cells = row.querySelectorAll('td');
             console.log('🔍 CALLBACK DEBUG: Row has', cells.length, 'cells');
 
-            const todoCell = cells[6];
+            const todoCell = cells[7];
             if (!todoCell) {
-                console.log('❌ CALLBACK DEBUG: TODO cell (index 6) not found');
+                console.log('❌ CALLBACK DEBUG: TODO cell (index 7) not found');
                 return;
             }
 
@@ -10288,6 +11471,7 @@ window.createCallbackFromVicidialImport = function(leadId, leadName, comments) {
     // Add the callback
     callbacks[leadId].push(callbackData);
     localStorage.setItem(callbacksKey, JSON.stringify(callbacks));
+    if (window.CallbackNotifications && window.CallbackNotifications.refresh) window.CallbackNotifications.refresh();
 
     console.log('✅ VICIDIAL IMPORT CALLBACK: Created callback for', leadName, 'scheduled at', callbackTime.toLocaleString());
 
@@ -11073,9 +12257,98 @@ ${error.message}`);
 
         // Restore button
         if (event.target) {
-            event.target.innerHTML = '<i class="fas fa-search"></i> DOT Lookup';
+            event.target.innerHTML = '<i class="fas fa-sync-alt"></i> Rescan DOT';
             event.target.disabled = false;
         }
+    }
+};
+
+// Build word-span HTML from Deepgram word array (with speaker labels)
+function buildTranscriptSpans(words) {
+    let html = '';
+    let currentSpeaker = null;
+    for (const w of words) {
+        if (w.speaker !== currentSpeaker) {
+            if (currentSpeaker !== null) html += '<br>';
+            currentSpeaker = w.speaker;
+            const label = w.speaker === 0 ? 'Agent' : 'Customer';
+            html += `<strong style="color:#374151;">${label}:</strong> `;
+        }
+        html += `<span class="tw" data-s="${w.start}" data-e="${w.end}" style="cursor:pointer;" title="Click to seek" onclick="(function(el){var id=el.closest('[id^=transcript-display-]').id.replace('transcript-display-','');var a=document.getElementById('recording-audio-'+id);if(a){a.currentTime=+el.dataset.s;a.play();}})(this)">${w.word} </span>`;
+    }
+    return html;
+}
+
+// Attach audio timeupdate → word highlight sync
+function initTranscriptSync(leadId) {
+    const audio = document.getElementById(`recording-audio-${leadId}`);
+    const display = document.getElementById(`transcript-display-${leadId}`);
+    if (!audio || !display) return;
+
+    audio.addEventListener('timeupdate', function() {
+        const t = audio.currentTime;
+        let scrollTarget = null;
+        display.querySelectorAll('span.tw').forEach(span => {
+            const s = +span.dataset.s;
+            const e = +span.dataset.e;
+            if (t >= e) {
+                span.style.color = '#2563eb';  // already said — blue
+                span.style.fontWeight = '';
+            } else if (t >= s) {
+                span.style.color = '#1d4ed8';  // current word — darker blue + bold
+                span.style.fontWeight = 'bold';
+                scrollTarget = span;
+            } else {
+                span.style.color = '';
+                span.style.fontWeight = '';
+            }
+        });
+        if (scrollTarget) scrollTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+}
+
+// Transcribe a call recording on demand using Deepgram
+window.transcribeRecording = async function(leadId, recordingPath) {
+    const btn = document.getElementById(`transcribe-btn-${leadId}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Transcribing...';
+    }
+
+    try {
+        const response = await fetch('/api/transcribe-recording', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leadId, recordingPath })
+        });
+        const data = await response.json();
+
+        if (data.error) throw new Error(data.error);
+
+        // Populate the transcript display and save
+        const display = document.getElementById(`transcript-display-${leadId}`);
+        if (display) {
+            if (data.words && data.words.length) {
+                display.innerHTML = buildTranscriptSpans(data.words);
+                initTranscriptSync(leadId);
+            } else {
+                display.innerHTML = data.transcript.replace(/\n/g, '<br>');
+            }
+        }
+        if (window.updateLeadField) window.updateLeadField(leadId, 'transcriptText', data.transcript);
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i> Transcribed';
+            btn.style.background = '#10b981';
+        }
+    } catch (err) {
+        console.error('Transcription failed:', err);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-file-alt"></i> Transcribe Recording';
+        }
+        alert('Transcription failed: ' + err.message);
     }
 };
 
@@ -11087,4 +12360,40 @@ window.toggleDOTButton = function(leadId, dotValue) {
         button.style.display = shouldShow ? 'flex' : 'none';
         console.log(`🔘 DOT Button toggle for lead ${leadId}: ${shouldShow ? 'SHOW' : 'HIDE'} (DOT: "${dotValue}")`);
     }
+};
+// Navigate to lead generation tab and auto-search by DOT
+window.acctGoToDOTLookup = function(leadId) {
+    // Get the DOT number from the input field on the current profile
+    const dotInput = document.getElementById('dot-input-' + leadId);
+    const dot = (dotInput ? dotInput.value : '') || '';
+
+    // Close the lead profile modal
+    const modal = document.getElementById('lead-profile-container');
+    if (modal) {
+        if (modal._idProtectionObserver) modal._idProtectionObserver.disconnect();
+        modal.remove();
+    }
+
+    // Navigate to lead generation tab
+    if (typeof navigateToTab === 'function') {
+        navigateToTab('#lead-generation');
+    } else if (typeof setActiveTab === 'function') {
+        setActiveTab('lead-generation');
+    } else {
+        window.location.hash = 'lead-generation';
+    }
+
+    // Wait for the tab to render, then fill and trigger search
+    const attempt = (tries) => {
+        const searchInput = document.getElementById('usdotSearch');
+        const searchBtn = document.querySelector('button[onclick="performLeadSearch()"]');
+        if (searchInput && searchBtn) {
+            searchInput.value = dot;
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchBtn.click();
+        } else if (tries > 0) {
+            setTimeout(() => attempt(tries - 1), 150);
+        }
+    };
+    setTimeout(() => attempt(10), 200);
 };

@@ -96,7 +96,7 @@ class ViciDialIntegration {
                 function: 'list_export',
                 status: 'SALE',
                 header: 'YES',
-                rec_fields: 'lead_id,list_id,status,first_name,last_name,phone_number,email,address1,city,state,postal_code,comments,last_local_call_time'
+                rec_fields: 'lead_id,list_id,status,first_name,last_name,phone_number,email,address1,city,state,postal_code,comments,last_local_call_time,length_in_sec'
             });
 
             const response = await fetch(`${this.apiUrl}?${params}`);
@@ -212,20 +212,66 @@ class ViciDialIntegration {
         return info;
     }
 
+    // Extract fleet size and calculate premium from ViciDial comments
+    extractFleetAndPremium(comments) {
+        if (!comments) return { fleetSize: 0, premium: 0 };
+        const patterns = [
+            /Fl:\s*(\d+)/i,
+            /Dr:\s*\d+\s*\|\s*Fl:\s*(\d+)/i,
+            /Size:\s*(\d+)/i,
+            /Fleet Size:?\s*(\d+)/i,
+            /(\d+)\s*vehicles?/i,
+            /fleet\s*of\s*(\d+)/i,
+            /(\d+)\s*units?/i,
+            /(\d+)\s*trucks?/i,
+            /(\d+)\s*power\s*units?/i,
+        ];
+        for (const p of patterns) {
+            const m = comments.match(p);
+            if (m) {
+                const fleetSize = parseInt(m[1]);
+                return { fleetSize, premium: fleetSize * 14400 };
+            }
+        }
+        return { fleetSize: 0, premium: 0 };
+    }
+
+    // Format seconds into CRM-readable duration string
+    formatDuration(seconds) {
+        seconds = parseInt(seconds) || 0;
+        if (seconds <= 0) return '< 1 min';
+        if (seconds < 60) return `${seconds} sec`;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return secs > 0 ? `${mins} min ${secs} sec` : `${mins} min`;
+    }
+
     // Convert ViciDial lead to insurance profile
     async convertToInsuranceProfile(viciLead, callRecording) {
+        const { fleetSize, premium } = this.extractFleetAndPremium(viciLead.comments);
+        const callSeconds = parseInt(viciLead.length_in_sec) || 0;
+        const callLog = {
+            timestamp: viciLead.last_local_call_time
+                ? new Date(viciLead.last_local_call_time).toISOString()
+                : new Date().toISOString(),
+            connected: true,
+            duration: this.formatDuration(callSeconds),
+            leftVoicemail: false,
+            notes: `ViciDial SALE call${callSeconds > 0 ? ` — ${this.formatDuration(callSeconds)}` : ''}`
+        };
+
         const profile = {
             // Basic Information
             id: `VICI-${viciLead.lead_id}`,
             source: 'ViciDial Import',
             importDate: new Date().toISOString(),
-            
+
             // Contact Information
             firstName: viciLead.first_name,
             lastName: viciLead.last_name,
             phone: viciLead.phone_number,
             email: viciLead.email,
-            
+
             // Address
             address: {
                 street: viciLead.address1,
@@ -233,21 +279,33 @@ class ViciDialIntegration {
                 state: viciLead.state,
                 zip: viciLead.postal_code
             },
-            
+
             // Lead Details
             status: 'New',
-            type: 'Commercial Auto', // Default, can be updated from transcript
+            type: 'Commercial Auto',
             leadScore: this.calculateLeadScore(viciLead, callRecording),
-            
+            fleetSize: fleetSize > 0 ? String(fleetSize) : 'Unknown',
+            premium: premium,
+
             // Call Information
             callDate: viciLead.last_local_call_time,
-            callDuration: callRecording?.transcript?.duration || 0,
+            callDuration: callSeconds,
             callRecordingUrl: callRecording?.url || '',
-            
+
+            // reachOut — populate so talk time bar shows correctly
+            reachOut: {
+                callAttempts: 1,
+                callsConnected: 1,
+                emailCount: 0,
+                textCount: 0,
+                voicemailCount: 0,
+                callLogs: [callLog]
+            },
+
             // Transcript Analysis
             transcript: callRecording?.transcript?.text || '',
             extractedInfo: this.extractInfoFromTranscript(callRecording?.transcript?.text),
-            
+
             // Notes
             notes: viciLead.comments || '',
 

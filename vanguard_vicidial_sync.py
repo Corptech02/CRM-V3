@@ -46,9 +46,10 @@ class VanguardViciDialSync:
         self.assignment_index = self.get_current_assignment_index()
 
     def load_processed_leads(self):
-        """Load list of already processed lead IDs"""
+        """Load list of already processed lead IDs (all ViciDial-sourced leads)"""
         cursor = self.db.cursor()
-        cursor.execute("SELECT id FROM leads WHERE id LIKE '8%' AND LENGTH(id) = 5")
+        # Load all ViciDial leads by source tag — not just IDs starting with '8'
+        cursor.execute("SELECT id FROM leads WHERE JSON_EXTRACT(data, '$.source') = 'ViciDial'")
         return set(row[0] for row in cursor.fetchall())
 
     def get_current_assignment_index(self):
@@ -232,7 +233,59 @@ class VanguardViciDialSync:
                     details['address3'] = value.strip()
                     logger.info(f"Found renewal date in address3: {value}")
 
+        # Extract recording URL from the page
+        recording_url = self.extract_recording_url(response.text)
+        if recording_url:
+            details['recording_url'] = recording_url
+            logger.info(f"Found recording URL for lead {lead_id}: {recording_url}")
+
         return details
+
+    def extract_recording_url(self, page_html):
+        """Extract recording URL from ViciDial lead page HTML"""
+        # Pattern 1: Look for href links to recording files
+        recording_pattern = r'href="(http[^"]*RECORDINGS[^"]*\.(?:mp3|wav))"'
+        matches = re.findall(recording_pattern, page_html, re.IGNORECASE)
+        if matches:
+            return matches[0]
+
+        # Pattern 2: Look for src attributes with recording files
+        source_pattern = r'(?:src|href)=["\']([^"\']*RECORDINGS[^"\']*\.(?:mp3|wav))["\']'
+        source_matches = re.findall(source_pattern, page_html, re.IGNORECASE)
+        if source_matches:
+            recording_url = source_matches[0]
+            if not recording_url.startswith('http'):
+                recording_url = f"http://{VICIDIAL_HOST}{recording_url}"
+            return recording_url
+
+        return None
+
+    def download_recording(self, recording_url, lead_id):
+        """Download recording and save to local storage"""
+        try:
+            recordings_dir = '/var/www/vanguard/recordings'
+            os.makedirs(recordings_dir, exist_ok=True)
+
+            response = self.session.get(recording_url, stream=True, timeout=30)
+            if response.status_code == 200:
+                file_ext = '.mp3' if '.mp3' in recording_url.lower() else '.wav'
+                local_filename = f"recording_{lead_id}{file_ext}"
+                local_path = os.path.join(recordings_dir, local_filename)
+
+                with open(local_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                if os.path.exists(local_path) and os.path.getsize(local_path) > 1000:
+                    logger.info(f"✅ Recording downloaded: {local_path}")
+                    return f"/recordings/{local_filename}"
+                else:
+                    logger.warning(f"⚠️ Downloaded recording is too small or empty")
+            else:
+                logger.warning(f"⚠️ Failed to download recording: HTTP {response.status_code}")
+        except Exception as e:
+            logger.warning(f"⚠️ Error downloading recording: {str(e)[:50]}")
+        return None
 
     def format_business_name(self, first_name, last_name, vendor_code, company_name=None):
         """Format business name like existing leads"""
@@ -371,6 +424,9 @@ class VanguardViciDialSync:
         # Extract fleet size from multiple possible patterns
         # Primary pattern: "Insurance Expires: xxxx-xx-xx | Fleet Size: x"
         fleet_patterns = [
+            # NEW FORMAT: "Fl: 2" pattern (highest priority)
+            r'Fl:\s*(\d+)',  # NEW: "Fl: 2" pattern for newest ViciDial format
+            r'Dr:\s*\d+\s*\|\s*Fl:\s*(\d+)',  # NEW: "Dr: 2 | Fl: 2" combined pattern
             r'Insurance Expires:.*?\|\s*Fleet Size:?\s*(\d+)',  # Original pattern
             r'Size:\s*(\d+)',  # NEW: "Size: 10" pattern for new ViciDial format
             r'Fleet Size:?\s*(\d+)',  # Simple "Fleet Size: x" pattern
@@ -514,6 +570,43 @@ class VanguardViciDialSync:
         # Get assigned representative based on list ID (intelligent assignment)
         assigned_representative = self.get_assigned_agent_for_list(vicidial_lead.get('list_id', '1000'))
 
+        # Download recording if available
+        recording_path = None
+        call_duration_str = None
+        call_talk_time = None
+        call_timestamp = None
+        if lead_details and lead_details.get('recording_url'):
+            recording_url = lead_details['recording_url']
+            recording_path = self.download_recording(recording_url, lead_id)
+            if recording_path:
+                # Get actual duration from downloaded file using ffprobe
+                local_path = f"/var/www/vanguard{recording_path}"
+                try:
+                    import subprocess as _sp
+                    _r = _sp.run(
+                        ['ffprobe', '-v', 'quiet', '-show_entries',
+                         'format=duration', '-of', 'csv=p=0', local_path],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    if _r.returncode == 0 and _r.stdout.strip():
+                        _secs = int(float(_r.stdout.strip()))
+                        mins, secs = divmod(_secs, 60)
+                        call_duration_str = f"{mins}:{secs:02d}"
+                        call_talk_time = f"{mins} min" if secs == 0 else f"{mins} min {secs} sec"
+                        if _secs < 60:
+                            call_talk_time = f"{_secs} sec"
+                        logger.info(f"✅ Recording duration: {call_talk_time} ({_secs}s)")
+                except Exception as _e:
+                    logger.warning(f"⚠️ ffprobe failed: {_e}")
+                # Extract timestamp from recording filename (e.g. 20260226-210307_...)
+                _ts_m = re.search(r'(\d{8})-(\d{6})', recording_url)
+                if _ts_m:
+                    try:
+                        _ts = datetime.strptime(f"{_ts_m.group(1)} {_ts_m.group(2)}", "%Y%m%d %H%M%S")
+                        call_timestamp = _ts.isoformat()
+                    except Exception:
+                        pass
+
         # Create lead data matching existing format
         lead_data = {
             "id": lead_id,
@@ -531,7 +624,7 @@ class VanguardViciDialSync:
             "premium": policy_info['calculated_premium'],  # Use calculated premium from fleet size
             "dotNumber": vicidial_lead.get('vendor_code', ''),
             "mcNumber": "",
-            "yearsInBusiness": "Unknown",
+            "yearsInBusiness": "",
             "fleetSize": str(policy_info['fleet_size']) if policy_info['fleet_size'] > 0 else "Unknown",
             "insuranceCompany": insurance_company,  # New field for current insurance company
             "address": "",
@@ -556,11 +649,28 @@ class VanguardViciDialSync:
             "lastContactDate": datetime.now().strftime("%-m/%-d/%Y"),
             "followUpDate": "",
             "notes": f"SALE from ViciDial list {vicidial_lead.get('list_id', '1000')}.",
-            "tags": ["ViciDial", "Sale", f"List-{vicidial_lead.get('list_id', '1000')}"]
+            "tags": ["ViciDial", "Sale", f"List-{vicidial_lead.get('list_id', '1000')}"],
+            "recordingPath": recording_path or "",
+            "hasRecording": bool(recording_path),
+            "reachOut": {
+                "callAttempts": 1,
+                "callsConnected": 1,
+                "emailCount": 0,
+                "textCount": 0,
+                "voicemailCount": 0,
+                "contacted": True,
+                "callLogs": [{
+                    "timestamp": call_timestamp or datetime.now().isoformat(),
+                    "connected": True,
+                    "duration": call_talk_time or call_duration_str or "< 1 min",
+                    "leftVoicemail": False,
+                    "notes": f"ViciDial SALE call{' — ' + call_talk_time if call_talk_time else ''}"
+                }]
+            }
         }
 
         # Simplified - no complex logging needed
-        logger.info(f"✓ Created lead record for {lead_data['name']} (ID: {lead_id})")
+        logger.info(f"✓ Created lead record for {lead_data['name']} (ID: {lead_id}) duration={call_talk_time or 'N/A'}")
 
         return lead_data
 
@@ -568,10 +678,80 @@ class VanguardViciDialSync:
         """Save lead to database"""
         cursor = self.db.cursor()
 
-        # Check if lead already exists
-        cursor.execute("SELECT id FROM leads WHERE id = ?", (lead_data['id'],))
+        # CRITICAL: Never re-insert permanently deleted leads
+        cursor.execute("SELECT id FROM deleted_leads WHERE id = ?", (lead_data['id'],))
         if cursor.fetchone():
+            logger.info(f"🚫 Skipping deleted lead {lead_data['id']} — present in deleted_leads table")
+            self.processed_leads.add(lead_data['id'])
+            return
+
+        # Check if lead already exists
+        cursor.execute("SELECT id, data FROM leads WHERE id = ?", (lead_data['id'],))
+        existing_row = cursor.fetchone()
+        if existing_row:
             logger.info(f"Lead {lead_data['id']} already exists, updating...")
+            try:
+                existing_data = json.loads(existing_row[1])
+
+                # USER-MANAGED FIELDS: Never overwrite with sync data if the existing record
+                # already has a value — mirrors server.js insertOrUpdateLead() protection.
+                USER_MANAGED_FIELDS = {
+                    'stage', 'stageUpdatedAt', 'confirmedPremium',
+                    'priority', 'notes', 'assignedTo', 'appStage',
+                    'callDuration', 'transcriptText', 'transcriptWords',
+                    'callTimestamp', 'brokerTracking'
+                }
+                for field in USER_MANAGED_FIELDS:
+                    existing_val = existing_data.get(field)
+                    has_value = (
+                        existing_val is not None
+                        and existing_val != ''
+                        and existing_val != 0
+                        and existing_val != []
+                        and existing_val != {}
+                    )
+                    if has_value:
+                        lead_data[field] = existing_val
+
+                # Preserve premium — only use calculated value if no existing premium
+                if existing_data.get('premium'):
+                    lead_data['premium'] = existing_data['premium']
+
+                # Preserve existing recordingPath/hasRecording if new sync didn't find a recording
+                if not lead_data.get('recordingPath') and existing_data.get('recordingPath'):
+                    lead_data['recordingPath'] = existing_data['recordingPath']
+                    lead_data['hasRecording'] = existing_data.get('hasRecording', True)
+                    logger.info(f"Preserving existing recording: {lead_data['recordingPath']}")
+
+                # Preserve DOT-lookup-populated fields so 5-min sync doesn't erase them
+                # Treat "Unknown" as missing — only preserve real values from DOT lookup
+                for dot_field in ['yearsInBusiness', 'commodityHauled', 'vehicles', 'trailers', 'drivers']:
+                    existing_val = existing_data.get(dot_field)
+                    if existing_val and existing_val != 'Unknown' and not lead_data.get(dot_field):
+                        lead_data[dot_field] = existing_val
+
+                # Preserve reachOut and merge call logs so 5-min sync doesn't wipe them
+                existing_reach = existing_data.get('reachOut', {})
+                existing_logs = existing_reach.get('callLogs', []) if isinstance(existing_reach, dict) else []
+                if existing_logs:
+                    if 'reachOut' not in lead_data or not isinstance(lead_data.get('reachOut'), dict):
+                        lead_data['reachOut'] = dict(existing_reach)
+                    else:
+                        new_logs = lead_data['reachOut'].get('callLogs', [])
+                        # Merge: keep existing, add new non-duplicate logs
+                        merged = list(existing_logs)
+                        for nl in new_logs:
+                            is_dup = any(
+                                l.get('timestamp') == nl.get('timestamp') or
+                                (l.get('notes') == nl.get('notes') and nl.get('notes'))
+                                for l in existing_logs
+                            )
+                            if not is_dup:
+                                merged.append(nl)
+                        lead_data['reachOut']['callLogs'] = merged
+                    logger.info(f"📞 Preserved {len(existing_logs)} existing call log(s)")
+            except Exception:
+                pass
             cursor.execute(
                 "UPDATE leads SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (json.dumps(lead_data), lead_data['id'])

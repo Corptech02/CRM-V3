@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DOT Lookup Integration Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .demo-section { background: #f9f9f9; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .info { background: #d1ecf1; color: #0c5460; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🚛 Vicidial DOT Lookup Integration Demo</h1>
+
+    <div class="demo-section">
+        <h2>📋 What This Integration Does:</h2>
+        <ul>
+            <li>✅ Automatically detects when Vicidial leads are imported</li>
+            <li>✅ Scans for leads with DOT numbers</li>
+            <li>✅ Queries 428K+ record DB-V3 database automatically</li>
+            <li>✅ Populates company data, contact info, and business details</li>
+            <li>✅ Adds vehicle and trailer information from inspection data</li>
+            <li>✅ Calculates insurance renewal dates and commodity types</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2>🧪 Test Cases from Your Console Logs:</h2>
+
+        <h3>SKUR TRANSPORT LLC</h3>
+        <button class="button" onclick="testDOTIntegration('3342195', 'SKUR TRANSPORT LLC')">
+            Test DOT Lookup (3342195)
+        </button>
+        <div id="skur-results"></div>
+
+        <h3>CIBULA HARVESTING LLC</h3>
+        <button class="button" onclick="testDOTIntegration('3358505', 'CIBULA HARVESTING LLC')">
+            Test DOT Lookup (3358505)
+        </button>
+        <div id="cibula-results"></div>
+    </div>
+
+    <div class="demo-section">
+        <h2>🔄 Integration Flow:</h2>
+        <div class="info">
+            <strong>1. Import Detection:</strong> vicidial-import-listener.js detects new imports<br>
+            <strong>2. DOT Scanning:</strong> Scans localStorage for leads with DOT numbers<br>
+            <strong>3. DB-V3 Query:</strong> Queries database using /api/test-db/{dotNumber}<br>
+            <strong>4. Data Population:</strong> Updates lead profile with carrier information<br>
+            <strong>5. Vehicle Processing:</strong> Adds trucks/trailers from inspection data
+        </div>
+    </div>
+
+    <div id="results" style="margin-top: 20px;">
+        <h3>Test Results:</h3>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        // Test the complete DOT integration
+        async function testDOTIntegration(dotNumber, companyName) {
+            const output = document.getElementById('output');
+            const resultsDiv = document.getElementById(companyName.toLowerCase().includes('skur') ? 'skur-results' : 'cibula-results');
+
+            resultsDiv.innerHTML = '<p>🔍 Testing DOT lookup...</p>';
+            output.innerHTML += `<div class="info"><strong>Testing ${companyName} (DOT: ${dotNumber})</strong></div>`;
+
+            try {
+                // Step 1: Test basic DOT lookup
+                console.log(`🔍 DOT LOOKUP: Testing ${companyName} (DOT: ${dotNumber})`);
+
+                const response = await fetch(`/api/test-db/${dotNumber}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const carrier = data.carrier;
+
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ DOT Lookup Successful!</h4>
+                            <p><strong>Company:</strong> ${carrier.LEGAL_NAME}</p>
+                            <p><strong>DOT:</strong> ${carrier.DOT_NUMBER}</p>
+                            <p><strong>State:</strong> ${carrier.PHY_STATE}</p>
+                            <p><strong>Phone:</strong> ${carrier.PHONE}</p>
+                        </div>
+                    `;
+
+                    // Step 2: Simulate what the integration would populate
+                    const populatedData = {
+                        companyName: carrier.LEGAL_NAME,
+                        dotNumber: carrier.DOT_NUMBER,
+                        phone: carrier.PHONE,
+                        state: carrier.PHY_STATE,
+                        // These would be calculated by the full integration:
+                        yearsInBusiness: calculateYearsFromDOT(carrier.DOT_NUMBER),
+                        estimatedRenewalDate: generateRenewalDate(),
+                        estimatedCommodities: generateCommodities(carrier.LEGAL_NAME)
+                    };
+
+                    output.innerHTML += `
+                        <div class="success">
+                            <h4>📝 Integration Would Populate:</h4>
+                            <p><strong>Company Name:</strong> ${populatedData.companyName}</p>
+                            <p><strong>DOT Number:</strong> ${populatedData.dotNumber}</p>
+                            <p><strong>Phone:</strong> ${populatedData.phone}</p>
+                            <p><strong>State:</strong> ${populatedData.state}</p>
+                            <p><strong>Years in Business:</strong> ${populatedData.yearsInBusiness} years</p>
+                            <p><strong>Est. Renewal Date:</strong> ${populatedData.estimatedRenewalDate}</p>
+                            <p><strong>Commodities:</strong> ${populatedData.estimatedCommodities}</p>
+                        </div>
+                    `;
+
+                } else {
+                    resultsDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px;">❌ Error: ${data.error}</div>`;
+                }
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px;">❌ Network Error: ${error.message}</div>`;
+                console.error('DOT lookup error:', error);
+            }
+        }
+
+        // Helper functions to simulate full integration
+        function calculateYearsFromDOT(dotNumber) {
+            // Simplified calculation - real integration would use ADD_DATE
+            const dotNum = parseInt(dotNumber);
+            if (dotNum < 1000000) return '25+ years';
+            if (dotNum < 2000000) return '15-20 years';
+            if (dotNum < 3000000) return '10-15 years';
+            return '5-10 years';
+        }
+
+        function generateRenewalDate() {
+            const date = new Date();
+            date.setMonth(date.getMonth() + Math.floor(Math.random() * 3) + 1); // 1-3 months from now
+            return date.toLocaleDateString();
+        }
+
+        function generateCommodities(companyName) {
+            if (companyName.includes('TRANSPORT')) return 'General Freight, Building Materials';
+            if (companyName.includes('HARVEST')) return 'Agricultural Products, Machinery';
+            return 'General Freight';
+        }
+
+        // Show integration status
+        window.addEventListener('load', () => {
+            const output = document.getElementById('output');
+
+            // Check if the DOT lookup integration scripts are loaded
+            const hasIntegration = typeof window.performDOTLookupForLead === 'function';
+
+            output.innerHTML += `
+                <div class="${hasIntegration ? 'success' : 'info'}">
+                    <strong>Integration Status:</strong> ${hasIntegration ? '✅ Active' : '⚠️ Test Mode'}
+                    ${hasIntegration ? '' : '<br><small>Load this page from the main CRM to see full integration</small>'}
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>

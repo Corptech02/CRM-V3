@@ -50,7 +50,7 @@
             if (!checkbox || String(checkbox.value) !== String(leadId)) return;
 
             // This is the app sent lead row
-            const todoCell = row.querySelectorAll('td')[6]; // TODO column is usually 7th column (index 6)
+            const todoCell = row.querySelectorAll('td')[7]; // TODO column is 8th column (index 7)
             if (!todoCell) return;
 
             const currentText = todoCell.textContent.trim();

@@ -131,6 +131,12 @@ class DashboardStats {
 
     // Update dashboard display
     async updateDashboard() {
+        // Skip stats update if dashboard is being restored from template
+        if (window.dashboardRestoring) {
+            console.log('Dashboard restoration in progress, skipping stats update to preserve original values');
+            return;
+        }
+
         console.log('Updating dashboard...');
         await this.fetchStatistics();
         console.log('Stats fetched:', this.stats);
@@ -155,7 +161,7 @@ class DashboardStats {
             policiesChangeElement.innerHTML = `<i class="fas fa-arrow-up"></i> ${this.stats.policiesChange}% from last month`;
         }
         
-        // Update All Time Premium
+        // Update Last 2 Month New Premium
         const premiumElement = document.querySelector('.stat-card:nth-child(3) .stat-value');
         const premiumChangeElement = document.querySelector('.stat-card:nth-child(3) .stat-change');
         if (premiumElement) {

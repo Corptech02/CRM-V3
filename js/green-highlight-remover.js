@@ -94,7 +94,7 @@
                 // Check TODO cell (7th column, index 6)
                 const cells = row.querySelectorAll('td');
                 if (cells.length > 6) {
-                    const todoCell = cells[6];
+                    const todoCell = cells[7];
 
                     if (hasTodoContent(todoCell)) {
                         removeGreenHighlight(row, leadId, 'TODO content detected');
@@ -128,7 +128,7 @@
 
                 const cells = row.querySelectorAll('td');
                 if (cells.length > 6) {
-                    const todoCell = cells[6];
+                    const todoCell = cells[7];
 
                     // Set up mutation observer for this specific cell
                     const observer = new MutationObserver((mutations) => {

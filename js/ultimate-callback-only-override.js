@@ -36,11 +36,6 @@ function nukeAllCompetingSystems() {
         console.log('🛑 Cleared emergency callback interval');
     }
 
-    // Clear any timeouts that might be queued
-    for (let i = 1; i < 9999; i++) {
-        window.clearTimeout(i);
-    }
-
     console.log('💥 NUCLEAR OVERRIDE COMPLETE: All competing systems disabled');
 }
 
@@ -87,7 +82,7 @@ function checkUltimateOverdueCallback(leadId) {
 
         const overdueCallback = leadCallbacks.find(callback => {
             if (callback.completed) return false;
-            const callbackDateTime = new Date(`${callback.date}T${callback.time}`);
+            const callbackDateTime = new Date(callback.dateTime);
             return callbackDateTime < now;
         });
 
@@ -166,7 +161,7 @@ function forceCleanAllTableCells() {
             const lead = leads.find(l => String(l.id) === String(leadId));
             if (!lead) return;
 
-            const todoCell = row.querySelectorAll('td')[6]; // TODO column
+            const todoCell = row.querySelectorAll('td')[7]; // TODO column
             if (!todoCell) return;
 
             // Check if this lead actually has overdue callbacks

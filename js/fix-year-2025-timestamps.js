@@ -123,7 +123,7 @@
             const cells = row.querySelectorAll('td');
             if (cells.length < 7) return;
 
-            const todoCell = cells[6];
+            const todoCell = cells[7];
             const todoText = (todoCell.textContent || '').trim();
 
             // Clear existing highlights

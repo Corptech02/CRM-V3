@@ -129,7 +129,20 @@
         const removedCount = leads.length - deduplicatedLeads.length;
         if (removedCount > 0) {
             console.log(`✅ Removed ${removedCount} duplicate leads`);
-            localStorage.setItem('insurance_leads', JSON.stringify(deduplicatedLeads));
+            try {
+                localStorage.setItem('insurance_leads', JSON.stringify(deduplicatedLeads));
+            } catch (quotaErr) {
+                console.warn('⚠️ localStorage quota exceeded in deduplication - trimming callLogs and retrying...');
+                const slimmed = deduplicatedLeads.map(lead => {
+                    if (!lead.reachOut || !lead.reachOut.callLogs) return lead;
+                    return { ...lead, reachOut: { ...lead.reachOut, callLogs: lead.reachOut.callLogs.slice(-25) } };
+                });
+                try {
+                    localStorage.setItem('insurance_leads', JSON.stringify(slimmed));
+                } catch (e2) {
+                    console.error('❌ localStorage still full after trimming in deduplication - skipping save');
+                }
+            }
         } else {
             console.log('✅ No duplicate leads found');
         }

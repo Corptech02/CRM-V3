@@ -23,6 +23,28 @@ window.toggleMyLeadsFilter = function(enabled) {
     const currentUser = getCurrentUser();
     console.log('👤 Current user:', currentUser);
 
+    // Inject a style rule to force display:none with !important when class is applied
+    if (!document.getElementById('my-leads-hide-style')) {
+        const s = document.createElement('style');
+        s.id = 'my-leads-hide-style';
+        s.textContent = '.ml-hidden { display: none !important; }';
+        document.head.appendChild(s);
+    }
+
+    function hideRow(row) { row.classList.add('ml-hidden'); }
+    function showRow(row) { row.classList.remove('ml-hidden'); }
+
+    function isMySection(text) {
+        return text.includes(`${currentUser}'s Leads`) ||
+               text.toLowerCase().includes(`${currentUser.toLowerCase()}'s leads`);
+    }
+    function isSpecialSection(text) {
+        return text.includes('Unassigned') || text.includes('Closed') || text.includes('New Leads');
+    }
+    function isLeadsSectionText(text) {
+        return text.includes("'s Leads") || text.includes(" Leads");
+    }
+
     // Get all table rows
     const allRows = Array.from(document.querySelectorAll('tbody tr, table tr'));
     console.log(`📋 Found ${allRows.length} total table rows`);
@@ -31,91 +53,73 @@ window.toggleMyLeadsFilter = function(enabled) {
     let shownCount = 0;
     let currentSection = '';
 
-    allRows.forEach((row, index) => {
-        const colspanTd = row.querySelector('td[colspan]');
-
-        // Check if this is a section header
-        if (colspanTd) {
-            const headerText = colspanTd.textContent || '';
-            if (headerText.includes("'s Leads (") || headerText.includes(" Leads (")) {
+    allRows.forEach(row => {
+        // lead-divider rows — use data-agent or text to determine section
+        if (row.classList.contains('lead-divider')) {
+            const td = row.querySelector('td');
+            const headerText = td ? td.textContent : '';
+            if (isLeadsSectionText(headerText)) {
                 currentSection = headerText;
-                console.log(`📍 Section header found: "${headerText}"`);
-
-                // Determine if this group belongs to current user
-                const isMyGroup = headerText.includes(`${currentUser}'s Leads`) ||
-                                 headerText.toLowerCase().includes(`${currentUser.toLowerCase()}'s leads`);
-                const isSpecialGroup = headerText.includes('Unassigned') ||
-                                      headerText.includes('Closed') ||
-                                      headerText.includes('New Leads');
-
-                // Hide/show the header row
                 if (enabled) {
-                    if (isMyGroup || isSpecialGroup) {
-                        row.style.display = '';
-                        console.log(`✅ Showing header: "${headerText}"`);
+                    if (isMySection(headerText) || isSpecialSection(headerText)) {
+                        showRow(row);
                     } else {
-                        row.style.display = 'none';
+                        hideRow(row);
                         hiddenCount++;
-                        console.log(`❌ Hiding header: "${headerText}"`);
                     }
                 } else {
-                    row.style.display = '';
+                    showRow(row);
                 }
-                return; // Skip to next row
+            }
+            return;
+        }
+
+        // Other section header rows (colspan td with section name)
+        const colspanTd = row.querySelector('td[colspan]');
+        if (colspanTd) {
+            const headerText = colspanTd.textContent || '';
+            if (isLeadsSectionText(headerText)) {
+                currentSection = headerText;
+                if (enabled) {
+                    if (isMySection(headerText) || isSpecialSection(headerText)) {
+                        showRow(row);
+                    } else {
+                        hideRow(row);
+                        hiddenCount++;
+                    }
+                } else {
+                    showRow(row);
+                }
+                return;
             }
         }
 
-        // Check if this is a lead row
+        // Lead rows
         const isLeadRow = row.hasAttribute('data-lead-id') ||
                          row.classList.contains('timestamp-red') ||
-                         row.querySelector('input.lead-checkbox') ||
-                         row.textContent.includes('Commercial Auto');
+                         row.classList.contains('timestamp-yellow') ||
+                         row.classList.contains('timestamp-green') ||
+                         row.querySelector('input.lead-checkbox') != null;
 
         if (isLeadRow) {
-            const leadName = row.getAttribute('data-lead-name') ||
-                            row.querySelector('.lead-name')?.textContent ||
-                            'Unknown Lead';
-
-            console.log(`🔍 Lead "${leadName}" in section "${currentSection}"`);
-
-            // Determine which section this lead belongs to
-            const isMyGroup = currentSection.includes(`${currentUser}'s Leads`) ||
-                             currentSection.toLowerCase().includes(`${currentUser.toLowerCase()}'s leads`);
-            const isSpecialGroup = currentSection.includes('Unassigned') ||
-                                  currentSection.includes('Closed') ||
-                                  currentSection.includes('New Leads');
-
+            const leadName = row.getAttribute('data-lead-name') || 'Unknown';
+            const mine = isMySection(currentSection) || isSpecialSection(currentSection);
             if (enabled) {
-                if (isMyGroup || isSpecialGroup) {
-                    row.style.display = '';
-                    shownCount++;
-                    console.log(`✅ Showing lead: "${leadName}"`);
-                } else {
-                    row.style.display = 'none';
-                    hiddenCount++;
-                    console.log(`❌ Hiding lead: "${leadName}" from section "${currentSection}"`);
-                }
+                if (mine) { showRow(row); shownCount++; }
+                else { hideRow(row); hiddenCount++; }
             } else {
-                row.style.display = '';
+                showRow(row);
                 shownCount++;
             }
         }
     });
 
-    console.log(`📊 ${enabled ? `Hidden ${hiddenCount} items, shown ${shownCount}` : `Restored ${shownCount} items`}`);
+    console.log(`📊 ${enabled ? `Hidden ${hiddenCount}, shown ${shownCount}` : `Restored ${shownCount} items`}`);
     updateToggleUI(enabled);
 };
 
 function updateToggleUI(enabled) {
-    const checkbox = document.getElementById('myLeadsToggle');
-    if (checkbox) checkbox.checked = enabled;
-
-    const slider = document.querySelector('#myLeadsToggle + span');
-    const dot = slider?.querySelector('span');
-    if (slider && dot) {
-        slider.style.backgroundColor = enabled ? '#3b82f6' : '#ccc';
-        dot.style.transform = enabled ? 'translateX(16px)' : 'translateX(0)';
-    }
+    updateToggleButtonUI();
 }
 
 // Function to remove all toggle buttons - AGGRESSIVE REMOVAL
@@ -173,9 +177,10 @@ function insertToggle() {
         return;
     }
 
-    // Check if toggle already exists - if so, don't create another one
+    // Check if toggle already exists - if so, just wire up behavior
     if (document.getElementById('myLeadsToggle')) {
-        console.log('🚫 Toggle already exists, skipping insertion');
+        console.log('✅ Toggle already exists in DOM, wiring up behavior');
+        setupToggleBehavior();
         return;
     }
 
@@ -186,19 +191,18 @@ function insertToggle() {
     setTimeout(() => {
         // Double-check that no toggle exists after cleanup
         if (document.getElementById('myLeadsToggle')) {
-            console.log('🚫 Toggle created by another instance, aborting');
+            console.log('✅ Toggle exists after cleanup, wiring up behavior');
+            setupToggleBehavior();
             return;
         }
 
         console.log('🔄 Inserting fresh toggle...');
 
         const toggleHTML = `
-        <button type="button" id="myLeadsToggle" onclick="window.toggleMyLeadsFilter()"
-                style="background: #6b7280; border-color: #6b7280; color: white; margin-right: 10px; position: relative; overflow: hidden; transition: all 0.3s;"
-                class="btn-secondary toggle-button">
-            <i class="fas fa-user" style="margin-right: 6px;"></i>
-            <span class="toggle-text">My Leads Only</span>
-            <div class="toggle-indicator" style="position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; opacity: 0; transition: opacity 0.3s;"></div>
+        <button type="button" id="myLeadsToggle" onclick="window.toggleMyLeadsFilter(!window.myLeadsOnlyActive)"
+                style="margin-left: 6px; padding: 4px 7px; font-size: 12px; background: transparent; color: #9ca3af; border: 1px solid #4b5563; border-radius: 4px; cursor: pointer; vertical-align: middle; transition: all 0.2s;"
+                title="My Leads Only">
+            <i id="myLeadsToggleIcon" class="fas fa-eye"></i>
         </button>
     `;
 
@@ -261,20 +265,19 @@ function setupToggleBehavior() {
 
 function updateToggleButtonUI() {
     const toggleButton = document.getElementById('myLeadsToggle');
-    const indicator = toggleButton?.querySelector('.toggle-indicator');
-    const text = toggleButton?.querySelector('.toggle-text');
+    const icon = document.getElementById('myLeadsToggleIcon');
 
     if (toggleButton) {
         if (window.myLeadsOnlyActive) {
-            toggleButton.style.background = '#3b82f6';
+            toggleButton.style.background = '#1e40af';
             toggleButton.style.borderColor = '#3b82f6';
-            if (indicator) indicator.style.opacity = '1';
-            if (text) text.textContent = 'My Leads Only ✓';
+            toggleButton.style.color = '#93c5fd';
+            if (icon) { icon.className = 'fas fa-eye-slash'; }
         } else {
-            toggleButton.style.background = '#6b7280';
-            toggleButton.style.borderColor = '#6b7280';
-            if (indicator) indicator.style.opacity = '0';
-            if (text) text.textContent = 'My Leads Only';
+            toggleButton.style.background = 'transparent';
+            toggleButton.style.borderColor = '#4b5563';
+            toggleButton.style.color = '#9ca3af';
+            if (icon) { icon.className = 'fas fa-eye'; }
         }
     }
 }

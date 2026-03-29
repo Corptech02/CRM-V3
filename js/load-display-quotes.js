@@ -41,11 +41,18 @@
         }
     }
 
-    // Function to recreate quote cards exactly as the Add Quote button creates them
+    // Function to recreate quote cards using the new placeholder system
     function displayQuotes(quotes) {
-        console.log('Recreating quote cards for saved quotes:', quotes);
+        console.log('Displaying quotes with placeholder system:', quotes);
 
-        // Find the quote submissions container - this maintains the original layout
+        // Use the refreshQuotesDisplay function if available, or fallback to our own logic
+        if (window.refreshQuotesDisplay && window.currentLeadId) {
+            console.log('Using refreshQuotesDisplay function');
+            window.refreshQuotesDisplay(window.currentLeadId);
+            return;
+        }
+
+        // Fallback: Find the quote submissions container
         let quotesDiv = document.getElementById('quote-submissions-container');
 
         if (!quotesDiv) {
@@ -53,10 +60,8 @@
             return;
         }
 
-        // IMPORTANT: Clear ALL existing cards to prevent duplicates
-        const allExistingCards = quotesDiv.querySelectorAll('.quote-card');
-        console.log(`Removing ${allExistingCards.length} existing quote cards`);
-        allExistingCards.forEach(card => card.remove());
+        // Clear existing content
+        quotesDiv.innerHTML = '';
 
         // Add each saved quote as a card
         quotes.forEach((quote, index) => {

@@ -1319,8 +1319,15 @@ async function checkAutoImportEligibility(leadId) {
             return { eligible: false, reason: 'Error checking existing market carriers' };
         }
 
+        // EXCEPTION: If market is empty, allow any 2+ quotes to import freely
         if (existingCarriers.length === 0) {
-            return { eligible: false, reason: 'No carriers exist in market yet - cannot calculate percentage differences' };
+            return {
+                eligible: true,
+                totalQuotes: quotes.length,
+                matchingQuotes: quotes.length,
+                carriers: quotes.map(q => q.insuranceCarrier),
+                freshMarket: true
+            };
         }
 
         const matchingQuotes = quotes.filter(quote =>

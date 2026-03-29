@@ -170,36 +170,29 @@
             }
         }, 100);
 
-        // Background server deletion (don't wait for it)
-        let serverDeletionCount = 0;
-        selectedLeadIds.forEach(leadId => {
-            // Add timeout to prevent hanging
-            const timeoutId = setTimeout(() => {
-                console.warn(`⏰ Server deletion timeout for lead ${leadId}`);
-                serverDeletionCount++;
-            }, 5000); // 5 second timeout
-
-            fetch(`/api/leads/${leadId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
+        // Background server deletion — sequential with delays to avoid nginx rate limit (10r/s)
+        (async () => {
+            let serverDeletionCount = 0;
+            for (const leadId of selectedLeadIds) {
+                try {
+                    const response = await fetch(`/api/leads/${leadId}`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    serverDeletionCount++;
+                    if (response.ok) {
+                        console.log('✅ Lead permanently deleted from server:', leadId);
+                    } else {
+                        console.warn('⚠️ Server deletion failed for lead:', leadId, response.status);
+                    }
+                } catch (error) {
+                    serverDeletionCount++;
+                    console.error('❌ Error deleting lead from server:', leadId, error.message);
                 }
-            })
-            .then(response => {
-                clearTimeout(timeoutId);
-                serverDeletionCount++;
-                if (response.ok) {
-                    console.log('✅ Lead permanently deleted from server:', leadId);
-                } else {
-                    console.warn('⚠️ Server deletion failed for lead:', leadId, response.status);
-                }
-            })
-            .catch(error => {
-                clearTimeout(timeoutId);
-                serverDeletionCount++;
-                console.error('❌ Error deleting lead from server:', leadId, error.message);
-            });
-        });
+                await new Promise(r => setTimeout(r, 120)); // ~8 req/s, under nginx 10r/s limit
+            }
+            console.log(`✅ Server deletion complete: ${serverDeletionCount}/${selectedLeadIds.length} processed`);
+        })();
     };
 
     // Mass archive function for selected leads
@@ -386,7 +379,7 @@
                             '<option value="loss_runs_requested">Loss Runs Requested</option>' +
                             '<option value="loss_runs_received">Loss Runs Received</option>' +
                             '<option value="app_prepared">App Prepared</option>' +
-                            '<option value="app_sent">App Sent</option>' +
+                            '<option value="app_sent">Waiting on Markets</option>' +
                             '<option value="app_quote_received">App Quote Received</option>' +
                             '<option value="app_quote_sent">App Quote Sent</option>' +
                             '<option value="quoted">Quoted</option>' +
@@ -695,7 +688,7 @@
                     {value: 'loss_runs_requested', text: 'Loss Runs Requested'},
                     {value: 'loss_runs_received', text: 'Loss Runs Received'},
                     {value: 'app_prepared', text: 'App Prepared'},
-                    {value: 'app_sent', text: 'App Sent'},
+                    {value: 'app_sent', text: 'Waiting on Markets'},
                     {value: 'app_quote_received', text: 'App Quote Received'},
                     {value: 'app_quote_sent', text: 'App Quote Sent'},
                     {value: 'quoted', text: 'Quoted'},

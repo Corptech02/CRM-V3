@@ -4,6 +4,70 @@
 
 console.log('🎯 LOADED: Simplified TO DO Logic - Callback-Only System');
 
+// STARTUP SYNC: Load backend callbacks into localStorage so overdue checks work
+// even if localStorage was cleared or the user is in a new browser session
+async function syncCallbacksFromBackend() {
+    try {
+        const urls = [
+            'http://162-220-14-239.nip.io:3001/api/callbacks',
+            'http://localhost:3001/api/callbacks'
+        ];
+        let data = null;
+        for (const url of urls) {
+            try {
+                const resp = await fetch(url);
+                if (resp.ok) { data = await resp.json(); break; }
+            } catch (e) { /* try next */ }
+        }
+        if (!Array.isArray(data)) return;
+
+        const callbacks = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+        let added = 0;
+        data.forEach(cb => {
+            const leadId = String(cb.lead_id || cb.leadId || '');
+            if (!leadId) return;
+            const dateTime = cb.date_time || cb.dateTime || '';
+            const cbId = String(cb.callback_id || cb.id || '');
+            if (!callbacks[leadId]) callbacks[leadId] = [];
+            // Only add if not already present (match by id or dateTime)
+            const exists = callbacks[leadId].some(existing =>
+                String(existing.id) === cbId ||
+                String(existing.callback_id) === cbId ||
+                existing.dateTime === dateTime
+            );
+            if (!exists) {
+                callbacks[leadId].push({
+                    id: cbId,
+                    callback_id: cbId,
+                    leadId: leadId,
+                    dateTime: dateTime,
+                    notes: cb.notes || '',
+                    completed: cb.completed === 1 || cb.completed === true,
+                    createdAt: cb.created_at || new Date().toISOString()
+                });
+                added++;
+            }
+        });
+        if (added > 0) {
+            localStorage.setItem('scheduled_callbacks', JSON.stringify(callbacks));
+            console.log(`✅ CALLBACK SYNC: Added ${added} backend callbacks to localStorage`);
+            // Refresh table so To Do cells reflect synced callbacks
+            if (typeof refreshLeadsTable === 'function') {
+                setTimeout(refreshLeadsTable, 100);
+            } else if (typeof loadLeadsView === 'function') {
+                setTimeout(loadLeadsView, 100);
+            }
+        } else {
+            console.log('✅ CALLBACK SYNC: localStorage already up to date');
+        }
+    } catch (e) {
+        console.error('❌ CALLBACK SYNC: Error syncing from backend:', e);
+    }
+}
+
+// Run sync immediately on load
+syncCallbacksFromBackend();
+
 // AGGRESSIVE OVERRIDE: Run after all other scripts have loaded
 setTimeout(() => {
     console.log('🚀 AGGRESSIVE OVERRIDE: Installing simplified TO DO logic...');
@@ -138,7 +202,7 @@ function checkSimpleOverdueCallback(leadId) {
         const overdueCallback = leadCallbacks.find(callback => {
             if (callback.completed) return false; // Skip completed callbacks
 
-            const callbackDateTime = new Date(`${callback.date}T${callback.time}`);
+            const callbackDateTime = new Date(callback.dateTime);
             return callbackDateTime < now; // Overdue if callback time has passed
         });
 

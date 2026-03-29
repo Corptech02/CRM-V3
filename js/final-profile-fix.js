@@ -150,6 +150,7 @@ window.createEnhancedProfile = function(lead) {
                             <option value="interested" ${lead.stage === 'interested' ? 'selected' : ''}>Interested</option>
                             <option value="not-interested" ${lead.stage === 'not-interested' ? 'selected' : ''}>Not Interested</option>
                             <option value="closed" ${lead.stage === 'closed' ? 'selected' : ''}>Closed</option>
+                            <option value="custom">Custom</option>
                         </select>
                         <div id="stage-timestamp-${lead.id}">
                             <!-- Stage timestamp will be dynamically inserted here -->
@@ -260,13 +261,23 @@ window.createEnhancedProfile = function(lead) {
                             <label style="font-weight: 600; font-size: 12px;">Contact:</label>
                             <input type="text" value="${lead.contact || ''}" onchange="updateLeadField('${lead.id}', 'contact', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
                         </div>
-                        <div>
+                        <div style="position: relative;">
                             <label style="font-weight: 600; font-size: 12px;">Phone:</label>
-                            <input type="text" value="${lead.phone || ''}" onchange="updateLeadField('${lead.id}', 'phone', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="text" value="${lead.phone || ''}" onchange="updateLeadField('${lead.id}', 'phone', this.value)" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <button onclick="window.open('tel:${lead.phone || ''}')" title="Call ${lead.phone || ''}" style="background: #10b981; color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                                    <i class="fas fa-phone" style="margin: 0;"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div>
+                        <div style="position: relative;">
                             <label style="font-weight: 600; font-size: 12px;">Email:</label>
-                            <input type="text" value="${lead.email || ''}" onchange="updateLeadField('${lead.id}', 'email', this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="text" value="${lead.email || ''}" onchange="updateLeadField('${lead.id}', 'email', this.value)" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <button onclick="window.open('mailto:${lead.email || ''}')" title="Compose email to ${lead.email || ''}" style="background: #3b82f6; color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
+                                    <i class="fas fa-envelope" style="margin: 0;"></i>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label style="font-weight: 600; font-size: 12px;">DOT Number:</label>

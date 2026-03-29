@@ -1,8 +1,25 @@
 /* Market Table Layout Styles */
 .market-content {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
     padding: 24px;
+    padding-left: calc(var(--sidebar-width) + 24px);
     background: #f8fafc;
-    min-height: 100vh;
+    z-index: 5;
+    box-sizing: border-box;
+}
+
+/* Shift content when sidebar expands on hover */
+.market-content {
+    transition: padding-left 0.3s ease;
+}
+
+.sidebar:hover ~ .market-content {
+    padding-left: calc(260px + 24px);
 }
 
 .market-header {

@@ -748,7 +748,7 @@ class VanguardViciDialSelectiveSync:
         return list_agent_mapping.get(list_id, 'Unassigned')
 
     def save_lead(self, lead_data):
-        """Save lead to database"""
+        """Save lead to database, merging with existing data to preserve user-managed fields"""
         cursor = self.db.cursor()
 
         # Validate lead ID before saving
@@ -758,6 +758,62 @@ class VanguardViciDialSelectiveSync:
             return False
 
         try:
+            # Skip permanently deleted leads
+            cursor.execute('SELECT id FROM deleted_leads WHERE id = ?', (str(lead_id),))
+            if cursor.fetchone():
+                logger.info(f"🚫 Skipping permanently deleted lead: {lead_data.get('name', 'Unknown')} (ID: {lead_id})")
+                return False
+
+            # Merge with existing data to preserve user-managed fields
+            cursor.execute('SELECT data FROM leads WHERE id = ?', (str(lead_id),))
+            existing_row = cursor.fetchone()
+            if existing_row:
+                try:
+                    existing = json.loads(existing_row[0])
+                    # Preserve premium if new data has none but existing has a value
+                    if not lead_data.get('premium') and existing.get('premium'):
+                        lead_data['premium'] = existing['premium']
+                        logger.info(f"💰 Preserving existing premium: {existing['premium']}")
+                    # Preserve user-managed fields that should never be reset by sync
+                    for field in ['stage', 'stageUpdatedAt', 'confirmedPremium', 'priority',
+                                  'notes', 'appStage', 'brokerTracking']:
+                        if existing.get(field) and not lead_data.get(field):
+                            lead_data[field] = existing[field]
+                    # Preserve DOT-lookup-populated fields (treat "Unknown" as missing)
+                    for dot_field in ['yearsInBusiness', 'commodityHauled', 'vehicles', 'trailers', 'drivers']:
+                        existing_val = existing.get(dot_field)
+                        if existing_val and existing_val != 'Unknown' and not lead_data.get(dot_field):
+                            lead_data[dot_field] = existing_val
+                    # Merge reachOut callLogs — keep existing logs, add new ones
+                    existing_reach = existing.get('reachOut', {})
+                    new_reach = lead_data.get('reachOut', {})
+                    existing_logs = existing_reach.get('callLogs', [])
+                    new_logs = new_reach.get('callLogs', [])
+                    if existing_logs:
+                        merged_logs = list(existing_logs)
+                        for new_log in new_logs:
+                            is_dup = any(
+                                l.get('timestamp') == new_log.get('timestamp') or
+                                (l.get('notes') == new_log.get('notes') and l.get('notes'))
+                                for l in existing_logs
+                            )
+                            if not is_dup:
+                                merged_logs.append(new_log)
+                        lead_data['reachOut']['callLogs'] = merged_logs
+                        lead_data['reachOut']['callAttempts'] = max(
+                            new_reach.get('callAttempts', 0),
+                            existing_reach.get('callAttempts', 0),
+                            len(merged_logs)
+                        )
+                        lead_data['reachOut']['callsConnected'] = max(
+                            new_reach.get('callsConnected', 0),
+                            existing_reach.get('callsConnected', 0),
+                            len([l for l in merged_logs if l.get('connected')])
+                        )
+                        logger.info(f"📞 Merged call logs: {len(existing_logs)} existing + {len(new_logs)} new = {len(merged_logs)} total")
+                except Exception as merge_err:
+                    logger.warning(f"⚠️ Could not merge existing data: {merge_err}")
+
             cursor.execute('''
                 INSERT OR REPLACE INTO leads (id, data, created_at, updated_at)
                 VALUES (?, ?, ?, ?)
@@ -853,6 +909,34 @@ class VanguardViciDialSelectiveSync:
                     recording_path = self.download_recording(recording_url, lead_id_raw)
                     if recording_path:
                         logger.info(f"✅ Recording saved: {recording_path}")
+                        # Get actual duration from the downloaded file using ffprobe
+                        # (extract_call_info runs before download so Strategy 4 doesn't work first time)
+                        if not lead_details.get('call_duration'):
+                            local_path = f"/var/www/vanguard{recording_path}"
+                            try:
+                                import subprocess as _sp
+                                _r = _sp.run(
+                                    ['ffprobe', '-v', 'quiet', '-show_entries',
+                                     'format=duration', '-of', 'csv=p=0', local_path],
+                                    capture_output=True, text=True, timeout=10
+                                )
+                                if _r.returncode == 0 and _r.stdout.strip():
+                                    _secs = int(float(_r.stdout.strip()))
+                                    lead_details['call_duration'] = self.format_duration(_secs)
+                                    lead_details['talk_time'] = self.format_talk_time(_secs)
+                                    # Extract timestamp from recording filename (e.g. 20260226-210307_...)
+                                    _ts_m = re.search(r'(\d{8})-(\d{6})', recording_url)
+                                    if _ts_m and not lead_details.get('call_timestamp'):
+                                        try:
+                                            _ts = datetime.strptime(
+                                                f"{_ts_m.group(1)} {_ts_m.group(2)}", "%Y%m%d %H%M%S"
+                                            )
+                                            lead_details['call_timestamp'] = _ts.isoformat()
+                                        except Exception:
+                                            pass
+                                    logger.info(f"✅ Got duration from recording file: {lead_details['talk_time']} ({_secs}s)")
+                            except Exception as _e:
+                                logger.warning(f"⚠️ ffprobe duration extraction failed: {_e}")
                     else:
                         logger.warning(f"⚠️ Failed to download recording")
 
@@ -938,15 +1022,23 @@ class VanguardViciDialSelectiveSync:
                         'talk_time': lead_details.get('talk_time')
                     }
                     lead_data = self.create_auto_call_log(lead_data, call_info)
-                elif recording_path:
-                    # Fallback: If we have a recording but no call info, create a basic call log
-                    logger.info(f"🎵 Creating fallback call log for recording: {recording_path}")
-                    fallback_call_info = {
-                        'call_duration': 'Unknown',
-                        'call_timestamp': datetime.now().isoformat(),
-                        'talk_time': 'Recording available'
+                else:
+                    # SALE leads always had a call — create a call log even without exact duration
+                    # (recording_path or no recording_path — doesn't matter, it was a SALE)
+                    talk_time_str = lead_details.get('talk_time') or ('Recording available' if recording_path else '< 1 min')
+                    call_ts = lead_details.get('call_timestamp') or datetime.now().isoformat()
+                    logger.info(f"📞 SALE lead — creating call log (duration not extracted, using '{talk_time_str}')")
+                    sale_call_log = {
+                        'timestamp': call_ts,
+                        'connected': True,
+                        'duration': talk_time_str,
+                        'leftVoicemail': False,
+                        'notes': f'ViciDial SALE call{" — recording available" if recording_path else ""}'
                     }
-                    lead_data = self.create_auto_call_log(lead_data, fallback_call_info)
+                    lead_data['reachOut']['callLogs'].append(sale_call_log)
+                    lead_data['reachOut']['callAttempts'] = max(lead_data['reachOut'].get('callAttempts', 0), 1)
+                    lead_data['reachOut']['callsConnected'] = max(lead_data['reachOut'].get('callsConnected', 0), 1)
+                    lead_data['reachOut']['contacted'] = True
 
                 logger.info(f"📋 Final lead data for {lead_data['name']}:")
                 logger.info(f"  Fleet Size: {policy_info['fleet_size']}")
