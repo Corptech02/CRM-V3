@@ -11,9 +11,20 @@ async function loadPoliciesFromServer() {
             const serverPolicies = await response.json();
             console.log(`Loaded ${serverPolicies.length} policies from server`);
 
-            // Store in localStorage for offline access
-            localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
-            console.log('✅ Policies synced to localStorage');
+            // Merge: preserve local clientId/clientName when server doesn't have them
+            const existingLocal = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            const localById = {};
+            existingLocal.forEach(p => { if (p.id) localById[p.id] = p; });
+            const mergedPolicies = serverPolicies.map(sp => {
+                const lp = localById[sp.id];
+                if (!lp) return sp;
+                const merged = { ...sp };
+                if (!sp.clientId && lp.clientId) { merged.clientId = lp.clientId; merged.clientName = lp.clientName || sp.clientName; }
+                if (!sp.contact?.['Owner Name'] && lp.contact?.['Owner Name']) merged.contact = { ...lp.contact, ...sp.contact };
+                return merged;
+            });
+            localStorage.setItem('insurance_policies', JSON.stringify(mergedPolicies));
+            console.log('✅ Policies synced to localStorage (clientId preserved)');
 
             return serverPolicies;
         } else {
@@ -307,9 +318,13 @@ async function loadClientsFromServer(limit = 500) {
                 }
             }
 
-            // Store in localStorage for caching
-            localStorage.setItem('insurance_clients', JSON.stringify(serverClients));
-            console.log('💾 Stored clients in localStorage');
+            // Merge: keep local-only clients (IVANS-created) not yet on server
+            const existingLocalClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+            const serverClientIds = new Set(serverClients.map(c => String(c.id)));
+            const localOnlyClients = existingLocalClients.filter(c => c.id && !serverClientIds.has(String(c.id)));
+            const mergedClients = [...serverClients, ...localOnlyClients];
+            localStorage.setItem('insurance_clients', JSON.stringify(mergedClients));
+            console.log(`💾 Stored ${mergedClients.length} clients in localStorage (${localOnlyClients.length} local-only preserved)`);
 
             // Store pagination info for later use
             if (data.total) {
@@ -584,40 +599,28 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         updateSidebarNotifBtn();
         startCOINotificationWatcher();
+        startChatNotificationWatcher();
     }, 2000);
 
-    // Load dashboard immediately if on dashboard
-    if (!window.location.hash || window.location.hash === '' || window.location.hash === '#dashboard') {
-        console.log('Loading dashboard on page load');
-        loadContent('#dashboard');
+    const _initialHash = window.location.hash || '#dashboard';
+
+    // If not on dashboard, blank out the pre-rendered HTML immediately so
+    // the static dashboard stats don't flash before the real view loads.
+    if (_initialHash !== '#dashboard') {
+        const _dc = document.querySelector('.dashboard-content');
+        if (_dc) _dc.innerHTML = '';
     }
-    
-    // BASIC APPROACH - Let browser handle hash changes naturally without any click handlers
-    
-    // Handle initial hash
-    if (window.location.hash) {
-        console.log('Initial hash:', window.location.hash);
-        setTimeout(() => {
-            loadContent(window.location.hash);
-            updateActiveMenuItem(window.location.hash);
-        }, 100);
-    } else {
-        // Load dashboard by default - using loadFullDashboard through loadContent
-        setTimeout(() => {
-            loadContent('#dashboard');
-            updateActiveMenuItem('#dashboard');
-        }, 100);
-    }
+
+    // Load the correct view immediately — no delay needed
+    loadContent(_initialHash);
+    updateActiveMenuItem(_initialHash);
 });
 
-// Ensure To-Do box is added when page is fully loaded
+// Dashboard data refresh once all resources are loaded (images, etc.)
 window.addEventListener('load', function() {
-    setTimeout(() => {
-        const hash = window.location.hash || '#dashboard';
-        if (hash === '#dashboard' || hash === '') {
-            loadDashboardView();
-        }
-    }, 500);
+    if ((window.location.hash || '#dashboard') === '#dashboard') {
+        setTimeout(loadDashboardView, 500);
+    }
 });
 
 // COI Management View
@@ -781,7 +784,11 @@ function loadPolicyList() {
                         let clientName = 'N/A';
 
                         // PRIORITY 1: Check Named Insured tab data first (most accurate)
-                        if (policy.insured?.['Name/Business Name']) {
+                        if (policy.insured?.['Business Name']) {
+                            clientName = policy.insured['Business Name'];
+                        } else if (policy.contact?.['Business Name']) {
+                            clientName = policy.contact['Business Name'];
+                        } else if (policy.insured?.['Name/Business Name']) {
                             clientName = policy.insured['Name/Business Name'];
                         } else if (policy.insured?.['Primary Named Insured']) {
                             clientName = policy.insured['Primary Named Insured'];
@@ -2659,6 +2666,16 @@ function openCalendar() {
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
 
+    // Initialize calendarState BEFORE generating the grid so Maureen's view is correct from the start
+    const _calInitUser = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase();
+    window.calendarState = {
+        currentMonth: currentMonth,
+        currentYear: currentYear,
+        selectedDate: new Date(),
+        serverCallbacks: [],
+        currentView: 'personal'
+    };
+
     calendarModal.innerHTML = `
         <div class="calendar-header" style="padding: 15px 20px; border-bottom: 2px solid #e5e7eb; background: #f8fafc; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-radius: 12px 12px 0 0;">
             <div style="display: flex; align-items: center;">
@@ -2795,14 +2812,11 @@ function openCalendar() {
     // Make calendar draggable
     makeCalendarDraggable(calendarModal);
 
-    // Store current calendar state
-    window.calendarState = {
-        currentMonth: currentMonth,
-        currentYear: currentYear,
-        selectedDate: new Date(),
-        serverCallbacks: [],
-        currentView: 'personal' // Default to personal view
-    };
+    // Hide agency view toggle for Maureen — she only sees her own data
+    if (_calInitUser === 'maureen') {
+        const agencyViewBtn = document.getElementById('agencyViewBtn');
+        if (agencyViewBtn) agencyViewBtn.style.display = 'none';
+    }
 
     // Load server data and refresh calendar display
     Promise.all([
@@ -3215,19 +3229,22 @@ function getEventsForDate(year, month, day) {
     const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
     const currentUser = sessionData.username || '';
     const currentView = window.calendarState?.currentView || 'personal';
+    // Maureen always sees only her own data regardless of view toggle
+    const _isMaureenCal = currentUser.toLowerCase() === 'maureen';
+    const effectiveView = _isMaureenCal ? 'personal' : currentView;
 
     // Filter local events by date
     let filteredLocalEvents = localEvents.filter(event => event.date === dateStr);
 
     // Filter local events by view mode
-    if (currentView === 'personal') {
+    if (effectiveView === 'personal') {
         filteredLocalEvents = filteredLocalEvents.filter(event =>
-            !event.assignedAgent || event.assignedAgent === currentUser
+            !event.assignedAgent || (event.assignedAgent || '').toLowerCase() === currentUser.toLowerCase()
         );
     }
 
     // Get todos for this date and convert them to calendar events
-    const todoStorageKey = currentView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+    const todoStorageKey = effectiveView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
     const allTodos = JSON.parse(localStorage.getItem(todoStorageKey) || '[]');
 
     const todoEvents = allTodos
@@ -3270,15 +3287,15 @@ function getEventsForDate(year, month, day) {
         }));
 
     // Filter server events by view mode
-    if (currentView === 'personal') {
+    if (effectiveView === 'personal') {
         serverCalendarEvents = serverCalendarEvents.filter(event =>
-            !event.assignedAgent || event.assignedAgent === currentUser
+            !event.assignedAgent || (event.assignedAgent || '').toLowerCase() === currentUser.toLowerCase()
         );
     }
 
     // Add server callbacks for this date
     const serverCallbacks = window.calendarState?.serverCallbacks || [];
-    console.log(`🔍 Getting events for ${dateStr}, found ${serverCallbacks.length} server callbacks (${currentView} view for ${currentUser})`);
+    console.log(`🔍 Getting events for ${dateStr}, found ${serverCallbacks.length} server callbacks (${effectiveView} view for ${currentUser})`);
 
     let callbackEvents = serverCallbacks
         .filter(callback => {
@@ -3307,10 +3324,14 @@ function getEventsForDate(year, month, day) {
         }));
 
     // Filter callback events by view mode
-    if (currentView === 'personal') {
+    if (effectiveView === 'personal') {
         const beforeFilter = callbackEvents.length;
         callbackEvents = callbackEvents.filter(event => {
-            const isAssignedToUser = !event.assignedAgent || event.assignedAgent === currentUser;
+            const agentLower = (event.assignedAgent || '').toLowerCase();
+            const userLower = currentUser.toLowerCase();
+            // Maureen: only show callbacks explicitly assigned to her (not unassigned ones)
+            if (_isMaureenCal) return agentLower.includes('maureen');
+            const isAssignedToUser = !event.assignedAgent || agentLower === userLower;
             if (!isAssignedToUser) {
                 console.log(`🚫 Personal view: Filtering out callback "${event.title}" assigned to "${event.assignedAgent}" (current user: "${currentUser}")`);
             }
@@ -4138,6 +4159,12 @@ function updateActiveMenuItem(hash) {
             }
         }
     }
+
+    // Show Archived Leads nav item only when on leads or archived-leads
+    const archivedNavItem = document.getElementById('archived-leads-nav-item');
+    if (archivedNavItem) {
+        archivedNavItem.style.display = (normalizedHash === '#leads' || normalizedHash === '#archived-leads') ? '' : 'none';
+    }
 }
 
 // Modal Functions
@@ -4461,6 +4488,10 @@ function loadContent(section) {
             // Don't clear content, instead rebuild the dashboard structure
             loadFullDashboard();
             break;
+        case '#archived-leads':
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Archived Leads...</div>';
+            loadArchivedLeadsView();
+            break;
         case '#leads':
             console.log('🔥 DEBUG: About to call loadLeadsView()');
             dashboardContent.innerHTML = '<div>Loading leads from server...</div>'; // Show loading state
@@ -4473,6 +4504,17 @@ function loadContent(section) {
                         console.error('🔥 ERROR: loadLeadsView() did not add any content!');
                     }
                 }, 100);
+                // Sync toggle button UI state (filter already applied at render time)
+                setTimeout(() => {
+                    if (window.myLeadsOnlyActive && document.getElementById('myLeadsToggle')) {
+                        const btn = document.getElementById('myLeadsToggle');
+                        const icon = document.getElementById('myLeadsToggleIcon');
+                        btn.style.background = '#1e40af';
+                        btn.style.borderColor = '#3b82f6';
+                        btn.style.color = '#93c5fd';
+                        if (icon) icon.className = 'fas fa-eye-slash';
+                    }
+                }, 50);
             }).catch(error => {
                 console.error('🔥 ERROR: loadLeadsView() failed:', error);
             });
@@ -4713,6 +4755,66 @@ function loadContent(section) {
             // Default to dashboard
             loadDashboardView();
             break;
+    }
+}
+
+// Archived Leads Full-Page View
+function loadArchivedLeadsView() {
+    const dashboardContent = document.querySelector('.dashboard-content');
+    if (!dashboardContent) return;
+
+    dashboardContent.innerHTML = `
+        <div class="archived-view">
+            <header class="content-header" style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid #e5e7eb;flex-wrap:wrap;gap:12px;">
+                <div style="display:flex;align-items:center;gap:16px;">
+                    <a href="#leads" style="color:#6b7280;text-decoration:none;font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                        <i class="fas fa-arrow-left"></i> Active Leads
+                    </a>
+                    <h1 style="margin:0;font-size:24px;font-weight:700;color:#111827;">Archived Leads</h1>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button onclick="exportArchivedLeads()" style="background:#10b981;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-weight:500;font-size:14px;">
+                        <i class="fas fa-download"></i> Export Month
+                    </button>
+                    <button onclick="exportAllArchivedLeads()" style="background:#6366f1;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-weight:500;font-size:14px;">
+                        <i class="fas fa-download"></i> Export All
+                    </button>
+                </div>
+            </header>
+
+            <div id="monthlyArchiveTabs" style="display:flex;gap:2px;margin:16px 24px 0;border-bottom:2px solid #e5e7eb;overflow-x:auto;white-space:nowrap;padding-bottom:2px;">
+                <!-- Monthly tabs populated by loadArchivedLeads() -->
+            </div>
+
+            <div class="table-container" style="margin:0 24px 24px;overflow-x:auto;">
+                <table class="data-table" id="archivedLeadsTable" style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;padding:12px;text-align:center;">
+                                <input type="checkbox" id="selectAllArchived" onclick="toggleAllArchived(this)">
+                            </th>
+                            <th style="width:28px;padding:4px;text-align:center;"></th>
+                            <th style="padding:12px;text-align:left;">Name</th>
+                            <th style="padding:12px;text-align:left;">Contact</th>
+                            <th style="padding:12px;text-align:left;">Product</th>
+                            <th style="padding:12px;text-align:left;">Premium</th>
+                            <th style="padding:12px;text-align:left;">Renewal</th>
+                            <th style="padding:12px;text-align:left;">Talk Time</th>
+                            <th style="padding:12px;text-align:left;">Agent</th>
+                            <th style="padding:12px;text-align:left;">Archived Date</th>
+                            <th style="padding:12px;text-align:center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="archivedLeadsTableBody">
+                        <tr><td colspan="11" style="text-align:center;padding:2rem;color:#6b7280;">⏳ Loading archived leads...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    if (typeof loadArchivedLeads === 'function') {
+        loadArchivedLeads();
     }
 }
 
@@ -5382,6 +5484,7 @@ function loadFullDashboard() {
                         <span id="goals-personal-title" style="font-size: 0.95rem; font-weight: 700; color: #1f2937;">My Goals</span>
                     </div>
                     <div style="display: flex; gap: 5px;">
+                        <button id="goals-day-btn" onclick="switchGoalsPeriod('day')" style="padding:4px 12px;font-size:0.75rem;background:#e5e7eb;color:#6b7280;border:none;border-radius:4px;cursor:pointer;">Day</button>
                         <button id="goals-week-btn" onclick="switchGoalsPeriod('week')" style="padding:4px 12px;font-size:0.75rem;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Week</button>
                         <button id="goals-month-btn" onclick="switchGoalsPeriod('month')" style="padding:4px 12px;font-size:0.75rem;background:#e5e7eb;color:#6b7280;border:none;border-radius:4px;cursor:pointer;">Month</button>
                     </div>
@@ -5652,6 +5755,15 @@ function loadDashboardView() {
     }).catch(error => {
         console.log('⚠️ Immediate server data load failed (this is normal on first load):', error.message);
     });
+
+    // Hide Agency todo toggle for Maureen (she's United, not Vanguard)
+    const _dashSessionUser = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase();
+    if (_dashSessionUser === 'maureen') {
+        const agencyBtn = document.getElementById('dashboardAgencyTodoBtn');
+        if (agencyBtn) agencyBtn.style.display = 'none';
+        const personalBtn = document.getElementById('dashboardPersonalTodoBtn');
+        if (personalBtn) { personalBtn.textContent = 'My Tasks'; personalBtn.style.background = '#3b82f6'; personalBtn.style.color = 'white'; }
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -5661,10 +5773,12 @@ window.goalsPeriod = 'week';
 
 window.switchGoalsPeriod = function(period) {
     window.goalsPeriod = period;
+    const dBtn = document.getElementById('goals-day-btn');
     const wBtn = document.getElementById('goals-week-btn');
     const mBtn = document.getElementById('goals-month-btn');
-    if (wBtn) { wBtn.style.background = period === 'week' ? '#3b82f6' : '#e5e7eb'; wBtn.style.color = period === 'week' ? 'white' : '#6b7280'; }
-    if (mBtn) { mBtn.style.background = period === 'month' ? '#3b82f6' : '#e5e7eb'; mBtn.style.color = period === 'month' ? 'white' : '#6b7280'; }
+    if (dBtn) { dBtn.style.background = period === 'day'   ? '#3b82f6' : '#e5e7eb'; dBtn.style.color = period === 'day'   ? 'white' : '#6b7280'; dBtn.style.fontWeight = period === 'day'   ? '600' : '400'; }
+    if (wBtn) { wBtn.style.background = period === 'week'  ? '#3b82f6' : '#e5e7eb'; wBtn.style.color = period === 'week'  ? 'white' : '#6b7280'; wBtn.style.fontWeight = period === 'week'  ? '600' : '400'; }
+    if (mBtn) { mBtn.style.background = period === 'month' ? '#3b82f6' : '#e5e7eb'; mBtn.style.color = period === 'month' ? 'white' : '#6b7280'; mBtn.style.fontWeight = period === 'month' ? '600' : '400'; }
     renderPersonalGoals(window._goalsData, period);
 };
 
@@ -5814,12 +5928,15 @@ function renderPersonalGoals(data, period) {
     if (!container) return;
 
     const currentUser = getCurrentUser().toLowerCase();
-    const periodLabel = period === 'week' ? 'This Week' : 'This Month';
+    const periodLabel = period === 'day' ? 'Today' : period === 'week' ? 'This Week' : 'This Month';
 
     // Date range
     const now = new Date();
     let startTs, endTs;
-    if (period === 'week') {
+    if (period === 'day') {
+        startTs = new Date(now); startTs.setHours(0,0,0,0);
+        endTs   = new Date(now); endTs.setHours(23,59,59,999);
+    } else if (period === 'week') {
         const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
         startTs = new Date(now); startTs.setDate(now.getDate() + diff); startTs.setHours(0,0,0,0);
         endTs = new Date(startTs); endTs.setDate(startTs.getDate() + 6); endTs.setHours(23,59,59,999);
@@ -5844,10 +5961,10 @@ function renderPersonalGoals(data, period) {
         const yr2 = String(endTs.getFullYear()).slice(-2);
         if (titleEl) titleEl.textContent = agentName + "'s Goals — " + periodLabel + ' (' + fmt2(startTs) + '-' + fmt2(endTs) + '/' + yr2 + ')';
         const grayMetrics = currentUser === 'grant'
-            ? ['Sales','Talk Time','Apps Sent','Lead Callback %']
+            ? ['Sales','Talk Time','Apps Sent','Scheduled Callbacks']
             : currentUser === 'carson'
-            ? ['New Leads','Avg Talk Time / Lead','Apps Sent','Lead Callback %']
-            : ['Total Talk Time','Sales','Avg Talk Time / Call','Apps to Market','Lead Callback %'];
+            ? ['New Leads','Avg Talk Time / Lead','Apps Sent','Scheduled Callbacks']
+            : ['Total Talk Time','Sales','Avg Talk Time / Call','Apps to Market','Scheduled Callbacks'];
         container.innerHTML = grayMetrics.map(lbl =>
             '<div style="background:#f9fafb;border-radius:8px;padding:10px 12px;border:1px solid #e5e7eb;opacity:0.45;">' +
                 '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
@@ -5862,7 +5979,9 @@ function renderPersonalGoals(data, period) {
 
     const fmt = d => (d.getMonth() + 1) + '/' + d.getDate();
     const yr = String(endTs.getFullYear()).slice(-2);
-    const dateRange = '(' + fmt(startTs) + '-' + fmt(endTs) + '/' + yr + ')';
+    const dateRange = period === 'day'
+        ? '(' + fmt(startTs) + '/' + yr + ')'
+        : '(' + fmt(startTs) + '-' + fmt(endTs) + '/' + yr + ')';
     if (titleEl) titleEl.textContent = agentName + "'s Goals — " + periodLabel + ' ' + dateRange;
 
     const { leads, policies, callbacks } = data;
@@ -5898,29 +6017,28 @@ function renderPersonalGoals(data, period) {
     // Apps to market
     let appsInRange = 0;
     leads.filter(l => (l.assignedTo || '').toLowerCase() === currentUser).forEach(lead => {
-        const appSentDate = lead.appSentAt ? new Date(lead.appSentAt) : null;
-        const appSentInRange = appSentDate && appSentDate >= startTs && appSentDate <= endTs;
         const createdStr = lead.created_at || lead.created || '';
-        const createdDate = createdStr ? new Date(createdStr) : null;
-        const createdInRange = createdDate && createdDate >= startTs && createdDate <= endTs;
-        if (appSentInRange || (createdInRange && (lead.stage === 'app_sent' || lead.appStage?.app || lead.appStage?.lossRuns || lead.appStage?.iftas || lead.appStage?.saa))) appsInRange++;
+        const d = createdStr ? new Date(createdStr) : null;
+        if (!d || d < startTs || d > endTs) return;
+        if (lead.stage === 'app_sent' || lead.appStage?.app || lead.appStage?.lossRuns || lead.appStage?.iftas || lead.appStage?.saa) appsInRange++;
     });
 
-    // Scheduled callback % — same formula as Agent Performance Report:
-    // % of all open (non-closed/lost) leads that have an active future callback scheduled
+    // Scheduled callback %
     const cbByLead = {};
     callbacks.forEach(cb => { const lid = String(cb.lead_id); if (!cbByLead[lid]) cbByLead[lid] = []; cbByLead[lid].push(cb); });
-    let openLeads = 0, leadsWithCB = 0;
-    const nowTs = Date.now();
+    let connectedLeads = 0, leadsWithCB = 0;
     leads.filter(l => (l.assignedTo || '').toLowerCase() === currentUser).forEach(lead => {
-        const ls = (lead.stage || '').toLowerCase();
-        if (ls === 'closed' || ls === 'lost') return;
-        openLeads++;
+        const hasConn = (lead.reachOut?.callLogs || []).some(c => {
+            const d = c.timestamp ? new Date(c.timestamp) : null;
+            return d && d >= startTs && d <= endTs && c.connected;
+        });
+        if (!hasConn) return;
+        connectedLeads++;
         const cbs = (cbByLead[String(lead.id)] || []).filter(cb => !cb.completed);
-        if (cbs.some(cb => new Date(cb.date_time).getTime() >= nowTs)) leadsWithCB++;
+        if (cbs.length > 0) leadsWithCB++;
     });
-    const cbPct = openLeads > 0 ? (leadsWithCB / openLeads) * 100 : 0;
-    const avgTalkSecs = connectedInRange > 0 ? callSecsInRange / connectedInRange : 0;
+    const cbPct = connectedLeads > 0 ? (leadsWithCB / connectedLeads) * 100 : 0;
+    const avgTalkSecs = callsInRange > 0 ? callSecsInRange / callsInRange : 0;
 
     // New leads in range (leads created/assigned in the period)
     const newLeadsInRange = leads.filter(l => {
@@ -5942,11 +6060,40 @@ function renderPersonalGoals(data, period) {
         : (DEF_ACTIVE[currentUser] || {})[fa] !== false;
 
     // Merged goal values (config overrides defaults)
-    const defG = { totalTalkHours:p==='week'?1:4, sales:p==='week'?2:7, newLeads:p==='week'?15:60, avgTalkMin:10, apps:p==='week'?1:4, callbacks:85 };
-    const defC = { totalTalkHours:p==='week'?1:4, sales:p==='week'?4:15, newLeads:p==='week'?15:60, avgTalkMin:45, apps:p==='week'?4:20, callbacks:85 };
-    const defH = { totalTalkHours:p==='week'?1:4, sales:p==='week'?2:7, newLeads:p==='week'?10:40, avgTalkMin:10, apps:p==='week'?1:4, callbacks:85 };
+    // Defaults align with target stacks (high estimates): Hunter 2/mo sales, Carson 4/mo sales
+    const defG = { totalTalkHours:p==='day'?0.3:p==='week'?1.5:6,   sales:p==='day'?0.1:p==='week'?0.5:2,  newLeads:p==='day'?2:p==='week'?10:42,  avgTalkMin:10, apps:p==='day'?0.3:p==='week'?1.5:7,  callbacks:85 };
+    const defC = { totalTalkHours:p==='day'?0.9:p==='week'?4.6:20,  sales:p==='day'?0.2:p==='week'?1:4,    newLeads:p==='day'?2.5:p==='week'?13:55, avgTalkMin:45, apps:p==='day'?1.2:p==='week'?6.2:27, callbacks:85 };
+    const defH = { totalTalkHours:p==='day'?0.7:p==='week'?3.7:16,  sales:p==='day'?0.1:p==='week'?0.5:2,  newLeads:p==='day'?1.5:p==='week'?7:32,  avgTalkMin:10, apps:p==='day'?0.7:p==='week'?3.5:15, callbacks:85 };
     const gBase = currentUser === 'grant' ? defG : currentUser === 'carson' ? defC : defH;
-    const g = Object.assign({}, gBase, (agentCfg[p] || {}));
+    const periodKey = p === 'day' ? 'day' : p === 'week' ? 'week' : 'month';
+    const g = Object.assign({}, gBase, (agentCfg[periodKey] || {}));
+
+    // ── Recalibration: if behind monthly pace, adjust daily/weekly goals ──────
+    if (p === 'day' || p === 'week') {
+        const todayD = now;
+        const yr = todayD.getFullYear(), mo = todayD.getMonth();
+        const wdInMonth = _countWorkDaysInMonth(yr, mo);
+        const wdElapsed = _countWorkDaysElapsed(yr, mo, todayD.getDate());
+        const wdRemaining = Math.max(1, wdInMonth - wdElapsed + 1); // include today
+
+        const mGoals = Object.assign({}, gBase, (agentCfg.month || {}));
+        const actuals = { totalTalkHours: callSecsInRange / 3600, sales: salesInRange, newLeads: newLeadsInRange, apps: appsInRange };
+
+        ['totalTalkHours', 'sales', 'newLeads', 'apps'].forEach(key => {
+            const mGoal = mGoals[key] || 0;
+            if (!mGoal) return;
+            const actual = actuals[key] || 0;
+            const remaining = Math.max(0, mGoal - actual);
+            const recalibDaily = remaining / wdRemaining;
+            if (p === 'day' && recalibDaily > g[key]) {
+                g[key] = Math.round(recalibDaily * 10) / 10;
+            } else if (p === 'week') {
+                const weeksRemaining = Math.max(1, wdRemaining / _WORK_DAYS_PER_WEEK);
+                const recalibWeekly = remaining / weeksRemaining;
+                if (recalibWeekly > g[key]) g[key] = Math.round(recalibWeekly * 10) / 10;
+            }
+        });
+    }
 
     const totalTalkGoal = g.totalTalkHours * 3600;
     const avgTalkGoalSecs = g.avgTalkMin * 60;
@@ -5971,7 +6118,7 @@ function renderPersonalGoals(data, period) {
     if (fieldActive('apps'))
         html += _goalBar(appsLabel, appsInRange, g.apps, '#f59e0b', 'fa-paper-plane', appsInRange + ' / ' + g.apps);
     if (fieldActive('callbacks'))
-        html += _goalBar('Lead Callback %', Math.round(cbPct), g.callbacks, '#8b5cf6', 'fa-phone-alt',
+        html += _goalBar('Scheduled Callbacks', Math.round(cbPct), g.callbacks, '#8b5cf6', 'fa-phone-alt',
             Math.round(cbPct) + '% / ' + g.callbacks + '% goal', cbPct / g.callbacks);
     if (!html)
         html = '<div style="color:#9ca3af;text-align:center;grid-column:1/-1;padding:10px;font-size:0.85rem;">All goals are currently disabled.</div>';
@@ -5992,13 +6139,86 @@ function saveGoalsConfig(cfg) {
     }).catch(e => console.warn('Goals config server save failed:', e));
 }
 
+// Auto-calc other goal fields when Sales monthly is entered
+window.goalsAutoCalc = function(user, salesInput) {
+    const raw = salesInput.value;
+    if (raw === '' || raw === null) return; // still-typing / empty
+    const val = parseFloat(raw) || 0;
+    const ratio = _SALES_RATIOS[user];
+    if (!ratio || val < 0) return;
+    const WPM = 4.33;
+    const DPM = _WORK_DAYS_PER_MONTH;
+
+    // Convert input period to monthly sales
+    const id = salesInput.id || '';
+    let monthlySales;
+    if (id.includes('-d-sales'))      monthlySales = val * DPM;
+    else if (id.includes('-w-sales')) monthlySales = val * WPM;
+    else                              monthlySales = val; // monthly
+
+    // Sync the other two sales boxes
+    const mSalesEl = document.getElementById('gcfg-' + user + '-m-sales');
+    const wSalesEl = document.getElementById('gcfg-' + user + '-w-sales');
+    const dSalesEl = document.getElementById('gcfg-' + user + '-d-sales');
+    if (mSalesEl && mSalesEl !== salesInput) mSalesEl.value = Math.round(monthlySales * 10) / 10;
+    if (wSalesEl && wSalesEl !== salesInput) wSalesEl.value = Math.round((monthlySales / WPM) * 10) / 10;
+    if (dSalesEl && dSalesEl !== salesInput) dSalesEl.value = Math.round((monthlySales / DPM) * 10) / 10;
+
+    // Populate leads, apps, talk time across all periods (skip callbacks & avgTalkMin)
+    function setField(key, monthly) {
+        const mEl = document.getElementById('gcfg-' + user + '-m-' + key);
+        const wEl = document.getElementById('gcfg-' + user + '-w-' + key);
+        const dEl = document.getElementById('gcfg-' + user + '-d-' + key);
+        if (mEl) mEl.value = Math.round(monthly * 10) / 10;
+        if (wEl) wEl.value = Math.round((monthly / WPM) * 10) / 10;
+        if (dEl) dEl.value = Math.round((monthly / DPM) * 10) / 10;
+    }
+    setField('newLeads',       monthlySales * ratio.newLeads);
+    setField('apps',           monthlySales * ratio.apps);
+    setField('totalTalkHours', monthlySales * ratio.totalTalkHours);
+};
+
+// Sales ratios per sale (derived from high-estimate target stacks)
+// Hunter: 2,200 calls, 32 leads, 15 apps, 2 sales, 16 hrs → ratios per sale
+// Carson: 4,200 calls, 55 leads, 27 apps, 4 sales, 20 hrs → ratios per sale
+const _SALES_RATIOS = {
+    hunter: { newLeads: 16, apps: 7.5, totalTalkHours: 8 },
+    carson: { newLeads: 13.75, apps: 6.75, totalTalkHours: 5 },
+    grant:  { newLeads: 14, apps: 7, totalTalkHours: 6 },
+};
+const _WORK_DAYS_PER_MONTH = 22;
+const _WORK_DAYS_PER_WEEK  = 5;
+
+// Count Mon-Fri work days in a given month
+function _countWorkDaysInMonth(year, month) {
+    let count = 0;
+    const days = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= days; d++) {
+        const dow = new Date(year, month, d).getDay();
+        if (dow >= 1 && dow <= 5) count++;
+    }
+    return count;
+}
+// Count Mon-Fri work days from the 1st to today (inclusive)
+function _countWorkDaysElapsed(year, month, today) {
+    let count = 0;
+    for (let d = 1; d <= today; d++) {
+        const dow = new Date(year, month, d).getDay();
+        if (dow >= 1 && dow <= 5) count++;
+    }
+    return count;
+}
+
 const _GOAL_FIELDS = [
-    { key: 'totalTalkHours', label: 'Total Talk Time (hrs)', wDef: { grant:1, carson:1, hunter:1 }, mDef: { grant:4, carson:4, hunter:4 }, defActive: { grant:false, carson:false, hunter:true } },
-    { key: 'sales',          label: 'Sales',                 wDef: { grant:2, carson:4, hunter:2 }, mDef: { grant:7, carson:15,hunter:7 }, defActive: { grant:false, carson:false, hunter:true } },
-    { key: 'newLeads',       label: 'New Leads',             wDef: { grant:15,carson:15,hunter:10}, mDef: { grant:60,carson:60,hunter:40}, defActive: { grant:false, carson:true,  hunter:false} },
-    { key: 'avgTalkMin',     label: 'Avg Talk Time (min)',   wDef: { grant:10,carson:45,hunter:10}, mDef: { grant:10,carson:45,hunter:10}, defActive: { grant:false, carson:true,  hunter:true } },
-    { key: 'apps',           label: 'Apps Sent',             wDef: { grant:1, carson:4, hunter:1 }, mDef: { grant:4, carson:20,hunter:4 }, defActive: { grant:false, carson:true,  hunter:true } },
-    { key: 'callbacks',      label: 'Callbacks Goal (%)',    wDef: { grant:85,carson:85,hunter:85}, mDef: { grant:85,carson:85,hunter:85}, defActive: { grant:false, carson:true,  hunter:true } },
+    // dDef = daily, wDef = weekly, mDef = monthly
+    // Hunter monthly highs: leads=32, apps=15, sales=2, talkHrs=16
+    // Carson monthly highs: leads=55, apps=27, sales=4, talkHrs=20
+    { key: 'totalTalkHours', label: 'Total Talk Time (hrs)', dDef: { grant:0.3, carson:0.9, hunter:0.7 }, wDef: { grant:1.5, carson:4.6, hunter:3.7 }, mDef: { grant:6,  carson:20, hunter:16 }, defActive: { grant:true, carson:true, hunter:true } },
+    { key: 'sales',          label: 'Sales',                 dDef: { grant:0.1, carson:0.2, hunter:0.1 }, wDef: { grant:0.5, carson:1,   hunter:0.5 }, mDef: { grant:2,  carson:4,  hunter:2  }, defActive: { grant:true, carson:true, hunter:true } },
+    { key: 'newLeads',       label: 'New Leads',             dDef: { grant:2,   carson:2.5, hunter:1.5 }, wDef: { grant:10,  carson:13,  hunter:7   }, mDef: { grant:42, carson:55, hunter:32 }, defActive: { grant:true, carson:true, hunter:true } },
+    { key: 'avgTalkMin',     label: 'Avg Talk Time (min)',   dDef: { grant:10,  carson:45,  hunter:10  }, wDef: { grant:10,  carson:45,  hunter:10  }, mDef: { grant:10, carson:45, hunter:10 }, defActive: { grant:false,carson:true, hunter:true } },
+    { key: 'apps',           label: 'Apps Sent',             dDef: { grant:0.3, carson:1.2, hunter:0.7 }, wDef: { grant:1.5, carson:6.2, hunter:3.5 }, mDef: { grant:7,  carson:27, hunter:15 }, defActive: { grant:true, carson:true, hunter:true } },
+    { key: 'callbacks',      label: 'Callbacks Goal (%)',    dDef: { grant:85,  carson:85,  hunter:85  }, wDef: { grant:85,  carson:85,  hunter:85  }, mDef: { grant:85, carson:85, hunter:85 }, defActive: { grant:true, carson:true, hunter:true } },
 ];
 
 function _miniToggle(id, checked) {
@@ -6050,20 +6270,35 @@ window.openGoalsEditor = async function() {
         const mCfg = uCfg.month || {};
         const toggleId = 'goals-toggle-' + u.key;
 
-        const fieldsHTML = '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:7px 10px;align-items:center;margin-top:12px;">' +
+        const dCfg = uCfg.day || {};
+        // Color styles: daily=green, weekly=yellow, monthly=blue
+        // Override: avgTalkMin + callbacks rows = yellow on all columns
+        const CSS_D = 'width:62px;padding:4px 6px;border:1px solid #86efac;border-radius:4px;font-size:0.8rem;text-align:center;background:#f0fdf4;color:#166534;';
+        const CSS_W = 'width:62px;padding:4px 6px;border:1px solid #fcd34d;border-radius:4px;font-size:0.8rem;text-align:center;background:#fefce8;color:#92400e;';
+        const CSS_M = 'width:62px;padding:4px 6px;border:1px solid #bfdbfe;border-radius:4px;font-size:0.8rem;text-align:center;background:#eff6ff;color:#1d4ed8;';
+        const CSS_Y = 'width:62px;padding:4px 6px;border:1px solid #fde047;border-radius:4px;font-size:0.8rem;text-align:center;background:#fef9c3;color:#713f12;';
+        const fieldsHTML = '<div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:7px 10px;align-items:center;margin-top:12px;">' +
             '<div style="font-size:0.68rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;">Metric</div>' +
             '<div style="font-size:0.68rem;font-weight:700;color:#9ca3af;text-align:center;">On</div>' +
-            '<div style="font-size:0.68rem;font-weight:700;color:#9ca3af;text-align:center;">Weekly</div>' +
-            '<div style="font-size:0.68rem;font-weight:700;color:#9ca3af;text-align:center;">Monthly</div>' +
+            '<div style="font-size:0.68rem;font-weight:700;color:#166534;text-align:center;background:#f0fdf4;border-radius:4px;padding:2px 6px;">Daily</div>' +
+            '<div style="font-size:0.68rem;font-weight:700;color:#92400e;text-align:center;background:#fefce8;border-radius:4px;padding:2px 6px;">Weekly</div>' +
+            '<div style="font-size:0.68rem;font-weight:700;color:#1d4ed8;text-align:center;background:#eff6ff;border-radius:4px;padding:2px 6px;">Monthly</div>' +
             _GOAL_FIELDS.map(f => {
                 const isActive = fieldActiveCfg[f.key] !== undefined ? fieldActiveCfg[f.key] : (f.defActive[u.key] !== false);
+                const dVal = dCfg[f.key] !== undefined ? dCfg[f.key] : f.dDef[u.key];
                 const wVal = wCfg[f.key] !== undefined ? wCfg[f.key] : f.wDef[u.key];
                 const mVal = mCfg[f.key] !== undefined ? mCfg[f.key] : f.mDef[u.key];
                 const fId = 'gcfg-' + u.key + '-fa-' + f.key;
+                // Yellow override for rate/pct metrics; sales monthly is blue; others use column colors
+                const isYellow = f.key === 'avgTalkMin' || f.key === 'callbacks';
+                const csD = isYellow ? CSS_Y : CSS_D;
+                const csW = isYellow ? CSS_Y : CSS_W;
+                const csM = isYellow ? CSS_Y : CSS_M;
                 return '<div style="font-size:0.78rem;color:#374151;">' + f.label + '</div>' +
                     '<div style="display:flex;justify-content:center;">' + _miniToggle(fId, isActive) + '</div>' +
-                    '<input type="number" id="gcfg-' + u.key + '-w-' + f.key + '" value="' + wVal + '" min="0" style="width:62px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.8rem;text-align:center;">' +
-                    '<input type="number" id="gcfg-' + u.key + '-m-' + f.key + '" value="' + mVal + '" min="0" style="width:62px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.8rem;text-align:center;">';
+                    '<input type="number" id="gcfg-' + u.key + '-d-' + f.key + '" value="' + dVal + '" min="0" style="' + csD + '">' +
+                    '<input type="number" id="gcfg-' + u.key + '-w-' + f.key + '" value="' + wVal + '" min="0" style="' + csW + '">' +
+                    '<input type="number" id="gcfg-' + u.key + '-m-' + f.key + '" value="' + mVal + '" min="0" style="' + csM + '">';
             }).join('') +
         '</div>';
 
@@ -6114,6 +6349,17 @@ window.openGoalsEditor = async function() {
 
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    // Wire up sales input listeners + auto-calc on open
+    ['grant','carson','hunter'].forEach(u => {
+        ['d','w','m'].forEach(p => {
+            const el = document.getElementById('gcfg-' + u + '-' + p + '-sales');
+            if (el) el.addEventListener('input', () => goalsAutoCalc(u, el));
+        });
+        // Run once on open so all fields reflect current sales value
+        const mEl = document.getElementById('gcfg-' + u + '-m-sales');
+        if (mEl && parseFloat(mEl.value) > 0) goalsAutoCalc(u, mEl);
+    });
 };
 
 window.saveGoalsFromEditor = function() {
@@ -6124,16 +6370,19 @@ window.saveGoalsFromEditor = function() {
         if (!cfg[u]) cfg[u] = {};
         const toggle = document.getElementById('goals-toggle-' + u);
         if (toggle) cfg[u].active = toggle.checked;
-        cfg[u].week = cfg[u].week || {};
+        cfg[u].day   = cfg[u].day   || {};
+        cfg[u].week  = cfg[u].week  || {};
         cfg[u].month = cfg[u].month || {};
         cfg[u].fieldActive = cfg[u].fieldActive || {};
         FIELD_KEYS.forEach(k => {
             const faEl = document.getElementById('gcfg-' + u + '-fa-' + k);
+            const dEl  = document.getElementById('gcfg-' + u + '-d-' + k);
             const wEl  = document.getElementById('gcfg-' + u + '-w-' + k);
             const mEl  = document.getElementById('gcfg-' + u + '-m-' + k);
             if (faEl) cfg[u].fieldActive[k] = faEl.checked;
+            if (dEl)  cfg[u].day[k]   = parseFloat(dEl.value)  || 0;
             if (wEl)  cfg[u].week[k]  = parseFloat(wEl.value)  || 0;
-            if (mEl)  cfg[u].month[k] = parseFloat(mEl.value) || 0;
+            if (mEl)  cfg[u].month[k] = parseFloat(mEl.value)  || 0;
         });
         const annualToggleEl = document.getElementById('gcfg-' + u + '-showAnnualBar');
         const annualGoalEl   = document.getElementById('gcfg-' + u + '-annualGoal');
@@ -6141,6 +6390,12 @@ window.saveGoalsFromEditor = function() {
         if (annualGoalEl)   cfg[u].annualGoal    = parseFloat(annualGoalEl.value) || 0;
     });
     saveGoalsConfig(cfg);
+    // Also persist to server so dashboard reloads don't overwrite localStorage
+    fetch('/api/goals-config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(cfg)
+    }).catch(e => console.warn('Goals config server save failed:', e));
     document.getElementById('goals-editor-overlay')?.remove();
     if (window._goalsData) {
         const cu = getCurrentUser().toLowerCase();
@@ -7903,6 +8158,7 @@ async function loadLeadsView() {
         }
 
         window.filteredLeads = leads;
+        window.currentActiveLeads = leads; // used by toggleMyLeadsFilter for re-render
 
         // Never generate sample data - only show real leads
         if (allLeads.length === 0) {
@@ -7938,16 +8194,6 @@ async function loadLeadsView() {
         <div class="leads-view">
             <header class="content-header">
                 <h1>Lead Management</h1>
-
-                <!-- Lead Management Tabs -->
-                <div class="lead-tabs" style="display: flex; gap: 0; margin: 20px 0 10px 0; border-bottom: 2px solid #e5e7eb;">
-                    <button class="lead-tab active" onclick="switchLeadTab('active')" style="padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 6px 6px 0 0; cursor: pointer; font-weight: 600; transition: all 0.2s;">
-                        <i class="fas fa-users"></i> Active Leads
-                    </button>
-                    <button class="lead-tab" onclick="switchLeadTab('archived')" style="padding: 12px 24px; background: #f3f4f6; color: #6b7280; border: none; border-radius: 6px 6px 0 0; cursor: pointer; font-weight: 600; margin-left: 2px; transition: all 0.2s;">
-                        <i class="fas fa-archive"></i> Archived Leads
-                    </button>
-                </div>
 
                 <div class="header-actions">
                     <button class="btn-primary" onclick="syncVicidialLeads()" style="background: #10b981; border-color: #10b981;">
@@ -8470,13 +8716,10 @@ async function loadLeadsView() {
                     </thead>
                     <tbody id="leadsTableBody">
                         ${(() => {
-                            console.log(`🐛 DEBUGGING: About to generate table with ${leads.length} leads`);
-                            console.log(`🐛 Lead IDs being processed:`, leads.map(l => l.id).join(', '));
-                            if (leads.length === 1) {
-                                console.error(`❌ PROBLEM: Only 1 lead found! This is the bug!`);
-                                console.error(`❌ Single lead ID:`, leads[0].id, `Name:`, leads[0].name);
-                            }
-                            return generateSimpleLeadRowsWithDividers(leads);
+                            const _leadsForTable = (window.myLeadsOnlyActive && currentUser)
+                                ? leads.filter(l => (l.assignedTo || '').toLowerCase() === currentUser)
+                                : leads;
+                            return generateSimpleLeadRowsWithDividers(_leadsForTable);
                         })()}
                     </tbody>
                 </table>
@@ -8484,60 +8727,6 @@ async function loadLeadsView() {
             </div>
             <!-- End Active Leads Tab -->
 
-            <!-- Archived Leads Tab Content -->
-            <div id="archived-leads-tab" class="tab-content" style="display: none;">
-                <div class="archived-leads-content">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0;">
-                        <div>
-                            <h3 style="margin: 0; color: #374151;">Archived Leads</h3>
-                            <p style="color: #6b7280; margin: 5px 0 0 0;">Leads that have been archived from the active pipeline</p>
-                        </div>
-                        <div class="archived-actions">
-                            <button class="btn-secondary" onclick="exportArchivedLeads()" style="background: #10b981; border-color: #10b981; color: white;">
-                                <i class="fas fa-download"></i> Export Current Month
-                            </button>
-                            <button class="btn-secondary" onclick="exportAllArchivedLeads()" style="background: #6366f1; border-color: #6366f1; color: white; margin-left: 10px;">
-                                <i class="fas fa-download"></i> Export All
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Monthly Archive Tabs -->
-                    <div class="monthly-archive-tabs" id="monthlyArchiveTabs" style="display: flex; gap: 2px; margin: 20px 0 10px 0; border-bottom: 2px solid #e5e7eb; overflow-x: auto; white-space: nowrap; padding-bottom: 2px;">
-                        <!-- Monthly tabs will be populated here -->
-                    </div>
-
-                    <!-- Archive Summary Stats -->
-                    <div class="archive-stats" id="archiveStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">
-                        <!-- Stats will be populated here -->
-                    </div>
-
-                    <!-- Archived Leads Table -->
-                    <div class="table-container">
-                        <table class="data-table" id="archivedLeadsTable">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">
-                                        <input type="checkbox" id="selectAllArchived" onclick="toggleAllArchived(this)">
-                                    </th>
-                                    <th>Name</th>
-                                    <th>Contact</th>
-                                    <th>Value Level</th>
-                                    <th>Premium</th>
-                                    <th>Final Stage</th>
-                                    <th>Assigned To</th>
-                                    <th>Archived Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="archivedLeadsTableBody">
-                                ${generateArchivedLeadRows()}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <!-- End Archived Leads Tab -->
 
         </div>
     `;
@@ -10607,17 +10796,18 @@ async function generateClientRows(page = 1) {
         console.log(`👑 Admin user - showing all ${clients.length} clients`);
     }
 
-    // Remove duplicates based on name
+    // Remove duplicates based on identity key (name + DOB when available)
     const uniqueClients = [];
-    const seenNames = new Set();
+    const seenKeys = new Set();
 
     clients.forEach(client => {
-        const name = (client.name || '').toUpperCase().trim();
-        if (name && !seenNames.has(name)) {
-            seenNames.add(name);
+        const dob = client.dateOfBirth || client['Date of Birth'] || '';
+        const key = _clientIdentityKey(client.name || client.businessName || '', dob)
+                    || (client.name || '').toUpperCase().trim();
+        if (key && !seenKeys.has(key)) {
+            seenKeys.add(key);
             uniqueClients.push(client);
-        } else if (!name) {
-            // Keep clients without names (shouldn't happen but just in case)
+        } else if (!key) {
             uniqueClients.push(client);
         }
     });
@@ -10660,19 +10850,47 @@ async function generateClientRows(page = 1) {
         let policyCount = 0;
         let totalPremium = 0;
 
+        // Build client identity key for policy matching
+        const clientDob = client.dateOfBirth || client['Date of Birth'] || '';
+        const clientKey = _clientIdentityKey(client.name || client.businessName || '', clientDob);
+
         // Find all policies for this client - ONLY use fresh data
         const clientPolicies = allPolicies.filter(policy => {
-            // Check if policy belongs to this client by clientId
-            if (policy.clientId && String(policy.clientId) === String(client.id)) return true;
+            // 1. If policy has explicit clientId, ONLY count it for the exact match (no double-counting)
+            if (policy.clientId) {
+                return String(policy.clientId) === String(client.id);
+            }
 
-            // Check if the insured name matches
+            // No clientId — use fallback matching for legacy/manual policies
+
+            // 2. Match by identity key (owner name + DOB from contact)
+            const polOwner = policy.contact?.['Owner Name'] || policy.insuredName || '';
+            const polDob   = policy.contact?.['Date of Birth'] || '';
+            const polKey   = _clientIdentityKey(polOwner, polDob);
+            if (clientKey && polKey && polKey === clientKey) return true;
+
+            // 3. Fallback: insured name match (legacy policies without contact.Owner Name)
             const insuredName = policy.insured?.['Name/Business Name'] ||
                                policy.insured?.['Primary Named Insured'] ||
-                               policy.insuredName;
+                               policy.insured?.['Full Name'] ||
+                               policy.insured?.['Business Name'] ||
+                               policy.insuredName ||
+                               policy.clientName;
             if (insuredName && client.name && insuredName.toLowerCase() === client.name.toLowerCase()) return true;
+            // 4. Fuzzy identity key on insuredName/clientName (handles cases where contact.Owner Name is missing)
+            if (insuredName) {
+                const polKeyFallback = _clientIdentityKey(insuredName, '');
+                if (clientKey && polKeyFallback && polKeyFallback === clientKey) return true;
+            }
+            // 5. Business name match: commercial policy's business name matches client's businessName
+            const polBizName = policy.contact?.['Business Name'] ||
+                               (policy.insured?.['Entity Type'] === 'Commercial' ? (policy.insuredName || '') : '');
+            if (polBizName && client.businessName) {
+                const polBizKey    = _clientIdentityKey(polBizName, '');
+                const clientBizKey = _clientIdentityKey(client.businessName, '');
+                if (polBizKey && clientBizKey && polBizKey === clientBizKey) return true;
+            }
 
-            // DO NOT check client.policies array as it may be outdated
-            // Only use the fresh data from insurance_policies storage
             return false;
         });
 
@@ -10760,6 +10978,9 @@ async function loadClientsView() {
                 <div class="header-actions">
                     <button class="btn-secondary" onclick="importClients()">
                         <i class="fas fa-upload"></i> Import
+                    </button>
+                    <button class="btn-secondary" onclick="showIvansUpload()" style="background:#e0f2fe;color:#0369a1;border-color:#7dd3fc;" title="Import IVANS Download Files">
+                        <i class="fas fa-cloud-download-alt"></i> IVANS
                     </button>
                     <button class="btn-primary" onclick="showNewClient()">
                         <i class="fas fa-plus"></i> New Client
@@ -11239,6 +11460,9 @@ function loadPoliciesView() {
                     <button class="btn-secondary" onclick="exportPolicies()">
                         <i class="fas fa-download"></i> Export
                     </button>
+                    <button class="btn-secondary" onclick="showIvansUpload()" style="background:#e0f2fe;color:#0369a1;border-color:#7dd3fc;" title="Import IVANS Download Files">
+                        <i class="fas fa-cloud-download-alt"></i> IVANS
+                    </button>
                     <button class="btn-primary" onclick="showNewPolicy()">
                         <i class="fas fa-plus"></i> New Policy
                     </button>
@@ -11517,53 +11741,64 @@ function loadRenewalsView() {
         }
     }
 
+    // Agency → agent mapping (same as Carriers tab)
+    const RENEWAL_AGENCY_AGENTS = {
+        'Vanguard': ['grant', 'hunter', 'carson'],
+        'United': ['maureen'],
+        'ALL': null
+    };
+
+    const _isMaureenRen = currentUser && currentUser.toLowerCase() === 'maureen';
+
     // Filter policies and clients based on user role - SPECIAL CASE: Maureen gets filtered even though she's admin
-    if (currentUser && currentUser.toLowerCase() === 'maureen') {
+    if (_isMaureenRen) {
         // MAUREEN SPECIAL CASE: Filter to only her renewals despite admin status
         const originalPolicyCount = allPolicies.length;
         const originalClientCount = clients.length;
 
-        // Filter policies by assigned user
         allPolicies = allPolicies.filter(policy => {
-            const assignedTo = policy.assignedTo ||
-                              policy.agent ||
-                              policy.assignedAgent ||
-                              policy.producer ||
-                              'Grant'; // Default to Grant if no assignment
-            return assignedTo.toLowerCase() === 'maureen';
+            const assignedTo = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || '').toLowerCase();
+            return assignedTo.includes('maureen');
         });
-
-        // Filter clients by assigned user
         clients = clients.filter(client => {
-            const assignedTo = client.assignedTo || client.agent || 'Grant';
-            return assignedTo.toLowerCase() === 'maureen';
+            const assignedTo = (client.assignedTo || client.agent || '').toLowerCase();
+            return assignedTo.includes('maureen');
         });
 
-        console.log(`🔒 Maureen special renewals filter: Policies ${originalPolicyCount} -> ${allPolicies.length}, Clients ${originalClientCount} -> ${clients.length} (showing only Maureen's renewals)`);
+        console.log(`🔒 Maureen special renewals filter: Policies ${originalPolicyCount} -> ${allPolicies.length}, Clients ${originalClientCount} -> ${clients.length}`);
     } else if (!isAdmin && currentUser) {
         // Regular non-admin filtering
         const originalPolicyCount = allPolicies.length;
         const originalClientCount = clients.length;
 
-        // Filter policies by assigned user
         allPolicies = allPolicies.filter(policy => {
-            const assignedTo = policy.assignedTo ||
-                              policy.agent ||
-                              policy.assignedAgent ||
-                              policy.producer ||
-                              'Grant'; // Default to Grant if no assignment
-            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+            const assignedTo = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || '').toLowerCase();
+            return assignedTo === currentUser.toLowerCase();
         });
-
-        // Filter clients by assigned user
         clients = clients.filter(client => {
-            const assignedTo = client.assignedTo || client.agent || 'Grant';
-            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+            const assignedTo = (client.assignedTo || client.agent || '').toLowerCase();
+            return assignedTo === currentUser.toLowerCase();
         });
 
         console.log(`🔒 Renewals filtered: Policies ${originalPolicyCount} -> ${allPolicies.length}, Clients ${originalClientCount} -> ${clients.length} (showing only ${currentUser}'s)`);
-    } else if (isAdmin && currentUser && currentUser.toLowerCase() !== 'maureen') {
-        console.log(`👑 Renewals: Admin user (${currentUser}) - showing all ${allPolicies.length} policies and ${clients.length} clients`);
+    } else if (isAdmin && !_isMaureenRen) {
+        // Admin (Grant): apply agency dropdown filter
+        const _renewalAgency = window._renewalAgencyFilter || 'ALL';
+        const _agentSet = RENEWAL_AGENCY_AGENTS[_renewalAgency];
+        if (_agentSet) {
+            const before = allPolicies.length;
+            allPolicies = allPolicies.filter(policy => {
+                const a = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || '').toLowerCase();
+                return _agentSet.some(name => a.includes(name));
+            });
+            clients = clients.filter(client => {
+                const a = (client.assignedTo || client.agent || '').toLowerCase();
+                return _agentSet.some(name => a.includes(name));
+            });
+            console.log(`🏢 Renewals agency filter (${_renewalAgency}): ${before} -> ${allPolicies.length} policies`);
+        } else {
+            console.log(`👑 Renewals: Admin user (${currentUser}) - showing all ${allPolicies.length} policies (ALL agencies)`);
+        }
     }
 
     // Process policies for renewals
@@ -11588,6 +11823,12 @@ function loadRenewalsView() {
                             <i class="fas fa-calendar"></i> Year View
                         </button>
                     </div>
+                    ${!_isMaureenRen ? `
+                    <select onchange="window._renewalAgencyFilter=this.value;loadRenewalsView()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;margin-right:8px;">
+                        <option value="ALL" ${(window._renewalAgencyFilter||'ALL')==='ALL'?'selected':''}>All Agencies</option>
+                        <option value="Vanguard" ${window._renewalAgencyFilter==='Vanguard'?'selected':''}>Vanguard</option>
+                        <option value="United" ${window._renewalAgencyFilter==='United'?'selected':''}>United</option>
+                    </select>` : ''}
                     <button class="btn-primary" onclick="exportRenewals()">
                         <i class="fas fa-download"></i> Export
                     </button>
@@ -11969,6 +12210,8 @@ function showRenewalProfile(policyId) {
     // Show profile and adjust layout
     listContainer.style.width = '40%';
     renewalProfile.style.display = 'block';
+    const renewalStats = document.querySelector('.renewal-stats');
+    if (renewalStats) renewalStats.style.display = 'none';
     renewalProfile.innerHTML = `
         <div class="profile-header">
             <h2>Renewal Profile</h2>
@@ -11977,55 +12220,19 @@ function showRenewalProfile(policyId) {
             </button>
         </div>
         
-        <div class="profile-layout">
-            <div class="policy-info-panel">
-                <h3>Policy Information</h3>
-                <div class="info-group">
-                    <label>Client:</label>
-                    <span>${policy.client}</span>
-                </div>
-                <div class="info-group">
-                    <label>Policy #:</label>
-                    <span>${policy.policyNumber}</span>
-                </div>
-                <div class="info-group">
-                    <label>Type:</label>
-                    <span>${policy.type}</span>
-                </div>
-                <div class="info-group">
-                    <label>Carrier:</label>
-                    <span>${policy.carrier}</span>
-                </div>
-                <div class="info-group">
-                    <label>Premium:</label>
-                    <span>$${policy.premium.toLocaleString()}/yr</span>
-                </div>
-                <div class="info-group">
-                    <label>Effective:</label>
-                    <span>${formatDate(policy.effectiveDate)}</span>
-                </div>
-                <div class="info-group">
-                    <label>Expiration:</label>
-                    <span>${formatDate(policy.expirationDate)}</span>
-                </div>
-                <div class="info-group">
-                    <label>Agent:</label>
-                    <span>${policy.agent}</span>
-                </div>
-                <div class="info-group">
-                    <label>Contact:</label>
-                    <span>${policy.phone}</span>
-                    <span>${policy.email}</span>
-                </div>
-            </div>
-            
-            <div class="profile-main-content">
-                <div class="profile-tabs">
-                    <button class="profile-tab active" onclick="switchProfileTab('tasks')">
-                        <i class="fas fa-tasks"></i> Tasks
-                    </button>
-                    <button class="profile-tab" onclick="switchProfileTab('submissions')">
-                        <i class="fas fa-file-alt"></i> Submissions
+        <div class="profile-layout" style="display: block;">
+            <div class="profile-main-content" style="width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="profile-tabs">
+                        <button class="profile-tab active" onclick="switchProfileTab('tasks')">
+                            <i class="fas fa-tasks"></i> Tasks
+                        </button>
+                        <button class="profile-tab" onclick="switchProfileTab('submissions')">
+                            <i class="fas fa-file-alt"></i> Submissions
+                        </button>
+                    </div>
+                    <button onclick="viewPolicy('${policyId}')" style="background: #3b82f6; color: white; border: none; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap;">
+                        <i class="fas fa-external-link-alt"></i> View Policy
                     </button>
                 </div>
                 <div id="profileTabContent" class="tab-content">
@@ -12062,11 +12269,13 @@ function renderTasksTab() {
         { id: 5, task: 'Create Applications', completed: false, completedAt: '', notes: 'Make sure he fills out a supplemental' },
         { id: 6, task: 'Create Proposal', completed: false, completedAt: '', notes: '' },
         { id: 7, task: 'Send Proposal', completed: false, completedAt: '', notes: '' },
-        { id: 8, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
-        { id: 9, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
-        { id: 10, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
+        { id: 8, task: 'Request Finance Agreement', completed: false, completedAt: '', notes: '' },
+        { id: 9, task: 'Finance Agreement Received', completed: false, completedAt: '', notes: '' },
+        { id: 10, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
+        { id: 11, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
+        { id: 12, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
     ];
-    
+
     let tasks = savedTasks || defaultTasks;
 
     // Check if current policy has completed renewal from server or localStorage
@@ -12087,8 +12296,8 @@ function renderTasksTab() {
         isRenewalCompleted = localStorage.getItem(`renewal_completed_${currentPolicyId}`) === 'true';
     }
 
-    // Update task 10 (Finalize Renewal) based on completion status
-    const finalizeTaskIndex = tasks.findIndex(t => t.id === 10);
+    // Update task 12 (Finalize Renewal) based on completion status
+    const finalizeTaskIndex = tasks.findIndex(t => t.id === 12);
     if (finalizeTaskIndex !== -1 && isRenewalCompleted) {
         tasks[finalizeTaskIndex].completed = true;
         if (!tasks[finalizeTaskIndex].completedAt) {
@@ -12142,167 +12351,146 @@ function renderTasksTab() {
 }
 
 function renderSubmissionsTab() {
-    // Get saved submissions from localStorage
-    const savedSubmissions = JSON.parse(localStorage.getItem('renewalSubmissions') || '[]');
-    
+    const currentPolicyId = getCurrentPolicyId();
+    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const rawPolicy = allPolicies.find(p => p.id === currentPolicyId) || {};
+    const clientId = rawPolicy.clientId || rawPolicy._clientId || currentPolicyId;
+
+    // Load saved quote premiums for this policy
+    const savedQuotes = JSON.parse(localStorage.getItem(`renewalQuotes_${currentPolicyId}`) || '{}');
+    const progressivePremium = savedQuotes.progressive || '';
+    const geicoPremium = savedQuotes.geico || '';
+
+    // Current policy premium for comparison
+    const currentPremiumRaw = rawPolicy.premium || rawPolicy.annualPremium || '';
+    const currentPremiumVal = parseFloat(currentPremiumRaw.toString().replace(/[^0-9.]/g, '')) || 0;
+
+    // Returns card border style based on quote vs current premium
+    function quoteBorder(val) {
+        const n = parseFloat((val + '').replace(/[^0-9.]/g, ''));
+        if (!val || isNaN(n) || currentPremiumVal === 0) return '2px solid #e5e7eb';
+        if (n > currentPremiumVal) return '2px solid #ef4444';
+        if (n < currentPremiumVal) return '2px solid #10b981';
+        return '2px solid #e5e7eb';
+    }
+    function quoteBg(val) {
+        const n = parseFloat((val + '').replace(/[^0-9.]/g, ''));
+        if (!val || isNaN(n) || currentPremiumVal === 0) return 'white';
+        if (n > currentPremiumVal) return '#fff5f5';
+        if (n < currentPremiumVal) return '#f0fff4';
+        return 'white';
+    }
+
     return `
-        <div class="submissions-tab">
-            <div id="submissionsList">
-                <div class="submissions-header">
-                    <h3>Quote Submissions</h3>
-                    <button class="btn-primary" onclick="showAddSubmissionForm()">
-                        <i class="fas fa-plus"></i> Add New Quote
+        <div class="submissions-tab" style="padding: 5px 0;">
+
+            <!-- Quote Submissions -->
+            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #e5e7eb;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #111827; font-size: 15px; font-weight: 600;">
+                        <i class="fas fa-file-alt" style="color: #0066cc; margin-right: 6px;"></i> Quote Submissions
+                    </h3>
+                    ${currentPremiumVal > 0 ? `<span style="font-size: 12px; color: #6b7280;">Current premium: <strong style="color: #111827;">$${currentPremiumVal.toLocaleString()}</strong></span>` : ''}
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div data-quote-card="progressive-${currentPolicyId}" style="background: ${quoteBg(progressivePremium)}; padding: 15px; border-radius: 8px; border: ${quoteBorder(progressivePremium)}; transition: border 0.2s, background 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <div style="width: 32px; height: 32px; background: #0066cc; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <i class="fas fa-car" style="color: white; font-size: 13px;"></i>
+                            </div>
+                            <span style="font-weight: 600; color: #111827; font-size: 14px;">Progressive</span>
+                        </div>
+                        <label style="font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Annual Premium</label>
+                        <input type="text" id="quote-progressive-${currentPolicyId}"
+                               value="${progressivePremium}"
+                               placeholder="$0.00"
+                               style="width: 100%; margin-top: 5px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;"
+                               oninput="window._updateQuoteCardColor(this, ${currentPremiumVal})"
+                               onblur="saveRenewalQuote('${currentPolicyId}', 'progressive', this.value)">
+                    </div>
+                    <div data-quote-card="geico-${currentPolicyId}" style="background: ${quoteBg(geicoPremium)}; padding: 15px; border-radius: 8px; border: ${quoteBorder(geicoPremium)}; transition: border 0.2s, background 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <div style="width: 32px; height: 32px; background: #00a651; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <i class="fas fa-shield-alt" style="color: white; font-size: 13px;"></i>
+                            </div>
+                            <span style="font-weight: 600; color: #111827; font-size: 14px;">GEICO</span>
+                        </div>
+                        <label style="font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Annual Premium</label>
+                        <input type="text" id="quote-geico-${currentPolicyId}"
+                               value="${geicoPremium}"
+                               placeholder="$0.00"
+                               style="width: 100%; margin-top: 5px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;"
+                               oninput="window._updateQuoteCardColor(this, ${currentPremiumVal})"
+                               onblur="saveRenewalQuote('${currentPolicyId}', 'geico', this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Application Submissions -->
+            <div style="background: #f0f9f0; padding: 20px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #d1fae5;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827;">
+                        <i class="fas fa-file-signature" style="margin-right: 6px;"></i> Application Submissions
+                    </h3>
+                    <button style="background: #10b981; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;"
+                            onclick="window._openRenewalQuoteApp ? window._openRenewalQuoteApp('${currentPolicyId}','${clientId}') : createQuoteApplicationForPolicy('${currentPolicyId}')">
+                        <i class="fas fa-file-alt"></i> Quote Application
                     </button>
                 </div>
-                
-                ${savedSubmissions.length > 0 ? `
-                    <div class="submissions-list">
-                        ${savedSubmissions.map((submission, index) => `
-                            <div class="submission-item">
-                                <div class="submission-info">
-                                    <h4>${submission.carrier} - ${submission.type}</h4>
-                                    <div class="submission-details-row">
-                                        <span><strong>Quote #:</strong> ${submission.quoteNumber}</span>
-                                        <span><strong>Premium:</strong> $${submission.premium}/yr</span>
-                                        <span><strong>Deductible:</strong> $${submission.deductible}</span>
-                                        <span><strong>Coverage:</strong> ${submission.coverage}</span>
-                                    </div>
-                                    <div class="submission-meta">
-                                        <span><i class="fas fa-calendar"></i> Submitted: ${new Date().toLocaleDateString()}</span>
-                                        <span class="quote-status received">Quote Received</span>
-                                    </div>
-                                </div>
-                                <div class="submission-actions">
-                                    <button class="btn-icon" title="View Quote"><i class="fas fa-eye"></i></button>
-                                    <button class="btn-icon" title="Download"><i class="fas fa-download"></i></button>
-                                    <button class="btn-icon" onclick="removeSubmission(${index})" title="Delete"><i class="fas fa-trash"></i></button>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : `
-                    <div class="empty-submissions">
-                        <i class="fas fa-file-invoice" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
-                        <p style="color: #666;">No quote submissions yet</p>
-                        <p style="color: #999; font-size: 14px;">Click "Add New Quote" to create your first submission</p>
-                    </div>
-                `}
-                
-                <div class="comparison-section">
-                    <h4>Quote Comparison</h4>
-                    ${savedSubmissions.length > 0 ? `
-                        <table class="comparison-table">
-                            <thead>
-                                <tr>
-                                    <th>Carrier</th>
-                                    <th>Policy Type</th>
-                                    <th>Premium</th>
-                                    <th>Deductible</th>
-                                    <th>Coverage</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${savedSubmissions.map((submission, index) => `
-                                    <tr>
-                                        <td><strong>${submission.carrier}</strong></td>
-                                        <td>${submission.type}</td>
-                                        <td class="premium-cell">$${submission.premium}</td>
-                                        <td>$${submission.deductible}</td>
-                                        <td>${submission.coverage}</td>
-                                        <td><button class="btn-small ${index === 0 ? 'btn-success' : ''}" onclick="selectQuote(${index})">Select</button></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    ` : `
-                        <p style="text-align: center; color: #666; padding: 20px;">Add multiple quotes to compare them side by side</p>
-                    `}
+                <div id="application-submissions-container-${clientId}" data-loading="false">
+                    ${(function(){
+                        if (window._renewalContainerMap) window._renewalContainerMap[currentPolicyId] = clientId;
+                        var policyLeadId = 'policy_' + currentPolicyId;
+                        var aliasId = 'application-submissions-container-' + policyLeadId;
+                        setTimeout(function() {
+                            var alias = document.getElementById(aliasId);
+                            if (alias && window.showApplicationSubmissions) window.showApplicationSubmissions(policyLeadId);
+                        }, 100);
+                        return '<div id="' + aliasId + '" style="width:100%;"><p style="color:#9ca3af;text-align:center;padding:20px;margin:0;">Loading...</p></div>';
+                    })()}
                 </div>
             </div>
-            
-            <div id="submissionForm" class="submission-form" style="display: none;">
-                <div class="form-card">
-                    <div class="form-header">
-                        <button class="back-btn" onclick="hideAddSubmissionForm()" title="Back to Submissions">
-                            <i class="fas fa-arrow-left"></i>
+
+            <!-- Loss Runs & Documentation -->
+            <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #fde68a;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827;">
+                        <i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Loss Runs and Other Documentation
+                    </h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="window._openRenewalEmailDocumentation ? window._openRenewalEmailDocumentation('${currentPolicyId}','${clientId}') : checkFilesAndOpenEmail('${clientId}')"
+                                style="background: #0066cc; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            <i class="fas fa-envelope"></i> Email Documentation
                         </button>
-                        <h4>Add New Quote Submission</h4>
-                    </div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Insurance Company</label>
-                            <select class="form-control" id="submissionCarrier">
-                                <option value="">Select Carrier</option>
-                                <option value="Progressive">Progressive</option>
-                                <option value="State Farm">State Farm</option>
-                                <option value="Hartford">Hartford</option>
-                                <option value="Travelers">Travelers</option>
-                                <option value="Liberty Mutual">Liberty Mutual</option>
-                                <option value="Nationwide">Nationwide</option>
-                                <option value="Allstate">Allstate</option>
-                                <option value="GEICO">GEICO</option>
-                                <option value="Farmers">Farmers</option>
-                                <option value="USAA">USAA</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Policy Type</label>
-                            <select class="form-control" id="submissionType">
-                                <option value="">Select Type</option>
-                                <option value="Commercial Auto">Commercial Auto</option>
-                                <option value="General Liability">General Liability</option>
-                                <option value="Workers Comp">Workers Compensation</option>
-                                <option value="Property">Commercial Property</option>
-                                <option value="Umbrella">Commercial Umbrella</option>
-                                <option value="Professional">Professional Liability</option>
-                                <option value="Cyber">Cyber Liability</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Annual Premium <span style="color: red;">*</span></label>
-                            <input type="text" class="form-control" id="submissionPremium" placeholder="$0.00" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Deductible</label>
-                            <input type="text" class="form-control" id="submissionDeductible" placeholder="$0.00">
-                        </div>
-                        <div class="form-group">
-                            <label>Coverage Limit</label>
-                            <input type="text" class="form-control" id="submissionLimit" placeholder="e.g., $1M/$2M">
-                        </div>
-                        <div class="form-group">
-                            <label>Quote Number</label>
-                            <input type="text" class="form-control" id="submissionQuoteNum" placeholder="Quote #">
-                        </div>
-                    </div>
-                    
-                    <div class="upload-section">
-                        <label>Upload Quote Document</label>
-                        <div class="upload-area" onclick="document.getElementById('quoteFile').click()">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Click to upload or drag and drop</p>
-                            <span>PDF, DOC, DOCX (Max 10MB)</span>
-                            <input type="file" id="quoteFile" style="display: none;" accept=".pdf,.doc,.docx" onchange="handleQuoteUpload(this)">
-                        </div>
-                        <div id="uploadedFile" class="uploaded-file" style="display: none;">
-                            <i class="fas fa-file-pdf"></i>
-                            <span id="fileName"></span>
-                            <button onclick="removeUploadedFile()" class="remove-file">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button class="btn-secondary" onclick="hideAddSubmissionForm()">Cancel</button>
-                        <button class="btn-primary" onclick="saveSubmission()">Save Quote</button>
+                        <button onclick="openLossRunsUpload('${clientId}')"
+                                style="background: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            <i class="fas fa-upload"></i> Upload Documentation
+                        </button>
                     </div>
                 </div>
+                <div id="loss-runs-container-${clientId}">
+                    ${(function(){
+                        var cid = clientId;
+                        setTimeout(function() {
+                            if (typeof protectedFunctions !== 'undefined' && protectedFunctions.loadLossRuns) {
+                                protectedFunctions.loadLossRuns(cid);
+                            }
+                        }, 150);
+                        return '<p style="color:#9ca3af;text-align:center;padding:20px;margin:0;">Loading...</p>';
+                    })()}
+                </div>
             </div>
+
         </div>
     `;
 }
+
+window.saveRenewalQuote = function(policyId, carrier, value) {
+    const storageKey = `renewalQuotes_${policyId}`;
+    const quotes = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    quotes[carrier] = value;
+    localStorage.setItem(storageKey, JSON.stringify(quotes));
+};
 
 function switchRenewalView(view) {
     currentRenewalView = view;
@@ -12336,7 +12524,9 @@ function closeRenewalProfile() {
     if (renewalProfile) {
         renewalProfile.style.display = 'none';
         listContainer.style.width = '100%';
-        
+        const renewalStats = document.querySelector('.renewal-stats');
+        if (renewalStats) renewalStats.style.display = '';
+
         // Clear selection
         selectedRenewalPolicyId = null;
         document.querySelectorAll('.renewal-card.selected, .mini-policy.selected').forEach(card => {
@@ -12375,9 +12565,11 @@ function toggleTask(taskId, policyId) {
             { id: 5, task: 'Create Applications', completed: false, completedAt: '', notes: 'Make sure he fills out a supplemental' },
             { id: 6, task: 'Create Proposal', completed: false, completedAt: '', notes: '' },
             { id: 7, task: 'Send Proposal', completed: false, completedAt: '', notes: '' },
-            { id: 8, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
-            { id: 9, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
-            { id: 10, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
+            { id: 8, task: 'Request Finance Agreement', completed: false, completedAt: '', notes: '' },
+            { id: 9, task: 'Finance Agreement Received', completed: false, completedAt: '', notes: '' },
+            { id: 10, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
+            { id: 11, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
+            { id: 12, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
         ];
 
         const task = defaultTasks.find(t => t.id === taskId);
@@ -12392,10 +12584,10 @@ function toggleTask(taskId, policyId) {
         localStorage.setItem(storageKey, JSON.stringify(tasks));
     }
 
-    // Check if "Finalize Renewal" task (ID 10) was completed
-    if (taskId === 10) {
+    // Check if "Finalize Renewal" task (ID 12) was completed
+    if (taskId === 12) {
         const currentTasks = JSON.parse(localStorage.getItem(`renewalTasks_${policyId}`) || '[]');
-        const finalizeTask = currentTasks.find(t => t.id === 10);
+        const finalizeTask = currentTasks.find(t => t.id === 12);
 
         if (finalizeTask && finalizeTask.completed) {
             // Add green highlighting to the current policy
@@ -12649,12 +12841,14 @@ function saveTaskNote(taskId, note, policyId) {
             { id: 5, task: 'Create Applications', completed: false, completedAt: '', notes: 'Make sure he fills out a supplemental' },
             { id: 6, task: 'Create Proposal', completed: false, completedAt: '', notes: '' },
             { id: 7, task: 'Send Proposal', completed: false, completedAt: '', notes: '' },
-            { id: 8, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
-            { id: 9, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
-            { id: 10, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
+            { id: 8, task: 'Request Finance Agreement', completed: false, completedAt: '', notes: '' },
+            { id: 9, task: 'Finance Agreement Received', completed: false, completedAt: '', notes: '' },
+            { id: 10, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
+            { id: 11, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
+            { id: 12, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
         ];
     }
-    
+
     const taskIndex = tasks.findIndex(t => t.id === taskId);
     if (taskIndex !== -1) {
         tasks[taskIndex].notes = note;
@@ -12689,9 +12883,11 @@ function addRenewalTask() {
                 { id: 5, task: 'Create Applications', completed: false, completedAt: '', notes: 'Make sure he fills out a supplemental' },
                 { id: 6, task: 'Create Proposal', completed: false, completedAt: '', notes: '' },
                 { id: 7, task: 'Send Proposal', completed: false, completedAt: '', notes: '' },
-                { id: 8, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
-                { id: 9, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
-                { id: 10, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
+                { id: 8, task: 'Request Finance Agreement', completed: false, completedAt: '', notes: '' },
+                { id: 9, task: 'Finance Agreement Received', completed: false, completedAt: '', notes: '' },
+                { id: 10, task: 'Signed Docs Received', completed: false, completedAt: '', notes: '' },
+                { id: 11, task: 'Bind Order', completed: false, completedAt: '', notes: '' },
+                { id: 12, task: 'Finalize Renewal', completed: false, completedAt: '', notes: 'Accounting / Send Thank You Card / Finance' }
             ];
         }
         
@@ -13891,20 +14087,21 @@ async function loadAccountingView() {
 
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
     const isAdmin = typeof isCurrentUserAdmin === 'function' ? isCurrentUserAdmin() : (currentUser.role === 'admin');
+    const _acctOwner = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || 'grant').toLowerCase();
 
     container.innerHTML = `<div style="padding:32px;text-align:center;color:#6b7280;"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Loading financial data…</div>`;
 
     try {
         const year = _acct.txYear;
         const [summaryRes, plaidRes, txRes, plRes, cfRes, invRes, ctrRes, taxRes, cpRes, budRes] = await Promise.allSettled([
-            fetch(`/api/accounting/summary`),
+            fetch(`/api/accounting/summary?owner=${_acctOwner}`),
             fetch(`/api/plaid/status`),
-            fetch(`/api/finance/transactions?year=${year}`),
-            fetch(`/api/finance/pl?year=${year}`),
-            fetch(`/api/finance/cashflow?year=${year}`),
+            fetch(`/api/finance/transactions?year=${year}&owner=${_acctOwner}`),
+            fetch(`/api/finance/pl?year=${year}&owner=${_acctOwner}`),
+            fetch(`/api/finance/cashflow?year=${year}&owner=${_acctOwner}`),
             fetch(`/api/finance/invoices`),
             fetch(`/api/finance/contractors`),
-            fetch(`/api/finance/tax-summary?year=${year}`),
+            fetch(`/api/finance/tax-summary?year=${year}&owner=${_acctOwner}`),
             fetch(`/api/finance/client-profitability?year=${year}`),
             fetch(`/api/finance/budget?year=${year}`)
         ]);
@@ -13985,6 +14182,14 @@ function _acctRenderFull(container, isAdmin, currentUser) {
     _acctInjectStyles();
 }
 
+function acctDrillMonth(monthNum, type) {
+    _acct._txMonthFilter = monthNum;
+    _acct._txTypeFilter  = type;
+    _acct._txCatFilter   = '';
+    _acct._txSearch      = '';
+    acctTab('transactions');
+}
+
 function acctTab(tab) {
     _acct.activeTab = tab;
     const body = document.getElementById('acct-body');
@@ -13997,6 +14202,10 @@ function acctTab(tab) {
     document.querySelectorAll('.acct-tab').forEach(b => {
         b.classList.toggle('active', b.getAttribute('onclick') === `acctTab('${tab}')`);
     });
+    // Render chart if transactions tab is in chart view mode
+    if (tab === 'transactions' && (_acct._txViewMode === 'chart')) {
+        setTimeout(() => { if (typeof acctRedrawChart === 'function') acctRedrawChart(); }, 50);
+    }
 }
 
 function _acctTabContent(tab, isAdmin) {
@@ -14168,16 +14377,16 @@ function _acctPLHTML() {
     <thead><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">% of Rev</th></tr></thead>
     <tbody>
       <tr class="pl-section"><td colspan="3"><strong>INCOME</strong></td></tr>
-      ${income.length ? income.map(i => plRow(i.category, i.total, '', 16)).join('') : '<tr><td colspan="3" style="padding-left:16px;color:#9ca3af">No income recorded — upload transactions</td></tr>'}
+      ${income.length ? income.map(i => plRow(i.category, i.amount||i.total, '', 16)).join('') : '<tr><td colspan="3" style="padding-left:16px;color:#9ca3af">No income recorded — upload transactions</td></tr>'}
       ${plRow('Total Revenue', totalRev, 'pl-total', 0)}
 
       <tr class="pl-section"><td colspan="3"><strong>COST OF REVENUE (Agent Commissions Paid)</strong></td></tr>
-      ${cor.length ? cor.map(c => plRow(c.category || c.agent, c.total, '', 16)).join('') : '<tr><td colspan="3" style="padding-left:16px;color:#9ca3af">No agent commission payouts recorded</td></tr>'}
+      ${cor.length ? cor.map(c => plRow(c.category || c.agent, -(c.amount||c.total||0), '', 16)).join('') : '<tr><td colspan="3" style="padding-left:16px;color:#9ca3af">No agent commission payouts recorded</td></tr>'}
       ${plRow('Gross Profit', grossProfit, 'pl-total', 0)}
 
       <tr class="pl-section"><td colspan="3"><strong>OPERATING EXPENSES</strong></td></tr>
-      ${expenses.length ? expenses.map(e => plRow(e.category, e.total, '', 16)).join('') : '<tr><td colspan="3" style="padding-left:16px;color:#9ca3af">No expenses recorded — upload transactions</td></tr>'}
-      ${plRow('Total Expenses', totals.totalExpenses||0, 'pl-total', 0)}
+      ${expenses.length ? expenses.map(e => plRow(e.category, -(e.amount||e.total||0), '', 16)).join('') : '<tr><td colspan="3" style="padding-left:16px;color:#9ca3af">No expenses recorded — upload transactions</td></tr>'}
+      ${plRow('Total Expenses', -(totals.totalExpenses||0), 'pl-total', 0)}
 
       <tr class="pl-final ${netIncome >= 0 ? 'pl-profit' : 'pl-loss'}">
         <td><strong>NET INCOME</strong></td>
@@ -14193,8 +14402,8 @@ function _acctPLHTML() {
       <thead><tr><th>Month</th><th style="text-align:right">Income</th><th style="text-align:right">Expenses</th><th style="text-align:right">Net</th></tr></thead>
       <tbody>${(pl.monthly||[]).map(m=>`<tr>
         <td>${m.label}</td>
-        <td style="text-align:right;color:#16a34a">${fmtDollar(m.income)}</td>
-        <td style="text-align:right;color:#ef4444">${fmtDollar(m.expenses)}</td>
+        <td style="text-align:right;color:#16a34a">${m.income>0?`<span style="display:inline-flex;align-items:center;gap:4px;">${fmtDollar(m.income)}<button onclick="acctDrillMonth(${m.month},'income')" title="View ${m.label} income transactions" style="background:none;border:none;cursor:pointer;color:#16a34a;padding:0;line-height:1;font-size:.75rem;"><i class="fas fa-arrow-right"></i></button></span>`:fmtDollar(m.income)}</td>
+        <td style="text-align:right;color:#ef4444">${m.expenses>0?`<span style="display:inline-flex;align-items:center;gap:4px;">${fmtDollar(m.expenses)}<button onclick="acctDrillMonth(${m.month},'expense')" title="View ${m.label} expense transactions" style="background:none;border:none;cursor:pointer;color:#ef4444;padding:0;line-height:1;font-size:.75rem;"><i class="fas fa-arrow-right"></i></button></span>`:fmtDollar(m.expenses)}</td>
         <td style="text-align:right;font-weight:600;color:${m.net>=0?'#16a34a':'#ef4444'}">${fmtDollar(m.net)}</td>
       </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#9ca3af">No data</td></tr>'}</tbody>
     </table>
@@ -14205,26 +14414,96 @@ function _acctPLHTML() {
 // ── TRANSACTIONS TAB ─────────────────────────────────────────
 function _acctTransactionsHTML(isAdmin) {
     const txs = _acct.transactions || [];
-    const sorted = [...txs].sort((a,b) => new Date(b.date) - new Date(a.date));
+    const MONTH_LABELS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
     const categories = [...new Set(txs.map(t => t.category).filter(Boolean))].sort();
     const catFilter = _acct._txCatFilter || '';
     const typeFilter = _acct._txTypeFilter || '';
+    const monthFilter = _acct._txMonthFilter || 0;
     const searchFilter = (_acct._txSearch || '').toLowerCase();
+    const sortMode = _acct._txSort || 'date';
+    const viewMode = _acct._txViewMode || 'list';
+    const chartType = _acct._chartType || 'donut';
 
-    let filtered = sorted;
+    if (!_acct._chartHiddenCats) _acct._chartHiddenCats = new Set();
+
+    // Sort base list
+    let base = [...txs];
+    if (sortMode === 'amount_desc') base.sort((a,b) => Math.abs(b.amount) - Math.abs(a.amount));
+    else if (sortMode === 'amount_asc') base.sort((a,b) => Math.abs(a.amount) - Math.abs(b.amount));
+    else base.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    let filtered = base;
+    if (monthFilter) filtered = filtered.filter(t => t.date && parseInt(t.date.substring(5,7)) === monthFilter);
     if (catFilter) filtered = filtered.filter(t => t.category === catFilter);
     if (typeFilter === 'income') filtered = filtered.filter(t => t.amount > 0);
     if (typeFilter === 'expense') filtered = filtered.filter(t => t.amount < 0);
     if (searchFilter) filtered = filtered.filter(t => (t.description || '').toLowerCase().includes(searchFilter) || (t.category || '').toLowerCase().includes(searchFilter));
 
-    const totalIn = txs.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
-    const totalOut = txs.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0);
+    const totalIn  = filtered.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+    const totalOut = filtered.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0);
+
+    // Build chart data
+    const catTotals = {};
+    if (typeFilter === 'income') {
+        filtered.filter(t => t.amount > 0).forEach(t => {
+            const c = t.category || 'OTHER';
+            catTotals[c] = (catTotals[c] || 0) + t.amount;
+        });
+    } else {
+        filtered.filter(t => t.amount < 0 && !(t.category||'').toUpperCase().includes('INCOME')).forEach(t => {
+            const c = t.category || 'OTHER';
+            catTotals[c] = (catTotals[c] || 0) + Math.abs(t.amount);
+        });
+    }
+    const catSorted = Object.entries(catTotals).sort((a,b) => b[1]-a[1]);
+    const CHART_COLORS = ['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0891b2','#be185d','#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6'];
+    const totalExpense = Math.abs(totalOut) || 1;
+    const _mIn = new Array(12).fill(0), _mOut = new Array(12).fill(0);
+    filtered.forEach(t => {
+        if (!t.date) return;
+        const mi = parseInt(t.date.substring(5,7)) - 1;
+        if (mi >= 0 && mi < 12) { if (t.amount > 0) _mIn[mi] += t.amount; else _mOut[mi] += Math.abs(t.amount); }
+    });
+    _acct._chartData = { catSorted, CHART_COLORS, totalExpense, monthlyIn: _mIn, monthlyOut: _mOut };
+
+    // Month pill label
+    const currentYear = new Date().getFullYear();
+    const monthPill = monthFilter ? `<span class="acct-month-pill"><i class="fas fa-calendar-alt"></i> ${MONTH_LABELS[monthFilter]} ${currentYear}${typeFilter ? ' · ' + typeFilter : ''} <button onclick="_acct._txMonthFilter=null;_acct._txTypeFilter='';acctTab('transactions')" title="Clear month filter">×</button></span>` : '';
+
+    // Chart type buttons
+    const chartTypes = [
+        {id:'bar', icon:'fa-grip-horizontal', label:'Bar'},
+        {id:'donut', icon:'fa-chart-pie', label:'Pie'},
+        {id:'line', icon:'fa-chart-line', label:'Line'},
+        {id:'combo', icon:'fa-chart-bar', label:'Column+Line'},
+        {id:'area', icon:'fa-water', label:'Area'}
+    ];
+    const chartTypeBtns = chartTypes.map(ct =>
+        `<button class="acct-chart-type-btn acct-ctype-btn ${chartType===ct.id?'active':''}" data-t="${ct.id}" onclick="_acct._chartType='${ct.id}';_acct._chartHiddenCats=new Set();acctTab('transactions')"><i class="fas ${ct.icon}"></i> ${ct.label}</button>`
+    ).join('');
+
+    const chartSection = viewMode === 'chart' ? `
+  <div class="acct-chart-type-bar">${chartTypeBtns}</div>
+  <div class="acct-chart-wrap${chartType==='donut'?' acct-chart-wrap-pie':''}">
+    <div id="acct-chart-inner" style="display:flex;gap:16px;align-items:flex-start;flex:1;min-width:0;"></div>
+  </div>` : '';
+
+    const tableSection = viewMode === 'list' ? (filtered.length ? `<table class="acct-table">
+    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th>${isAdmin?'<th></th>':''}</tr></thead>
+    <tbody>${filtered.map(t=>`<tr>
+      <td style="white-space:nowrap">${t.date ? t.date.substring(0,10) : ''}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.description||''}">${t.description||''}</td>
+      <td><span class="acct-cat-badge">${t.category||'OTHER'}</span></td>
+      <td style="text-align:right;font-weight:600;color:${t.amount>=0?'#16a34a':'#ef4444'}">${fmtDollar(t.amount)}</td>
+      ${isAdmin?`<td><button class="acct-del-btn" onclick="acctDeleteTransaction('${t.id}')"><i class="fas fa-trash"></i></button></td>`:''}
+    </tr>`).join('')}</tbody>
+  </table>` : `<div class="acct-empty"><i class="fas fa-receipt"></i><p>${txs.length ? 'No matches for filters' : 'No transactions yet — upload a CSV bank statement'}</p></div>`) : '';
 
     return `
 <div class="acct-card">
   <div class="acct-card-hdr" style="display:flex;justify-content:space-between;align-items:center;">
-    <span>General Ledger — ${txs.length} transactions</span>
+    <span>General Ledger — ${filtered.length}${filtered.length !== txs.length ? ` of ${txs.length}` : ''} transactions</span>
     <div style="display:flex;gap:8px;align-items:center;">
       <span style="color:#16a34a;font-weight:600;font-size:.9rem;">In: ${fmtDollar(totalIn)}</span>
       <span style="color:#ef4444;font-weight:600;font-size:.9rem;">Out: ${fmtDollar(totalOut)}</span>
@@ -14243,19 +14522,124 @@ function _acctTransactionsHTML(isAdmin) {
       <option value="income" ${typeFilter==='income'?'selected':''}>Income</option>
       <option value="expense" ${typeFilter==='expense'?'selected':''}>Expense</option>
     </select>
+    <select onchange="_acct._txSort=this.value;acctTab('transactions')">
+      <option value="date" ${sortMode==='date'?'selected':''}>Date (newest)</option>
+      <option value="amount_desc" ${sortMode==='amount_desc'?'selected':''}>Amount (high → low)</option>
+      <option value="amount_asc" ${sortMode==='amount_asc'?'selected':''}>Amount (low → high)</option>
+    </select>
+    ${monthPill}
+    <button class="acct-chart-toggle ${viewMode==='chart'?'active':''}" onclick="_acct._txViewMode=_acct._txViewMode==='chart'?'list':'chart';acctTab('transactions')">
+      <i class="fas fa-${viewMode==='chart'?'list':'chart-bar'}"></i> View ${viewMode==='chart'?'List':'Chart'}
+    </button>
   </div>
 
-  ${filtered.length ? `<table class="acct-table">
-    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th>${isAdmin?'<th></th>':''}</tr></thead>
-    <tbody>${filtered.map(t=>`<tr>
-      <td style="white-space:nowrap">${t.date ? t.date.substring(0,10) : ''}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.description||''}">${t.description||''}</td>
-      <td><span class="acct-cat-badge">${t.category||'OTHER'}</span></td>
-      <td style="text-align:right;font-weight:600;color:${t.amount>=0?'#16a34a':'#ef4444'}">${fmtDollar(t.amount)}</td>
-      ${isAdmin?`<td><button class="acct-del-btn" onclick="acctDeleteTransaction('${t.id}')"><i class="fas fa-trash"></i></button></td>`:''}
-    </tr>`).join('')}</tbody>
-  </table>` : `<div class="acct-empty"><i class="fas fa-receipt"></i><p>${txs.length ? 'No matches for filters' : 'No transactions yet — upload a CSV bank statement'}</p></div>`}
+  ${chartSection}
+  ${tableSection}
 </div>`;
+}
+
+// ── CHART ENGINE ─────────────────────────────────────────────
+const _ACCT_ML = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+window.acctSetChartType = function(type) {
+    _acct._chartType = type;
+    acctRedrawChart();
+};
+window.acctToggleChartCat = function(cat) {
+    if (!_acct._chartHiddenCats) _acct._chartHiddenCats = new Set();
+    if (_acct._chartHiddenCats.has(cat)) _acct._chartHiddenCats.delete(cat);
+    else _acct._chartHiddenCats.add(cat);
+    acctRedrawChart();
+};
+window.acctRedrawChart = function() {
+    const inner = document.getElementById('acct-chart-inner');
+    if (!inner) return;
+    inner.innerHTML = _acctChartInnerHTML();
+    // Highlight active type button
+    document.querySelectorAll('.acct-ctype-btn').forEach(b => {
+        const active = b.dataset.t === (_acct._chartType || 'donut');
+        b.style.background = active ? '#3b82f6' : '#e5e7eb';
+        b.style.color = active ? 'white' : '#374151';
+    });
+};
+
+function _acctChartInnerHTML() {
+    const d = _acct._chartData;
+    if (!d) return '';
+    const type = _acct._chartType || 'donut';
+    const hidden = _acct._chartHiddenCats || new Set();
+    const vis = d.catSorted.filter(([c]) => !hidden.has(c));
+    const visTotal = vis.reduce((s,[,a]) => s+a, 0) || 1;
+
+    let svgHTML = '';
+    if (type === 'donut') {
+        if (!vis.length) { svgHTML = '<div style="color:#9ca3af;padding:30px;text-align:center;font-size:.8rem;">No data</div>'; }
+        else {
+            const R=70,CX=90,CY=90,SW=34, CI=2*Math.PI*R; let off=0;
+            const segs = vis.map(([cat,amt],i) => {
+                const oi = d.catSorted.findIndex(([c])=>c===cat);
+                const color = d.CHART_COLORS[oi%d.CHART_COLORS.length];
+                const f=amt/visTotal, da=f*CI;
+                const s=`<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${color}" stroke-width="${SW}" stroke-dasharray="${da.toFixed(2)} ${(CI-da).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" style="transition:all .4s;"><title>${cat}: ${fmtDollar(amt)} (${Math.round(f*100)}%)</title></circle>`;
+                off+=da; return s;
+            }).join('');
+            svgHTML = `<svg width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg);display:block;">${segs}<circle cx="${CX}" cy="${CY}" r="${R-SW/2-2}" fill="white"/></svg><div style="font-size:.7rem;color:#6b7280;text-align:center;margin-top:4px;">Total: ${fmtDollar(visTotal)}</div>`;
+        }
+    } else if (type === 'bar') {
+        if (!vis.length) { svgHTML = '<div style="color:#9ca3af;padding:30px;text-align:center;font-size:.8rem;">No data</div>'; }
+        else {
+            const bH=20,gap=5,pL=108,pR=64,pT=8,pB=8,W=420;
+            const tH=vis.length*(bH+gap)+pT+pB;
+            const bMax=W-pL-pR, maxAmt=Math.max(...vis.map(([,a])=>a))||1;
+            const bars = vis.map(([cat,amt],i) => {
+                const oi=d.catSorted.findIndex(([c])=>c===cat);
+                const color=d.CHART_COLORS[oi%d.CHART_COLORS.length];
+                const y=pT+i*(bH+gap), w=(amt/maxAmt)*bMax;
+                const lbl=cat.length>14?cat.substring(0,13)+'…':cat;
+                return `<text x="${pL-6}" y="${y+bH/2+4}" text-anchor="end" font-size="10" fill="#374151">${lbl}</text><rect x="${pL}" y="${y}" width="${w.toFixed(1)}" height="${bH}" fill="${color}" rx="3" opacity=".85"><title>${cat}: ${fmtDollar(amt)}</title></rect><text x="${(pL+w+4).toFixed(1)}" y="${y+bH/2+4}" font-size="10" fill="#6b7280">${fmtDollar(amt)}</text>`;
+            }).join('');
+            svgHTML = `<svg width="${W}" height="${tH}" viewBox="0 0 ${W} ${tH}" style="max-width:100%;display:block;">${bars}</svg>`;
+        }
+    } else {
+        // Line / Combo / Area — monthly data
+        const {monthlyIn:mI, monthlyOut:mO} = d;
+        const maxV = Math.max(...mI,...mO,1);
+        const W=380,H=180,pL=52,pR=14,pT=16,pB=26,cW=W-pL-pR,cH=H-pT-pB,bY=pT+cH;
+        const px=(i)=>(pL+(i/11)*cW).toFixed(1);
+        const py=(v)=>(pT+cH-(v/maxV)*cH).toFixed(1);
+        const grid=[.25,.5,.75,1].map(f=>{const y=(pT+cH-f*cH).toFixed(1);return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/><text x="${pL-4}" y="${(+y+3).toFixed(1)}" text-anchor="end" font-size="8" fill="#9ca3af">$${(maxV*f/1000).toFixed(0)}k</text>`;}).join('');
+        const xax=_ACCT_ML.map((m,i)=>`<text x="${px(i)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#9ca3af">${m}</text>`).join('');
+        if (type === 'line') {
+            const lpts=(arr,color)=>{const pts=arr.map((_,i)=>`${px(i)},${py(arr[i])}`).join(' ');const dots=arr.map((v,i)=>`<circle cx="${px(i)}" cy="${py(v)}" r="3" fill="${color}"><title>${_ACCT_ML[i]}: ${fmtDollar(v)}</title></circle>`).join('');return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>${dots}`;};
+            svgHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;display:block;">${grid}${lpts(mI,'#16a34a')}${lpts(mO,'#ef4444')}${xax}<text x="${pL}" y="12" font-size="9" fill="#16a34a">■ Income</text><text x="${pL+58}" y="12" font-size="9" fill="#ef4444">■ Expenses</text></svg>`;
+        } else if (type === 'combo') {
+            const bW=(cW/12)*.55;
+            const bars=mO.map((v,i)=>{const bh=(v/maxV)*cH,x=pL+(i/12)*cW+(cW/12-bW)/2,y=pT+cH-bh;return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW.toFixed(1)}" height="${bh.toFixed(1)}" fill="#ef4444" opacity=".7" rx="2"><title>${_ACCT_ML[i]} Out: ${fmtDollar(v)}</title></rect>`;}).join('');
+            const lpts=mI.map((_,i)=>`${(pL+(i/12)*cW+cW/24).toFixed(1)},${py(mI[i])}`).join(' ');
+            const dots=mI.map((v,i)=>`<circle cx="${(pL+(i/12)*cW+cW/24).toFixed(1)}" cy="${py(v)}" r="3" fill="#16a34a"><title>${_ACCT_ML[i]} In: ${fmtDollar(v)}</title></circle>`).join('');
+            const xl=_ACCT_ML.map((m,i)=>`<text x="${(pL+(i/12)*cW+cW/24).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#9ca3af">${m}</text>`).join('');
+            svgHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;display:block;">${grid}${bars}<polyline points="${lpts}" fill="none" stroke="#16a34a" stroke-width="2" stroke-linejoin="round"/>${dots}${xl}<text x="${pL}" y="12" font-size="9" fill="#16a34a">— Income</text><text x="${pL+58}" y="12" font-size="9" fill="#ef4444">■ Expenses</text></svg>`;
+        } else { // area
+            const apath=(arr,color)=>{const pts=arr.map((_,i)=>`${px(i)},${py(arr[i])}`);const path=`M ${pL},${bY} L ${pts.join(' L ')} L ${(pL+cW).toFixed(1)},${bY} Z`;return `<path d="${path}" fill="${color}" opacity=".25"/><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2"/>`;};
+            svgHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;display:block;">${grid}${apath(mO,'#ef4444')}${apath(mI,'#16a34a')}${xax}<text x="${pL}" y="12" font-size="9" fill="#16a34a">■ Income</text><text x="${pL+58}" y="12" font-size="9" fill="#ef4444">■ Expenses</text></svg>`;
+        }
+    }
+
+    // Legend with toggle buttons
+    const legendHTML = d.catSorted.map(([cat,amt],i)=>{
+        const color=d.CHART_COLORS[i%d.CHART_COLORS.length];
+        const isHidden=hidden.has(cat);
+        const pct=Math.round((amt/d.totalExpense)*100);
+        return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;opacity:${isHidden?.35:1};">
+            <div style="width:10px;height:10px;border-radius:2px;background:${color};flex-shrink:0;"></div>
+            <div style="font-size:.7rem;color:#374151;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${cat}">${cat}</div>
+            <div style="font-size:.7rem;color:#6b7280;white-space:nowrap;">${fmtDollar(amt)}</div>
+            <div style="font-size:.68rem;color:#9ca3af;width:24px;text-align:right;">${pct}%</div>
+            <button onclick="acctToggleChartCat('${cat.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')" title="${isHidden?'Show':'Hide'}" style="background:none;border:none;cursor:pointer;padding:1px 3px;color:${isHidden?'#9ca3af':'#ef4444'};font-size:.72rem;line-height:1;"><i class="fas fa-${isHidden?'eye':'times'}"></i></button>
+        </div>`;
+    }).join('');
+
+    return `<div style="flex:1;min-width:0;overflow:auto;">${svgHTML}</div><div style="width:190px;flex-shrink:0;max-height:240px;overflow-y:auto;padding-left:8px;border-left:1px solid #e5e7eb;"><div style="font-size:.68rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Legend <span style="font-weight:400;color:#9ca3af;cursor:pointer;" onclick="(_acct._chartHiddenCats=new Set())&&acctRedrawChart()" title="Show all">reset</span></div>${legendHTML}</div>`;
 }
 
 // ── CASH FLOW TAB ────────────────────────────────────────────
@@ -14689,11 +15073,12 @@ async function acctImportCSV(input) {
 
     if (!transactions.length) { showNotification('No valid transactions found in CSV', 'error'); return; }
 
+    const _csvOwner = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || 'grant').toLowerCase();
     try {
         const res = await fetch('/api/finance/transactions/bulk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ transactions })
+            body: JSON.stringify({ transactions, owner: _csvOwner })
         });
         if (res.ok) {
             const data = await res.json();
@@ -14749,10 +15134,11 @@ function acctAddTransaction() {
     if (isNaN(amount)) { showNotification('Invalid amount', 'error'); return; }
     const category = prompt('Category (e.g. INSURANCE_INCOME, OFFICE_SUPPLIES, OTHER):') || 'OTHER';
 
+    const _txOwner = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || 'grant').toLowerCase();
     fetch('/api/finance/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, description: desc, amount, category })
+        body: JSON.stringify({ date, description: desc, amount, category, owner: _txOwner })
     }).then(r => { if (r.ok) { showNotification('Transaction added', 'success'); loadAccountingView(); } else showNotification('Failed to add', 'error'); })
     .catch(e => showNotification('Error: ' + e.message, 'error'));
 }
@@ -14951,9 +15337,19 @@ function _acctInjectStyles() {
 
 .acct-cat-badge { background:#eff6ff; color:#1d4ed8; padding:2px 7px; border-radius:10px; font-size:.73rem; font-weight:500; white-space:nowrap; }
 
-.acct-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.acct-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
 .acct-search { border:1px solid #d1d5db; border-radius:6px; padding:5px 10px; font-size:.85rem; min-width:180px; }
 .acct-filters select { border:1px solid #d1d5db; border-radius:6px; padding:5px 10px; font-size:.85rem; background:#fff; }
+.acct-chart-toggle { background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db; border-radius:6px; padding:5px 12px; font-size:.85rem; cursor:pointer; font-weight:500; transition:.2s; }
+.acct-chart-toggle:hover { background:#e5e7eb; }
+.acct-chart-toggle.active { background:#3b82f6; color:white; border-color:#3b82f6; }
+.acct-month-pill { display:inline-flex; align-items:center; gap:5px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:20px; padding:4px 10px; font-size:.82rem; font-weight:500; white-space:nowrap; }
+.acct-month-pill button { background:none; border:none; color:#1d4ed8; cursor:pointer; font-size:.9rem; padding:0 2px; line-height:1; }
+.acct-chart-type-bar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:12px; }
+.acct-chart-type-btn { padding:5px 12px; border:none; border-radius:6px; cursor:pointer; font-size:.82rem; font-weight:500; background:#e5e7eb; color:#374151; transition:.15s; }
+.acct-chart-type-btn:hover, .acct-chart-type-btn.active { background:#3b82f6; color:white; }
+.acct-chart-wrap { background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:14px; margin-bottom:14px; overflow-x:auto; }
+.acct-chart-wrap-pie { display:flex; gap:16px; align-items:flex-start; }
 
 .acct-empty { text-align:center; padding:40px 20px; color:#9ca3af; }
 .acct-empty i { font-size:2rem; margin-bottom:12px; display:block; }
@@ -15168,6 +15564,22 @@ function loadReportsView() {
                     <p>Dialer call stats, connection rates, and agent activity</p>
                 </div>
 
+                <div class="report-card" onclick="runReport('lead-list')">
+                    <div class="report-icon">
+                        <i class="fas fa-list-alt"></i>
+                    </div>
+                    <h3>Lead List</h3>
+                    <p>Full lead roster with status, assignment, and pipeline stage</p>
+                </div>
+
+                <div class="report-card" onclick="runReport('quarterly')">
+                    <div class="report-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <h3>Quarterly Report</h3>
+                    <p>Sales, financial &amp; activity metrics by quarter</p>
+                </div>
+
                 <div class="report-card" onclick="runReport('production')">
                     <div class="report-icon">
                         <i class="fas fa-chart-line"></i>
@@ -15175,7 +15587,7 @@ function loadReportsView() {
                     <h3>Production Report</h3>
                     <p>New business and renewal production metrics</p>
                 </div>
-                
+
                 <div class="report-card" onclick="runReport('loss-ratio')">
                     <div class="report-icon">
                         <i class="fas fa-chart-pie"></i>
@@ -15183,7 +15595,7 @@ function loadReportsView() {
                     <h3>Loss Ratio Analysis</h3>
                     <p>Claims vs premium analysis by line</p>
                 </div>
-                
+
                 <div class="report-card" onclick="runReport('renewal')">
                     <div class="report-icon">
                         <i class="fas fa-sync"></i>
@@ -15191,7 +15603,7 @@ function loadReportsView() {
                     <h3>Renewal Forecast</h3>
                     <p>Upcoming renewals and retention metrics</p>
                 </div>
-                
+
                 <div class="report-card" onclick="runReport('marketing')">
                     <div class="report-icon">
                         <i class="fas fa-bullhorn"></i>
@@ -15199,7 +15611,7 @@ function loadReportsView() {
                     <h3>Marketing ROI</h3>
                     <p>Campaign performance and lead conversion</p>
                 </div>
-                
+
                 <div class="report-card" onclick="runReport('carrier')">
                     <div class="report-icon">
                         <i class="fas fa-building"></i>
@@ -16631,11 +17043,17 @@ function selectQuoteToAttach(type, leadName, quoteIndex) {
 }
 
 // Function to calculate real carrier statistics from policies
-function calculateCarrierStats(carrierName) {
+function calculateCarrierStats(carrierName, agentNames) {
     const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const agentSet = agentNames ? new Set(agentNames.map(a => a.toLowerCase())) : null;
     const carrierPolicies = policies.filter(policy => {
         const policyCarrier = (policy.carrier || policy.insurance_company || '').toLowerCase();
-        return policyCarrier.includes(carrierName.toLowerCase());
+        if (!policyCarrier.includes(carrierName.toLowerCase())) return false;
+        if (agentSet) {
+            const agent = (policy.agent || policy.producer || '').toLowerCase();
+            return [...agentSet].some(a => agent.includes(a));
+        }
+        return true;
     });
 
     // Calculate total premium
@@ -16659,22 +17077,37 @@ function loadCarriersView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 
+    // Detect current user — Maureen always defaults to United and cannot change it
+    const _sessionUser = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const _currentUsername = (_sessionUser.username || '').toLowerCase();
+    const _isMaureen = _currentUsername === 'maureen';
+    if (_isMaureen) window._carrierAgencyFilter = 'United';
+
     // Force update carriers to new list (removing State Farm and Liberty Mutual)
     let carriers = [
-        { id: 1, name: 'Progressive', brandBg: 'linear-gradient(135deg,#0066cc,#004999)', brandText: '#ffffff', portalUrl: 'https://www.progressive.com/agent', type: 'direct' },
-        { id: 2, name: 'Geico', brandBg: 'linear-gradient(135deg,#003087,#00519b)', brandText: '#ffffff', portalUrl: 'https://www.geico.com/agent', type: 'direct' },
-        { id: 3, name: 'Northland', brandBg: 'linear-gradient(135deg,#1b3a6e,#2d5fa6)', brandText: '#ffffff', portalUrl: 'https://www.northlandinsurance.com', type: 'rps' },
-        { id: 4, name: 'Canal', brandBg: 'linear-gradient(135deg,#c8102e,#a00c24)', brandText: '#ffffff', portalUrl: 'https://www.canalinsurance.com', type: 'rps' },
-        { id: 5, name: 'Crum & Forster', brandBg: 'linear-gradient(135deg,#004b8d,#0066cc)', brandText: '#ffffff', portalUrl: 'https://www.cumbinsurance.com', type: 'rps' },
-        { id: 6, name: 'Nico', brandBg: 'linear-gradient(135deg,#2e4057,#3d5a80)', brandText: '#ffffff', portalUrl: 'https://www.nicoinsurance.com', type: 'rps' },
-        { id: 7, name: 'Occidental', brandBg: 'linear-gradient(135deg,#1a3c5e,#2e6da4)', brandText: '#ffffff', portalUrl: 'https://www.coverwhealinsurance.com', type: 'rps' },
-        { id: 8, name: 'Berkley Prime', brandBg: 'linear-gradient(135deg,#0d2c54,#1a4a7a)', brandText: '#ffffff', portalUrl: 'https://www.hathwayinsurance.com', type: 'rps' }
+        { id: 1, name: 'Progressive', brandBg: 'linear-gradient(135deg,#0066cc,#004999)', brandText: '#ffffff', portalUrl: 'https://www.progressive.com/agent', type: 'direct', agency: 'Vanguard' },
+        { id: 2, name: 'Geico', brandBg: 'linear-gradient(135deg,#003087,#00519b)', brandText: '#ffffff', portalUrl: 'https://www.geico.com/agent', type: 'direct', agency: 'Vanguard' },
+        { id: 3, name: 'Northland', brandBg: 'linear-gradient(135deg,#1b3a6e,#2d5fa6)', brandText: '#ffffff', portalUrl: 'https://www.northlandinsurance.com', type: 'rps', agency: 'Vanguard' },
+        { id: 4, name: 'Canal', brandBg: 'linear-gradient(135deg,#c8102e,#a00c24)', brandText: '#ffffff', portalUrl: 'https://www.canalinsurance.com', type: 'rps', agency: 'Vanguard' },
+        { id: 5, name: 'Crum & Forster', brandBg: 'linear-gradient(135deg,#004b8d,#0066cc)', brandText: '#ffffff', portalUrl: 'https://www.cumbinsurance.com', type: 'rps', agency: 'Vanguard' },
+        { id: 6, name: 'Nico', brandBg: 'linear-gradient(135deg,#2e4057,#3d5a80)', brandText: '#ffffff', portalUrl: 'https://www.nicoinsurance.com', type: 'rps', agency: 'Vanguard' },
+        { id: 7, name: 'Occidental', brandBg: 'linear-gradient(135deg,#1a3c5e,#2e6da4)', brandText: '#ffffff', portalUrl: 'https://www.coverwhealinsurance.com', type: 'rps', agency: 'Vanguard' },
+        { id: 8, name: 'Berkley Prime', brandBg: 'linear-gradient(135deg,#0d2c54,#1a4a7a)', brandText: '#ffffff', portalUrl: 'https://www.hathwayinsurance.com', type: 'rps', agency: 'Vanguard' }
     ];
     localStorage.setItem('carriers', JSON.stringify(carriers));
 
-    // Calculate real statistics for each carrier
+    // Agency → agent mapping
+    const AGENCY_AGENTS = {
+        'Vanguard': ['Grant', 'Hunter', 'Carson'],
+        'United':   ['Maureen'],
+        'ALL':      null
+    };
+    const agencyFilter = window._carrierAgencyFilter || 'ALL';
+    const agentFilter = AGENCY_AGENTS[agencyFilter] || null;
+
+    // Calculate real statistics for each carrier, filtered by agency agents
     carriers = carriers.map(carrier => {
-        const stats = calculateCarrierStats(carrier.name);
+        const stats = calculateCarrierStats(carrier.name, agentFilter);
         return {
             ...carrier,
             policies: stats.policies,
@@ -16682,9 +17115,12 @@ function loadCarriersView() {
         };
     });
 
+    // For United, show all carriers (same markets, filtered stats); for Vanguard, only Vanguard carriers
+    const filteredCarriers = agencyFilter === 'United' ? carriers : agencyFilter === 'Vanguard' ? carriers.filter(c => c.agency === 'Vanguard') : carriers;
+
     // Separate carriers by type
-    const directCarriers = carriers.filter(c => c.type === 'direct');
-    const rpsCarriers = carriers.filter(c => c.type === 'rps');
+    const directCarriers = filteredCarriers.filter(c => c.type === 'direct');
+    const rpsCarriers = filteredCarriers.filter(c => c.type === 'rps');
 
     // Parse premium strings like "$148K" or "$1.2M" into raw numbers
     const parsePremium = (str) => {
@@ -16706,6 +17142,11 @@ function loadCarriersView() {
             <header class="content-header">
                 <h1>Carrier Management</h1>
                 <div class="header-actions">
+                    ${_isMaureen ? '' : `<select onchange="window._carrierAgencyFilter=this.value;loadCarriersView()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;margin-right:8px;">
+                        <option value="ALL" ${agencyFilter==='ALL'?'selected':''}>All Agencies</option>
+                        <option value="Vanguard" ${agencyFilter==='Vanguard'?'selected':''}>Vanguard</option>
+                        <option value="United" ${agencyFilter==='United'?'selected':''}>United</option>
+                    </select>`}
                     <button class="btn-secondary" onclick="showRPSInfoSheet()" style="margin-right: 10px;">
                         <i class="fas fa-info-circle"></i> Info Sheet
                     </button>
@@ -17324,22 +17765,201 @@ function loadSettingsView() {
                     <button class="btn-primary">Save Preferences</button>
                 </div>
 
-                <div class="settings-section" style="grid-column: 1 / -1;">
-                    <h3><i class="fas fa-hard-hat"></i> OSHA Data Import</h3>
-                    <p style="font-size:0.85rem;color:#6b7280;margin:0 0 0.75rem 0;">Upload the full OSHA inspection CSV (700k+ records) from <a href="https://enforcedata.dol.gov/views/data_summary.php" target="_blank" style="color:#3b82f6;">enforcedata.dol.gov</a> directly into the commercial lead database.</p>
-                    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-                        <label style="background:#1e3a5f;color:white;padding:9px 18px;border-radius:6px;cursor:pointer;font-size:0.9rem;display:flex;align-items:center;gap:0.5rem;">
-                            <input type="file" id="settings-osha-input" accept=".csv,.txt" multiple style="display:none;" onchange="settingsImportOSHA(this)">
-                            <i class="fas fa-upload"></i> Choose OSHA CSV(s)
+                <div class="settings-section">
+                    <h3>File Uploads</h3>
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+                        <label class="btn-secondary" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;width:fit-content;">
+                            <i class="fas fa-cloud-download-alt"></i> Upload IVANS File
+                            <input type="file" accept=".al3,.dat,.txt,.xml,.zip" style="display:none;" onchange="handleIvansFileDrop(this.files[0])">
                         </label>
-                        <div id="settings-osha-progress" style="font-size:0.85rem;color:#374151;"></div>
+                        <label class="btn-secondary" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;width:fit-content;">
+                            <i class="fas fa-upload"></i> Upload Agency File
+                            <input type="file" id="agency-file-input" multiple style="display:none;">
+                        </label>
                     </div>
+                    <div id="agency-upload-status" style="display:none;margin-top:8px;padding:6px 10px;border-radius:6px;font-size:12px;"></div>
+                    <div id="agency-drop-zone" style="display:none;"></div>
+                    <div id="agency-file-list" style="margin-top:10px;"></div>
                 </div>
             </div>
         </div>
     `;
 
-    // Load file list after settings renders
+    // Agency File Upload logic (compact)
+    (function initAgencyUpload() {
+        const fileInput = document.getElementById('agency-file-input');
+        const statusDiv = document.getElementById('agency-upload-status');
+        const fileList = document.getElementById('agency-file-list');
+        if (!fileInput) return;
+
+        function showStatus(msg, isError) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = isError ? '#fef2f2' : '#f0fdf4';
+            statusDiv.style.color = isError ? '#dc2626' : '#16a34a';
+            statusDiv.style.border = isError ? '1px solid #fecaca' : '1px solid #bbf7d0';
+            statusDiv.textContent = msg;
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        async function loadFileList() {
+            try {
+                const res = await fetch('/api/agency-files');
+                const data = await res.json();
+                if (!data.success || !data.files.length) {
+                    fileList.innerHTML = '<p style="color:#9ca3af;font-size:12px;padding:8px 0;">No files uploaded yet.</p>';
+                    return;
+                }
+                fileList.innerHTML = `
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead><tr style="border-bottom:1px solid #e5e7eb;background:#f8fafc;">
+                            <th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:600;">Name</th>
+                            <th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:600;">Size</th>
+                            <th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:600;">Uploaded</th>
+                            <th style="padding:6px 8px;"></th>
+                        </tr></thead>
+                        <tbody>${data.files.map(f => `
+                            <tr style="border-bottom:1px solid #f3f4f6;">
+                                <td style="padding:5px 8px;font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">${f.name}</td>
+                                <td style="padding:5px 8px;color:#6b7280;">${formatSize(f.size)}</td>
+                                <td style="padding:5px 8px;color:#6b7280;">${new Date(f.uploadDate||f.upload_date).toLocaleDateString()}</td>
+                                <td style="padding:5px 8px;text-align:right;">
+                                    <button onclick="deleteAgencyFile('${f.id}')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;">Delete</button>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                fileList.innerHTML = '<p style="color:#dc2626;font-size:12px;">Failed to load files.</p>';
+            }
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('uploadedBy', 'Agency');
+            showStatus('Uploading ' + file.name + '…', false);
+            try {
+                const res = await fetch('/api/agency-files', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    showStatus(file.name + ' uploaded.', false);
+                    loadFileList();
+                    // Refresh IVANS panel too in case it was an IVANS file
+                    setTimeout(() => { const el = document.getElementById('ivans-settings-file-list'); if (el) initIvansSettingsPanel(); }, 300);
+                } else {
+                    showStatus('Upload failed: ' + (data.error || 'Unknown error'), true);
+                }
+            } catch (e) {
+                showStatus('Upload error: ' + e.message, true);
+            }
+        }
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) Array.from(fileInput.files).forEach(f => uploadFile(f));
+            fileInput.value = '';
+        });
+
+        window.deleteAgencyFile = async function(fileId) {
+            if (!confirm('Delete this file?')) return;
+            try {
+                const res = await fetch('/api/agency-files/' + fileId, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showStatus('File deleted.', false);
+                    loadFileList();
+                } else {
+                    showStatus('Delete failed: ' + (data.error || ''), true);
+                }
+            } catch (e) {
+                showStatus('Delete error: ' + e.message, true);
+            }
+        };
+
+        loadFileList();
+    })();
+
+    // ── IVANS settings panel ──────────────────────────────────────────────────
+    async function initIvansSettingsPanel() {
+        const container = document.getElementById('ivans-settings-file-list');
+        const historyEl = document.getElementById('ivans-import-history');
+        if (!container) return;
+
+        const ivansExts = ['.al3','.dat','.txt','.xml','.zip','.834'];
+        const isIvansFile = name => ivansExts.some(ext => name.toLowerCase().endsWith(ext));
+        const fmtSize = b => b<1024 ? b+' B' : b<1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+
+        // Render import history from localStorage
+        if (historyEl) {
+            const hist = JSON.parse(localStorage.getItem('ivans_import_history') || '[]');
+            if (!hist.length) {
+                historyEl.innerHTML = '<div style="color:#9ca3af;font-size:12px;padding:10px;">No imports yet.</div>';
+            } else {
+                historyEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11px;">
+                    <thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                        <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:600;">File</th>
+                        <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:600;">Date</th>
+                        <th style="padding:6px 8px;text-align:center;color:#1e40af;font-weight:600;">Upd</th>
+                        <th style="padding:6px 8px;text-align:center;color:#15803d;font-weight:600;">New</th>
+                    </tr></thead>
+                    <tbody>${hist.slice().reverse().map(h => `
+                        <tr style="border-bottom:1px solid #f3f4f6;">
+                            <td style="padding:5px 8px;font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${h.filename}">${h.filename}</td>
+                            <td style="padding:5px 8px;color:#6b7280;">${new Date(h.timestamp).toLocaleDateString()} ${new Date(h.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td>
+                            <td style="padding:5px 8px;text-align:center;font-weight:700;color:#1e40af;">${h.updated}</td>
+                            <td style="padding:5px 8px;text-align:center;font-weight:700;color:#15803d;">${h.created}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+            }
+        }
+
+        // Render server files
+        try {
+            const res = await fetch('/api/agency-files');
+            const data = await res.json();
+            const files = (data.files||[]).filter(f => isIvansFile(f.name));
+            if (!files.length) {
+                container.innerHTML = `<div style="color:#9ca3af;font-size:12px;padding:10px;">No IVANS files found. Upload a .dat, .al3, or .zip file.</div>`;
+                return;
+            }
+            container.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                    <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:600;">File</th>
+                    <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:600;">Size</th>
+                    <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:600;">Date</th>
+                    <th style="padding:6px 8px;"></th>
+                </tr></thead>
+                <tbody>${files.map(f => {
+                    const ext = f.name.split('.').pop().toUpperCase();
+                    const badgeBg = ext==='ZIP' ? '#fef3c7' : '#dbeafe';
+                    const badgeColor = ext==='ZIP' ? '#92400e' : '#1e40af';
+                    return `<tr style="border-bottom:1px solid #f3f4f6;">
+                        <td style="padding:5px 8px;font-weight:500;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">
+                            ${f.name}
+                            <span style="background:${badgeBg};color:${badgeColor};font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;margin-left:4px;">${ext}</span>
+                        </td>
+                        <td style="padding:5px 8px;color:#6b7280;">${fmtSize(f.size)}</td>
+                        <td style="padding:5px 8px;color:#6b7280;">${new Date(f.uploadDate||f.upload_date).toLocaleDateString()}</td>
+                        <td style="padding:5px 8px;text-align:right;">
+                            <button onclick="ivansImportFromServer('${f.id}','${f.name.replace(/'/g,"\\'")}',this)"
+                                    style="background:#0284c7;border:none;color:#fff;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">
+                                <i class="fas fa-bolt"></i> Import
+                            </button>
+                        </td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>`;
+        } catch(e) {
+            container.innerHTML = `<div style="color:#dc2626;font-size:12px;padding:10px;">Failed to load: ${e.message}</div>`;
+        }
+    }
+    // initIvansSettingsPanel removed (panel replaced with simple upload button)
+
     // Update average performance display after the HTML is loaded
     console.log('🔄 DEBUG: Setting timeout to update average performance display');
     setTimeout(async () => {
@@ -18057,7 +18677,9 @@ function collectPolicyData() {
             case 'coverage':
                 tab.querySelectorAll('input, select, textarea').forEach(field => {
                     if (field.id && field.value) {
-                        const fieldName = field.previousElementSibling?.textContent?.replace(' *', '') || field.id;
+                        // Use the form-group's <label> for the key (not previousElementSibling which may be a hidden input)
+                        const label = field.closest('.form-group')?.querySelector('label')?.textContent?.replace(' *', '').trim();
+                        const fieldName = label || field.id;
                         data.coverage[fieldName] = field.value;
                     }
                 });
@@ -18940,6 +19562,996 @@ function deleteClient(id) {
     }
 }
 
+// ── IVANS Download Import ─────────────────────────────────────────────────────
+
+function showIvansUpload() {
+    document.querySelectorAll('#ivans-upload-overlay').forEach(e => e.remove());
+    const overlay = document.createElement('div');
+    overlay.id = 'ivans-upload-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.8);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;box-sizing:border-box;';
+    overlay.innerHTML = `
+        <div onclick="event.stopPropagation()" style="background:#fff;border-radius:16px;width:100%;max-width:960px;max-height:92vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,0.35);display:flex;flex-direction:column;">
+            <div style="background:linear-gradient(135deg,#0c4a6e,#0284c7);padding:20px 24px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:42px;height:42px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;flex-shrink:0;"><i class="fas fa-cloud-download-alt"></i></div>
+                    <div>
+                        <div style="font-size:16px;font-weight:700;color:#fff;">IVANS Download Import</div>
+                        <div style="font-size:12px;color:rgba(255,255,255,0.7);">Upload ACORD AL3 or XML files to update clients &amp; policies</div>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('ivans-upload-overlay').remove()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:20px;cursor:pointer;flex-shrink:0;">&times;</button>
+            </div>
+            <div style="padding:24px;">
+                <div id="ivans-parse-status"></div>
+                <div id="ivans-review-area"></div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function handleIvansFileDrop(file) {
+    if (!file) return;
+    // If the modal isn't open yet (e.g. called from Settings page), open it first
+    if (!document.getElementById('ivans-parse-status')) {
+        showIvansUpload();
+        setTimeout(() => handleIvansFileDrop(file), 50);
+        return;
+    }
+    const statusEl = document.getElementById('ivans-parse-status');
+    document.getElementById('ivans-review-area').innerHTML = '';
+    statusEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;color:#2563eb;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Parsing <strong>${file.name}</strong>…</div>`;
+
+    const isZip = /\.zip$/i.test(file.name) || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+
+    function _process(content, fname) {
+        try {
+            const policies = parseIvansFile(content, fname);
+            policies.forEach(p => p._srcFile = fname);
+            if (!policies.length) {
+                const rawLines = content.split(/\r\n|\r|\n/).filter(l => l.trim());
+                const preview = rawLines.slice(0,20).map((l,i) => `[${String(i+1).padStart(2)}] seg="${l.substring(0,6)}" | ${l.substring(0,160)}`).join('\n');
+                statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5;"><i class="fas fa-exclamation-triangle"></i> No policies found (${rawLines.length} lines). First 20:<br><pre style="margin:8px 0 0;font-size:10px;white-space:pre-wrap;word-break:break-all;color:#374151;background:#f1f5f9;padding:8px;border-radius:4px;">${preview.replace(/</g,'&lt;')}</pre></div>`;
+            } else {
+                statusEl.innerHTML = `<div style="color:#15803d;font-size:13px;font-weight:600;padding:8px 14px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;"><i class="fas fa-check-circle"></i> Found <strong>${policies.length}</strong> polic${policies.length===1?'y':'ies'} in ${fname}</div>`;
+                showIvansReview(policies);
+            }
+        } catch(err) {
+            statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px;padding:10px 14px;background:#fef2f2;border-radius:8px;"><i class="fas fa-exclamation-triangle"></i> Parse error: ${err.message}</div>`;
+        }
+    }
+
+    if (isZip) {
+        // Send ZIP to server for extraction
+        const fd = new FormData();
+        fd.append('file', file);
+        fetch('/api/ivans/unzip', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) throw new Error(data.error || 'Unzip failed');
+                const content = data.content;
+                const lineCount = content.split(/\r\n|\r|\n/).filter(l => l.trim()).length;
+
+                if (lineCount <= 1) {
+                    // IVANS fixed-width format (no line separators, 196-byte records)
+                    if (content.startsWith('1') && /2TRG\d{3} \d /.test(content.substring(0, 500))) {
+                        _process(content, data.filename || file.name);
+                        return;
+                    }
+                    // Unknown format — show text preview
+                    statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px;padding:10px;background:#fef2f2;border-radius:8px;">Unrecognised format. File: ${data.totalBytes} bytes.<br><pre style="font-size:10px;margin-top:6px;">${content.substring(0,400).replace(/</g,'&lt;')}</pre></div>`;
+                    return;
+                }
+                _process(content, data.filename || file.name);
+            })
+            .catch(err => {
+                statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px;padding:10px 14px;background:#fef2f2;border-radius:8px;"><i class="fas fa-exclamation-triangle"></i> ${err.message}</div>`;
+            });
+    } else {
+        const reader = new FileReader();
+        reader.onload = e => _process(e.target.result, file.name);
+        reader.onerror = () => { statusEl.innerHTML = `<div style="color:#dc2626;font-size:13px;">Failed to read file.</div>`; };
+        reader.readAsText(file);
+    }
+}
+
+function parseIvansFile(content, filename) {
+    const t = content.trim();
+
+    // MIME multipart wrapper (IVANS sometimes delivers XML+PDF in a MIME envelope)
+    if (/^MIME-Version:/i.test(t)) {
+        const boundaryMatch = t.match(/boundary="?([^";\r\n]+)"?/i);
+        if (boundaryMatch) {
+            const boundary = '--' + boundaryMatch[1].trim();
+            const parts = t.split(new RegExp(boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+            for (const part of parts) {
+                if (/Content-Type:\s*text\/xml/i.test(part) || /Content-Type:\s*application\/xml/i.test(part)) {
+                    // Extract body: everything after the first blank line
+                    const bodyMatch = part.match(/\r?\n\r?\n([\s\S]*)/);
+                    if (bodyMatch) {
+                        const xmlContent = bodyMatch[1].trim();
+                        if (xmlContent.startsWith('<')) return parseAcordXML(xmlContent);
+                    }
+                }
+            }
+        }
+        throw new Error('MIME multipart file detected but no XML policy data found inside. Check that this is an IVANS AL3 or ACORD XML download, not a single-policy PDF notice.');
+    }
+
+    if (t.startsWith('<') || (filename||'').toLowerCase().endsWith('.xml')) return parseAcordXML(t);
+    // IVANS fixed-width download format (no line separators, TRG-based groups)
+    if (t.startsWith('1') && /2TRG\d{3} \d /.test(t.substring(0, 500))) return parseIvansFixed(t);
+    return parseAcordAL3(t);
+}
+
+function parseIvansFixed(content) {
+    const policies = [];
+
+    // AL3 records are variable-length: each record has its byte-length at positions 4-6
+    const records = [];
+    let i = 0;
+    while (i < content.length - 7) {
+        const rtype = content.substring(i, i + 4);
+        if (!/^[0-9A-Z]{4}$/.test(rtype)) { i++; continue; }
+        const rlen = parseInt(content.substring(i + 4, i + 7));
+        if (isNaN(rlen) || rlen < 10 || rlen > 2000) { i++; continue; }
+        records.push([rtype, content.substring(i, i + rlen)]);
+        i += rlen;
+    }
+    if (!records.length) return [];
+
+    // Group records by 2TRG — each TRG block = one policy transaction
+    const groups = [];
+    let cur = [];
+    for (const rec of records) {
+        if (rec[0] === '2TRG' && cur.length) { groups.push(cur); cur = []; }
+        cur.push(rec);
+    }
+    if (cur.length) groups.push(cur);
+
+    const clean = s => (s || '').replace(/[\x00?]/g, ' ').replace(/\s+/g, ' ').trim();
+    const fmtYYMMDD = s => {
+        const d = (s || '').replace(/\D/g, '');
+        if (d.length !== 6) return '';
+        const yy = parseInt(d.substring(0, 2));
+        const yr = yy >= 50 ? 1900 + yy : 2000 + yy;
+        return `${d.substring(2, 4)}/${d.substring(4, 6)}/${yr}`;
+    };
+    const DISCOUNT_CODES = new Set(['HODIS','MCAR','AQD','EFTD','LFREE','PPLSD','MULTI','SNGL']);
+
+    for (const grp of groups) {
+        const by = {};
+        for (const [t, r] of grp) { if (!by[t]) by[t] = []; by[t].push(r); }
+        if (!by['2TRG']) continue;
+
+        const trg = by['2TRG'][0];
+        const lobCode    = trg.substring(24, 29).trim();
+        const carrier    = trg.substring(47, 72).trim();
+
+        // ── 5BPI: policy number, dates, premium ─────────────────────────────
+        let policyNumber = '', effectiveDate = '', expirationDate = '', premium = '';
+        if (by['5BPI']) {
+            const b = by['5BPI'][0];
+            policyNumber    = clean(b.substring(30, 50));
+            effectiveDate   = fmtYYMMDD(b.substring(80, 86));
+            expirationDate  = fmtYYMMDD(b.substring(86, 92));
+            const pm = b.substring(111).match(/(\d{10,12})[+\-]/);
+            if (pm) { const c = parseInt(pm[1]); if (c > 0 && c < 9999999999) premium = (c / 100).toFixed(2); }
+        }
+
+        // ── 5BIS: insured name & entity type ────────────────────────────────
+        let insuredName = '', firstName = '', lastName = '', middleName = '',
+            suffix = '', entityType = 'P', companyName = '';
+        if (by['5BIS']) {
+            const b = by['5BIS'][0];
+            entityType = b[30] || 'P';
+            if (entityType === 'C' || entityType === 'B') {
+                companyName  = clean(b.substring(31, 90));
+                insuredName  = companyName;
+            } else {
+                firstName    = clean(b.substring(39, 55));
+                middleName   = clean(b.substring(55, 66));
+                lastName     = clean(b.substring(66, 86));
+                suffix       = clean(b.substring(86, 90));
+                insuredName  = [firstName, middleName, lastName, suffix].filter(Boolean).join(' ');
+            }
+        }
+
+        // ── 9BIS: address / phone ────────────────────────────────────────────
+        let address = '', city = '', state = '', zip = '', phone = '';
+        if (by['9BIS']) {
+            const b = by['9BIS'][0];
+            address = clean(b.substring(30, 90));
+            city    = clean(b.substring(90, 109));
+            state   = b.substring(109, 111).trim();
+            zip     = b.substring(111, 120).replace(/\D/g, '').substring(0, 5);
+            phone   = b.substring(120, 130).replace(/\D/g, '');
+        }
+
+        // ── 5VEH: vehicles (personal auto) ──────────────────────────────────
+        const vehicles = [];
+        for (const b of (by['5VEH'] || [])) {
+            const year  = clean(b.substring(38, 42));
+            const make  = clean(b.substring(42, 62));
+            const model = clean(b.substring(62, 82));
+            const vin   = b.substring(87, 104).replace(/[?\x00\s]/g, '');
+            const vs    = b.substring(112, 114).trim();
+            if (year || make || vin) vehicles.push({ year, make, model, vin, state: vs });
+        }
+        // ── 5CAR: commercial auto trucks ────────────────────────────────────
+        for (const b of (by['5CAR'] || [])) {
+            const year  = clean(b.substring(38, 42));
+            const make  = clean(b.substring(42, 62));
+            const model = clean(b.substring(62, 82));
+            const vin   = b.substring(87, 104).replace(/[?\x00\s]/g, '');
+            if (year || make || vin) vehicles.push({ year, make, model, vin });
+        }
+
+        // ── 6CVA: coverages (per vehicle, personal auto) ─────────────────────
+        const coverages = {};
+        for (const b of (by['6CVA'] || [])) {
+            const code = b.substring(30, 35).trim();
+            if (DISCOUNT_CODES.has(code)) continue;
+            const desc = clean(b.substring(148, 208));
+            if (!desc) continue;
+            const lims = (b.substring(79, 130).match(/\d{8}/g) || [])
+                          .map(x => parseInt(x)).filter(x => x > 0 && x < 9999999);
+            if (!lims.length) continue;
+            // Store plain numeric (dropdown-compatible); skip if already set
+            if (!coverages[desc]) coverages[desc] = lims.length >= 2 ? `${lims[0]}/${lims[1]}` : String(lims[0]);
+        }
+        // ── 5CVG: coverages (commercial auto) ───────────────────────────────
+        const CVG_LABELS = {
+            CSL:   'Liability Limits',              // Combined Single Limit
+            UMCSL: 'Uninsured/Underinsured Motorist', // matches form label exactly
+            UNCSL: 'Uninsured/Underinsured Motorist',
+            UMAUTO:'Uninsured/Underinsured Motorist',
+            COMP:  'Comprehensive Deductible',
+            COLL:  'Collision Deductible',
+            MTGL:  'General Liability',             // GL occurrence/aggregate
+            MEDPM: 'Medical Payments',
+            GLCBI: 'General Liability BI',
+            GLCPD: 'General Liability PD',
+            PRDCO: 'Products/Completed Ops',
+            PIADV: 'Personal Injury/Advertising',
+            FIRDM: 'Fire Damage Liability',
+            MDEXP: 'Medical Expense',
+            UMPD:  'UM Property Damage',
+            NOTRL: 'Non-Trucking Liability',
+        };
+        // MTC/MTRTK are handled separately below (split into Cargo Limit + Cargo Deductible)
+        // ADDIN/AINxx are fee/add-on codes; CARGO is a duplicate of MTC/MTRTK split
+        const CVG_SKIP = new Set(['EFTD','POLFE','HODIS','MCAR','AQD','LFREE','PPLSD','MULTI','SNGL','FILFE','ADDIN','CARGO','WVSUB','ROAD']);
+        for (const b of (by['5CVG'] || [])) {
+            const code = b.substring(30, 35).trim();
+            if (CVG_SKIP.has(code) || /^AIN\d+$/.test(code)) continue;
+            const body = b.substring(35);
+            const limNums = (body.match(/0\d{9}/g) || []).map(x => parseInt(x)).filter(x => x > 0 && x < 1000000000);
+            const desc = CVG_LABELS[code] || code;
+            if (!desc || coverages[desc]) continue;
+            // COMP/COLL deductibles are encoded as 8-digit zero-padded numbers (e.g. 00002500 = $2,500)
+            // not the 10-digit limit format — check these before the limNums guard
+            if (code === 'COMP' || code === 'COLL') {
+                const dedNums = (body.match(/(?<!\d)0\d{7}(?!\d)/g) || []).map(x => parseInt(x)).filter(x => x > 0 && x < 100000000);
+                if (dedNums.length > 0) { coverages[desc] = String(dedNums[0]); continue; }
+            }
+            // MEDPM (Medical Payments): small values ($1k–$10k) stored as 8-digit like deductibles.
+            // The 10-digit regex picks up premiums instead of limits — use 8-digit and cap at 10000.
+            if (code === 'MEDPM') {
+                const medNums = (body.match(/(?<!\d)0\d{7}(?!\d)/g) || []).map(x => parseInt(x)).filter(x => x > 0 && x <= 10000);
+                if (medNums.length > 0) { coverages[desc] = String(medNums[0]); continue; }
+                // fallback: take smallest 10-digit match that is a plausible medical payments limit
+                const medFallback = limNums.filter(n => n <= 10000);
+                if (medFallback.length > 0) { coverages[desc] = String(Math.min(...medFallback)); continue; }
+                continue; // skip if nothing reasonable found
+            }
+            if (!limNums.length) continue;
+            // MTC / MTRTK: split into Cargo Limit + Cargo Deductible
+            // Limit is 10-digit (e.g. 0001000000 = $100,000); deductible is 8-digit (e.g. 00001000 = $1,000)
+            if (code === 'MTC' || code === 'MTRTK') {
+                if (!coverages['Cargo Limit']) coverages['Cargo Limit'] = String(limNums[0]);
+                if (!coverages['Cargo Deductible']) {
+                    const dedNums8 = (body.match(/(?<!\d)0\d{7}(?!\d)/g) || []).map(x => parseInt(x)).filter(x => x > 0 && x < 100000000);
+                    if (dedNums8.length > 0) coverages['Cargo Deductible'] = String(dedNums8[0]);
+                }
+                continue;
+            }
+            // MTGL (General Liability): values must be >= $100,000 to be actual limits (not premiums)
+            if (code === 'MTGL') {
+                const glNums = limNums.filter(n => n >= 100000);
+                if (glNums.length > 0) coverages[desc] = glNums.length >= 2 ? `${glNums[0]}/${glNums[1]}` : String(glNums[0]);
+                continue;
+            }
+            // Store plain numeric values (dropdown-compatible)
+            coverages[desc] = limNums.length >= 2 ? `${limNums[0]}/${limNums[1]}` : String(limNums[0]);
+        }
+
+        // ── 5DRV: drivers (personal auto) ───────────────────────────────────
+        const drivers = [];
+        for (const b of (by['5DRV'] || [])) {
+            const de = b[38] || 'P';
+            let dn = '';
+            if (de === 'C' || de === 'B') {
+                dn = clean(b.substring(39, 90));
+            } else {
+                const df = clean(b.substring(47, 63));
+                const dm = clean(b.substring(63, 74));
+                const dl = clean(b.substring(74, 94));
+                dn = [df, dm, dl].filter(Boolean).join(' ');
+            }
+            const lic      = b.substring(107, 131).replace(/[?\x00\s]/g, '');
+            const licState = b.substring(132, 134).trim();
+            const dob      = fmtYYMMDD(b.substring(140, 146));
+            if (dn) drivers.push({ name: dn, licenseNumber: lic, licenseState: licState, dateOfBirth: dob });
+        }
+        // ── 6SDV: drivers (commercial auto) ─────────────────────────────────
+        for (const b of (by['6SDV'] || [])) {
+            const dn       = clean(b.substring(39, 98));
+            const dob      = fmtYYMMDD(b.substring(98, 104));
+            const lic      = b.substring(105, 129).replace(/[?\x00\s]/g, '');
+            const licState = b.substring(129, 131).trim();
+            if (dn) drivers.push({ name: dn, licenseNumber: lic, licenseState: licState, dateOfBirth: dob });
+        }
+
+        if (insuredName || policyNumber) {
+            policies.push({
+                policyNumber, insuredName,
+                firstName, lastName, middleName, suffix, entityType, companyName,
+                phone, email: '',
+                address, city, state, zip,
+                effectiveDate, expirationDate, premium,
+                lob: _ivansLobLabel(lobCode), carrier,
+                vehicles, drivers, coverages,
+            });
+        }
+    }
+
+    return policies.filter(p => p.insuredName || p.policyNumber);
+}
+
+function _ivansLobLabel(code) {
+    return ({ PAUTO:'Personal Auto', CAUTO:'Commercial Auto', SYNBN:'Commercial Auto',
+              PRTBN:'Personal Auto', HOME:'Homeowners', HO:'Homeowners',
+              COMMP:'Commercial Property', GL:'General Liability',
+              WC:"Workers' Comp", UMBRL:'Umbrella', BOAT:'Boat' })[code] || code || '';
+}
+function _ivansLobToType(lob) {
+    return ({
+        'Personal Auto':       'personal-auto',
+        'Commercial Auto':     'commercial-auto',
+        'Commercial':          'commercial-auto',
+        'Homeowners':          'homeowners',
+        'Commercial Property': 'commercial-property',
+        "General Liability":   'general-liability',
+        "Workers' Comp":       'workers-comp',
+        'Umbrella':            'umbrella',
+        'Boat':                'boat',
+    })[lob] || (lob && lob.toLowerCase().includes('commercial') ? 'commercial-auto' : 'personal-auto');
+}
+
+function parseAcordXML(content) {
+    const doc = new DOMParser().parseFromString(content, 'application/xml');
+    const getText = (parent, ...selectors) => {
+        for (const sel of selectors) {
+            try { const el = parent.querySelector(sel); if (el && el.textContent.trim()) return el.textContent.trim(); } catch(e) {}
+        }
+        return '';
+    };
+    const policies = [];
+    const policyNodes = Array.from(doc.querySelectorAll('PersPolicy,CommlPolicy,Policy'));
+    if (!policyNodes.length) {
+        // Try flat structure
+        const pNums = Array.from(doc.querySelectorAll('PolicyNumber,PolNumber'));
+        pNums.forEach(pn => {
+            const root = pn.parentElement || doc;
+            policies.push({
+                policyNumber: pn.textContent.trim(),
+                insuredName: getText(root, 'CommercialName','FullName','GivenName'),
+                carrier: getText(root, 'InsurerName','CompanyName'),
+                effectiveDate: getText(root, 'EffectiveDt'),
+                expirationDate: getText(root, 'ExpirationDt'),
+                premium: getText(root, 'Amt','TotalPremiumAmt','WrittenPremiumAmt'),
+                lob: getText(root, 'LOBCd','LineOfBusiness'),
+                phone: getText(root, 'PhoneNumber'),
+                email: getText(root, 'EmailAddr'),
+            });
+        });
+        return policies.filter(p => p.policyNumber);
+    }
+    policyNodes.forEach(pn => {
+        const ctx = pn.closest('PersAutoPolicyAddRs,CommlAutoPolicyAddRs,PolicyAddRs,InsuranceSvcRs') || doc.documentElement;
+        const insNode = ctx.querySelector('InsuredOrPrincipal,Insured');
+        policies.push({
+            policyNumber: getText(pn, 'PolicyNumber','PolNumber'),
+            insuredName: insNode ? getText(insNode,'CommercialName','FullName','GivenName') : '',
+            carrier: getText(ctx,'InsurerName','CompanyName'),
+            effectiveDate: getText(pn,'EffectiveDt'),
+            expirationDate: getText(pn,'ExpirationDt'),
+            premium: getText(pn,'Amt','TotalPremiumAmt','CurrentTermAmt Amt','WrittenPremiumAmt'),
+            lob: getText(pn,'LOBCd','LineOfBusiness'),
+            phone: insNode ? getText(insNode,'PhoneNumber') : '',
+            email: insNode ? getText(insNode,'EmailAddr') : '',
+        });
+    });
+    return policies.filter(p => p.policyNumber || p.insuredName);
+}
+
+function parseAcordAL3(content) {
+    const lines = content.split(/\r\n|\r|\n/);
+    const policies = [];
+    let cur = null;
+
+    const segType = l => l.substring(0,6).trim().toUpperCase();
+    // AL3 can be pipe-delimited or fixed-width — try pipe first, fall back to positional
+    const field = (line, pipeIdx, start, len) => {
+        const parts = line.split('|');
+        if (parts.length > pipeIdx) return (parts[pipeIdx]||'').trim();
+        return line.length > start ? line.substring(start, start+len).trim() : '';
+    };
+    const fmtDate = raw => {
+        const d = (raw||'').replace(/[^\d]/g,'');
+        if (d.length === 8) {
+            if (parseInt(d.substring(0,4)) > 1900) return `${d.substring(4,6)}/${d.substring(6,8)}/${d.substring(0,4)}`;
+            return `${d.substring(0,2)}/${d.substring(2,4)}/${d.substring(4,8)}`;
+        }
+        return raw||'';
+    };
+
+    for (const rawLine of lines) {
+        const line = rawLine.trimEnd();
+        if (!line) continue;
+        const seg = segType(line);
+        switch(seg) {
+            case 'POLHDR': case 'PHPOL': case 'BPOL': {
+                if (cur) policies.push(cur);
+                cur = {
+                    policyNumber: field(line,1,6,18).replace(/\s+/g,''),
+                    insuredName:'', phone:'', email:'',
+                    effectiveDate: fmtDate(field(line,2,24,8)),
+                    expirationDate: fmtDate(field(line,3,32,8)),
+                    premium:'',
+                    lob: field(line,4,40,6),
+                    carrier:'',
+                };
+                break;
+            }
+            case 'INSNME': case 'NAMADD': case 'INSNAM': case 'NAME': {
+                if (!cur) cur = {policyNumber:'',insuredName:'',phone:'',email:'',effectiveDate:'',expirationDate:'',premium:'',lob:'',carrier:''};
+                const nm = field(line,1,6,60);
+                if (nm && !cur.insuredName) cur.insuredName = nm;
+                break;
+            }
+            case 'PREMUM': case 'PREIFO': case 'PRMPOL': case 'PREM': {
+                if (cur) { const v = field(line,1,6,14); if (/[\d.]/.test(v)) cur.premium = v.replace(/[^\d.]/g,''); }
+                break;
+            }
+            case 'TELENO': case 'CONTCT': case 'PHONE': {
+                if (cur && !cur.phone) { const ph = field(line,1,6,14).replace(/[^\d]/g,''); if (ph.length >= 7) cur.phone = ph; }
+                break;
+            }
+            case 'EMAIL': case 'EADDR': {
+                if (cur && !cur.email) { const em = field(line,1,6,80); if (em.includes('@')) cur.email = em; }
+                break;
+            }
+            case 'CMPNAM': case 'INSCO': case 'CARNAM': {
+                if (cur && !cur.carrier) { const cn = field(line,1,6,40); if (cn) cur.carrier = cn; }
+                break;
+            }
+        }
+        // Also try to catch policy numbers if no POLHDR found yet
+        if (!cur && /^\d{6,12}\s/.test(line.trim())) {
+            const m = line.trim().match(/^(\d{6,12})/);
+            if (m) cur = {policyNumber:m[1],insuredName:'',phone:'',email:'',effectiveDate:'',expirationDate:'',premium:'',lob:'',carrier:''};
+        }
+    }
+    if (cur) policies.push(cur);
+    return policies.filter(p => p.policyNumber || p.insuredName);
+}
+
+function showIvansReview(parsedPolicies) {
+    const reviewEl = document.getElementById('ivans-review-area');
+    if (!reviewEl) return;
+
+    const existing = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+    const annotated = parsedPolicies.map(p => {
+        const pNum = (p.policyNumber||'').replace(/\s+/g,'').toLowerCase();
+        const match = pNum ? existing.find(ep => {
+            const epNum = (ep.policyNumber || ep.financial?.['Policy Number'] || '').replace(/\s+/g,'').toLowerCase();
+            return epNum && epNum === pNum;
+        }) : null;
+        return { ...p, _match: match||null, _id: match ? match.id : null };
+    });
+
+    // Tag source filename for history tracking
+    annotated.forEach(p => { p._srcFile = (parsedPolicies[0]||{})._srcFile || 'upload'; });
+    window._ivansReviewData = annotated;
+    const upd = annotated.filter(p => p._match).length;
+    const newc = annotated.filter(p => !p._match).length;
+
+    const agentOpts = ['Grant','Hunter','Carson','Maureen'];
+    const agentOptHtml = `<option value="">Unassigned</option>` + agentOpts.map(a => `<option>${a}</option>`).join('');
+
+    reviewEl.innerHTML = `
+    <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-top:16px;">
+        <div style="background:#f8fafc;padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;gap:12px;align-items:center;">
+                <span style="font-size:13px;font-weight:700;color:#374151;">Review &amp; Confirm</span>
+                ${upd ? `<span style="background:#dbeafe;color:#1e40af;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;"><i class="fas fa-sync-alt" style="font-size:9px;"></i> ${upd} Update${upd!==1?'s':''}</span>` : ''}
+                ${newc ? `<span style="background:#dcfce7;color:#15803d;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;"><i class="fas fa-plus" style="font-size:9px;"></i> ${newc} New</span>` : ''}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <label style="font-size:11px;font-weight:600;color:#64748b;white-space:nowrap;">Default Producer:</label>
+                <select id="ivans-default-producer" onchange="ivansApplyDefaultProducer(this.value)"
+                        style="font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;color:#374151;cursor:pointer;">
+                    <option value="">— Select —</option>
+                    ${agentOpts.map(a=>`<option>${a}</option>`).join('')}
+                </select>
+                <span style="width:1px;height:16px;background:#e2e8f0;"></span>
+                <button onclick="ivansSelectAll(true)" style="font-size:11px;padding:4px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;color:#374151;">All</button>
+                <button onclick="ivansSelectAll(false)" style="font-size:11px;padding:4px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;color:#374151;">None</button>
+            </div>
+        </div>
+        <div style="overflow-x:auto;max-height:340px;overflow-y:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead style="position:sticky;top:0;z-index:1;">
+                    <tr style="background:#f1f5f9;">
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;width:32px;"></th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Policy #</th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Insured Name</th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Carrier</th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Effective</th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Expires</th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Premium</th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Action</th>
+                        <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Producer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${annotated.map((p,i) => {
+                        const isUpd = !!p._match;
+                        const badge = isUpd
+                            ? `<span style="background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;">UPDATE</span>`
+                            : `<span style="background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;">NEW</span>`;
+                        const prem = p.premium ? '$' + parseFloat(p.premium||0).toLocaleString() + '/yr' : '—';
+                        const rowBg = isUpd ? '' : 'background:#f0fdf4;';
+                        // Pre-fill producer from existing policy if available
+                        const existAgent = p._match ? (p._match.agent || p._match.assignedTo || p._match.producer || '') : '';
+                        const producerSel = `<select id="ivans-producer-${i}" class="ivans-producer-sel"
+                            style="font-size:11px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;color:#374151;cursor:pointer;min-width:90px;">
+                            <option value=""${!existAgent?'selected':''}>Unassigned</option>
+                            ${agentOpts.map(a=>`<option${existAgent===a?' selected':''}>${a}</option>`).join('')}
+                        </select>`;
+                        return `<tr style="${rowBg}border-bottom:1px solid #f1f5f9;">
+                            <td style="padding:8px 10px;"><input type="checkbox" class="ivans-row-cb" data-idx="${i}" checked style="width:14px;height:14px;accent-color:#0284c7;cursor:pointer;"></td>
+                            <td style="padding:8px 10px;font-weight:700;color:#1e40af;font-family:monospace;font-size:11px;">${p.policyNumber||'—'}</td>
+                            <td style="padding:8px 10px;color:#111827;font-weight:500;">${p.insuredName||'—'}</td>
+                            <td style="padding:8px 10px;color:#374151;">${p.carrier||'—'}</td>
+                            <td style="padding:8px 10px;color:#374151;">${p.effectiveDate||'—'}</td>
+                            <td style="padding:8px 10px;color:#374151;">${p.expirationDate||'—'}</td>
+                            <td style="padding:8px 10px;font-weight:600;color:#059669;">${prem}</td>
+                            <td style="padding:8px 10px;">${badge}</td>
+                            <td style="padding:8px 10px;">${producerSel}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div style="padding:14px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:#64748b;">Unchecked rows will be skipped</span>
+            <div style="display:flex;gap:10px;">
+                <button onclick="document.getElementById('ivans-upload-overlay').remove()" style="padding:8px 16px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:13px;color:#374151;">Cancel</button>
+                <button id="ivans-confirm-btn" onclick="confirmIvansImport()" style="padding:8px 20px;background:#0284c7;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;color:#fff;"><i class="fas fa-check"></i> Confirm &amp; Import</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function ivansSelectAll(val) {
+    document.querySelectorAll('.ivans-row-cb').forEach(cb => cb.checked = val);
+}
+
+function ivansApplyDefaultProducer(producer) {
+    if (!producer) return;
+    document.querySelectorAll('.ivans-producer-sel').forEach(sel => {
+        if (!sel.value) sel.value = producer; // only fill unassigned rows
+    });
+}
+
+async function confirmIvansImport() {
+    const data = window._ivansReviewData;
+    if (!data) return;
+
+    const checked = Array.from(document.querySelectorAll('.ivans-row-cb:checked')).map(cb => parseInt(cb.dataset.idx));
+    const selected = checked.map(i => ({
+        ...data[i],
+        _producer: document.getElementById(`ivans-producer-${i}`)?.value || ''
+    }));
+    if (!selected.length) { if (window.showNotification) showNotification('No policies selected', 'warning'); return; }
+
+    const btn = document.getElementById('ivans-confirm-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing…'; }
+
+    let updated = 0, created = 0;
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+    for (const p of selected) {
+        if (p._match && p._id) {
+            // UPDATE existing policy
+            const idx = policies.findIndex(ep => ep.id === p._id);
+            if (idx >= 0) {
+                if (p.effectiveDate)  policies[idx].effectiveDate  = p.effectiveDate;
+                if (p.expirationDate) policies[idx].expirationDate = p.expirationDate;
+                if (p.carrier)        policies[idx].carrier        = p.carrier;
+                if (p.lob) {
+                    policies[idx].lob = p.lob;
+                    const pt = _ivansLobToType(p.lob);
+                    if (pt) policies[idx].policyType = pt;
+                }
+                if (p.insuredName) {
+                    if (!policies[idx].clientName) policies[idx].clientName = p.insuredName;
+                    if (!policies[idx].client) policies[idx].client = p.insuredName;
+                }
+                if (p._producer) {
+                    policies[idx].agent      = p._producer;
+                    policies[idx].assignedTo = p._producer;
+                    policies[idx].producer   = p._producer;
+                }
+                if (p.premium) {
+                    const n = parseFloat(p.premium);
+                    if (!isNaN(n)) {
+                        policies[idx].premium = `$${n.toLocaleString()}/yr`;
+                        if (!policies[idx].financial) policies[idx].financial = {};
+                        policies[idx].financial['Annual Premium'] = n;
+                    }
+                }
+                // Named insured
+                const insObj = policies[idx].insured || {};
+                if (p.entityType === 'C' || p.entityType === 'B') {
+                    if (p.companyName) insObj['Business Name'] = p.companyName;
+                    insObj['Entity Type'] = 'Commercial';
+                } else {
+                    if (p.firstName)   insObj['First Name']   = p.firstName;
+                    if (p.middleName)  insObj['Middle Name']  = p.middleName;
+                    if (p.lastName)    insObj['Last Name']    = p.lastName;
+                    if (p.suffix)      insObj['Suffix']       = p.suffix;
+                    if (p.insuredName) insObj['Full Name']    = p.insuredName;
+                }
+                policies[idx].insured = insObj;
+                // Contact
+                const conObj = policies[idx].contact || {};
+                const isCommEnt = (p.entityType === 'C' || p.entityType === 'B');
+                if (isCommEnt) {
+                    // Commercial: owner = the individual behind the business (first principal driver)
+                    const principal = p.drivers?.[0]?.name || '';
+                    if (principal) conObj['Owner Name'] = principal;
+                    // Keep business name separate (already in insured object)
+                    conObj['Business Name'] = p.companyName || p.insuredName || '';
+                } else {
+                    if (p.insuredName) conObj['Owner Name'] = p.insuredName;
+                }
+                const ownerDob = (p.drivers && p.drivers[0]?.dateOfBirth) ? p.drivers[0].dateOfBirth : '';
+                if (ownerDob) conObj['Date of Birth'] = ownerDob;
+                if (p.address) conObj['Address']  = p.address;
+                if (p.city)    conObj['City']     = p.city;
+                if (p.state)   conObj['State']    = p.state;
+                if (p.zip)     conObj['Zip Code'] = p.zip;
+                if (p.phone)   conObj['Phone']    = p.phone;
+                policies[idx].contact = conObj;
+                // Coverage, vehicles, drivers
+                if (p.coverages && Object.keys(p.coverages).length)
+                    policies[idx].coverage = Object.assign({}, policies[idx].coverage || {}, p.coverages);
+                if (p.vehicles && p.vehicles.length) policies[idx].vehicles = p.vehicles;
+                if (p.drivers  && p.drivers.length)  policies[idx].drivers  = p.drivers;
+                policies[idx].ivansUpdated = new Date().toISOString();
+                updated++;
+                // Upsert client record FIRST so clientId is set before server sync
+                await _ivansUpsertClient(policies[idx]);
+                // Sync to server (now includes clientId)
+                try {
+                    const r = await fetch(`/api/policies/${p._id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(policies[idx]) });
+                    if (!r.ok) console.warn(`IVANS: PUT /api/policies/${p._id} failed (${r.status}) — falling back to POST upsert`);
+                    if (!r.ok) {
+                        await fetch('/api/policies', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(policies[idx]) });
+                    }
+                } catch(e) { console.warn('IVANS: server sync error (update):', e); }
+            }
+        } else {
+            // CREATE new policy
+            const newId = `POL-${Date.now()}-${Math.random().toString(36).substr(2,8)}`;
+            const n = p.premium ? parseFloat(p.premium) : 0;
+            const polType = _ivansLobToType(p.lob);
+            // Build insured object
+            const insObj = {};
+            if (p.entityType === 'C' || p.entityType === 'B') {
+                if (p.companyName) insObj['Business Name'] = p.companyName;
+                insObj['Entity Type'] = 'Commercial';
+            } else {
+                if (p.firstName)   insObj['First Name']  = p.firstName;
+                if (p.middleName)  insObj['Middle Name'] = p.middleName;
+                if (p.lastName)    insObj['Last Name']   = p.lastName;
+                if (p.suffix)      insObj['Suffix']      = p.suffix;
+                if (p.insuredName) insObj['Full Name']   = p.insuredName;
+            }
+            // Build contact object
+            const conObj = {};
+            const isCommEntNew = (p.entityType === 'C' || p.entityType === 'B');
+            if (isCommEntNew) {
+                const principal = p.drivers?.[0]?.name || '';
+                if (principal) conObj['Owner Name'] = principal;
+                conObj['Business Name'] = p.companyName || p.insuredName || '';
+            } else {
+                if (p.insuredName) conObj['Owner Name'] = p.insuredName;
+            }
+            const ownerDobNew = (p.drivers && p.drivers[0]?.dateOfBirth) ? p.drivers[0].dateOfBirth : '';
+            if (ownerDobNew) conObj['Date of Birth'] = ownerDobNew;
+            if (p.address) conObj['Address']  = p.address;
+            if (p.city)    conObj['City']     = p.city;
+            if (p.state)   conObj['State']    = p.state;
+            if (p.zip)     conObj['Zip Code'] = p.zip;
+            if (p.phone)   conObj['Phone']    = p.phone;
+            const newPol = {
+                id:             newId,
+                policyNumber:   (p.policyNumber||'').replace(/\s+/g,''),
+                policyType:     polType,
+                insuredName:    p.insuredName||'',
+                clientName:     p.insuredName||'',
+                client:         p.insuredName||'',
+                carrier:        p.carrier||'',
+                effectiveDate:  p.effectiveDate||'',
+                expirationDate: p.expirationDate||'',
+                premium:        n ? `$${n.toLocaleString()}/yr` : '',
+                financial:      { 'Annual Premium': n||0 },
+                lob:            p.lob||'',
+                policyStatus:   'active',
+                source:         'ivans',
+                createdAt:      Date.now(),
+                ivansUpdated:   new Date().toISOString(),
+                insured:        insObj,
+                contact:        conObj,
+                coverage:       p.coverages || {},
+                vehicles:       p.vehicles  || [],
+                drivers:        p.drivers   || [],
+                agent:          p._producer || '',
+                assignedTo:     p._producer || '',
+                producer:       p._producer || '',
+            };
+            policies.push(newPol);
+            created++;
+            try {
+                const r = await fetch('/api/policies', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(newPol) });
+                if (!r.ok) console.warn(`IVANS: POST /api/policies failed (${r.status})`);
+            } catch(e) { console.warn('IVANS: server sync error (create):', e); }
+            // Upsert client record and link policy
+            await _ivansUpsertClient(newPol);
+        }
+    }
+
+    localStorage.setItem('insurance_policies', JSON.stringify(policies));
+
+    // Run client upsert on ALL existing policies so clients stay in sync even for
+    // policies not included in this AL3 batch (incremental IVANS downloads).
+    const allPoliciesForClients = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    for (const pol of allPoliciesForClients) {
+        await _ivansUpsertClient(pol);
+    }
+    localStorage.setItem('insurance_policies', JSON.stringify(allPoliciesForClients));
+
+    // Dedup clients with same identity key — keep older, re-link policies to it, delete newer duplicate
+    {
+        const dedupClients  = JSON.parse(localStorage.getItem('insurance_clients')  || '[]');
+        const dedupPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        const keyToId = {}; // identity key → client id to keep
+        const mergeMap = {}; // removedId → keepId
+        for (const c of dedupClients) {
+            const cn = c.name || c.businessName || '';
+            const cd = c.dateOfBirth || c['Date of Birth'] || '';
+            const ck = _clientIdentityKey(cn, cd);
+            if (!ck) continue;
+            if (keyToId[ck]) {
+                mergeMap[c.id] = keyToId[ck]; // remove c, keep the earlier one
+            } else {
+                keyToId[ck] = c.id;
+            }
+        }
+        const removeIds = new Set(Object.keys(mergeMap));
+        if (removeIds.size > 0) {
+            let policyChanged = false;
+            for (const pol of dedupPolicies) {
+                if (pol.clientId && removeIds.has(String(pol.clientId))) {
+                    pol.clientId = mergeMap[String(pol.clientId)];
+                    policyChanged = true;
+                }
+            }
+            const cleanedClients = dedupClients.filter(c => !removeIds.has(String(c.id)));
+            localStorage.setItem('insurance_clients',  JSON.stringify(cleanedClients));
+            if (policyChanged) localStorage.setItem('insurance_policies', JSON.stringify(dedupPolicies));
+            for (const rid of removeIds) {
+                fetch(`/api/clients/${rid}`, { method: 'DELETE' }).catch(() => {});
+            }
+        }
+    }
+
+    // Save import history entry
+    const hist = JSON.parse(localStorage.getItem('ivans_import_history') || '[]');
+    const srcFilename = (window._ivansReviewData && window._ivansReviewData[0] && window._ivansReviewData[0]._srcFile) || 'unknown';
+    hist.push({ timestamp: new Date().toISOString(), filename: srcFilename, updated, created });
+    if (hist.length > 100) hist.splice(0, hist.length - 100); // keep last 100
+    localStorage.setItem('ivans_import_history', JSON.stringify(hist));
+
+    document.getElementById('ivans-upload-overlay').remove();
+
+    const msg = [updated && `${updated} polic${updated!==1?'ies':'y'} updated`, created && `${created} polic${created!==1?'ies':'y'} created`].filter(Boolean).join(', ');
+    if (window.showNotification) showNotification(`IVANS import complete — ${msg}`, 'success');
+
+    // Refresh IVANS history panel if on settings page
+    if (typeof initIvansSettingsPanel === 'function' && document.getElementById('ivans-import-history')) initIvansSettingsPanel();
+
+    // Refresh policies view (navigate to it if not already there, or reload if visible)
+    if (document.querySelector('.policies-view') && typeof loadPoliciesView === 'function') {
+        loadPoliciesView();
+    } else if (document.querySelector('.clients-view') && typeof loadClientsView === 'function') {
+        loadClientsView();
+    }
+}
+
+// Normalize owner identity key: name+DOB for individuals, name alone for commercial
+function _clientIdentityKey(ownerName, dob) {
+    const n = (ownerName || '').toLowerCase()
+        .replace(/\band\b/g, '')          // "AND" == "&" (JCW AND SONS == JCW & SONS)
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ').trim();
+    if (!n) return null;
+    return dob ? `${n}|${dob}` : n;
+}
+
+async function _ivansUpsertClient(policy) {
+    const isCommercialEnt = policy.insured?.['Entity Type'] === 'Commercial' ||
+                            !!policy.contact?.['Business Name'] ||
+                            (policy.policyType || '').toLowerCase().includes('commercial');
+
+    const rawOwnerName = policy.contact?.['Owner Name'] || '';
+    // If ownerName looks like a business entity (old imports stored biz name as owner), treat as empty
+    const BIZ_SUFFIX = /\b(llc|l\.l\.c|inc|incorporated|corp|corporation|ltd|limited|lp|l\.p|trucking|transport|transportation|logistics|hauling|construction|farms|enterprises|services|solutions|towing)\b/i;
+    const ownerName  = BIZ_SUFFIX.test(rawOwnerName) ? '' : rawOwnerName;
+    const bizName    = policy.contact?.['Business Name'] || (isCommercialEnt ? (policy.insuredName || policy.clientName || '') : '');
+    const dob        = policy.contact?.['Date of Birth'] || '';
+
+    // Client identity is ALWAYS based on the owner person + DOB.
+    // For commercial: use owner name if available, fall back to business name (no DOB).
+    const identName  = ownerName || (isCommercialEnt ? bizName : (policy.insuredName || policy.clientName || ''));
+    const identDob   = ownerName ? dob : '';   // only use DOB when we have a real person name
+    if (!identName) return;
+
+    const identKey = _clientIdentityKey(identName, identDob);
+    if (!identKey) return;
+
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+
+    // First: if policy already has a clientId, reuse that client ONLY if its identity matches
+    // (prevents old business-named clientId from blocking creation of the real person client)
+    let client = null;
+    if (policy.clientId) {
+        const existing = clients.find(c => String(c.id) === String(policy.clientId));
+        if (existing) {
+            const existingDob = existing.dateOfBirth || existing['Date of Birth'] || '';
+            const existingKey = _clientIdentityKey(existing.name || existing.businessName || '', existingDob);
+            // Only reuse if identity matches — otherwise fall through to search/create correct client
+            if (existingKey && existingKey === identKey) client = existing;
+        }
+    }
+
+    // Fallback: find existing client by identity key (owner name + DOB)
+    if (!client) {
+        client = clients.find(c => {
+            const cn = c.name || c.businessName || '';
+            const cdob = c.dateOfBirth || c['Date of Birth'] || '';
+            return _clientIdentityKey(cn, cdob) === identKey;
+        });
+    }
+    // Fall back to business name match when person identity is unknown (no valid ownerName)
+    if (!client && isCommercialEnt && bizName && !ownerName) {
+        const bizKey = _clientIdentityKey(bizName, '');
+        client = clients.find(c => {
+            const cbiz = c.businessName || (c.type === 'Commercial Lines' ? c.name : '');
+            return bizKey && _clientIdentityKey(cbiz, '') === bizKey;
+        });
+    }
+
+    if (client) {
+        // Update missing fields
+        let changed = false;
+        if (!client.phone && policy.contact?.['Phone'])    { client.phone = policy.contact['Phone']; changed = true; }
+        if (!client.email && policy.contact?.['Email'])    { client.email = policy.contact['Email']; changed = true; }
+        if (!client.address && policy.contact?.['Address']){ client.address = policy.contact['Address']; changed = true; }
+        if (!client.dateOfBirth && dob)                    { client.dateOfBirth = dob; changed = true; }
+        if (isCommercialEnt && bizName && !client.businessName) { client.businessName = bizName; changed = true; }
+        const pol_agent = policy.agent || policy.assignedTo || '';
+        if (pol_agent && !client.assignedTo) { client.assignedTo = pol_agent; client.agent = pol_agent; changed = true; }
+        if (changed) {
+            client.ivansUpdated = new Date().toISOString();
+            localStorage.setItem('insurance_clients', JSON.stringify(clients));
+            fetch('/api/clients', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(client) }).catch(()=>{});
+        }
+    } else {
+        // Create new client
+        client = {
+            id:           String(Date.now()) + Math.random().toString(36).substr(2, 5),
+            // Client name = the PERSON (owner). Business name stored separately.
+            name:         identName,
+            businessName: isCommercialEnt ? bizName : '',
+            phone:        policy.contact?.['Phone'] || '',
+            email:        policy.contact?.['Email'] || '',
+            address:      policy.contact?.['Address'] || '',
+            city:         policy.contact?.['City'] || '',
+            state:        policy.contact?.['State'] || '',
+            zip:          policy.contact?.['Zip Code'] || '',
+            dateOfBirth:  dob,
+            type:         isCommercialEnt ? 'Commercial Lines' : 'Personal Lines',
+            assignedTo:   policy.agent || policy.assignedTo || '',
+            agent:        policy.agent || policy.assignedTo || '',
+            source:       'ivans',
+            ivansUpdated: new Date().toISOString(),
+            createdAt:    Date.now(),
+        };
+        clients.push(client);
+        localStorage.setItem('insurance_clients', JSON.stringify(clients));
+        try {
+            const r = await fetch('/api/clients', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(client) });
+            if (r.ok) { const saved = await r.json(); if (saved.id) client.id = saved.id; }
+        } catch(e) { console.warn('IVANS: client create server sync error:', e); }
+        // Re-save with server-assigned id if changed
+        localStorage.setItem('insurance_clients', JSON.stringify(clients));
+    }
+
+    // Link policy to this client
+    if (policy.clientId !== client.id) {
+        policy.clientId   = client.id;
+        policy.clientName = client.name;
+        // Persist the policy update locally (caller already saved to localStorage)
+        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        const idx = policies.findIndex(p => p.id === policy.id);
+        if (idx >= 0) {
+            policies[idx].clientId   = client.id;
+            policies[idx].clientName = client.name;
+            localStorage.setItem('insurance_policies', JSON.stringify(policies));
+        }
+    }
+}
+
+async function ivansImportFromServer(fileId, filename, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading…'; }
+    try {
+        const res = await fetch(`/api/agency-files/${fileId}/content`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed to read file');
+
+        const policies = parseIvansFile(data.content, data.filename || filename);
+        policies.forEach(p => p._srcFile = filename);
+
+        if (!policies.length) {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Import'; }
+            if (window.showNotification) showNotification('No policies found in ' + filename, 'warning');
+            return;
+        }
+
+        // Open the IVANS review modal
+        showIvansUpload();
+        // Small delay to let modal render, then inject the results
+        setTimeout(() => {
+            const statusEl = document.getElementById('ivans-parse-status');
+            if (statusEl) statusEl.innerHTML = `<div style="color:#15803d;font-size:13px;font-weight:600;padding:8px 14px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;"><i class="fas fa-check-circle"></i> Found <strong>${policies.length}</strong> polic${policies.length===1?'y':'ies'} in ${filename}</div>`;
+            showIvansReview(policies);
+        }, 150);
+
+    } catch(e) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Import'; }
+        if (window.showNotification) showNotification('Import error: ' + e.message, 'error');
+    }
+}
+
+// ── End IVANS Download Import ─────────────────────────────────────────────────
+
 function importClients() {
     console.log('Importing clients');
     // Would open import wizard
@@ -19088,18 +20700,18 @@ function showPolicyDetailsModal(policy) {
                 </div>
                 
                 <!-- Tab Navigation -->
-                <div class="policy-tabs" style="margin-bottom: 30px; padding: 5px; background: #f3f4f6; border-radius: 10px;">
+                <div class="pv-tab-nav" style="margin-bottom: 30px; padding: 5px; background: #f3f4f6; border-radius: 10px; display: flex; flex-wrap: wrap;">
                     ${tabs.map((tab, index) => `
-                        <button class="tab-btn ${index === 0 ? 'active' : ''}" data-tab="${tab.id}" onclick="switchViewTab('${tab.id}')" style="padding: 14px 24px; font-size: 14px; border-radius: 8px; transition: all 0.2s; margin: 2px;">
+                        <button class="pv-tab-btn ${index === 0 ? 'pv-active' : ''}" data-tab="${tab.id}" onclick="(function(btn,id){var m=document.getElementById('policyViewModal');if(!m)return;m.querySelectorAll('.pv-tab-section').forEach(function(el){el.style.display='none'});m.querySelectorAll('.pv-tab-btn').forEach(function(b){b.classList.remove('pv-active');b.style.background='transparent';b.style.color='#374151';b.style.boxShadow='none'});var tc=document.getElementById(id+'-view-content');if(tc){tc.style.display='block'}btn.classList.add('pv-active');btn.style.background='#0066cc';btn.style.color='white';btn.style.boxShadow='0 2px 4px rgba(0,102,204,0.3)'})(this,'${tab.id}')" style="padding: 14px 24px; font-size: 14px; border-radius: 8px; transition: all 0.2s; margin: 2px; border: none; cursor: pointer; font-weight: 500; background: ${index === 0 ? '#0066cc' : 'transparent'}; color: ${index === 0 ? 'white' : '#374151'}; box-shadow: ${index === 0 ? '0 2px 4px rgba(0,102,204,0.3)' : 'none'};">
                             <i class="${tab.icon}" style="margin-right: 6px;"></i> ${tab.name}
                         </button>
                     `).join('')}
                 </div>
-                
+
                 <!-- Tab Contents -->
-                <div class="tab-contents" style="padding: 35px; background: #ffffff; border: 2px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                <div style="padding: 35px; background: #ffffff; border: 2px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
                     ${tabs.map((tab, index) => `
-                        <div id="${tab.id}-view-content" class="tab-content ${index === 0 ? 'active' : ''}" style="padding: 15px;">
+                        <div id="${tab.id}-view-content" class="pv-tab-section" style="padding: 15px; display: ${index === 0 ? 'block' : 'none'};">
                             ${generateViewTabContent(tab.id, policy)}
                         </div>
                     `).join('')}
@@ -19120,7 +20732,30 @@ function showPolicyDetailsModal(policy) {
         </div>
     `;
 
+    // Remove any stale modal with the same ID before appending
+    const _existingModal = document.getElementById('policyViewModal');
+    if (_existingModal) _existingModal.remove();
+
     document.body.appendChild(modalOverlay);
+
+    // Install a clean, direct switchViewTab for this modal instance.
+    // All three addon scripts capture `window.switchViewTab` only at page-load time
+    // so overriding it here at runtime is safe and will persist until the next open.
+    window.switchViewTab = function(tabId) {
+        const _m = document.getElementById('policyViewModal');
+        if (!_m) return;
+        _m.querySelectorAll('.tab-content').forEach(function(el) {
+            el.style.display = 'none';
+            el.classList.remove('active');
+        });
+        _m.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.classList.remove('active');
+        });
+        const _tc = document.getElementById(tabId + '-view-content');
+        if (_tc) { _tc.style.display = 'block'; _tc.classList.add('active'); }
+        const _tb = _m.querySelector('.tab-btn[data-tab="' + tabId + '"]');
+        if (_tb) _tb.classList.add('active');
+    };
 
     // Initialize ID cards display for this policy
     setTimeout(() => {
@@ -19291,7 +20926,9 @@ function generateViewTabContent(tabId, policy) {
                         </div>
                         ${(() => {
                             // Get business name from Named Insured tab first, then fallback to clientName
-                            const businessName = policy.insured?.['Name/Business Name'] ||
+                            const businessName = policy.insured?.['Business Name'] ||
+                                                policy.contact?.['Business Name'] ||
+                                                policy.insured?.['Name/Business Name'] ||
                                                 policy.insured?.['Primary Named Insured'] ||
                                                 policy.namedInsured?.name ||
                                                 policy.clientName;
@@ -19347,17 +20984,40 @@ function generateViewTabContent(tabId, policy) {
             
         case 'contact':
             const contactData = policy.contact || {};
+            const isCommContact = policy.insured?.['Entity Type'] === 'Commercial' || !!contactData['Business Name'];
+            const ownerName = contactData['Owner Name'] || '';
+            const businessNameC = contactData['Business Name'] || (isCommContact ? (policy.insuredName || policy.clientName || '') : '');
+            const ownerDob  = contactData['Date of Birth'] || '';
+            const contactFields = Object.entries(contactData).filter(([k]) => !['Owner Name','Date of Birth','Business Name'].includes(k));
             return `
+                <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; margin-bottom: 24px; color: #111827; font-size: 22px; font-weight: 600;">Named Insured / Owner</h3>
+                    <div class="view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 35px;">
+                        ${isCommContact && businessNameC ? `
+                        <div class="view-item">
+                            <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">Business Name</label>
+                            <p style="font-size: 17px; font-weight: 600; margin: 0; color: #111827;">${businessNameC}</p>
+                        </div>` : ''}
+                        <div class="view-item">
+                            <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${isCommContact ? 'Owner / Principal' : 'Owner Name'}</label>
+                            <p style="font-size: 17px; font-weight: 600; margin: 0; color: #111827;">${ownerName || (isCommContact ? 'N/A' : (policy.insuredName || policy.clientName || 'N/A'))}</p>
+                        </div>
+                        <div class="view-item">
+                            <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">Date of Birth</label>
+                            <p style="font-size: 17px; margin: 0; color: #374151;">${ownerDob || 'N/A'}</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
                     <h3 style="margin-top: 0; margin-bottom: 30px; color: #111827; font-size: 22px; font-weight: 600;">Contact Information</h3>
                     <div class="view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 35px;">
-                        ${Object.entries(contactData).map(([key, value]) => `
+                        ${contactFields.map(([key, value]) => `
                             <div class="view-item">
                                 <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${key}</label>
                                 <p style="font-size: 17px; margin: 0; color: #374151;">${value || 'N/A'}</p>
                             </div>
                         `).join('')}
-                        ${Object.keys(contactData).length === 0 ? '<p style="color: #6b7280;">No contact information available</p>' : ''}
+                        ${contactFields.length === 0 ? '<p style="color: #6b7280;">No contact information available</p>' : ''}
                     </div>
                 </div>
             `;
@@ -19432,16 +21092,27 @@ function generateViewTabContent(tabId, policy) {
                     </div>
                 `;
             }
+            const DRIVER_LABELS = {
+                name: 'Name', firstName: 'First Name', lastName: 'Last Name',
+                licenseNumber: 'License Number', licenseState: 'License State',
+                dateOfBirth: 'Date of Birth', dob: 'Date of Birth',
+                maritalStatus: 'Marital Status', relationship: 'Relationship',
+                yearsExperience: 'Years Experience', violations: 'Violations',
+                accidents: 'Accidents', excluded: 'Excluded',
+                cdl: 'CDL', cdlNumber: 'CDL Number', cdlClass: 'CDL Class',
+                hireDate: 'Hire Date', terminationDate: 'Termination Date',
+                gender: 'Gender', occupation: 'Occupation'
+            };
             return `
                 <div class="form-section" style="padding: 20px; background: #f9fafb; border-radius: 8px;">
                     <h3 style="margin-top: 0; margin-bottom: 25px; color: #111827; font-size: 20px;">Drivers</h3>
                     ${drivers.map((driver, index) => `
                         <div style="background: #ffffff; padding: 30px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
-                            <h4 style="margin-top: 0; color: #374151;">Driver ${index + 1}</h4>
+                            <h4 style="margin-top: 0; color: #374151;">Driver ${index + 1}${driver.name ? ' — ' + driver.name : (driver.firstName ? ' — ' + driver.firstName + (driver.lastName ? ' ' + driver.lastName : '') : '')}</h4>
                             <div class="view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                 ${Object.entries(driver).filter(([key]) => key !== 'endorsements').map(([key, value]) => `
                                     <div class="view-item">
-                                        <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${key}</label>
+                                        <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${DRIVER_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</label>
                                         <p style="font-size: 14px; margin: 0;">${value || 'N/A'}</p>
                                     </div>
                                 `).join('')}
@@ -19460,18 +21131,119 @@ function generateViewTabContent(tabId, policy) {
         case 'coverage':
             const coverageData = policy.coverage || {};
             const additionalCoveragesList = coverageData.additionalCoverages || [];
-            const coverageDataWithoutAdditional = Object.entries(coverageData).filter(([key]) => key !== 'additionalCoverages');
+            // Normalize raw IVANS codes and internal field IDs to display labels
+            const COVERAGE_DISPLAY_LABELS = {
+                // IVANS codes → display label
+                'MTGL': 'General Liability', 'MEDPM': 'Medical Payments',
+                'MTC': 'Cargo Limit', 'MTRTK': 'Cargo Limit',
+                'CSL': 'Liability Limits', 'Combined Single Limit': 'Liability Limits',
+                'COMP': 'Comprehensive Deductible', 'Comprehensive': 'Comprehensive Deductible',
+                'COLL': 'Collision Deductible', 'Collision': 'Collision Deductible',
+                'UMCSL': 'Uninsured/Underinsured Motorist', 'UNCSL': 'Uninsured/Underinsured Motorist',
+                'UMAUTO': 'Uninsured/Underinsured Motorist',
+                // Legacy key aliases (old IVANS imports used these keys)
+                'Uninsured Motorist CSL': 'Uninsured/Underinsured Motorist',
+                'Uninsured Motorist': 'Uninsured/Underinsured Motorist',
+                'Motor Truck Cargo': 'Cargo Limit',
+                'GLCBI': 'General Liability BI', 'GLCPD': 'General Liability PD',
+                'FIRDM': 'Fire Damage Liability', 'MDEXP': 'Medical Expense',
+                'UMPD': 'UM Property Damage', 'NOTRL': 'Non-Trucking Liability',
+                // Form field IDs
+                'coverage-liability-limits': 'Liability Limits',
+                'coverage-general-aggregate': 'General Liability',
+                'coverage-comp-deduct': 'Comprehensive Deductible',
+                'coverage-coll-deduct': 'Collision Deductible',
+                'coverage-cargo-limit': 'Cargo Limit',
+                'coverage-cargo-deduct': 'Cargo Deductible',
+                'coverage-medical': 'Medical Payments',
+                'coverage-um-uim': 'Uninsured/Underinsured Motorist',
+                'coverage-trailer-interchange': 'Trailer Interchange',
+                'coverage-non-trucking': 'Non-Trucking Liability',
+                'coverage-reefer': 'Reefer Breakdown',
+            };
+            // Deduplicate: group by display label.
+            // Form-save entries have human-label keys (NOT in COVERAGE_DISPLAY_LABELS) and plain numeric values (e.g. "1000000").
+            // IVANS entries have code keys (IN COVERAGE_DISPLAY_LABELS) and formatted display strings (e.g. "$1,000,000").
+            // Always prefer form-save entries — they are what the edit form and COI generation rely on.
+            // Raw IVANS codes already normalized to human labels — hide them as raw keys
+            const CVG_DISPLAY_SKIP = new Set([
+                'ADDIN','CARGO','WVSUB','ROAD','MTC','MTRTK','MTGL','CSL','COMP','COLL','MEDPM',
+                'UNCSL','UMCSL','UMAUTO','UMBI','UMPD',
+                'GLCBI','GLCPD','PRDCO','PIADV','FIRDM','MDEXP','NOTRL',
+                ...Array.from({length: 15}, (_, i) => `AIN${String(i+1).padStart(2,'0')}`),
+                ...Array.from({length: 15}, (_, i) => `AIN${i+1}`),
+            ]);
+            // Canonical display order for coverage fields
+            const CVG_ORDER = ['Liability Limits','Uninsured/Underinsured Motorist','Medical Payments',
+                'Comprehensive Deductible','Collision Deductible','General Liability',
+                'Cargo Limit','Cargo Deductible','Trailer Interchange','Non-Trucking Liability',
+                'Reefer Breakdown','General Liability BI','General Liability PD',
+                'Products/Completed Ops','Personal Injury/Advertising','Fire Damage Liability',
+                'Medical Expense','UM Property Damage'];
+            const _deduped = new Map();
+            Object.entries(coverageData).forEach(([key, value]) => {
+                if (key === 'additionalCoverages') return;
+                // Skip raw IVANS codes that are already normalized, and fee/add-on codes
+                if (CVG_DISPLAY_SKIP.has(key) || /^AIN\d+$/.test(key)) return;
+                // Skip old-format IVANS strings that embed premium info (e.g. "$1,000 ($100/yr)")
+                if (typeof value === 'string' && value.includes('($')) return;
+                const displayLabel = COVERAGE_DISPLAY_LABELS[key] || key;
+                const isFormSave = !COVERAGE_DISPLAY_LABELS[key]; // key not in map = saved by form with human label
+                // For General Liability, skip if all parsed values are < $100,000 (those are premiums, not limits)
+                if (displayLabel === 'General Liability') {
+                    const glParts = String(value).replace(/[$,]/g,'').split('/');
+                    if (glParts.every(p => !isNaN(parseFloat(p)) && parseFloat(p) < 100000)) return;
+                }
+                const existing = _deduped.get(displayLabel);
+                if (!existing) {
+                    _deduped.set(displayLabel, { value, isFormSave });
+                } else if (isFormSave && !existing.isFormSave) {
+                    // Form-save beats IVANS
+                    _deduped.set(displayLabel, { value, isFormSave: true });
+                } else if (isFormSave === existing.isFormSave && !existing.value && value) {
+                    // Same type, prefer non-empty
+                    _deduped.set(displayLabel, { value, isFormSave });
+                }
+            });
+            // Format a plain numeric value for display (e.g. "1000000" → "$1,000,000")
+            // For deductible labels with slash-format (stated_value/deductible), show only the deductible part
+            const _fmtCovVal = (val, label) => {
+                if (!val) return val;
+                const s = String(val).trim();
+                if (label && label.toLowerCase().includes('deductible') && s.includes('/') && !s.includes('$')) {
+                    const parts = s.split('/');
+                    if (parts.every(p => /^\d+(\.\d+)?$/.test(p.trim()))) {
+                        return '$' + parseFloat(parts[parts.length - 1].trim()).toLocaleString();
+                    }
+                }
+                if (s.includes('$') || (s.includes('/') && s.includes('$'))) return s;
+                const parts = s.split('/');
+                if (parts.every(p => /^\d+(\.\d+)?$/.test(p.trim()))) {
+                    return parts.map(p => '$' + parseFloat(p.trim()).toLocaleString()).join('/');
+                }
+                return s;
+            };
+            // Filter out entries with no real value, then sort by canonical order
+            const coverageEntries = [..._deduped.entries()]
+                .filter(([, entry]) => entry.value && String(entry.value).trim() !== '' && String(entry.value).trim().toLowerCase() !== 'n/a')
+                .sort(([a], [b]) => {
+                    const ai = CVG_ORDER.indexOf(a), bi = CVG_ORDER.indexOf(b);
+                    if (ai === -1 && bi === -1) return a.localeCompare(b);
+                    if (ai === -1) return 1;
+                    if (bi === -1) return -1;
+                    return ai - bi;
+                });
             return `
                 <div class="form-section" style="padding: 30px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
                     <h3 style="margin-top: 0; margin-bottom: 30px; color: #111827; font-size: 22px; font-weight: 600;">Coverage Details</h3>
                     <div class="view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 35px;">
-                        ${coverageDataWithoutAdditional.map(([key, value]) => `
+                        ${coverageEntries.map(([label, entry]) => `
                             <div class="view-item">
-                                <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${key}</label>
-                                <p style="font-size: 17px; margin: 0; font-weight: 600; color: #059669;">${value || 'N/A'}</p>
+                                <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${label}</label>
+                                <p style="font-size: 17px; margin: 0; font-weight: 600; color: #059669;">${entry.isFormSave ? _fmtCovVal(entry.value, label) : entry.value}</p>
                             </div>
                         `).join('')}
-                        ${coverageDataWithoutAdditional.length === 0 ? '<p style="color: #6b7280;">No coverage information available</p>' : ''}
+                        ${coverageEntries.length === 0 ? '<p style="color: #6b7280;">No coverage information available</p>' : ''}
                     </div>
                     ${additionalCoveragesList.length > 0 ? `
                         <div style="margin-top: 30px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
@@ -19602,20 +21374,24 @@ function generateViewTabContent(tabId, policy) {
 }
 
 function switchViewTab(tabId) {
-    // Remove active class from all tabs and contents
+    // Remove active class and hide all tabs and contents
     document.querySelectorAll('#policyViewModal .tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
     document.querySelectorAll('#policyViewModal .tab-content').forEach(content => {
         content.classList.remove('active');
+        content.style.display = 'none';
     });
-    
-    // Add active class to selected tab and content
+
+    // Activate selected tab button and show selected content
     const selectedTab = document.querySelector(`#policyViewModal .tab-btn[data-tab="${tabId}"]`);
     const selectedContent = document.getElementById(`${tabId}-view-content`);
-    
+
     if (selectedTab) selectedTab.classList.add('active');
-    if (selectedContent) selectedContent.classList.add('active');
+    if (selectedContent) {
+        selectedContent.classList.add('active');
+        selectedContent.style.display = 'block';
+    }
 }
 
 function getPolicyTypeBadgeColor(policyType) {
@@ -19642,11 +21418,31 @@ function getPolicyTypeLabel(policyType) {
 }
 
 
-function editPolicy(policyId) {
-    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+async function editPolicy(policyId) {
     const idStr = String(policyId);
-    const policy = policies.find(p => String(p.id) === idStr || p.policyNumber === idStr);
-    
+
+    // Always fetch fresh data from server so IVANS-imported fields are present
+    let policy = null;
+    try {
+        const resp = await fetch(`/api/policies/${encodeURIComponent(idStr)}`);
+        if (resp.ok) {
+            const data = await resp.json();
+            // Server returns the policy object directly (not wrapped)
+            if (data && typeof data === 'object' && !Array.isArray(data) && (data.id || data.policyNumber)) {
+                policy = data;
+                console.log('✅ editPolicy: loaded from server, vehicles:', policy.vehicles?.length || 0, 'drivers:', policy.drivers?.length || 0);
+            }
+        }
+    } catch (e) {
+        console.warn('Server fetch failed, falling back to localStorage:', e);
+    }
+
+    // Fallback to localStorage if server fetch failed or returned invalid data
+    if (!policy || typeof policy !== 'object' || (!policy.id && !policy.policyNumber)) {
+        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        policy = policies.find(p => String(p.id) === idStr || p.policyNumber === idStr);
+    }
+
     if (policy) {
         // Open the policy modal in edit mode with the existing policy data
         if (typeof showPolicyModal === 'function') {
@@ -19780,18 +21576,21 @@ async function generatePolicyRows() {
     console.log('🚨 GENERATEPOLICYROWS - Syncing with server first...');
 
     // ALWAYS sync with server first to get latest data
+    let freshServerPolicies = null;
     if (window.loadPoliciesFromServer) {
         try {
-            const serverPolicies = await window.loadPoliciesFromServer();
-            console.log(`🔄 Policy server sync: Retrieved ${serverPolicies ? serverPolicies.length : 0} policies from API`);
+            freshServerPolicies = await window.loadPoliciesFromServer();
+            console.log(`🔄 Policy server sync: Retrieved ${freshServerPolicies ? freshServerPolicies.length : 0} policies from API`);
         } catch (error) {
             console.error('⚠️ Policy server sync failed, proceeding with localStorage:', error);
         }
     }
 
-    // Now load from localStorage (which should now have fresh data)
-    let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    console.log(`✅ Loaded ${policies.length} policies from localStorage (post-server-sync)`);
+    // Use server data directly if available (avoids stale localStorage cache), otherwise fall back to localStorage
+    let policies = (freshServerPolicies && freshServerPolicies.length > 0)
+        ? freshServerPolicies
+        : JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    console.log(`✅ Loaded ${policies.length} policies (source: ${freshServerPolicies ? 'server' : 'localStorage'})`);
 
     // Get current user and check if they are admin
     const sessionData = sessionStorage.getItem('vanguard_user');
@@ -19840,6 +21639,10 @@ async function generatePolicyRows() {
     
     // Generate rows for actual saved policies
     return policies.map(policy => {
+        // Normalize top-level fields using overview as fallback (server stores data in overview sub-object)
+        if (!policy.effectiveDate && policy.overview?.['Effective Date']) policy.effectiveDate = policy.overview['Effective Date'];
+        if (!policy.expirationDate && policy.overview?.['Expiration Date']) policy.expirationDate = policy.overview['Expiration Date'];
+
         // Ensure policy type is available - check multiple possible locations
         const policyType = policy.policyType || policy.type || (policy.overview && policy.overview['Policy Type'] ?
             policy.overview['Policy Type'].toLowerCase().replace(/\s+/g, '-') : 'unknown');
@@ -19877,7 +21680,11 @@ async function generatePolicyRows() {
         let clientName = 'N/A';
 
         // PRIORITY 1: Check Named Insured tab data first (most accurate)
-        if (policy.insured?.['Name/Business Name']) {
+        if (policy.insured?.['Business Name']) {
+            clientName = policy.insured['Business Name'];
+        } else if (policy.contact?.['Business Name']) {
+            clientName = policy.contact['Business Name'];
+        } else if (policy.insured?.['Name/Business Name']) {
             clientName = policy.insured['Name/Business Name'];
         } else if (policy.insured?.['Primary Named Insured']) {
             clientName = policy.insured['Primary Named Insured'];
@@ -19914,7 +21721,7 @@ async function generatePolicyRows() {
                 <td class="policy-number" style="padding-left: 20px;">${policy.policyNumber}</td>
                 <td><span class="policy-type-badge ${badgeClass}">${typeLabel}</span></td>
                 <td>${clientName}</td>
-                <td>${policy.carrier}</td>
+                <td>${policy.carrier && policy.carrier !== 'Unknown' ? policy.carrier : (policy.overview?.Carrier || policy.carrier || 'N/A')}</td>
                 <td>${formatDate(policy.effectiveDate)}</td>
                 <td>${formatDate(policy.expirationDate)}</td>
                 <td>${premium}/yr</td>
@@ -20066,6 +21873,13 @@ function runReport(type) {
             showNotification('Generating ViciDial Performance report...', 'info');
             generateViciDialPerformanceReport();
             break;
+        case 'lead-list':
+            generateLeadListReport();
+            break;
+        case 'quarterly':
+            showNotification('Generating Quarterly Report...', 'info');
+            generateQuarterlyReport();
+            break;
         default:
             showNotification(`Generating ${type} report...`, 'info');
             setTimeout(() => {
@@ -20073,6 +21887,693 @@ function runReport(type) {
             }, 2000);
     }
 }
+
+// ─── QUARTERLY REPORT ────────────────────────────────────────────────────────
+function generateQuarterlyReport() {
+    document.querySelectorAll('.qrpt-overlay').forEach(e => e.remove());
+    const now = new Date();
+    const curQ = Math.floor(now.getMonth() / 3) + 1;
+    const curY = now.getFullYear();
+    let defQ = curQ - 1; let defY = curY;
+    if (defQ < 1) { defQ = 4; defY = curY - 1; }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'qrpt-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.75);display:flex;align-items:center;justify-content:center;z-index:999999;padding:12px;box-sizing:border-box;';
+
+    overlay.innerHTML = `
+    <div style="background:#f8fafc;border-radius:20px;width:100%;max-width:1400px;height:94vh;display:flex;flex-direction:column;box-shadow:0 30px 100px rgba(0,0,0,0.45);overflow:hidden" onclick="event.stopPropagation()">
+      <div style="background:linear-gradient(135deg,#4338ca 0%,#7c3aed 100%);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="background:rgba(255,255,255,0.18);border-radius:12px;padding:10px 12px"><i class="fas fa-calendar-check" style="color:#fff;font-size:22px"></i></div>
+          <div>
+            <h2 style="margin:0;color:#fff;font-size:21px;font-weight:700;letter-spacing:-.3px">Quarterly Business Report</h2>
+            <p style="margin:2px 0 0;color:rgba(255,255,255,0.65);font-size:12px">Sales, Financial &amp; Activity Metrics</p>
+          </div>
+        </div>
+        <button onclick="this.closest('.qrpt-overlay').remove()" style="background:rgba(255,255,255,0.15);border:none;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:22px;color:#fff;display:flex;align-items:center;justify-content:center">&times;</button>
+      </div>
+      <div style="background:#fff;border-bottom:2px solid #e2e8f0;padding:14px 28px;display:flex;gap:16px;align-items:flex-end;flex-shrink:0;flex-wrap:wrap">
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Quarter</label>
+          <div style="display:flex;gap:6px">
+            ${[1,2,3,4].map(q => `<button onclick="setQRptQuarter(${q})" id="qrpt-qbtn-${q}" style="padding:7px 14px;background:${q===defQ?'#ede9fe':'#f1f5f9'};border:1.5px solid ${q===defQ?'#7c3aed':'#e2e8f0'};border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;color:${q===defQ?'#4c1d95':'#475569'}">Q${q}</button>`).join('')}
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Year</label>
+          <select id="qrpt-year" onchange="runQuarterlyReport()" style="padding:7px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:13px;color:#111827;outline:none">
+            ${[curY-2, curY-1, curY, curY+1].map(y => `<option value="${y}" ${y===defY?'selected':''}>${y}</option>`).join('')}
+          </select>
+        </div>
+        <input type="hidden" id="qrpt-q" value="${defQ}">
+        <div style="margin-left:auto;align-self:flex-end">
+          <button onclick="runQuarterlyReport()" style="padding:10px 28px;background:linear-gradient(135deg,#4338ca,#7c3aed);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(124,58,237,0.4)">
+            <i class="fas fa-play" style="font-size:13px"></i> Run Report
+          </button>
+        </div>
+      </div>
+      <div id="qrpt-results" style="flex:1;overflow-y:auto;padding:24px;">
+        <div style="text-align:center;color:#94a3b8;padding:60px 0">
+          <i class="fas fa-calendar-check" style="font-size:48px;margin-bottom:12px;display:block;color:#ede9fe"></i>
+          <p style="font-size:15px;font-weight:500;margin:0">Click <strong>Run Report</strong> to load quarterly data</p>
+        </div>
+      </div>
+      <div style="background:#fff;border-top:1px solid #e2e8f0;padding:10px 28px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <span id="qrpt-footer" style="font-size:12px;color:#64748b">Ready</span>
+        <button onclick="exportQRptCSV()" style="padding:7px 16px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px"><i class="fas fa-download"></i> Export CSV</button>
+      </div>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    setTimeout(() => runQuarterlyReport(), 200);
+}
+
+function setQRptQuarter(q) {
+    const hidden = document.getElementById('qrpt-q');
+    if (hidden) hidden.value = q;
+    for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById('qrpt-qbtn-' + i);
+        if (!btn) continue;
+        const active = i === q;
+        btn.style.background = active ? '#ede9fe' : '#f1f5f9';
+        btn.style.borderColor = active ? '#7c3aed' : '#e2e8f0';
+        btn.style.color = active ? '#4c1d95' : '#475569';
+    }
+    runQuarterlyReport();
+}
+
+async function runQuarterlyReport() {
+    const qEl = document.getElementById('qrpt-q');
+    const yEl = document.getElementById('qrpt-year');
+    const resultsEl = document.getElementById('qrpt-results');
+    const footerEl = document.getElementById('qrpt-footer');
+    if (!resultsEl || !qEl || !yEl) return;
+
+    const q = parseInt(qEl.value);
+    const year = parseInt(yEl.value);
+    const qMonth0 = (q - 1) * 3;
+    const startDate = new Date(year, qMonth0, 1).toISOString().slice(0, 10);
+    const endDate = new Date(year, qMonth0 + 3, 0).toISOString().slice(0, 10);
+    const qLabel = 'Q' + q + ' ' + year;
+    const qMonths = [qMonth0, qMonth0 + 1, qMonth0 + 2];
+
+    resultsEl.innerHTML = '<div style="text-align:center;padding:60px 0;color:#7c3aed"><i class="fas fa-spinner fa-spin" style="font-size:32px"></i><p style="margin-top:12px;font-weight:500">Loading ' + qLabel + ' data...</p></div>';
+    if (footerEl) footerEl.textContent = 'Loading ' + qLabel + '...';
+
+    const fmt = n => '$' + (isNaN(n) ? '0' : Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}));
+    const fmtN = n => isNaN(n) ? '0' : Number(n).toLocaleString('en-US');
+    const pct = (a, b) => b > 0 ? ((a / b) * 100).toFixed(1) + '%' : '0%';
+
+    try {
+        const [plData, txnData, cashData, summaryData, policiesRaw, leadsRaw, vdData] = await Promise.all([
+            fetch('/api/finance/pl?year=' + year).then(r => r.json()).catch(() => ({})),
+            fetch('/api/finance/transactions?start=' + startDate + '&end=' + endDate).then(r => r.json()).catch(() => []),
+            fetch('/api/finance/cashflow?year=' + year).then(r => r.json()).catch(() => ({})),
+            fetch('/api/accounting/summary').then(r => r.json()).catch(() => ({})),
+            fetch('/api/policies?includeInactive=true').then(r => r.json()).catch(() => []),
+            fetch('/api/leads').then(r => r.json()).catch(() => []),
+            fetch('/api/vicidial/performance-report?query_date=' + startDate + '&end_date=' + endDate + '&shift=--&users=--ALL--').then(r => r.json()).catch(() => ({}))
+        ]);
+
+        const qStart = new Date(startDate + 'T00:00:00').getTime();
+        const qEnd   = new Date(endDate   + 'T23:59:59').getTime();
+
+        // ── Vanguard-only filter (exclude Maureen / United) ──────────────────
+        const isVanguard = val => !/maureen/i.test(val || '');
+
+        // ── POLICIES in quarter ──────────────────────────────────────────────
+        // Renewals: Q1-effective-date policies that are NOT new business (hard-coded by management)
+        const RENEWAL_POLICY_NUMBERS = new Set([
+            '9300107451', // A-VINO LTD — Grant renewal
+            '9300123436', // MIDWEST APEX TRANSPORT LLC — Grant renewal
+            '868356853',  // Du Road Trucking LLC — Grant renewal
+        ]);
+        const allPolicies = (Array.isArray(policiesRaw) ? policiesRaw : [])
+            .filter(p => isVanguard(p.agent) && isVanguard(p.assignedTo) && isVanguard(p.agentName));
+        const qPolicies = allPolicies.filter(p => {
+            if (RENEWAL_POLICY_NUMBERS.has(String(p.policyNumber || p.policy_number || ''))) return false;
+            const dateStr = p.effectiveDate || p.createdDate || p.created_at || '';
+            if (dateStr) { const ts = new Date(dateStr).getTime(); return ts >= qStart && ts <= qEnd; }
+            const m = String(p.id || '').match(/POL-(\d+)-/);
+            if (m) { const ts = parseInt(m[1]); return ts >= qStart && ts <= qEnd; }
+            return false;
+        });
+
+        let totalWrittenPremium = 0;
+        const premiumByLine = {}, agentPremium = {}, agentPolicyCnt = {}, carrierPremium = {};
+        qPolicies.forEach(p => {
+            const premium = parseFloat((p.premium || p.annualPremium || '0').toString().replace(/[^0-9.]/g, '')) || 0;
+            totalWrittenPremium += premium;
+            const line  = p.coverageType || p.lineOfBusiness || p.policyType || 'Other';
+            const agent = p.agent || p.assignedTo || p.agentName || 'Unassigned';
+            const carr  = p.carrier || 'Unknown';
+            premiumByLine[line]    = (premiumByLine[line]    || 0) + premium;
+            agentPremium[agent]    = (agentPremium[agent]    || 0) + premium;
+            agentPolicyCnt[agent]  = (agentPolicyCnt[agent]  || 0) + 1;
+            carrierPremium[carr]   = (carrierPremium[carr]   || 0) + premium;
+        });
+        const avgPremPerPolicy = qPolicies.length > 0 ? totalWrittenPremium / qPolicies.length : 0;
+        const topAgents = Object.entries(agentPremium).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+        // ── TOTAL Q1 WRITTEN PREMIUM (all Q1-effective policies, new + renewals) ──
+        const agentTotalPremium = {};
+        let totalBookPremium = 0;
+        allPolicies.filter(p => {
+            const dateStr = p.effectiveDate || p.createdDate || p.created_at || '';
+            if (dateStr) { const ts = new Date(dateStr).getTime(); return ts >= qStart && ts <= qEnd; }
+            const m = String(p.id || '').match(/POL-(\d+)-/);
+            if (m) { const ts = parseInt(m[1]); return ts >= qStart && ts <= qEnd; }
+            return false;
+        }).forEach(p => {
+            const premium = parseFloat((p.premium || p.annualPremium || '0').toString().replace(/[^0-9.]/g, '')) || 0;
+            const agent = p.agent || p.assignedTo || p.agentName || 'Unassigned';
+            agentTotalPremium[agent] = (agentTotalPremium[agent] || 0) + premium;
+            totalBookPremium += premium;
+        });
+
+        // ── FINANCIAL ────────────────────────────────────────────────────────
+        const plMonthly = plData.monthly || [];
+        const qMonthlyPL = plMonthly.filter((_, i) => qMonths.includes(i));
+        const qRevPL   = qMonthlyPL.reduce((s, m) => s + (m.income   || 0), 0);
+        const qExpPL   = qMonthlyPL.reduce((s, m) => s + (m.expenses || 0), 0);
+
+        const EQUITY_CATS = new Set(['Capital Contribution','Owner Contribution','Equity Contribution','Owner Deposit']);
+        const txnIncomeCats = {}, txnExpenseCats = {};
+        let txnTotalIncome = 0, txnTotalExpenses = 0;
+        (Array.isArray(txnData) ? txnData : []).forEach(t => {
+            if (t.amount > 0 && !EQUITY_CATS.has(t.category)) {
+                const cat = t.category || 'Other Income';
+                txnIncomeCats[cat] = (txnIncomeCats[cat] || 0) + t.amount;
+                txnTotalIncome += t.amount;
+            } else if (t.amount < 0) {
+                const cat = t.category || 'Other Expense';
+                txnExpenseCats[cat] = (txnExpenseCats[cat] || 0) + Math.abs(t.amount);
+                txnTotalExpenses += Math.abs(t.amount);
+            }
+        });
+        const hasTxData    = txnTotalIncome > 0 || txnTotalExpenses > 0;
+        const dispRevenue  = hasTxData ? txnTotalIncome  : qRevPL;
+        const dispExpenses = hasTxData ? txnTotalExpenses : qExpPL;
+        const dispNet      = dispRevenue - dispExpenses;
+
+        // ── CASH FLOW ────────────────────────────────────────────────────────
+        const cfMonthly = (cashData.monthly || []);
+        const qCFMonths = cfMonthly.filter((_, i) => qMonths.includes(i));
+        const qInflow  = qCFMonths.reduce((s, m) => s + (m.inflow  || 0), 0);
+        const qOutflow = qCFMonths.reduce((s, m) => s + (m.outflow || 0), 0);
+        const qNetCF   = qInflow - qOutflow;
+
+        // ── LEADS / ACTIVITY ─────────────────────────────────────────────────
+        const localLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+        const leadMap = new Map(localLeads.map(l => [String(l.id), l]));
+        let allLeads = (Array.isArray(leadsRaw) ? leadsRaw : []).map(sl => {
+            const ll = leadMap.get(String(sl.id));
+            return ll ? Object.assign({}, sl, {reachOut: ll.reachOut || sl.reachOut}) : sl;
+        });
+        localLeads.forEach(l => { if (!allLeads.find(s => String(s.id) === String(l.id))) allLeads.push(l); });
+
+        // Exclude Maureen's leads
+        allLeads = allLeads.filter(l => isVanguard(l.assignedTo) && isVanguard(l.agent));
+
+        let qLeads = 0, qCalls = 0, qConnected = 0, totalCallSecs = 0;
+        const agCRM = {};
+        const getAgCRM = a => { if (!agCRM[a]) agCRM[a] = {leads:0, calls:0, connected:0, callSecs:0, appsToMarket:0}; return agCRM[a]; };
+        allLeads.forEach(lead => {
+            const agent = lead.assignedTo || lead.agent || 'Unassigned';
+            const cTs = new Date(lead.createdAt || lead.created_at || '').getTime();
+            if (cTs >= qStart && cTs <= qEnd) { qLeads++; getAgCRM(agent).leads++; }
+            const app = lead.appStage || {};
+            if (app.app || app.lossRuns || app.iftas || app.saa) getAgCRM(agent).appsToMarket++;
+            const callLogs = (lead.reachOut || {}).callLogs || [];
+            callLogs.forEach(c => {
+                const lTs = new Date(c.timestamp || '').getTime();
+                if (lTs >= qStart && lTs <= qEnd) {
+                    qCalls++; getAgCRM(agent).calls++;
+                    if (c.connected) { qConnected++; getAgCRM(agent).connected++; }
+                    const dur = c.duration || 0;
+                    totalCallSecs += dur; getAgCRM(agent).callSecs += dur;
+                }
+            });
+        });
+
+        const connectionRate  = pct(qConnected, qCalls);
+        const leadToSaleRatio = pct(qPolicies.length, qLeads);
+        const callToSaleRatio = pct(qPolicies.length, qCalls);
+        const avgCallsPerSale = qPolicies.length > 0 ? (qCalls / qPolicies.length).toFixed(1) : '—';
+        const avgCallsPerLead = qLeads   > 0 ? (qCalls / qLeads).toFixed(1)   : '—';
+        const avgTalkMins     = qCalls   > 0 ? (totalCallSecs / qCalls / 60).toFixed(1) : '—';
+        const costPerPolicy   = (qPolicies.length > 0 && dispExpenses > 0) ? dispExpenses / qPolicies.length : 0;
+        const acctAgentSummary = (summaryData.agentSummary || []).filter(a => isVanguard(a.agent));
+
+        // ── VICIDIAL TOTALS + PER-AGENT ──────────────────────────────────────
+        let vdTotalCalls = 0, vdTotalSales = 0, vdTotalAnswered = 0, vdAvgTalkSecs = 0, vdHasData = false;
+        const vdAgentMap = {}; // keyed by lowercase name fragments for flexible lookup
+        try {
+            if (vdData && vdData.success && vdData.html) {
+                const vdDoc = new DOMParser().parseFromString(vdData.html, 'text/html');
+                const vdPre = vdDoc.querySelector('pre');
+                const vdLines = (vdPre ? vdPre.textContent : '').split('\n');
+                const vdCS = vdLines.findIndex(l => l.includes('CALL STATS BREAKDOWN'));
+                const vdPS = vdLines.findIndex(l => l.includes('PAUSE CODE BREAKDOWN'));
+                const vdCE = vdPS >= 0 ? vdPS : vdLines.length;
+                if (vdCS >= 0) {
+                    const vdCm = vdGetColMap(vdLines, vdCS, vdCE);
+                    const vdRows = vdParseRows(vdLines, vdCS, vdCE);
+                    const vdTots = vdParseTotals(vdLines, vdCS, vdCE);
+                    const rci = (r, name) => r[vdCm[name] ?? -1] ?? '-';
+                    // Store per-agent VD data keyed by first name (lowercase) and full name
+                    vdRows.forEach(r => {
+                        const fullName = (r[0] || '').toLowerCase().trim();
+                        const firstName = fullName.split(' ')[0];
+                        const entry = {
+                            fullName: r[0] || '',
+                            calls:    parseInt((rci(r,'CALLS')||'0').replace(/[^\d]/g,'')) || 0,
+                            answered: parseInt((rci(r,'A')||'0').replace(/[^\d]/g,''))     || 0,
+                            sales:    parseInt((rci(r,'SALE')||'0').replace(/[^\d]/g,''))  || 0,
+                            dnc:      parseInt((rci(r,'DNC')||'0').replace(/[^\d]/g,''))   || 0,
+                            callbk:   parseInt((rci(r,'CALLBK')||'0').replace(/[^\d]/g,''))|| 0,
+                            dispo:    parseInt((rci(r,'DISPO')||'0').replace(/[^\d]/g,'')) || 0,
+                            dead:     parseInt((rci(r,'DEAD')||'0').replace(/[^\d]/g,''))  || 0,
+                            talkTime: rci(r,'TALK'), talkAvg: rci(r,'TALKAVG'),
+                            loginTime: rci(r,'TIME'), pauseTime: rci(r,'PAUSE'), waitTime: rci(r,'WAIT')
+                        };
+                        vdAgentMap[fullName]  = entry;
+                        vdAgentMap[firstName] = entry;
+                    });
+                    if (vdTots) {
+                        const SHIFT = 3;
+                        const vtc = name => { const i = (vdCm[name] ?? -1) - SHIFT; return i >= 0 ? (vdTots[i] || '0') : '0'; };
+                        vdTotalCalls    = parseInt(vtc('CALLS').replace(/[^\d]/g, ''))  || 0;
+                        vdTotalSales    = parseInt(vtc('SALE').replace(/[^\d]/g, ''))   || 0;
+                        vdTotalAnswered = parseInt(vtc('A').replace(/[^\d]/g, ''))      || 0;
+                        vdAvgTalkSecs   = vdTotalCalls > 0 ? vdTimeSec(vtc('TALK')) / vdTotalCalls : 0;
+                        vdHasData = vdTotalCalls > 0;
+                    }
+                }
+            }
+        } catch(e) { console.warn('ViciDial parse in quarterly report:', e); }
+
+        // NOTE: ViciDial "SALE" dispo = a Lead in Vanguard terminology (not a true policy sale)
+        // vdTotalSales = ViciDial leads (SALE dispo count)
+        // qPolicies.length = actual sales (CRM policies written)
+        const vdTotalVDLeads    = vdTotalSales; // rename for clarity
+        // Lead→Sale: VD leads (SALE dispo) as denominator, CRM policies as numerator
+        const vdLeadToSaleRatio = vdHasData && vdTotalVDLeads > 0 ? pct(qPolicies.length, vdTotalVDLeads) : pct(qPolicies.length, qLeads);
+        const vdConnectionRate  = vdHasData ? pct(vdTotalAnswered, vdTotalCalls) : connectionRate;
+        const vdCallsPerLead    = (vdHasData && vdTotalVDLeads > 0) ? (vdTotalCalls / vdTotalVDLeads).toFixed(1) : '—';
+        const vdAvgTalkMins     = vdAvgTalkSecs > 0 ? (vdAvgTalkSecs / 60).toFixed(1) : (totalCallSecs > 0 && qCalls > 0 ? (totalCallSecs / qCalls / 60).toFixed(1) : '—');
+
+        // ── STORE DATA FOR POPUPS ─────────────────────────────────────────────
+        window._qrptQPolicies = qPolicies;
+        window._qrptLabel = qLabel;
+        window._qrptAgentData = {};
+        const allAgNames = new Set([...Object.keys(agentPremium), ...Object.keys(agCRM)]);
+        allAgNames.forEach(a => {
+            const aLow = a.toLowerCase();
+            const vdEntry = vdAgentMap[aLow] || vdAgentMap[aLow.split(' ')[0]] || null;
+            window._qrptAgentData[a] = { name: a, crm: agCRM[a] || {leads:0,calls:0,connected:0,callSecs:0,appsToMarket:0}, policies: agentPolicyCnt[a] || 0, premium: agentPremium[a] || 0, vd: vdEntry };
+        });
+
+        // ── HELPERS ──────────────────────────────────────────────────────────
+        const th = 'padding:10px 14px;text-align:left;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;background:#f8fafc;border-bottom:2px solid #e2e8f0;';
+        const td = 'padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#374151;';
+        const tdr = td + 'text-align:right;font-weight:600;';
+        const tbl = 'width:100%;border-collapse:collapse;font-size:13px;';
+
+        const kpiCard = (icon, label, value, sub, color) =>
+            '<div style="background:#fff;border-radius:14px;padding:20px 22px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.05);">' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+            '<div style="width:38px;height:38px;border-radius:10px;background:' + color + '18;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+            '<i class="fas ' + icon + '" style="color:' + color + ';font-size:15px"></i></div>' +
+            '<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em">' + label + '</div></div>' +
+            '<div style="font-size:26px;font-weight:800;color:#111827;margin-bottom:4px">' + value + '</div>' +
+            '<div style="font-size:12px;color:#94a3b8">' + sub + '</div></div>';
+
+        const secHdr = (icon, title, color) =>
+            '<div style="display:flex;align-items:center;gap:10px;margin:28px 0 16px">' +
+            '<div style="width:34px;height:34px;border-radius:9px;background:' + color + '18;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+            '<i class="fas ' + icon + '" style="color:' + color + ';font-size:14px"></i></div>' +
+            '<h3 style="margin:0;font-size:16px;font-weight:700;color:#111827">' + title + '</h3>' +
+            '<div style="flex:1;height:1px;background:#e2e8f0;margin-left:8px"></div></div>';
+
+        const card = (title, icon, color, html) =>
+            '<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">' +
+            '<div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;font-size:14px;color:#111827;background:#fafafa">' +
+            '<i class="fas ' + icon + '" style="color:' + color + ';margin-right:8px"></i>' + title + '</div>' + html + '</div>';
+
+        const noDataRow = (cols, msg) => '<tr><td colspan="' + cols + '" style="' + td + 'text-align:center;color:#94a3b8;padding:20px">' + msg + '</td></tr>';
+
+        // ── Revenue by line ──────────────────────────────────────────────────
+        const lineRows = Object.entries(premiumByLine).sort((a, b) => b[1] - a[1]).map(([line, prem]) =>
+            '<tr><td style="' + td + '">' + line + '</td>' +
+            '<td style="' + tdr + 'color:#7c3aed">' + fmt(prem) + '</td>' +
+            '<td style="' + tdr + '">' + pct(prem, totalWrittenPremium) + '</td></tr>'
+        ).join('') || noDataRow(3, 'No production data for ' + qLabel);
+
+        // ── Top agents ───────────────────────────────────────────────────────
+        const agColors = ['#7c3aed','#4338ca','#0891b2','#059669','#d97706','#dc2626'];
+        const agentRows = topAgents.map(([agent, prem], i) =>
+            '<tr><td style="' + td + '"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:' + (agColors[i]||'#64748b') + '18;color:' + (agColors[i]||'#64748b') + ';font-size:11px;font-weight:700;margin-right:8px">' + (i+1) + '</span>' + agent + '</td>' +
+            '<td style="' + tdr + '">' + fmtN(agentPolicyCnt[agent] || 0) +
+              ' <button onclick="viewQRptAgentPolicies(\'' + agent.replace(/'/g,"\\'") + '\')" title="View ' + agent + ' policies" style="background:#fef3c7;border:none;border-radius:5px;padding:3px 7px;cursor:pointer;color:#d97706;font-size:11px;margin-left:4px"><i class="fas fa-eye"></i></button></td>' +
+            '<td style="' + tdr + '">' + fmt(prem) + '</td>' +
+            '<td style="' + tdr + 'color:#059669">' + fmt(agentTotalPremium[agent] || 0) + '</td>' +
+            '<td style="' + tdr + '">' + (agentPolicyCnt[agent] ? fmt(prem / agentPolicyCnt[agent]) : '—') + '</td>' +
+            '<td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;text-align:center"><button onclick="viewQRptAgentStats(\'' + agent.replace(/'/g,"\\'") + '\')" title="View ' + agent + ' full stats" style="background:#ede9fe;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;color:#7c3aed;font-size:12px"><i class="fas fa-eye"></i></button></td></tr>'
+        ).join('') || noDataRow(6, 'No agent data for ' + qLabel);
+
+        // ── Income by category ───────────────────────────────────────────────
+        const incRows = Object.entries(txnIncomeCats).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([cat, amt]) =>
+            '<tr><td style="' + td + '">' + cat + '</td>' +
+            '<td style="' + tdr + 'color:#059669">' + fmt(amt) + '</td>' +
+            '<td style="' + tdr + '">' + pct(amt, txnTotalIncome) + '</td></tr>'
+        ).join('') || noDataRow(3, 'No income transactions for ' + qLabel);
+
+        const incFoot = txnTotalIncome > 0 ? '<tfoot><tr style="background:#f0fdf4"><td style="padding:10px 14px;font-weight:700;font-size:12px;color:#064e3b">Total</td><td style="padding:10px 14px;text-align:right;font-weight:800;color:#059669">' + fmt(txnTotalIncome) + '</td><td style="padding:10px 14px;text-align:right;font-weight:600;color:#64748b">100%</td></tr></tfoot>' : '';
+
+        // ── Expenses by category ─────────────────────────────────────────────
+        const expRows = Object.entries(txnExpenseCats).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([cat, amt]) =>
+            '<tr><td style="' + td + '">' + cat + '</td>' +
+            '<td style="' + tdr + 'color:#ef4444">' + fmt(amt) + '</td>' +
+            '<td style="' + tdr + '">' + pct(amt, txnTotalExpenses) + '</td></tr>'
+        ).join('') || noDataRow(3, 'No expense transactions for ' + qLabel);
+
+        const expFoot = txnTotalExpenses > 0 ? '<tfoot><tr style="background:#fff7f7"><td style="padding:10px 14px;font-weight:700;font-size:12px;color:#991b1b">Total</td><td style="padding:10px 14px;text-align:right;font-weight:800;color:#ef4444">' + fmt(txnTotalExpenses) + '</td><td style="padding:10px 14px;text-align:right;font-weight:600;color:#64748b">100%</td></tr></tfoot>' : '';
+
+        // ── Cash flow by month ───────────────────────────────────────────────
+        const cfRows = qCFMonths.map(m =>
+            '<tr><td style="' + td + 'font-weight:600">' + m.label + '</td>' +
+            '<td style="' + tdr + 'color:#059669">' + fmt(m.inflow) + '</td>' +
+            '<td style="' + tdr + 'color:#ef4444">' + fmt(m.outflow) + '</td>' +
+            '<td style="' + tdr + (m.net >= 0 ? 'color:#059669' : 'color:#ef4444') + '">' + (m.net >= 0 ? '+' : '') + fmt(m.net) + '</td></tr>'
+        ).join('') || noDataRow(4, 'No cash flow data for ' + qLabel);
+
+        // ── Agent compensation ───────────────────────────────────────────────
+        const acctAgRows = acctAgentSummary.slice(0, 6).map(a =>
+            '<tr><td style="' + td + '">' + a.agent + '</td>' +
+            '<td style="' + tdr + '">' + fmtN(a.policyCount || 0) + '</td>' +
+            '<td style="' + tdr + '">' + fmt(a.premiumYTD || 0) + '</td>' +
+            '<td style="' + tdr + 'color:#2563eb">' + fmt(a.commissionYTD || 0) + '</td>' +
+            '<td style="' + tdr + 'color:#059669">' + fmt(a.paidYTD || 0) + '</td>' +
+            '<td style="' + tdr + 'color:#f59e0b">' + fmt(a.pendingYTD || 0) + '</td></tr>'
+        ).join('') || noDataRow(6, 'No compensation data — commissions tracked in Accounting tab');
+
+        const noTxNote = !hasTxData
+            ? '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:16px"><i class="fas fa-info-circle" style="margin-right:6px"></i>No bank transactions found for ' + qLabel + '. Upload a CSV in <strong>Accounting → Transactions</strong> to see detailed P&amp;L and expense breakdowns.</div>'
+            : '';
+
+        resultsEl.innerHTML =
+            '<div style="font-size:13px;color:#64748b;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">' +
+            '<span>Report period: <strong>' + startDate + '</strong> → <strong>' + endDate + '</strong></span>' +
+            '<span style="background:#ede9fe;color:#4c1d95;padding:4px 14px;border-radius:20px;font-weight:700;font-size:12px">📊 ' + qLabel + '</span></div>' +
+
+            // ── KPI ROW ──────────────────────────────────────────────────────
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:8px">' +
+            kpiCard('fa-shield-alt',   'New Written Premium', fmt(totalWrittenPremium), qPolicies.length + ' policies this quarter', '#7c3aed') +
+            kpiCard('fa-book-open',    'Total Q1 Written',  fmt(totalBookPremium),    'New business + renewals written in quarter', '#059669') +
+            kpiCard('fa-dollar-sign',  'Net Revenue',   fmt(dispRevenue),  hasTxData ? fmt(dispNet) + ' net income' : 'P&L estimate', '#059669') +
+            kpiCard('fa-file-contract','New Policies',  fmtN(qPolicies.length), 'Avg premium: ' + fmt(avgPremPerPolicy), '#4338ca') +
+            kpiCard('fa-phone-volume', 'Calls → Leads %', vdHasData ? pct(vdTotalVDLeads, vdTotalCalls) : '—', vdHasData ? fmtN(vdTotalCalls) + ' calls · ' + fmtN(vdTotalVDLeads) + ' leads' : 'ViciDial unavailable', '#0891b2') +
+            kpiCard('fa-percentage',   'Lead → Sale %', vdLeadToSaleRatio, vdHasData ? fmtN(vdTotalVDLeads) + ' leads → ' + fmtN(qPolicies.length) + ' sales' : qLeads + ' leads → ' + qPolicies.length + ' sales', '#d97706') +
+            kpiCard('fa-chart-line',   'Net Income',    fmt(dispNet),      'Revenue − Expenses', dispNet >= 0 ? '#059669' : '#dc2626') +
+            '</div>' +
+
+            // ── SECTION 1: SALES & PRODUCTION ────────────────────────────────
+            secHdr('fa-shield-alt', 'Sales & Production Metrics', '#7c3aed') +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">' +
+            card('Premium by Line of Business', 'fa-layer-group', '#7c3aed',
+                '<table style="' + tbl + '"><thead><tr>' +
+                '<th style="' + th + '">Line</th><th style="' + th + 'text-align:right">Premium</th><th style="' + th + 'text-align:right">% of Total</th>' +
+                '</tr></thead><tbody>' + lineRows + '</tbody></table>') +
+            '<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">' +
+            '<div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;font-size:14px;color:#111827;background:#fafafa;display:flex;align-items:center;justify-content:space-between">' +
+            '<span><i class="fas fa-trophy" style="color:#d97706;margin-right:8px"></i>Top Agents by Written Premium</span>' +
+            '<button onclick="viewQRptAgentPolicies(\'--ALL--\')" title="View all policies this quarter" style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:7px;padding:5px 11px;cursor:pointer;color:#d97706;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px"><i class="fas fa-eye"></i> All Policies</button>' +
+            '</div>' +
+            '<table style="' + tbl + '"><thead><tr>' +
+            '<th style="' + th + '">Agent</th><th style="' + th + 'text-align:right">Policies</th><th style="' + th + 'text-align:right">New Prem</th><th style="' + th + 'text-align:right">Total Prem</th><th style="' + th + 'text-align:right">Avg/Policy</th><th style="' + th + 'text-align:center">Stats</th>' +
+            '</tr></thead><tbody>' + agentRows + '</tbody></table></div>' +
+            '</div>' +
+
+            // ── SECTION 2: FINANCIAL METRICS ─────────────────────────────────
+            secHdr('fa-chart-pie', 'Financial Metrics', '#059669') +
+            noTxNote +
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
+            '<div style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px 16px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px">Total Revenue</div><div style="font-size:22px;font-weight:800;color:#059669">' + fmt(dispRevenue) + '</div></div>' +
+            '<div style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px 16px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px">Total Expenses</div><div style="font-size:22px;font-weight:800;color:#ef4444">' + fmt(dispExpenses) + '</div></div>' +
+            '<div style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px 16px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px">Gross Profit</div><div style="font-size:22px;font-weight:800;color:' + (dispNet >= 0 ? '#059669' : '#ef4444') + '">' + fmt(dispNet) + '</div></div>' +
+            '<div style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px 16px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px">Profit Margin</div><div style="font-size:22px;font-weight:800;color:' + (dispNet >= 0 ? '#059669' : '#ef4444') + '">' + (dispRevenue > 0 ? pct(dispNet, dispRevenue) : 'N/A') + '</div></div>' +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">' +
+            card('Revenue by Category', 'fa-coins', '#059669',
+                '<table style="' + tbl + '"><thead><tr><th style="' + th + '">Category</th><th style="' + th + 'text-align:right">Amount</th><th style="' + th + 'text-align:right">%</th></tr></thead><tbody>' + incRows + '</tbody>' + incFoot + '</table>') +
+            card('Expenses by Category', 'fa-receipt', '#ef4444',
+                '<table style="' + tbl + '"><thead><tr><th style="' + th + '">Category</th><th style="' + th + 'text-align:right">Amount</th><th style="' + th + 'text-align:right">%</th></tr></thead><tbody>' + expRows + '</tbody>' + expFoot + '</table>') +
+            card('Monthly Cash Flow', 'fa-water', '#0891b2',
+                '<table style="' + tbl + '"><thead><tr><th style="' + th + '">Month</th><th style="' + th + 'text-align:right">Inflow</th><th style="' + th + 'text-align:right">Outflow</th><th style="' + th + 'text-align:right">Net</th></tr></thead><tbody>' + cfRows + '</tbody>' +
+                '<tfoot><tr style="background:#f0f9ff"><td style="padding:10px 14px;font-weight:700;font-size:12px;color:#0c4a6e">Quarter Total</td>' +
+                '<td style="padding:10px 14px;text-align:right;font-weight:800;color:#059669">' + fmt(qInflow) + '</td>' +
+                '<td style="padding:10px 14px;text-align:right;font-weight:800;color:#ef4444">' + fmt(qOutflow) + '</td>' +
+                '<td style="padding:10px 14px;text-align:right;font-weight:800;color:' + (qNetCF >= 0 ? '#059669' : '#ef4444') + '">' + (qNetCF >= 0 ? '+' : '') + fmt(qNetCF) + '</td></tr></tfoot></table>') +
+            '</div>' +
+
+            // ── SECTION 3: SALES METRICS ──────────────────────────────────────
+            secHdr('fa-funnel-dollar', 'Sales Activity Metrics', '#4338ca') +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">' +
+            kpiCard('fa-phone-volume', 'ViciDial Calls',  vdHasData ? fmtN(vdTotalCalls) : '—',         fmtN(vdTotalCalls) + ' calls → ' + fmtN(vdTotalVDLeads) + ' leads', '#0891b2') +
+            kpiCard('fa-users',        'ViciDial Leads', vdHasData ? fmtN(vdTotalVDLeads) : '—',       'SALE dispo = qualified lead in ViciDial', '#7c3aed') +
+            kpiCard('fa-phone',        'CRM Calls',      fmtN(qCalls),                                  'Call logs recorded in CRM', '#4338ca') +
+            kpiCard('fa-plug',         'Connection Rate', vdConnectionRate,                              vdHasData ? fmtN(vdTotalAnswered) + ' answered (ViciDial)' : fmtN(qConnected) + ' connected (CRM)', '#059669') +
+            kpiCard('fa-file-contract','Policies Sold',  fmtN(qPolicies.length),                        'Written this quarter (CRM)', '#d97706') +
+            kpiCard('fa-percentage',   'Lead → Sale %',  vdLeadToSaleRatio,                             vdHasData ? fmtN(vdTotalVDLeads) + ' leads → ' + fmtN(qPolicies.length) + ' sales' : qLeads + ' leads → ' + qPolicies.length + ' sales', '#dc2626') +
+            kpiCard('fa-calculator',   'Calls per Lead', vdCallsPerLead,                                vdHasData ? 'ViciDial calls ÷ VD leads' : 'CRM calls ÷ CRM leads', '#64748b') +
+            kpiCard('fa-clock',        'Avg Talk Time',  vdAvgTalkMins + ' min',                        vdHasData ? 'Per call (ViciDial)' : 'Per CRM call', '#0891b2') +
+            '</div>' +
+
+            // ── SECTION 4: EXPENSE METRICS ────────────────────────────────────
+            secHdr('fa-wallet', 'Expense & Efficiency Metrics', '#dc2626') +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">' +
+            '<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:20px">' +
+            '<div style="font-weight:700;font-size:14px;color:#111827;margin-bottom:16px"><i class="fas fa-tachometer-alt" style="color:#dc2626;margin-right:8px"></i>Operating Efficiency</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+            [
+                ['Cost per Policy', costPerPolicy > 0 ? fmt(costPerPolicy) : 'N/A', 'Expenses ÷ policies written'],
+                ['Expense Ratio',   dispRevenue   > 0 ? pct(dispExpenses, dispRevenue) : 'N/A', 'Expenses as % of revenue'],
+                ['Profit Margin',   dispRevenue   > 0 ? pct(dispNet, dispRevenue) : 'N/A', 'Net income / revenue'],
+                ['Cost per Lead',   (qLeads > 0 && dispExpenses > 0) ? fmt(dispExpenses / qLeads) : 'N/A', 'Total expenses ÷ new leads'],
+                ['Cost per Call',   (qCalls > 0 && dispExpenses > 0) ? fmt(dispExpenses / qCalls) : 'N/A', 'Total expenses ÷ calls made'],
+                ['Rev per Policy',  qPolicies.length > 0 && dispRevenue > 0 ? fmt(dispRevenue / qPolicies.length) : 'N/A', 'Revenue ÷ policies written'],
+            ].map(([label, val, sub]) =>
+                '<div style="padding:12px;background:#fafafa;border-radius:8px;border:1px solid #f1f5f9">' +
+                '<div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:5px">' + label + '</div>' +
+                '<div style="font-size:20px;font-weight:800;color:#111827;margin-bottom:2px">' + val + '</div>' +
+                '<div style="font-size:11px;color:#94a3b8">' + sub + '</div></div>'
+            ).join('') + '</div></div>' +
+            card('Agent Compensation — YTD (from Accounting)', 'fa-user-tie', '#4338ca',
+                '<table style="' + tbl + '"><thead><tr>' +
+                '<th style="' + th + '">Agent</th><th style="' + th + 'text-align:right">Policies</th><th style="' + th + 'text-align:right">YTD Premium</th><th style="' + th + 'text-align:right">Commission</th><th style="' + th + 'text-align:right">Paid</th><th style="' + th + 'text-align:right">Pending</th>' +
+                '</tr></thead><tbody>' + acctAgRows + '</tbody></table>') +
+            '</div>';
+
+        if (footerEl) footerEl.textContent = qLabel + ' loaded — ' + qPolicies.length + ' policies | ' + qLeads + ' leads | ' + fmtN(qCalls) + ' calls | ' + fmt(totalWrittenPremium) + ' written premium';
+
+    } catch (err) {
+        console.error('Quarterly report error:', err);
+        resultsEl.innerHTML = '<div style="text-align:center;padding:60px;color:#ef4444"><i class="fas fa-exclamation-triangle" style="font-size:32px;margin-bottom:12px;display:block"></i><p style="font-weight:600">Error loading report: ' + err.message + '</p></div>';
+        if (footerEl) footerEl.textContent = 'Error — ' + err.message;
+    }
+}
+
+function exportQRptCSV() {
+    const qEl = document.getElementById('qrpt-q');
+    const yEl = document.getElementById('qrpt-year');
+    if (!qEl || !yEl) return;
+    const q = qEl.value, year = yEl.value;
+    const qMonth0 = (parseInt(q) - 1) * 3;
+    const startDate = new Date(parseInt(year), qMonth0, 1).toISOString().slice(0, 10);
+    const endDate   = new Date(parseInt(year), qMonth0 + 3, 0).toISOString().slice(0, 10);
+    Promise.all([
+        fetch('/api/policies?includeInactive=true').then(r => r.json()).catch(() => []),
+        fetch('/api/finance/transactions?start=' + startDate + '&end=' + endDate).then(r => r.json()).catch(() => [])
+    ]).then(([policies, txns]) => {
+        const qStart = new Date(startDate + 'T00:00:00').getTime();
+        const qEnd   = new Date(endDate   + 'T23:59:59').getTime();
+        const qPols = policies.filter(p => {
+            const ds = p.effectiveDate || p.createdDate || p.created_at || '';
+            if (ds) return new Date(ds).getTime() >= qStart && new Date(ds).getTime() <= qEnd;
+            const m = String(p.id||'').match(/POL-(\d+)-/);
+            return m && parseInt(m[1]) >= qStart && parseInt(m[1]) <= qEnd;
+        });
+        let csv = 'Type,Date,Description,Amount,Category\n';
+        qPols.forEach(p => {
+            const prem = parseFloat((p.premium||p.annualPremium||'0').toString().replace(/[^0-9.]/g,''))||0;
+            csv += 'Policy,' + (p.effectiveDate||p.createdDate||'') + ',"' + (p.insured_name||p.name||p.client||'') + ' — ' + (p.carrier||'') + '",' + prem + ',' + (p.coverageType||p.policyType||'Policy') + '\n';
+        });
+        (Array.isArray(txns)?txns:[]).forEach(t => {
+            csv += 'Transaction,' + t.date + ',"' + (t.description||'').replace(/"/g,"'") + '",' + t.amount + ',' + (t.category||'') + '\n';
+        });
+        const blob = new Blob([csv], {type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = 'quarterly-report-Q' + q + '-' + year + '.csv';
+        a.click(); URL.revokeObjectURL(url);
+        showNotification('CSV exported — Q' + q + ' ' + year, 'success');
+    });
+}
+
+function viewQRptAgentPolicies(agentName) {
+    const allPols = window._qrptQPolicies || [];
+    const qLabel  = window._qrptLabel || 'Quarter';
+    const agPols  = agentName === '--ALL--' ? allPols : allPols.filter(p => {
+        const a = (p.agent || p.assignedTo || p.agentName || '').toLowerCase();
+        return a.includes(agentName.toLowerCase().split(' ')[0].toLowerCase());
+    });
+    const displayName = agentName === '--ALL--' ? 'All Agents' : agentName;
+    document.querySelectorAll('.qrpt-pol-overlay').forEach(e => e.remove());
+
+    const fmt  = n => '$' + (isNaN(n)||!n ? '0' : Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}));
+    const fmtD = d => { try { return d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'; } catch(e) { return d||'—'; } };
+
+    const totalPrem = agPols.reduce((s,p) => s + (parseFloat((p.premium||p.annualPremium||'0').toString().replace(/[^0-9.]/g,''))||0), 0);
+
+    const th = 'padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;background:#f8fafc;border-bottom:2px solid #e2e8f0;white-space:nowrap;';
+    const td = 'padding:9px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f1f5f9;';
+    const tdr = td + 'text-align:right;font-weight:600;';
+
+    const showAgent = agentName === '--ALL--';
+    const colCount = showAgent ? 10 : 9;
+    const rows = agPols.length ? agPols.map((p, i) => {
+        const prem = parseFloat((p.premium||p.annualPremium||'0').toString().replace(/[^0-9.]/g,'')) || 0;
+        const client = p.insured_name || p.name || p.client || p.insuredName || '—';
+        const carrier = p.carrier || '—';
+        const line = p.coverageType || p.lineOfBusiness || p.policyType || '—';
+        const polNum = p.policyNumber || p.policy_number || '—';
+        const effDate = p.effectiveDate || p.effective_date || p.createdDate || '';
+        const expDate = p.expirationDate || p.expiration_date || '';
+        const status = p.status || 'Active';
+        const agentCol = p.agent || p.assignedTo || p.agentName || '—';
+        const statusColor = /active|in.force|current/i.test(status) ? '#059669' : '#94a3b8';
+        return '<tr style="' + (i%2===1?'background:#fafafa':'') + '">' +
+            '<td style="' + td + '">' + (i+1) + '</td>' +
+            (showAgent ? '<td style="' + td + 'font-weight:600;color:#4338ca">' + agentCol + '</td>' : '') +
+            '<td style="' + td + 'max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + client + '">' + client + '</td>' +
+            '<td style="' + td + '">' + carrier + '</td>' +
+            '<td style="' + td + '">' + line + '</td>' +
+            '<td style="' + td + 'font-family:monospace;font-size:12px">' + polNum + '</td>' +
+            '<td style="' + td + 'white-space:nowrap">' + fmtD(effDate) + '</td>' +
+            '<td style="' + td + 'white-space:nowrap;color:#94a3b8">' + fmtD(expDate) + '</td>' +
+            '<td style="' + tdr + 'color:#7c3aed">' + fmt(prem) + '</td>' +
+            '<td style="' + td + 'text-align:center"><span style="font-size:11px;font-weight:700;color:' + statusColor + ';background:' + statusColor + '18;padding:2px 8px;border-radius:20px">' + status + '</span></td>' +
+            '</tr>';
+    }).join('') : '<tr><td colspan="' + colCount + '" style="' + td + 'text-align:center;color:#94a3b8;padding:24px">No policies found for ' + displayName + ' in ' + qLabel + '</td></tr>';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'qrpt-pol-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.65);display:flex;align-items:center;justify-content:center;z-index:9999999;padding:16px;box-sizing:border-box;';
+
+    overlay.innerHTML =
+        '<div style="background:#fff;border-radius:16px;width:100%;max-width:1100px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.4)" onclick="event.stopPropagation()">' +
+        '<div style="background:linear-gradient(135deg,#d97706,#f59e0b);padding:16px 22px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">' +
+        '<div><div style="color:#fff;font-size:17px;font-weight:700"><i class="fas fa-file-contract" style="margin-right:8px"></i>' + agentName + ' — Policies</div>' +
+        '<div style="color:rgba(255,255,255,0.75);font-size:12px">' + qLabel + ' · ' + agPols.length + ' polic' + (agPols.length===1?'y':'ies') + ' · Total: ' + fmt(totalPrem) + '</div></div>' +
+        '<button onclick="this.closest(\'.qrpt-pol-overlay\').remove()" style="background:rgba(255,255,255,0.2);border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:20px;color:#fff;display:flex;align-items:center;justify-content:center">&times;</button></div>' +
+        '<div style="overflow-y:auto;flex:1">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+        '<thead style="position:sticky;top:0;z-index:1"><tr>' +
+        '<th style="' + th + '">#</th>' +
+        '<th style="' + th + '">Client</th>' +
+        '<th style="' + th + '">Carrier</th>' +
+        '<th style="' + th + '">Line</th>' +
+        '<th style="' + th + '">Policy #</th>' +
+        '<th style="' + th + '">Effective</th>' +
+        '<th style="' + th + '">Expires</th>' +
+        '<th style="' + th + 'text-align:right">Premium</th>' +
+        '<th style="' + th + 'text-align:center">Status</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody>' +
+        (agPols.length ? '<tfoot><tr style="background:#fffbeb"><td colspan="7" style="padding:10px 12px;font-weight:700;font-size:12px;color:#92400e">Total (' + agPols.length + ' policies)</td><td style="padding:10px 12px;text-align:right;font-weight:800;color:#d97706;font-size:14px">' + fmt(totalPrem) + '</td><td></td></tr></tfoot>' : '') +
+        '</table></div></div>';
+
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function viewQRptAgentStats(agentName) {
+    const data = (window._qrptAgentData || {})[agentName];
+    const qLabel = window._qrptLabel || 'Quarter';
+    if (!data) { showNotification('No data for ' + agentName, 'warning'); return; }
+    document.querySelectorAll('.qrpt-agent-overlay').forEach(e => e.remove());
+
+    const crm = data.crm || {};
+    const vd  = data.vd  || null;
+    const fmt  = n => '$' + (isNaN(n)||n==null ? '0' : Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}));
+    const fmtN = n => isNaN(n)||n==null ? '0' : Number(n).toLocaleString('en-US');
+    const pct  = (a, b) => b > 0 ? ((a/b)*100).toFixed(1)+'%' : '0%';
+    const secs2hm = s => { s=Math.round(s||0); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?h+'h '+m+'m':m+'m'; };
+
+    const mCard = (label, value, sub, color) =>
+        '<div style="background:#fff;border-radius:10px;border:1.5px solid #e2e8f0;padding:14px 16px">' +
+        '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + label + '</div>' +
+        '<div style="font-size:22px;font-weight:800;color:' + color + ';line-height:1.1;margin-bottom:3px">' + value + '</div>' +
+        '<div style="font-size:11px;color:#94a3b8">' + sub + '</div></div>';
+
+    const secHdr = (icon, title, color) =>
+        '<div style="display:flex;align-items:center;gap:8px;margin:0 0 10px">' +
+        '<div style="width:28px;height:28px;border-radius:7px;background:' + color + '18;display:flex;align-items:center;justify-content:center">' +
+        '<i class="fas ' + icon + '" style="color:' + color + ';font-size:12px"></i></div>' +
+        '<span style="font-size:12px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:.06em">' + title + '</span></div>';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'qrpt-agent-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.65);display:flex;align-items:center;justify-content:center;z-index:9999999;padding:16px;box-sizing:border-box;';
+
+    const vdBlock = vd
+        ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px">' +
+          mCard('Calls', fmtN(vd.calls), 'Dialer calls made', '#1e40af') +
+          mCard('Answered', fmtN(vd.answered), pct(vd.answered, vd.calls) + ' answer rate', '#059669') +
+          mCard('VD Leads', fmtN(vd.sales), 'SALE dispo (qualified)', '#7c3aed') +
+          mCard('Calls → Leads %', pct(vd.sales, vd.calls), fmtN(vd.calls) + ' calls', '#d97706') +
+          mCard('Talk Time', vd.talkTime || '—', 'Total ViciDial talk', '#0891b2') +
+          mCard('Talk Avg', vd.talkAvg || '—', 'Per call average', '#64748b') +
+          mCard('Login Time', vd.loginTime || '—', 'Time in dialer', '#4338ca') +
+          mCard('Pause Time', vd.pauseTime || '—', 'Total paused', '#f59e0b') +
+          mCard('Callbacks', fmtN(vd.callbk), 'Scheduled in dialer', '#0284c7') +
+          mCard('DNC', fmtN(vd.dnc), pct(vd.dnc, vd.calls) + ' DNC rate', '#dc2626') +
+          '</div>'
+        : '<div style="text-align:center;padding:20px;color:#94a3b8;background:#f1f5f9;border-radius:8px;font-size:13px">No ViciDial data found for this agent in the selected quarter</div>';
+
+    overlay.innerHTML =
+        '<div style="background:#f8fafc;border-radius:16px;width:100%;max-width:880px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4)" onclick="event.stopPropagation()">' +
+        '<div style="background:linear-gradient(135deg,#4338ca,#7c3aed);padding:16px 22px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:1">' +
+        '<div><div style="color:#fff;font-size:18px;font-weight:700">' + agentName + '</div>' +
+        '<div style="color:rgba(255,255,255,0.65);font-size:12px">' + qLabel + ' · Combined CRM &amp; ViciDial Stats</div></div>' +
+        '<button onclick="this.closest(\'.qrpt-agent-overlay\').remove()" style="background:rgba(255,255,255,0.15);border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:20px;color:#fff;display:flex;align-items:center;justify-content:center">&times;</button></div>' +
+
+        '<div style="padding:20px">' +
+
+        secHdr('fa-database', 'CRM Stats — ' + qLabel, '#4338ca') +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-bottom:22px">' +
+        mCard('Leads (in range)', fmtN(crm.leads), 'Created this quarter', '#4338ca') +
+        mCard('CRM Calls', fmtN(crm.calls), 'Call logs in range', '#0891b2') +
+        mCard('Connected', fmtN(crm.connected), pct(crm.connected, crm.calls) + ' connection rate', '#059669') +
+        mCard('Talk Time', crm.callSecs > 0 ? secs2hm(crm.callSecs) : '0m', 'CRM call duration total', '#7c3aed') +
+        mCard('Apps to Market', fmtN(crm.appsToMarket), 'App/LossRuns/IFTA/SAA set', '#d97706') +
+        mCard('Policies Sold', fmtN(data.policies), 'Written this quarter', '#059669') +
+        mCard('Written Premium', fmt(data.premium), 'This quarter', '#7c3aed') +
+        mCard('Avg Premium', data.policies > 0 ? fmt(data.premium / data.policies) : '—', 'Per policy', '#4338ca') +
+        '</div>' +
+
+        secHdr('fa-phone-volume', 'ViciDial Stats — ' + qLabel, '#015b91') +
+        vdBlock +
+
+        '</div></div>';
+
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// ─── END QUARTERLY REPORT ────────────────────────────────────────────────────
 
 function generateViciDialPerformanceReport() {
     document.querySelectorAll('.vicidial-perf-report-overlay').forEach(e => e.remove());
@@ -20107,8 +22608,8 @@ function generateViciDialPerformanceReport() {
                         <input type="date" id="vd_end_date" value="${today}" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
                     </div>
                     <div>
-                        <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;">USER <span style="font-weight:400;text-transform:none;font-size:10px;">(Ctrl/⌘ for multi)</span></label>
-                        <select id="vd_user" multiple size="4" style="padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;min-width:180px;">
+                        <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;">USER <span style="font-weight:400;text-transform:none;font-size:10px;">(hold Ctrl for multi)</span></label>
+                        <select id="vd_user" multiple size="4" style="padding:4px 8px;border:1.5px solid #d1d5db;border-radius:8px;font-size:13px;color:#111827;min-width:180px;outline:none;">
                             <option value="--ALL--" selected>-- All Agents --</option>
                             <option value="1001">Grant Corp (1001)</option>
                             <option value="1002">Hunter Brooks (1002)</option>
@@ -20149,8 +22650,8 @@ function vdRunReport() {
     const startDate = document.getElementById('vd_start_date')?.value;
     const endDate   = document.getElementById('vd_end_date')?.value;
     const userSel   = document.getElementById('vd_user');
-    const selected  = userSel ? Array.from(userSel.selectedOptions).map(o => o.value) : ['--ALL--'];
-    const user      = (selected.length === 0 || selected.includes('--ALL--')) ? '--ALL--' : selected.join(',');
+    const selectedUsers = userSel ? Array.from(userSel.selectedOptions).map(o => o.value) : ['--ALL--'];
+    const users     = selectedUsers.length ? selectedUsers : ['--ALL--'];
     const shift     = document.getElementById('vd_shift')?.value || '--';
     const results   = document.getElementById('vd_results');
     if (!results || !startDate || !endDate) return;
@@ -20158,7 +22659,7 @@ function vdRunReport() {
     results.innerHTML = '<div style="text-align:center;padding:40px;color:#64748b;"><i class="fas fa-spinner fa-spin" style="font-size:28px;margin-bottom:10px;display:block;"></i>Fetching ViciDial data...</div>';
 
     const params = new URLSearchParams({ query_date: startDate, end_date: endDate, shift });
-    params.append('users', user);
+    users.forEach(u => params.append('users', u));
 
     fetch(`/api/vicidial/performance-report?${params}`)
         .then(r => r.json())
@@ -20521,6 +23022,666 @@ function vdViewAgentProfile(agentId) {
 }
 window.vdViewAgentProfile = vdViewAgentProfile;
 
+// ── Lead List Report ──────────────────────────────────────────────────────────
+const _LLR_AGENTS = {'1001':'Grant Corp','1002':'Hunter Brooks','1003':'Carson Sweitzer'};
+const _LLR_STATE_NAMES = {'OH':'Ohio','TX':'Texas','IN':'Indiana','IL':'Illinois','PA':'Pennsylvania','GA':'Georgia','FL':'Florida','NJ':'New Jersey','CO':'Colorado','SC':'South Carolina'};
+function _llrAgentName(uid) { return _LLR_AGENTS[String(uid)] || `Agent ${uid}`; }
+function _llrExtractState(name) { const m = String(name).match(/\b(OH|TX|IN|IL|PA|GA|FL|NJ|CO|SC)\b/i); return m ? m[1].toUpperCase() : null; }
+function _llrStateName(abbr) { return _LLR_STATE_NAMES[abbr] || abbr || 'Unknown'; }
+function _llrParseNum(s) { return parseInt((String(s)||'').replace(/[^\d]/g,''),10)||0; }
+function _llrPct(n, total) { return total > 0 ? (n/total*100).toFixed(1)+'%' : '0.0%'; }
+function _llrPctCell(n, total, tdStyle) {
+    const pct = _llrPct(n, total);
+    return `<td style="${tdStyle}color:#64748b;">${pct} <span style="font-size:11px;font-weight:400;opacity:.65">(${n})</span></td>`;
+}
+
+function _llrBuildHTML(d, startDate, endDate) {
+    const { text, agentDisp, listDisp, agentSummary, listCounts, mainSummary, callStatusRows } = d;
+    window._llrData = { startDate, endDate, agentDisp, listDisp, agentSummary, listCounts, mainSummary, callStatusRows, text };
+
+    const ms = mainSummary || {};
+    const th  = 'padding:9px 14px;text-align:center;color:#64748b;font-weight:600;font-size:11px;white-space:nowrap;background:#f8fafc;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.4px;';
+    const thL = 'padding:9px 14px;text-align:left;color:#64748b;font-weight:600;font-size:11px;background:#f8fafc;border-bottom:1px solid #e2e8f0;text-transform:uppercase;letter-spacing:.4px;';
+    const td  = 'padding:9px 12px;text-align:center;font-size:13px;border-bottom:1px solid #f1f5f9;';
+    const tdL = 'padding:9px 12px;text-align:left;font-size:13px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#1e3a5f;';
+    const trAlt = 'background:#f8fafc;';
+
+    // ── Campaign Totals KPIs (border-top style) ──
+    const kpiDefs = [
+        {label:'Total Calls',    value:ms.totalCalls||0,                          icon:'fa-phone-alt',   color:'#0284c7'},
+        {label:'Human Answers',  value:ms.humanAnswers||0,                        icon:'fa-user-check',  color:'#059669'},
+        {label:'Drops',          value:`${ms.drops||0} (${ms.dropPct||'0%'})`,   icon:'fa-phone-slash', color:'#dc2626'},
+        {label:'No Answer',      value:ms.noAnswer||0,                            icon:'fa-phone-volume',color:'#d97706'},
+        {label:'Avg Call Length',value:ms.avgCallLen||'0:00',                     icon:'fa-clock',       color:'#7c3aed'},
+    ];
+    const kpiHTML = kpiDefs.map(k=>`
+        <div style="flex:1;min-width:160px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;border-top:3px solid ${k.color};">
+            <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;">
+                <i class="fas ${k.icon}" style="color:${k.color};"></i>${k.label}
+            </div>
+            <div style="font-size:22px;font-weight:700;color:#1e3a5f;margin-top:8px;">${k.value}</div>
+        </div>`).join('');
+
+    // ── Call Status Breakdown ──
+    const CSS_BG = {DNC:'#fef2f2',DROP:'#fff7ed',SALE:'#f0fdf4'};
+    const CSS_FG = {DNC:'#dc2626',DROP:'#ea580c',SALE:'#16a34a'};
+    const cssRows = callStatusRows || [];
+    const cssHTML = cssRows.length
+        ? cssRows.map((r,i)=>{
+            const s=r.status||''; const bg=CSS_BG[s]||(i%2===1?'#f8fafc':''); const fg=CSS_FG[s]||'#374151';
+            return `<tr style="${bg?`background:${bg};`:''}border-bottom:1px solid #f1f5f9;">
+                <td style="padding:9px 12px;text-align:left;font-size:13px;font-family:monospace;font-weight:700;color:${fg};">${s}</td>
+                <td style="padding:9px 12px;text-align:left;font-size:13px;color:#374151;">${r.description||''}</td>
+                <td style="padding:9px 12px;text-align:center;font-size:13px;font-weight:700;color:${fg};">${r.calls||0}</td>
+                <td style="padding:9px 12px;text-align:center;font-size:13px;color:#64748b;">${r.callTime||'-'}</td>
+                <td style="padding:9px 12px;text-align:center;font-size:13px;color:#64748b;">${r.agentTime||'-'}</td>
+                <td style="padding:9px 12px;text-align:center;font-size:13px;color:#64748b;">${r.callsHr||'-'}</td>
+            </tr>`;
+          }).join('')
+        : `<tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">No call status data</td></tr>`;
+
+    // ── Agent Stats ──
+    const as = agentSummary || {};
+    const agentRows = Object.entries(agentDisp||{}).map(([uid,disp])=>{
+        const sum = as[uid] || {};
+        return { uid, name:_llrAgentName(uid), calls:sum.calls||0, time:sum.time||'', avg:sum.avg||'', disp };
+    });
+    // Disposition cell: each with border-left; zero values grayed out
+    const dispCell = (val, color, blColor) => {
+        const v = val || 0;
+        const c = v === 0 ? '#cbd5e1' : color;
+        const fw = v === 0 ? '400' : '600';
+        return `<td style="${td}border-left:1px solid ${blColor||'#f1f5f9'};font-weight:${fw};color:${c};">${v}</td>`;
+    };
+    const agentHTML = agentRows.length
+        ? agentRows.map((a,i)=>`
+            <tr style="${i%2===1?trAlt:''}border-bottom:1px solid #e2e8f0;">
+                <td style="${tdL}color:#1e3a5f;">${a.name} <span style="font-size:11px;color:#94a3b8;">(${a.uid})</span></td>
+                <td style="${td}font-weight:600;color:#1e40af;">${a.calls||'—'}</td>
+                <td style="${td}">${a.time||'—'}</td>
+                <td style="${td}">${a.avg||'—'}</td>
+                ${dispCell(a.disp.A,'#64748b')}
+                ${dispCell(a.disp.SALE,'#059669')}
+                ${dispCell(a.disp.NI,'#6366f1')}
+                ${dispCell(a.disp.NP,'#f59e0b')}
+                ${dispCell(a.disp.DROP,'#ef4444')}
+                ${dispCell(a.disp.DNC,'#dc2626')}
+                <td style="${td}"><button onclick="vdViewCsAgentProfile('${a.uid}')" title="Agent profile" style="background:#e0f2fe;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;color:#0284c7;font-size:12px;transition:.2s;"><i class="fas fa-eye"></i></button></td>
+            </tr>`).join('')
+        : `<tr><td colspan="11" style="text-align:center;padding:20px;color:#94a3b8;">No agent data</td></tr>`;
+
+    // TOTAL row — uses mainSummary for calls/time/avg; disposition cells blank
+    const blankDisp = `<td style="${td}border-left:1px solid #f1f5f9;"></td>`.repeat(6);
+    const agTotHTML = agentRows.length ? `
+        <tr style="background:#e0f2fe;font-weight:700;border-top:2px solid #0284c7;">
+            <td style="${tdL}color:#015b91;">TOTAL</td>
+            <td style="${td}font-weight:700;color:#1e40af;">${ms.totalCalls||'—'}</td>
+            <td style="${td}">${ms.totalTime||'—'}</td>
+            <td style="${td}">${ms.avgCallLen||'—'}</td>
+            ${blankDisp}<td style="${td}"></td>
+        </tr>` : '';
+
+    // AVERAGE row: avg of per-agent calls/dispositions
+    const na = agentRows.length || 1;
+    const agSum = agentRows.reduce((s,r)=>({
+        calls:s.calls+r.calls, A:s.A+(r.disp.A||0), SALE:s.SALE+(r.disp.SALE||0),
+        NI:s.NI+(r.disp.NI||0), NP:s.NP+(r.disp.NP||0), DROP:s.DROP+(r.disp.DROP||0), DNC:s.DNC+(r.disp.DNC||0)
+    }), {calls:0,A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0});
+    const avgDispCell = (sum, color) => {
+        const v = (sum/na).toFixed(1);
+        const c = parseFloat(v)===0 ? '#cbd5e1' : color;
+        return `<td style="${td}border-left:1px solid #fef08a;font-weight:600;color:${c};">${v}</td>`;
+    };
+    const agAvgHTML = agentRows.length ? `
+        <tr style="background:#fef9c3;font-style:italic;border-top:1px solid #fde68a;">
+            <td style="${tdL}color:#92400e;font-weight:600;">AVERAGE</td>
+            <td style="${td}font-weight:600;color:#92400e;">${(agSum.calls/na).toFixed(1)}</td>
+            <td style="${td}">—</td><td style="${td}">—</td>
+            ${avgDispCell(agSum.A,'#64748b')}
+            ${avgDispCell(agSum.SALE,'#059669')}
+            ${avgDispCell(agSum.NI,'#6366f1')}
+            ${avgDispCell(agSum.NP,'#f59e0b')}
+            ${avgDispCell(agSum.DROP,'#ef4444')}
+            ${avgDispCell(agSum.DNC,'#dc2626')}
+            <td style="${td}"></td>
+        </tr>` : '';
+
+    // ── List Stats ──
+    const lc = listCounts || {};
+    const ld = listDisp || {};
+    const listSelect = document.getElementById('llr-lists');
+    const getListName = lid => {
+        const opt = listSelect ? Array.from(listSelect.options).find(o=>o.value===String(lid)) : null;
+        return opt ? opt.text : (lc[lid]?lc[lid].name:`List ${lid}`);
+    };
+    // Build rows from all lists in listCounts (not just tracked dispositions)
+    const allListIds = Object.keys(lc).filter(lid => (lc[lid].calls||0) > 0);
+    const listRows = allListIds.map(lid => {
+        const calls = lc[lid].calls || 0;
+        const disp = ld[lid] || {A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0};
+        return { lid, listName:getListName(lid), calls, disp };
+    }).sort((a,b) => parseInt(a.lid)-parseInt(b.lid));
+
+    const listRowsHTML = listRows.length
+        ? listRows.map((r,i)=>`<tr style="${i%2===1?trAlt:''}border-bottom:1px solid #f1f5f9;">
+                <td style="${tdL}">${r.listName}</td>
+                <td style="${td}font-weight:700;color:#1e40af;">${r.calls}</td>
+                ${_llrPctCell(r.disp.A||0,r.calls,td)}
+                ${_llrPctCell(r.disp.SALE||0,r.calls,td+'color:#16a34a;font-weight:700;')}
+                ${_llrPctCell(r.disp.NI||0,r.calls,td)}
+                ${_llrPctCell(r.disp.NP||0,r.calls,td)}
+                ${_llrPctCell(r.disp.DROP||0,r.calls,td+'color:#ea580c;')}
+                ${_llrPctCell(r.disp.DNC||0,r.calls,td+'color:#dc2626;')}
+                <td style="${td}"><button onclick="vdViewCsListProfile('${r.lid}')" title="List profile" style="background:#e0f2fe;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;color:#0284c7;font-size:12px;"><i class="fas fa-eye"></i></button></td>
+            </tr>`).join('')
+        : `<tr><td colspan="9" style="text-align:center;padding:20px;color:#94a3b8;">No list data</td></tr>`;
+
+    // List TOTAL / AVERAGE rows
+    const ltSum = listRows.reduce((s,r)=>({
+        calls:s.calls+r.calls, A:s.A+(r.disp.A||0), SALE:s.SALE+(r.disp.SALE||0),
+        NI:s.NI+(r.disp.NI||0), NP:s.NP+(r.disp.NP||0), DROP:s.DROP+(r.disp.DROP||0), DNC:s.DNC+(r.disp.DNC||0)
+    }), {calls:0,A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0});
+    const nl = listRows.length || 1;
+    const listTotHTML = listRows.length ? `
+        <tr style="background:#e0f2fe;font-weight:700;border-top:2px solid #0284c7;">
+            <td style="${tdL}color:#0369a1;">TOTAL</td>
+            <td style="${td}font-weight:700;color:#1e40af;">${ltSum.calls}</td>
+            ${_llrPctCell(ltSum.A,ltSum.calls,td)}<td style="${td}color:#16a34a;font-weight:700;">${_llrPct(ltSum.SALE,ltSum.calls)} <span style="font-size:11px;font-weight:400;opacity:.65">(${ltSum.SALE})</span></td>
+            ${_llrPctCell(ltSum.NI,ltSum.calls,td)}${_llrPctCell(ltSum.NP,ltSum.calls,td)}${_llrPctCell(ltSum.DROP,ltSum.calls,td+'color:#ea580c;')}${_llrPctCell(ltSum.DNC,ltSum.calls,td+'color:#dc2626;')}
+            <td style="${td}"></td>
+        </tr>` : '';
+    const listAvgHTML = listRows.length ? `
+        <tr style="background:#fef9c3;font-style:italic;border-top:1px solid #fde68a;">
+            <td style="${tdL}color:#92400e;">AVERAGE</td>
+            <td style="${td}color:#1e40af;">${(ltSum.calls/nl).toFixed(1)}</td>
+            <td style="${td}color:#64748b;">${(ltSum.A/nl).toFixed(1)}</td>
+            <td style="${td}color:#16a34a;">${(ltSum.SALE/nl).toFixed(1)}</td>
+            <td style="${td}">${(ltSum.NI/nl).toFixed(1)}</td>
+            <td style="${td}">${(ltSum.NP/nl).toFixed(1)}</td>
+            <td style="${td}color:#ea580c;">${(ltSum.DROP/nl).toFixed(1)}</td>
+            <td style="${td}color:#dc2626;">${(ltSum.DNC/nl).toFixed(1)}</td>
+            <td style="${td}"></td>
+        </tr>` : '';
+
+    return `
+        <p style="font-size:12px;color:#94a3b8;margin:0 0 20px;">
+            Report period: <strong>${startDate} 00:00:00</strong> to <strong>${endDate} 23:59:59</strong>
+        </p>
+
+        <h3 style="font-size:13px;font-weight:700;color:#1e3a5f;margin:0 0 12px;text-transform:uppercase;letter-spacing:.6px;"><i class="fas fa-chart-bar" style="margin-right:7px;color:#0284c7;"></i>Campaign Totals</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;">${kpiHTML}</div>
+
+        <h3 style="font-size:13px;font-weight:700;color:#1e3a5f;margin:0 0 10px;text-transform:uppercase;letter-spacing:.6px;"><i class="fas fa-list" style="margin-right:7px;color:#0284c7;"></i>Call Status Breakdown</h3>
+        <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr>
+                    <th style="${thL}">Status</th><th style="${thL}">Description</th>
+                    <th style="${th}">Calls</th><th style="${th}">Total Time</th><th style="${th}">Avg Time</th><th style="${th}">Calls/Hr</th>
+                </tr></thead>
+                <tbody>${cssHTML}</tbody>
+            </table>
+        </div>
+
+        <h3 style="font-size:13px;font-weight:700;color:#1e3a5f;margin:0 0 10px;text-transform:uppercase;letter-spacing:.6px;"><i class="fas fa-users" style="margin-right:7px;color:#0284c7;"></i>Agent Stats</h3>
+        <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:800px;">
+                <thead><tr style="background:#f1f5f9;border-bottom:2px solid #e2e8f0;">
+                    <th style="${thL}">AGENT</th><th style="${th}">CALLS</th><th style="${th}">TIME (H:M:S)</th><th style="${th}">AVG</th>
+                    <th style="${th}border-left:1px solid #e2e8f0;color:#64748b;">Ans. Machine</th>
+                    <th style="${th}border-left:1px solid #e2e8f0;color:#059669;">Sale</th>
+                    <th style="${th}border-left:1px solid #e2e8f0;color:#6366f1;">Not Int.</th>
+                    <th style="${th}border-left:1px solid #e2e8f0;color:#f59e0b;">No Pitch</th>
+                    <th style="${th}border-left:1px solid #e2e8f0;color:#ef4444;">DROP</th>
+                    <th style="${th}border-left:1px solid #e2e8f0;color:#dc2626;">DNC</th>
+                    <th style="${th}"></th>
+                </tr></thead>
+                <tbody>${agentHTML}${agTotHTML}${agAvgHTML}</tbody>
+            </table>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="font-size:13px;font-weight:700;color:#1e3a5f;margin:0;text-transform:uppercase;letter-spacing:.6px;"><i class="fas fa-list-alt" style="margin-right:7px;color:#0284c7;"></i>List Stats</h3>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:12px;font-weight:600;color:#64748b;">Group by State</span>
+                <span onclick="vdToggleListGroupStats(this)" data-on="false"
+                      style="display:inline-block;width:40px;height:22px;background:#cbd5e1;border-radius:10px;cursor:pointer;position:relative;transition:background .2s;vertical-align:middle;">
+                    <span style="position:absolute;left:2px;top:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></span>
+                </span>
+            </div>
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px;">
+                <thead><tr>
+                    <th id="vd-list-col-header" style="${thL}">List</th><th style="${th}">Calls</th>
+                    <th style="${th}">Ans.Machine</th><th style="${th}">Sale</th><th style="${th}">Not Int.</th>
+                    <th style="${th}">No Pitch</th><th style="${th}">DROP</th><th style="${th}">DNC</th><th style="${th}"></th>
+                </tr></thead>
+                <tbody id="vd-list-stats-tbody">${listRowsHTML}${listTotHTML}${listAvgHTML}</tbody>
+            </table>
+        </div>`;
+}
+
+function generateLeadListReport() {
+    document.querySelectorAll('.lead-list-report-overlay').forEach(e => e.remove());
+    const today = new Date().toISOString().slice(0,10);
+    const overlay = document.createElement('div');
+    overlay.className = 'lead-list-report-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.75);display:flex;align-items:center;justify-content:center;z-index:99999;padding:12px;box-sizing:border-box;';
+    overlay.innerHTML = `
+        <div style="background:#f8fafc;border-radius:18px;width:100%;max-width:1400px;height:94vh;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.4);display:flex;flex-direction:column;" onclick="event.stopPropagation()">
+            <div style="background:linear-gradient(135deg,#1e3a5f 0%,#0284c7 100%);padding:18px 28px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                <div style="display:flex;align-items:center;gap:14px;">
+                    <div style="background:rgba(255,255,255,0.18);border-radius:12px;padding:10px 12px;">
+                        <i class="fas fa-list-alt" style="color:#fff;font-size:22px;"></i>
+                    </div>
+                    <div>
+                        <h2 style="margin:0;color:#fff;font-size:20px;font-weight:700;">Lead List Report</h2>
+                        <p style="margin:3px 0 0;color:#bae6fd;font-size:12px;">ViciDial campaign statistics by list, agent, and disposition</p>
+                    </div>
+                </div>
+                <button onclick="this.closest('.lead-list-report-overlay').remove();" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">&times;</button>
+            </div>
+            <div style="background:#f1f5f9;border-bottom:2px solid #e2e8f0;padding:14px 28px;flex-shrink:0;">
+                <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Start Date</label>
+                        <input type="date" id="llr-start" value="${today}" style="padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13px;color:#1e293b;background:#fff;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">End Date</label>
+                        <input type="date" id="llr-end" value="${today}" style="padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13px;color:#1e293b;background:#fff;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Campaigns <span style="font-weight:400;font-size:9px;text-transform:none;">(Ctrl+click)</span></label>
+                        <select id="llr-campaigns" multiple size="4" style="padding:4px 8px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13px;color:#1e293b;background:#fff;min-width:185px;">
+                            <option value="--ALL--">-- ALL CAMPAIGNS --</option>
+                            <option value="AgentsCM" selected>AgentsCM</option>
+                            <option value="ILun" selected>ILun &#x2013; Grant Corp</option>
+                            <option value="INun" selected>INun &#x2013; Hunter Brooks</option>
+                            <option value="PAun" selected>PAun &#x2013; PA Unassigned</option>
+                            <option value="Sweitzer" selected>Sweitzer &#x2013; Carson Sweitzer</option>
+                            <option value="TXun" selected>TXun &#x2013; TX Unassigned</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Lists <span style="font-weight:400;font-size:9px;text-transform:none;">(Ctrl+click)</span></label>
+                        <select id="llr-lists" multiple size="4" style="padding:4px 8px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13px;color:#1e293b;background:#fff;min-width:220px;">
+                            <option value="--ALL--" selected>-- All Lists --</option>
+                            <option value="998">998 &#x2013; OH Hunter</option>
+                            <option value="999">999 &#x2013; TX Hunter</option>
+                            <option value="1000">1000 &#x2013; IN Hunter</option>
+                            <option value="1001">1001 &#x2013; OH Grant</option>
+                            <option value="1002">1002 &#x2013; TEST</option>
+                            <option value="1005">1005 &#x2013; TX Grant</option>
+                            <option value="1006">1006 &#x2013; IN Grant</option>
+                            <option value="1007">1007 &#x2013; OH Carson</option>
+                            <option value="1008">1008 &#x2013; TX Carson</option>
+                            <option value="1009">1009 &#x2013; IN Carson</option>
+                            <option value="1010">1010 &#x2013; SC Carson</option>
+                            <option value="1011">1011 &#x2013; PA Hunter</option>
+                            <option value="1012">1012 &#x2013; IL Hunter</option>
+                            <option value="1013">1013 &#x2013; GA Grant</option>
+                            <option value="1014">1014 &#x2013; IL Grant</option>
+                            <option value="1015">1015 &#x2013; IL Carson</option>
+                            <option value="1016">1016 &#x2013; FL Carson</option>
+                            <option value="1017">1017 &#x2013; FL Grant</option>
+                            <option value="1018">1018 &#x2013; FL Hunter</option>
+                            <option value="1019">1019 &#x2013; PA Grant</option>
+                            <option value="1020">1020 &#x2013; PA Carson</option>
+                            <option value="1021">1021 &#x2013; GA Carson</option>
+                            <option value="1022">1022 &#x2013; GA Hunter</option>
+                            <option value="1023">1023 &#x2013; NJ Hunter</option>
+                            <option value="1024">1024 &#x2013; NJ Grant</option>
+                            <option value="1025">1025 &#x2013; NJ Carson</option>
+                            <option value="1026">1026 &#x2013; CO Hunter</option>
+                            <option value="1027">1027 &#x2013; CO Carson</option>
+                            <option value="1028">1028 &#x2013; CO Grant</option>
+                            <option value="1029">1029 &#x2013; OH MANUFACTURING</option>
+                            <option value="1030">1030 &#x2013; OH CONTRACTORS</option>
+                            <option value="1031">1031 &#x2013; OH CONSTRUCTION</option>
+                            <option value="1032">1032 &#x2013; OH LOGISTICS/WAREHOUSING</option>
+                            <option value="1033">1033 &#x2013; OH HOSPITALITY</option>
+                            <option value="1034">1034 &#x2013; OH REAL ESTATE</option>
+                            <option value="1035">1035 &#x2013; OH ENERGY</option>
+                            <option value="1036">1036 &#x2013; OH AUTO DEALERS</option>
+                            <option value="1037">1037 &#x2013; OH RESTAURANTS</option>
+                            <option value="1038">1038 &#x2013; OH RETAIL</option>
+                            <option value="1039">1039 &#x2013; OH FINANCIAL INSTITUTIONS</option>
+                            <option value="1040">1040 &#x2013; OH HEALTHCARE</option>
+                            <option value="1041">1041 &#x2013; OH TECHNOLOGY/SAAS</option>
+                            <option value="1042">1042 &#x2013; OH PROFESSIONAL SERVICES</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Shift</label>
+                        <select id="llr-shift" style="padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13px;color:#1e293b;background:#fff;">
+                            <option value="ALL">All Day</option>
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Rollover</label>
+                        <select id="llr-rollover" style="padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13px;color:#1e293b;background:#fff;">
+                            <option value="NO">No</option>
+                            <option value="YES">Yes</option>
+                        </select>
+                    </div>
+                    <button onclick="_llrRun()" style="background:#015b91;color:#fff;border:none;padding:9px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;height:36px;display:flex;align-items:center;gap:7px;white-space:nowrap;">
+                        <i class="fas fa-play" style="font-size:11px;"></i>Run Report
+                    </button>
+                </div>
+            </div>
+            <div id="llr-results" style="flex:1;overflow-y:auto;padding:28px;">
+                <div style="text-align:center;padding:50px;color:#94a3b8;">
+                    <i class="fas fa-list-alt" style="font-size:40px;margin-bottom:14px;display:block;opacity:.4;"></i>
+                    <div style="font-size:14px;font-weight:600;">Select filters and click <strong>Run Report</strong></div>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function _llrRun() {
+    const startDate = document.getElementById('llr-start')?.value;
+    const endDate   = document.getElementById('llr-end')?.value;
+    const campaignSel = document.getElementById('llr-campaigns');
+    const listSel   = document.getElementById('llr-lists');
+    const shift     = document.getElementById('llr-shift')?.value || 'ALL';
+    const rollover  = document.getElementById('llr-rollover')?.value || 'NO';
+    const results   = document.getElementById('llr-results');
+    if (!results || !startDate || !endDate) return;
+
+    let campaigns = campaignSel ? Array.from(campaignSel.selectedOptions).map(o=>o.value) : ['AgentsCM','ILun','INun','PAun','Sweitzer','TXun'];
+    // If --ALL-- selected, send all individual campaigns
+    if (campaigns.includes('--ALL--')) campaigns = ['AgentsCM','ILun','INun','PAun','Sweitzer','TXun'];
+    const lists = listSel ? Array.from(listSel.selectedOptions).map(o=>o.value) : ['--ALL--'];
+
+    results.innerHTML = '<div style="text-align:center;padding:50px;color:#64748b;"><i class="fas fa-spinner fa-spin" style="font-size:32px;margin-bottom:14px;display:block;color:#0284c7;"></i><div style="font-size:14px;font-weight:600;">Fetching ViciDial data...</div><div style="font-size:12px;color:#94a3b8;margin-top:6px;">This may take 15–30 seconds</div></div>';
+
+    const params = new URLSearchParams({ query_date: startDate, end_date: endDate, shift, include_rollover: rollover });
+    campaigns.forEach(c => params.append('group[]', c));
+    lists.forEach(l => params.append('list_ids[]', l));
+
+    fetch(`/api/vicidial/campaign-stats?${params}`)
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) { results.innerHTML = `<div style="color:#ef4444;padding:20px;font-size:14px;"><i class="fas fa-exclamation-circle" style="margin-right:8px;"></i>Error: ${d.error}</div>`; return; }
+            results.innerHTML = _llrBuildHTML(d, startDate, endDate);
+        })
+        .catch(err => { results.innerHTML = `<div style="color:#ef4444;padding:20px;font-size:14px;"><i class="fas fa-exclamation-circle" style="margin-right:8px;"></i>Network error: ${err.message}</div>`; });
+}
+
+function vdToggleListGroupStats(toggleEl) {
+    const isOn = toggleEl.dataset.on === 'true';
+    const newOn = !isOn;
+    toggleEl.dataset.on = String(newOn);
+    const knob = toggleEl.firstElementChild;
+    if (newOn) { toggleEl.style.background='#3b82f6'; if(knob)knob.style.left='20px'; }
+    else        { toggleEl.style.background='#cbd5e1'; if(knob)knob.style.left='2px';  }
+
+    const tbody = document.getElementById('vd-list-stats-tbody');
+    const colHeader = document.getElementById('vd-list-col-header');
+    if (!tbody || !window._llrData) return;
+
+    const { listDisp, listCounts } = window._llrData;
+    const lc = listCounts || {};
+    const ld = listDisp || {};
+    const td  = 'padding:9px 12px;text-align:center;font-size:13px;border-bottom:1px solid #f1f5f9;';
+    const tdL = 'padding:9px 12px;text-align:left;font-size:13px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#1e3a5f;';
+    const trAlt = 'background:#f8fafc;';
+    const listSelect = document.getElementById('llr-lists');
+    const getListName = lid => {
+        const opt = listSelect ? Array.from(listSelect.options).find(o=>o.value===String(lid)) : null;
+        return opt ? opt.text : (lc[lid]?lc[lid].name:`List ${lid}`);
+    };
+
+    if (!newOn) {
+        if (colHeader) colHeader.textContent = 'List';
+        const allListIds = Object.keys(lc).filter(lid => (lc[lid].calls||0) > 0);
+        const rows = allListIds.map(lid => {
+            const calls = lc[lid].calls || 0;
+            const disp = ld[lid] || {A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0};
+            return { lid, listName:getListName(lid), calls, disp };
+        }).sort((a,b) => parseInt(a.lid)-parseInt(b.lid));
+        const ltSum = rows.reduce((s,r)=>({calls:s.calls+r.calls,A:s.A+(r.disp.A||0),SALE:s.SALE+(r.disp.SALE||0),NI:s.NI+(r.disp.NI||0),NP:s.NP+(r.disp.NP||0),DROP:s.DROP+(r.disp.DROP||0),DNC:s.DNC+(r.disp.DNC||0)}),{calls:0,A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0});
+        const nl = rows.length || 1;
+        tbody.innerHTML = rows.length
+            ? rows.map((r,i)=>`<tr style="${i%2===1?trAlt:''}border-bottom:1px solid #f1f5f9;">
+                <td style="${tdL}">${r.listName}</td>
+                <td style="${td}font-weight:700;color:#1e40af;">${r.calls}</td>
+                ${_llrPctCell(r.disp.A||0,r.calls,td)}
+                ${_llrPctCell(r.disp.SALE||0,r.calls,td+'color:#16a34a;font-weight:700;')}
+                ${_llrPctCell(r.disp.NI||0,r.calls,td)}${_llrPctCell(r.disp.NP||0,r.calls,td)}
+                ${_llrPctCell(r.disp.DROP||0,r.calls,td+'color:#ea580c;')}${_llrPctCell(r.disp.DNC||0,r.calls,td+'color:#dc2626;')}
+                <td style="${td}"><button onclick="vdViewCsListProfile('${r.lid}')" title="List profile" style="background:#e0f2fe;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;color:#0284c7;font-size:12px;"><i class="fas fa-eye"></i></button></td>
+              </tr>`).join('')
+            + (rows.length ? `<tr style="background:#e0f2fe;font-weight:700;border-top:2px solid #0284c7;"><td style="${tdL}color:#0369a1;">TOTAL</td><td style="${td}font-weight:700;color:#1e40af;">${ltSum.calls}</td>${_llrPctCell(ltSum.A,ltSum.calls,td)}${_llrPctCell(ltSum.SALE,ltSum.calls,td+'color:#16a34a;font-weight:700;')}${_llrPctCell(ltSum.NI,ltSum.calls,td)}${_llrPctCell(ltSum.NP,ltSum.calls,td)}${_llrPctCell(ltSum.DROP,ltSum.calls,td+'color:#ea580c;')}${_llrPctCell(ltSum.DNC,ltSum.calls,td+'color:#dc2626;')}<td style="${td}"></td></tr>` : '')
+            + (rows.length ? `<tr style="background:#fef9c3;font-style:italic;border-top:1px solid #fde68a;"><td style="${tdL}color:#92400e;">AVERAGE</td><td style="${td}color:#1e40af;">${(ltSum.calls/nl).toFixed(1)}</td><td style="${td}color:#64748b;">${(ltSum.A/nl).toFixed(1)}</td><td style="${td}color:#16a34a;">${(ltSum.SALE/nl).toFixed(1)}</td><td style="${td}">${(ltSum.NI/nl).toFixed(1)}</td><td style="${td}">${(ltSum.NP/nl).toFixed(1)}</td><td style="${td}color:#ea580c;">${(ltSum.DROP/nl).toFixed(1)}</td><td style="${td}color:#dc2626;">${(ltSum.DNC/nl).toFixed(1)}</td><td style="${td}"></td></tr>` : '')
+            : `<tr><td colspan="9" style="text-align:center;padding:20px;color:#94a3b8;">No list data</td></tr>`;
+    } else {
+        if (colHeader) colHeader.textContent = 'State';
+        // Aggregate by state using listCounts for total calls
+        const stateMap = {};
+        Object.keys(lc).forEach(lid => {
+            const calls = lc[lid].calls || 0;
+            if (!calls) return;
+            const listName = getListName(lid);
+            const abbr = _llrExtractState(listName) || 'Other';
+            const sn = _llrStateName(abbr);
+            if (!stateMap[sn]) stateMap[sn] = { sn, calls:0, A:0, SALE:0, NI:0, NP:0, DROP:0, DNC:0 };
+            const s = stateMap[sn];
+            s.calls += calls;
+            const disp = ld[lid] || {};
+            ['A','SALE','NI','NP','DROP','DNC'].forEach(k => s[k] += disp[k]||0);
+        });
+        const stateRows = Object.values(stateMap).filter(s=>s.calls>0).sort((a,b)=>b.calls-a.calls);
+        const stSum = stateRows.reduce((s,r)=>({calls:s.calls+r.calls,A:s.A+r.A,SALE:s.SALE+r.SALE,NI:s.NI+r.NI,NP:s.NP+r.NP,DROP:s.DROP+r.DROP,DNC:s.DNC+r.DNC}),{calls:0,A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0});
+        const ns = stateRows.length || 1;
+        tbody.innerHTML = stateRows.length
+            ? stateRows.map((s,i)=>`<tr style="${i%2===1?trAlt:''}border-bottom:1px solid #f1f5f9;">
+                <td style="${tdL}">${s.sn}</td>
+                <td style="${td}font-weight:700;color:#1e40af;">${s.calls}</td>
+                ${_llrPctCell(s.A,s.calls,td)}${_llrPctCell(s.SALE,s.calls,td+'color:#16a34a;font-weight:700;')}
+                ${_llrPctCell(s.NI,s.calls,td)}${_llrPctCell(s.NP,s.calls,td)}
+                ${_llrPctCell(s.DROP,s.calls,td+'color:#ea580c;')}${_llrPctCell(s.DNC,s.calls,td+'color:#dc2626;')}
+                <td style="${td}"><button onclick="vdViewCsStateProfile('${s.sn}')" title="State profile" style="background:#e0f2fe;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;color:#0284c7;font-size:12px;"><i class="fas fa-eye"></i></button></td>
+              </tr>`).join('')
+            + (stateRows.length ? `<tr style="background:#e0f2fe;font-weight:700;border-top:2px solid #0284c7;"><td style="${tdL}color:#0369a1;">TOTAL</td><td style="${td}font-weight:700;color:#1e40af;">${stSum.calls}</td>${_llrPctCell(stSum.A,stSum.calls,td)}${_llrPctCell(stSum.SALE,stSum.calls,td+'color:#16a34a;font-weight:700;')}${_llrPctCell(stSum.NI,stSum.calls,td)}${_llrPctCell(stSum.NP,stSum.calls,td)}${_llrPctCell(stSum.DROP,stSum.calls,td+'color:#ea580c;')}${_llrPctCell(stSum.DNC,stSum.calls,td+'color:#dc2626;')}<td style="${td}"></td></tr>` : '')
+            : `<tr><td colspan="9" style="text-align:center;padding:20px;color:#94a3b8;">No state data</td></tr>`;
+    }
+}
+
+// Shared helper: build profile overlay HTML with % stats + delta badges
+function _vdBuildProfileOverlay(opts) {
+    // opts: { id, icon, iconBg, title, subtitle, totalCalls, metrics }
+    // metrics: [{ label, rawVal, pct, avgPct, isGood, isNeutral }]
+    // For "Calls" metric: rawVal shown as count; others show as % of totalCalls
+    const legendHTML = `<div style="display:flex;gap:16px;align-items:center;margin-bottom:20px;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+        <span style="font-size:12px;font-weight:600;color:#374151;">Legend:</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:10px;height:10px;border-radius:50%;background:#bbf7d0;display:inline-block;"></span> Favourable</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:10px;height:10px;border-radius:50%;background:#fecaca;display:inline-block;"></span> Unfavourable</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:10px;height:10px;border-radius:50%;background:#e2e8f0;display:inline-block;"></span> Neutral</span>
+    </div>`;
+    const cardsHTML = opts.metrics.map(m => {
+        const delta = m.pct - m.avgPct;
+        const absDelta = Math.abs(delta).toFixed(1);
+        const sign = delta >= 0 ? '+' : '−';
+        let badgeBg, badgeColor, valColor;
+        if (m.isNeutral) {
+            badgeBg = '#e2e8f0'; badgeColor = '#64748b'; valColor = '#475569';
+        } else if (m.isGood) {
+            // Good metrics: higher = better (Calls, Sale)
+            if (delta > 0) { badgeBg = '#bbf7d0'; badgeColor = '#15803d'; valColor = '#15803d'; }
+            else if (delta < 0) { badgeBg = '#fecaca'; badgeColor = '#dc2626'; valColor = '#dc2626'; }
+            else { badgeBg = '#e2e8f0'; badgeColor = '#64748b'; valColor = '#475569'; }
+        } else {
+            // Bad metrics: lower = better (NI, NP, DROP, DNC)
+            if (delta < 0) { badgeBg = '#bbf7d0'; badgeColor = '#15803d'; valColor = '#15803d'; }
+            else if (delta > 0) { badgeBg = '#fecaca'; badgeColor = '#dc2626'; valColor = '#dc2626'; }
+            else { badgeBg = '#e2e8f0'; badgeColor = '#64748b'; valColor = '#475569'; }
+        }
+        const displayVal = m.isCount ? m.rawVal.toLocaleString() : m.pct.toFixed(1) + '%';
+        const displayAvg = m.isCount ? Math.round(m.avgPct).toLocaleString() : m.avgPct.toFixed(1) + '%';
+        const deltaLabel = m.isCount
+            ? `${sign}${Math.abs(Math.round(delta)).toLocaleString()}`
+            : `${sign}${absDelta}%`;
+        return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 16px;text-align:center;min-width:150px;flex:1;">
+            <div style="font-size:26px;font-weight:700;color:${valColor};line-height:1;">${displayVal}</div>
+            <div style="font-size:12px;font-weight:600;color:#374151;margin:6px 0 4px;">${m.label}</div>
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">avg ${displayAvg}</div>
+            <span style="display:inline-block;padding:2px 8px;border-radius:20px;background:${badgeBg};color:${badgeColor};font-size:11px;font-weight:600;">${deltaLabel}</span>
+        </div>`;
+    }).join('');
+    return `<div style="background:#fff;border-radius:16px;width:90vw;max-width:860px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">
+        <div style="background:${opts.iconBg||'linear-gradient(135deg,#1e3a5f,#0284c7)'};padding:20px 24px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:14px;">
+                <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;"><i class="${opts.icon}"></i></div>
+                <div><div style="font-size:17px;font-weight:700;color:#fff;">${opts.title}</div><div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">${opts.subtitle}</div></div>
+            </div>
+            <button onclick="document.getElementById('${opts.id}').remove();" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:20px;cursor:pointer;flex-shrink:0;">&times;</button>
+        </div>
+        <div style="padding:24px;">
+            ${legendHTML}
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">${cardsHTML}</div>
+        </div>
+    </div>`;
+}
+
+function vdViewCsAgentProfile(userId) {
+    if (!window._llrData) return;
+    const { agentDisp, agentSummary } = window._llrData;
+    const myDisp = agentDisp[String(userId)] || {};
+    const mySummary = (agentSummary||{})[String(userId)] || {};
+    const agentName = _llrAgentName(userId);
+    const myCalls = mySummary.calls || ((myDisp.A||0)+(myDisp.SALE||0)+(myDisp.NI||0)+(myDisp.NP||0)+(myDisp.DROP||0)+(myDisp.DNC||0));
+    const tc = myCalls || 1;
+    const allAgentIds = Object.keys(agentDisp||{});
+    const na = allAgentIds.length || 1;
+    const getAgentCalls = uid => { const s=(agentSummary||{})[uid]||{}; const d=agentDisp[uid]||{}; return s.calls||((d.A||0)+(d.SALE||0)+(d.NI||0)+(d.NP||0)+(d.DROP||0)+(d.DNC||0)); };
+    const avgCalls = allAgentIds.reduce((s,uid)=>s+getAgentCalls(uid),0)/na;
+    const avgPct = k => { const at=allAgentIds.reduce((s,uid)=>s+getAgentCalls(uid),0); return at>0 ? allAgentIds.reduce((s,uid)=>s+((agentDisp[uid]||{})[k]||0),0)/at*100 : 0; };
+    const overlayId = 'vd-cs-agent-profile-overlay';
+    document.querySelectorAll('#'+overlayId).forEach(e=>e.remove());
+    const overlay = document.createElement('div');
+    overlay.id = overlayId;
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.75);display:flex;align-items:center;justify-content:center;z-index:100000;padding:12px;box-sizing:border-box;';
+    overlay.innerHTML = _vdBuildProfileOverlay({
+        id: overlayId,
+        icon: 'fas fa-user',
+        iconBg: 'linear-gradient(135deg,#1e3a5f,#0284c7)',
+        title: agentName,
+        subtitle: `Agent Profile · compared to ${na} agent${na!==1?'s':''}`,
+        metrics: [
+            { label:'Calls',        rawVal:myCalls,           pct:myCalls,        avgPct:avgCalls,       isCount:true,  isGood:true,    isNeutral:false },
+            { label:'Ans. Machine', rawVal:myDisp.A||0,       pct:(myDisp.A||0)/tc*100,   avgPct:avgPct('A'),   isCount:false, isGood:false,   isNeutral:true  },
+            { label:'Sale',         rawVal:myDisp.SALE||0,    pct:(myDisp.SALE||0)/tc*100, avgPct:avgPct('SALE'),isCount:false, isGood:true,    isNeutral:false },
+            { label:'Not Int.',     rawVal:myDisp.NI||0,      pct:(myDisp.NI||0)/tc*100,   avgPct:avgPct('NI'),  isCount:false, isGood:false,   isNeutral:false },
+            { label:'No Pitch',     rawVal:myDisp.NP||0,      pct:(myDisp.NP||0)/tc*100,   avgPct:avgPct('NP'),  isCount:false, isGood:false,   isNeutral:false },
+            { label:'DROP',         rawVal:myDisp.DROP||0,    pct:(myDisp.DROP||0)/tc*100,  avgPct:avgPct('DROP'),isCount:false, isGood:false,   isNeutral:false },
+            { label:'DNC',          rawVal:myDisp.DNC||0,     pct:(myDisp.DNC||0)/tc*100,   avgPct:avgPct('DNC'), isCount:false, isGood:false,   isNeutral:false },
+        ]
+    });
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+}
+
+function vdViewCsStateProfile(stateName) {
+    if (!window._llrData) return;
+    const { listDisp, listCounts } = window._llrData;
+    const lc = listCounts || {};
+    const ld = listDisp || {};
+    const listSelect = document.getElementById('llr-lists');
+    const getListName = lid => {
+        const opt = listSelect ? Array.from(listSelect.options).find(o=>o.value===String(lid)) : null;
+        return opt ? opt.text : (lc[lid]?lc[lid].name:`List ${lid}`);
+    };
+    const stateMap = {};
+    Object.keys(lc).forEach(lid => {
+        const calls = lc[lid].calls || 0;
+        if (!calls) return;
+        const abbr = _llrExtractState(getListName(lid)) || 'Other';
+        const sn = _llrStateName(abbr);
+        if (!stateMap[sn]) stateMap[sn] = {calls:0,A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0};
+        stateMap[sn].calls += calls;
+        const disp = ld[lid] || {};
+        ['A','SALE','NI','NP','DROP','DNC'].forEach(k=>stateMap[sn][k]+=(disp[k]||0));
+    });
+    const myD = stateMap[stateName] || {calls:0,A:0,SALE:0,NI:0,NP:0,DROP:0,DNC:0};
+    const tc = myD.calls || 1;
+    const stateList = Object.values(stateMap);
+    const ns = stateList.length || 1;
+    const avgCalls = stateList.reduce((s,d)=>s+(d.calls||0),0)/ns;
+    const totalCallsAll = stateList.reduce((s,d)=>s+(d.calls||0),0);
+    const avgPct = k => totalCallsAll > 0 ? stateList.reduce((s,d)=>s+(d[k]||0),0)/totalCallsAll*100 : 0;
+    const overlayId = 'vd-cs-state-profile-overlay';
+    document.querySelectorAll('#'+overlayId).forEach(e=>e.remove());
+    const overlay = document.createElement('div');
+    overlay.id = overlayId;
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.75);display:flex;align-items:center;justify-content:center;z-index:100000;padding:12px;box-sizing:border-box;';
+    overlay.innerHTML = _vdBuildProfileOverlay({
+        id: overlayId,
+        icon: 'fas fa-map-marker-alt',
+        iconBg: 'linear-gradient(135deg,#134e4a,#0f766e)',
+        title: stateName,
+        subtitle: `State Group · compared to ${ns} state${ns!==1?'s':''}`,
+        metrics: [
+            { label:'Calls',        rawVal:myD.calls,  pct:myD.calls,         avgPct:avgCalls,       isCount:true,  isGood:true,    isNeutral:false },
+            { label:'Ans. Machine', rawVal:myD.A,      pct:myD.A/tc*100,      avgPct:avgPct('A'),    isCount:false, isGood:false,   isNeutral:true  },
+            { label:'Sale',         rawVal:myD.SALE,   pct:myD.SALE/tc*100,   avgPct:avgPct('SALE'), isCount:false, isGood:true,    isNeutral:false },
+            { label:'Not Int.',     rawVal:myD.NI,     pct:myD.NI/tc*100,     avgPct:avgPct('NI'),   isCount:false, isGood:false,   isNeutral:false },
+            { label:'No Pitch',     rawVal:myD.NP,     pct:myD.NP/tc*100,     avgPct:avgPct('NP'),   isCount:false, isGood:false,   isNeutral:false },
+            { label:'DROP',         rawVal:myD.DROP,   pct:myD.DROP/tc*100,   avgPct:avgPct('DROP'), isCount:false, isGood:false,   isNeutral:false },
+            { label:'DNC',          rawVal:myD.DNC,    pct:myD.DNC/tc*100,    avgPct:avgPct('DNC'),  isCount:false, isGood:false,   isNeutral:false },
+        ]
+    });
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+}
+
+function vdViewCsListProfile(listId) {
+    if (!window._llrData) return;
+    const { listDisp, listCounts } = window._llrData;
+    const lc = listCounts || {};
+    const lid = String(listId);
+    const myDisp = (listDisp||{})[lid] || {};
+    const myCalls = (lc[lid]||{}).calls || ((myDisp.A||0)+(myDisp.SALE||0)+(myDisp.NI||0)+(myDisp.NP||0)+(myDisp.DROP||0)+(myDisp.DNC||0));
+    const tc = myCalls || 1;
+    const listSelect = document.getElementById('llr-lists');
+    const opt = listSelect ? Array.from(listSelect.options).find(o=>o.value===lid) : null;
+    const listName = opt ? opt.text : ((lc[lid]||{}).name || `List ${listId}`);
+    const allListIds = Object.keys(lc).filter(l=>(lc[l].calls||0)>0);
+    const nl = allListIds.length || 1;
+    const avgCalls = allListIds.reduce((s,l)=>s+(lc[l].calls||0),0)/nl;
+    const totalCallsAll = allListIds.reduce((s,l)=>s+(lc[l].calls||0),0);
+    const avgPct = k => totalCallsAll > 0 ? allListIds.reduce((s,l)=>s+((listDisp||{})[l]?((listDisp||{})[l][k]||0):0),0)/totalCallsAll*100 : 0;
+    const overlayId = 'vd-cs-list-profile-overlay';
+    document.querySelectorAll('#'+overlayId).forEach(e=>e.remove());
+    const overlay = document.createElement('div');
+    overlay.id = overlayId;
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,0.75);display:flex;align-items:center;justify-content:center;z-index:100000;padding:12px;box-sizing:border-box;';
+    overlay.innerHTML = _vdBuildProfileOverlay({
+        id: overlayId,
+        icon: 'fas fa-list',
+        iconBg: 'linear-gradient(135deg,#1e3a5f,#2563eb)',
+        title: listName,
+        subtitle: `List Profile · compared to ${nl} list${nl!==1?'s':''}`,
+        metrics: [
+            { label:'Calls',        rawVal:myCalls,         pct:myCalls,               avgPct:avgCalls,       isCount:true,  isGood:true,    isNeutral:false },
+            { label:'Ans. Machine', rawVal:myDisp.A||0,     pct:(myDisp.A||0)/tc*100,  avgPct:avgPct('A'),    isCount:false, isGood:false,   isNeutral:true  },
+            { label:'Sale',         rawVal:myDisp.SALE||0,  pct:(myDisp.SALE||0)/tc*100, avgPct:avgPct('SALE'),isCount:false, isGood:true,    isNeutral:false },
+            { label:'Not Int.',     rawVal:myDisp.NI||0,    pct:(myDisp.NI||0)/tc*100,  avgPct:avgPct('NI'),  isCount:false, isGood:false,   isNeutral:false },
+            { label:'No Pitch',     rawVal:myDisp.NP||0,    pct:(myDisp.NP||0)/tc*100,  avgPct:avgPct('NP'),  isCount:false, isGood:false,   isNeutral:false },
+            { label:'DROP',         rawVal:myDisp.DROP||0,  pct:(myDisp.DROP||0)/tc*100, avgPct:avgPct('DROP'),isCount:false, isGood:false,   isNeutral:false },
+            { label:'DNC',          rawVal:myDisp.DNC||0,   pct:(myDisp.DNC||0)/tc*100,  avgPct:avgPct('DNC'), isCount:false, isGood:false,   isNeutral:false },
+        ]
+    });
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+}
+// ── End Lead List Report ───────────────────────────────────────────────────────
+
 function generateAgentPerformanceReport() {
     document.querySelectorAll('.agent-perf-report-overlay').forEach(e => e.remove());
 
@@ -20733,7 +23894,7 @@ function runAgentPerformanceReport() {
                 totalCallSecs: 0, callSecsInRange: 0, callsInRange: 0, connectedInRange: 0,
                 appsToMarket: 0, sales: 0, totalPremium: 0,
                 stages: {}, salesInRange: 0, premiumInRange: 0,
-                callbackLeads: 0, overdueCallbackLeads: 0, openLeads: 0,
+                callbackLeads: 0, overdueCallbackLeads: 0,
                 byDate: {}
             };
             return agentMap[agent];
@@ -20743,8 +23904,6 @@ function runAgentPerformanceReport() {
             const agent = lead.assignedTo || 'Unassigned';
             const m = getAgent(agent);
             m.totalLeads++;
-            const leadStage = lead.stage || 'new';
-            if (leadStage !== 'closed' && leadStage !== 'lost') m.openLeads++;
 
             // Lead in date range (by created_at or lead.created)
             const createdStr = lead.created_at || lead.created || lead.lastActivity || '';
@@ -20757,11 +23916,9 @@ function runAgentPerformanceReport() {
                 m.stages[stage] = (m.stages[stage] || 0) + 1;
             }
 
-            // Apps to market — check appSentAt timestamp first, fall back to lead creation date
-            const appSentDate = lead.appSentAt ? new Date(lead.appSentAt) : null;
-            const appSentInRange = appSentDate && appSentDate >= startTs && appSentDate <= endTs;
+            // Apps to market — green checkmark leads (doc emailed) within date range
             const docEmailed = lead.stage === 'app_sent' || (lead.reachOut && (lead.reachOut.emailSent || lead.reachOut.emailCount > 0));
-            if (appSentInRange || (leadInRange && docEmailed)) {
+            if (leadInRange && docEmailed) {
                 m.appsToMarket++;
             }
 
@@ -20843,8 +24000,6 @@ function runAgentPerformanceReport() {
             const agent = lead.assignedTo || 'Unassigned';
             const m = agentMap[agent];
             if (!m) return;
-            const ls = lead.stage || 'new';
-            if (ls === 'closed' || ls === 'lost') return;
             const cbs = (cbByLead[String(lead.id)] || []).filter(cb => !cb.completed);
             if (cbs.length === 0) return;
             const hasActive = cbs.some(cb => new Date(cb.date_time).getTime() >= nowTs);
@@ -20876,12 +24031,11 @@ function runAgentPerformanceReport() {
             acc.salesInRange += m.salesInRange; acc.totalPremium += m.totalPremium;
             acc.premiumInRange += m.premiumInRange;
             acc.callbackLeads += m.callbackLeads; acc.overdueCallbackLeads += m.overdueCallbackLeads;
-            acc.openLeads += m.openLeads;
             acc.stageNew += (m.stages['new'] || 0);
             acc.stageLossRuns += (m.stages['loss_runs_requested'] || 0);
             acc.stageClosed += (m.stages['closed'] || 0);
             return acc;
-        }, {totalLeads:0,leadsInRange:0,openLeads:0,totalCalls:0,callsInRange:0,connectedInRange:0,connectedCalls:0,voicemails:0,callSecsInRange:0,totalCallSecs:0,appsToMarket:0,sales:0,salesInRange:0,totalPremium:0,premiumInRange:0,stageNew:0,stageLossRuns:0,stageClosed:0,callbackLeads:0,overdueCallbackLeads:0});
+        }, {totalLeads:0,leadsInRange:0,totalCalls:0,callsInRange:0,connectedInRange:0,connectedCalls:0,voicemails:0,callSecsInRange:0,totalCallSecs:0,appsToMarket:0,sales:0,salesInRange:0,totalPremium:0,premiumInRange:0,stageNew:0,stageLossRuns:0,stageClosed:0,callbackLeads:0,overdueCallbackLeads:0});
 
         const stageColors = {new:'#6b7280',contact_attempted:'#f59e0b',contacted:'#3b82f6',info_requested:'#8b5cf6',loss_runs_requested:'#ec4899',quoted:'#06b6d4',closed:'#10b981',lost:'#ef4444'};
         const stageLabel = s => s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -20890,7 +24044,7 @@ function runAgentPerformanceReport() {
         const summaryCards = [
             {icon:'fa-users',label:'Total Leads (in range)',val:totals.leadsInRange,sub:`${totals.totalLeads} all time`,color:'#3b82f6',bg:'#eff6ff'},
             {icon:'fa-phone',label:'Calls (in range)',val:totals.callsInRange,sub:`${totals.connectedCalls} connected · ${totals.totalCalls} total attempts`,color:'#8b5cf6',bg:'#f5f3ff'},
-            {icon:'fa-clock',label:'Total Talk Time',val:formatTime(totals.callSecsInRange),sub:`Avg ${totals.connectedInRange>0?formatTime(Math.round(totals.callSecsInRange/totals.connectedInRange)):'—'} per call`,color:'#06b6d4',bg:'#ecfeff'},
+            {icon:'fa-clock',label:'Total Talk Time',val:formatTime(totals.callSecsInRange),sub:`Avg ${totals.callsInRange>0?formatTime(Math.round(totals.callSecsInRange/totals.callsInRange)):'—'} per call`,color:'#06b6d4',bg:'#ecfeff'},
             {icon:'fa-paper-plane',label:'Apps to Market',val:totals.appsToMarket,sub:showPct?pct(totals.appsToMarket,totals.totalLeads)+' of leads':'All time',color:'#f59e0b',bg:'#fffbeb'},
             {icon:'fa-handshake',label:'Sales (in range)',val:totals.salesInRange,sub:showPct?pct(totals.salesInRange,totals.leadsInRange||totals.totalLeads)+' conv. rate':'All time: '+totals.sales,color:'#10b981',bg:'#f0fdf4'},
             {icon:'fa-dollar-sign',label:'Total Premium',val:dollar(totals.premiumInRange),sub:'In range · All time: '+dollar(totals.totalPremium),color:'#059669',bg:'#ecfdf5'}
@@ -20910,7 +24064,7 @@ function runAgentPerformanceReport() {
 
         // Agent rows
         const agentRowsHTML = entries.map(m => {
-            const avgSecs = m.connectedInRange > 0 ? Math.round(m.callSecsInRange / m.connectedInRange) : 0;
+            const avgSecs = m.callsInRange > 0 ? Math.round(m.callSecsInRange / m.callsInRange) : 0;
             const topStages = Object.entries(m.stages).sort((a,b)=>b[1]-a[1]).slice(0,4)
                 .map(([s,n]) => `<span style="background:${(stageColors[s]||'#6b7280')}18;color:${stageColors[s]||'#6b7280'};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap">${stageLabel(s)}&nbsp;${n}</span>`).join(' ');
 
@@ -20940,8 +24094,8 @@ function runAgentPerformanceReport() {
                 <td style="padding:14px 16px;text-align:center"><span style="background:#fffbeb;color:#b45309;padding:3px 10px;border-radius:12px;font-weight:600">${m.appsToMarket}</span></td>
                 <td style="padding:14px 16px;text-align:center"><span style="background:#f0fdf4;color:#15803d;padding:4px 12px;border-radius:20px;font-weight:700">${m.salesInRange}</span>${convPctStr}</td>
                 <td style="padding:14px 16px;text-align:center;font-weight:700;color:#1d4ed8">${dollar(m.premiumInRange)}</td>
-                <td style="padding:14px 16px;text-align:center;font-weight:700;color:#0277bd">${m.openLeads>0?((m.callbackLeads/m.openLeads)*100).toFixed(1)+'%':'—'}</td>
-                <td style="padding:14px 16px;text-align:center;font-weight:700;color:${m.overdueCallbackLeads>0?'#dc2626':'#6b7280'}">${m.openLeads>0?((m.overdueCallbackLeads/m.openLeads)*100).toFixed(1)+'%':'—'}</td>
+                <td style="padding:14px 16px;text-align:center;font-weight:700;color:#0277bd">${m.totalLeads>0?((m.callbackLeads/m.totalLeads)*100).toFixed(1)+'%':'—'}</td>
+                <td style="padding:14px 16px;text-align:center;font-weight:700;color:${m.overdueCallbackLeads>0?'#dc2626':'#6b7280'}">${m.totalLeads>0?((m.overdueCallbackLeads/m.totalLeads)*100).toFixed(1)+'%':'—'}</td>
                 <td style="padding:14px 16px;text-align:center">
                     <button onclick="showAgentProfileModal('${agentKey}')" title="View ${m.agent} profile" style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;padding:6px 10px;cursor:pointer;color:#2563eb;font-size:14px;transition:.15s" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
                         <i class="fas fa-eye"></i>
@@ -20964,12 +24118,12 @@ function runAgentPerformanceReport() {
             <td style="padding:12px 16px;text-align:center">${totals.callsInRange} (${totals.connectedCalls})</td>
             <td style="padding:12px 16px;text-align:center">${totals.totalCalls}</td>
             <td style="padding:12px 16px;text-align:center">${formatTime(totals.callSecsInRange)}</td>
-            <td style="padding:12px 16px;text-align:center">${totals.connectedInRange>0?formatTime(Math.round(totals.callSecsInRange/totals.connectedInRange)):'—'}</td>
+            <td style="padding:12px 16px;text-align:center">${totals.callsInRange>0?formatTime(Math.round(totals.callSecsInRange/totals.callsInRange)):'—'}</td>
             <td style="padding:12px 16px;text-align:center;color:#b45309">${totals.appsToMarket}</td>
             <td style="padding:12px 16px;text-align:center;color:#15803d">${totals.salesInRange}</td>
             <td style="padding:12px 16px;text-align:center;color:#1d4ed8">${dollar(totals.premiumInRange)}</td>
-            <td style="padding:12px 16px;text-align:center;color:#0277bd">${totals.openLeads>0?((totals.callbackLeads/totals.openLeads)*100).toFixed(1)+'%':'—'}</td>
-            <td style="padding:12px 16px;text-align:center;color:${totals.overdueCallbackLeads>0?'#dc2626':'#6b7280'}">${totals.openLeads>0?((totals.overdueCallbackLeads/totals.openLeads)*100).toFixed(1)+'%':'—'}</td>
+            <td style="padding:12px 16px;text-align:center;color:#0277bd">${totals.totalLeads>0?((totals.callbackLeads/totals.totalLeads)*100).toFixed(1)+'%':'—'}</td>
+            <td style="padding:12px 16px;text-align:center;color:${totals.overdueCallbackLeads>0?'#dc2626':'#6b7280'}">${totals.totalLeads>0?((totals.overdueCallbackLeads/totals.totalLeads)*100).toFixed(1)+'%':'—'}</td>
             <td></td>
         </tr>
         <tr style="background:#fefce8;border-top:1px dashed #fde68a;font-style:italic">
@@ -20981,12 +24135,12 @@ function runAgentPerformanceReport() {
             <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${avgInt(totals.callsInRange)} (${avgInt(totals.connectedCalls)})</td>
             <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${avgInt(totals.totalCalls)}</td>
             <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${formatTime(avgInt(totals.callSecsInRange))}</td>
-            <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${totals.connectedInRange>0?formatTime(Math.round(totals.callSecsInRange/totals.connectedInRange)):'—'}</td>
+            <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${totals.callsInRange>0?formatTime(Math.round(totals.callSecsInRange/totals.callsInRange)):'—'}</td>
             <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${avg(totals.appsToMarket)}</td>
             <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${avg(totals.salesInRange)}</td>
             <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${dollar(avgInt(totals.premiumInRange))}</td>
-            <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${totals.openLeads>0?((totals.callbackLeads/totals.openLeads)*100).toFixed(1)+'%':'—'}</td>
-            <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${totals.openLeads>0?((totals.overdueCallbackLeads/totals.openLeads)*100).toFixed(1)+'%':'—'}</td>
+            <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${totals.totalLeads>0?((totals.callbackLeads/totals.totalLeads)*100).toFixed(1)+'%':'—'}</td>
+            <td style="padding:10px 16px;text-align:center;color:#92400e;font-weight:600">${totals.totalLeads>0?((totals.overdueCallbackLeads/totals.totalLeads)*100).toFixed(1)+'%':'—'}</td>
             <td></td>
         </tr>`;
 
@@ -21058,7 +24212,6 @@ function showAgentProfileModal(agentName) {
         totalCalls: avgOf('totalCalls'),
         callsInRange: avgOf('callsInRange'),
         connectedCalls: avgOf('connectedCalls'),
-        connectedInRange: avgOf('connectedInRange'),
         callSecsInRange: avgOf('callSecsInRange'),
         appsToMarket: avgOf('appsToMarket'),
         salesInRange: avgOf('salesInRange'),
@@ -21066,8 +24219,7 @@ function showAgentProfileModal(agentName) {
         totalPremium: avgOf('totalPremium'),
         totalLeads: avgOf('totalLeads'),
         callbackLeads: avgOf('callbackLeads'),
-        overdueCallbackLeads: avgOf('overdueCallbackLeads'),
-        openLeads: avgOf('openLeads')
+        overdueCallbackLeads: avgOf('overdueCallbackLeads')
     };
 
     const inSecs = data.inSecs;
@@ -21079,8 +24231,8 @@ function showAgentProfileModal(agentName) {
         return `${ss}s`;
     };
     const dollar = n => '$' + Math.round(n).toLocaleString();
-    const avgSecs = m.connectedInRange > 0 ? Math.round(m.callSecsInRange / m.connectedInRange) : 0;
-    const avgSecsAvg = avgs.connectedInRange > 0 ? avgs.callSecsInRange / avgs.connectedInRange : 0;
+    const avgSecs = m.callsInRange > 0 ? Math.round(m.callSecsInRange / m.callsInRange) : 0;
+    const avgSecsAvg = avgs.callsInRange > 0 ? avgs.callSecsInRange / avgs.callsInRange : 0;
 
     // stat card builder: green if agent >= avg (higher better), red if below
     const card = (label, agentVal, avgVal, fmt, higherBetter = true) => {
@@ -21118,24 +24270,19 @@ function showAgentProfileModal(agentName) {
     };
 
     const statsHTML = `
-        <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Date Range</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
             ${card('Leads (in range)', m.leadsInRange, avgs.leadsInRange, v => Math.round(v))}
+            ${card('Call Attempts', m.totalCalls, avgs.totalCalls, v => Math.round(v))}
             ${card('Calls (in range)', m.callsInRange, avgs.callsInRange, v => Math.round(v))}
-            ${card('Connected', m.connectedInRange, avgs.connectedInRange, v => Math.round(v))}
+            ${card('Connected', m.connectedCalls, avgs.connectedCalls, v => Math.round(v))}
             ${card('Talk Time', m.callSecsInRange, avgs.callSecsInRange, v => formatTime(Math.round(v)))}
             ${card('Avg Call Duration', avgSecs, avgSecsAvg, v => formatTime(Math.round(v)))}
             ${card('Apps to Market', m.appsToMarket, avgs.appsToMarket, v => Math.round(v))}
             ${card('Sales (in range)', m.salesInRange, avgs.salesInRange, v => Math.round(v))}
             ${card('Premium (in range)', m.premiumInRange, avgs.premiumInRange, dollar)}
-        </div>
-        <div style="border-top:2px solid #e2e8f0;margin:18px 0 10px"></div>
-        <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">All Time</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
-            ${card('Call Attempts', m.totalCalls, avgs.totalCalls, v => Math.round(v))}
-            ${card('Total Premium', m.totalPremium, avgs.totalPremium, dollar)}
-            ${card('Lead Callback %', m.openLeads > 0 ? (m.callbackLeads / m.openLeads) * 100 : 0, avgs.openLeads > 0 ? (avgs.callbackLeads / avgs.openLeads) * 100 : 0, v => parseFloat(v).toFixed(1) + '%')}
-            ${card('Overdue Callback %', m.openLeads > 0 ? (m.overdueCallbackLeads / m.openLeads) * 100 : 0, avgs.openLeads > 0 ? (avgs.overdueCallbackLeads / avgs.openLeads) * 100 : 0, v => parseFloat(v).toFixed(1) + '%', false)}
+            ${card('Total Premium (all time)', m.totalPremium, avgs.totalPremium, dollar)}
+            ${card('Lead Callback %', m.totalLeads > 0 ? (m.callbackLeads / m.totalLeads) * 100 : 0, avgs.totalLeads > 0 ? (avgs.callbackLeads / avgs.totalLeads) * 100 : 0, v => parseFloat(v).toFixed(1) + '%')}
+            ${card('Overdue Callback %', m.totalLeads > 0 ? (m.overdueCallbackLeads / m.totalLeads) * 100 : 0, avgs.totalLeads > 0 ? (avgs.overdueCallbackLeads / avgs.totalLeads) * 100 : 0, v => parseFloat(v).toFixed(1) + '%', false)}
         </div>`;
 
     // Stage breakdown
@@ -21200,17 +24347,15 @@ function printAgentProfileReport(agentName) {
     const avgs = {
         leadsInRange: avgOf('leadsInRange'), totalCalls: avgOf('totalCalls'),
         callsInRange: avgOf('callsInRange'), connectedCalls: avgOf('connectedCalls'),
-        connectedInRange: avgOf('connectedInRange'),
         callSecsInRange: avgOf('callSecsInRange'), appsToMarket: avgOf('appsToMarket'),
         salesInRange: avgOf('salesInRange'), premiumInRange: avgOf('premiumInRange'),
         totalPremium: avgOf('totalPremium'), totalLeads: avgOf('totalLeads'),
-        callbackLeads: avgOf('callbackLeads'), overdueCallbackLeads: avgOf('overdueCallbackLeads'),
-        openLeads: avgOf('openLeads')
+        callbackLeads: avgOf('callbackLeads'), overdueCallbackLeads: avgOf('overdueCallbackLeads')
     };
     const fmt = secs => { const h=Math.floor(secs/3600),mm=Math.floor((secs%3600)/60),ss=secs%60; if(h>0)return`${h}h ${mm}m`; if(mm>0)return`${mm}m ${ss}s`; return`${ss}s`; };
     const dollar = v => '$' + Math.round(v).toLocaleString();
-    const avgSecs = m.connectedInRange > 0 ? Math.round(m.callSecsInRange / m.connectedInRange) : 0;
-    const avgSecsAvg = avgs.connectedInRange > 0 ? avgs.callSecsInRange / avgs.connectedInRange : 0;
+    const avgSecs = m.callsInRange > 0 ? Math.round(m.callSecsInRange / m.callsInRange) : 0;
+    const avgSecsAvg = avgs.callsInRange > 0 ? avgs.callSecsInRange / avgs.callsInRange : 0;
 
     const row = (label, val, avg, display) => `
         <tr><td style="padding:8px 12px;font-weight:600;color:#374151;border-bottom:1px solid #f1f5f9">${label}</td>
@@ -21271,7 +24416,7 @@ function exportAgentReportCSV() {
 
     const rows = [['Agent','Total Leads','Total Calls','Connected','Attempts','Talk Time (s)','Avg Duration (s)','Apps to Market','Sales','Premium']];
     Object.values(data.agentMap).forEach(m => {
-        rows.push([m.agent, m.totalLeads, m.callsInRange, m.connectedInRange, m.totalCalls, m.callSecsInRange, m.connectedInRange>0?Math.round(m.callSecsInRange/m.connectedInRange):0, m.appsToMarket, m.salesInRange, m.premiumInRange]);
+        rows.push([m.agent, m.totalLeads, m.callsInRange, m.connectedInRange, m.totalCalls, m.callSecsInRange, m.callsInRange>0?Math.round(m.callSecsInRange/m.callsInRange):0, m.appsToMarket, m.salesInRange, m.premiumInRange]);
     });
 
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
@@ -23462,7 +26607,7 @@ function runProductionReport() {
 
         // Computed summary stats
         const avgPremium   = salesInRange > 0 ? premiumInRange / salesInRange : 0;
-        const avgCallSecs  = connectedInRange > 0 ? Math.round(callSecsInRange / connectedInRange) : 0;
+        const avgCallSecs  = callsInRange > 0 ? Math.round(callSecsInRange / callsInRange) : 0;
         const fmtDur = s => { const m = Math.floor(s/60), r = s%60; return m > 0 ? `${m}m ${r}s` : `${s}s`; };
         const fmt$  = v => '$' + v.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
         const dateLabel = startDate === '2020-01-01' ? 'All Time' : `${startDate} \u2014 ${endDate}`;
@@ -31580,12 +34725,228 @@ window.createQuoteApplicationForPolicy = function(policyId) {
     }
 };
 
+// Opens the quote application modal from the renewals profile and refreshes
+// the submissions container when the modal closes.
+// Map policyId → clientId so deleteQuoteApplication can refresh the renewals container
+window._renewalContainerMap = window._renewalContainerMap || {};
+
+// Email Documentation from renewals context — builds pseudo-lead from policy data
+window._openRenewalEmailDocumentation = async function(policyId, clientId) {
+    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    const policy = allPolicies.find(function(p) { return p.id === policyId; });
+    if (!policy) {
+        alert('Policy not found');
+        return;
+    }
+
+    const assignedTo = policy.assignedTo || policy.agent || '';
+    const isMaureen = assignedTo.toLowerCase() === 'maureen';
+
+    // Build a pseudo-lead object from policy fields so createEmailComposer works
+    // Must set .id = clientId so sendEmail() fetches files with the correct leadId
+    const pseudoLead = {
+        id: clientId,
+        name: policy.insuredName || policy.clientName || '',
+        dotNumber: policy.dotNumber || policy.dot || '',
+        renewalDate: policy.renewalDate || policy.expirationDate || policy.expDate || '',
+        assignedTo: assignedTo,
+        state: policy.state || (policy.insuredData && policy.insuredData['State']) || '',
+        email: policy.email || (policy.contact && policy.contact.email) || ''
+    };
+
+    // Build subject line
+    const renewalDate = pseudoLead.renewalDate
+        ? pseudoLead.renewalDate.replace(/\/\d{4}$/, '/2026').replace(/-\d{4}$/, '-2026')
+        : 'NULL';
+    const subject = 'Renewal: ' + renewalDate + ' - USDOT: ' + (pseudoLead.dotNumber || 'NULL') + ' - ' + (pseudoLead.name || 'NULL');
+
+    // Collect files from server using clientId
+    let allFiles = [];
+    try {
+        const response = await fetch('/api/loss-runs-upload?leadId=' + encodeURIComponent(clientId));
+        const serverData = await response.json();
+        if (serverData.success && serverData.files.length > 0) {
+            serverData.files.forEach(function(serverFile) {
+                const originalName = serverFile.file_name
+                    ? serverFile.file_name.replace(/^[a-f0-9]+_[0-9]+_/, '')
+                    : serverFile.filename;
+                allFiles.push({
+                    filename: serverFile.file_name || serverFile.filename,
+                    originalName: originalName,
+                    originalname: originalName,
+                    size: serverFile.file_size ? Math.round(serverFile.file_size / 1024) + ' KB' : '',
+                    type: serverFile.content_type || 'application/pdf',
+                    isServerFile: true,
+                    fileId: serverFile.id
+                });
+            });
+        }
+    } catch (e) {
+        console.warn('Could not load server files for renewal email:', e);
+    }
+
+    // For Maureen: install a self-restoring fetch interceptor BEFORE opening the modal.
+    // It fires exactly once on the /send-smtp call, swaps branding + routes to UIG account,
+    // then restores the original fetch. No DOMContentLoaded wrapper needed.
+    if (isMaureen) {
+        var _uigOrigFetch = window.fetch;
+        window.fetch = async function(url, options) {
+            if (typeof url === 'string' && url.includes('/api/outlook/send-smtp') && options && options.body) {
+                // Self-restore immediately so only this one call is intercepted
+                window.fetch = _uigOrigFetch;
+                try {
+                    var data = JSON.parse(options.body);
+                    if (data.body) {
+                        data.body = data.body
+                            .replace(/Vanguard Insurance Group LLC/g, 'United Insurance Group LLC')
+                            .replace(/Vanguard Insurance/g, 'United Insurance')
+                            .replace(/&copy; Vanguard/g, '&copy; United')
+                            .replace(/vigagency\.com/g, 'uigagency.com')
+                            .replace(/contact@vigagency\.com/gi, 'Contact@uigagency.com')
+                            .replace(/Visit vigagency\.com/g, 'Visit uigagency.com');
+                    }
+                    data.bcc = 'Contact@uigagency.com';
+                    data.account = 'uig';
+                    return _uigOrigFetch('/api/outlook/send-smtp', Object.assign({}, options, { body: JSON.stringify(data) }));
+                } catch(e) {
+                    return _uigOrigFetch(url, options);
+                }
+            }
+            return _uigOrigFetch(url, options);
+        };
+    }
+
+    if (typeof protectedFunctions !== 'undefined' && protectedFunctions.createEmailComposer) {
+        protectedFunctions.createEmailComposer(pseudoLead, subject, allFiles);
+
+        // For Maureen: swap VIG→UIG branding in the editable body textarea
+        if (isMaureen) {
+            setTimeout(function() {
+                var bodyField = document.getElementById('email-body-field');
+                if (bodyField) {
+                    bodyField.value = bodyField.value
+                        .replace(/Vanguard Insurance Group LLC/g, 'United Insurance Group LLC')
+                        .replace(/Vanguard Insurance/g, 'United Insurance')
+                        .replace(/vigagency\.com/g, 'uigagency.com')
+                        .replace(/contact@vigagency\.com/gi, 'Contact@uigagency.com')
+                        .replace(/VIG/g, 'UIG');
+                }
+            }, 50);
+        }
+    } else {
+        // Restore fetch if composer unavailable
+        if (isMaureen) window.fetch = _uigOrigFetch;
+        alert('Email composer not available');
+    }
+};
+
+// Live color update for quote cards vs current policy premium
+window._updateQuoteCardColor = function(input, currentPremiumVal) {
+    const card = input.closest('[data-quote-card]');
+    if (!card) return;
+    const n = parseFloat((input.value + '').replace(/[^0-9.]/g, ''));
+    if (!input.value || isNaN(n) || currentPremiumVal === 0) {
+        card.style.border = '2px solid #e5e7eb';
+        card.style.background = 'white';
+    } else if (n > currentPremiumVal) {
+        card.style.border = '2px solid #ef4444';
+        card.style.background = '#fff5f5';
+    } else {
+        card.style.border = '2px solid #10b981';
+        card.style.background = '#f0fff4';
+    }
+};
+
+window._openRenewalQuoteApp = function(policyId, clientId) {
+    const policyLeadId = 'policy_' + policyId;
+    const aliasId = 'application-submissions-container-' + policyLeadId;
+
+    // Track policyId→clientId so delete can refresh this container
+    window._renewalContainerMap[policyId] = clientId;
+
+    // showApplicationSubmissions looks for a container by policyLeadId.
+    // Create an alias div with that ID inside the visible renewals container so
+    // it finds it and renders the card directly there — no interception needed.
+    const visibleContainer = document.getElementById('application-submissions-container-' + clientId);
+    if (visibleContainer) {
+        visibleContainer.innerHTML = '<div id="' + aliasId + '" style="width:100%;"></div>';
+    }
+
+    // Register a post-save callback that enhanced-quote-modal checks for.
+    // This fires after the app is written to quote_applications in localStorage.
+    window._renewalPostSaveCallback = function() {
+        delete window._renewalPostSaveCallback;
+        setTimeout(function() {
+            // Ensure alias div still exists (may have been cleared)
+            const visContainer = document.getElementById('application-submissions-container-' + clientId);
+            if (visContainer && !document.getElementById(aliasId)) {
+                visContainer.innerHTML = '<div id="' + aliasId + '" style="width:100%;"></div>';
+            }
+            // Fetch fresh from server
+            if (window.showApplicationSubmissions) {
+                window.showApplicationSubmissions(policyLeadId);
+            }
+        }, 200);
+    };
+
+    window.createQuoteApplicationForPolicy(policyId);
+};
+
+// Override deleteQuoteApplication to always remove from localStorage (server may 404)
+// and refresh any visible renewals or policy-view containers for this policy.
+window.deleteQuoteApplication = function(appId) {
+    if (!confirm('Are you sure you want to delete this quote application?')) return;
+
+    // Find the app in localStorage to get its policyId
+    const allApps = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+    const app = allApps.find(a => a.id === appId);
+    const policyId = app ? (app.leadId || '').replace('policy_', '') : null;
+
+    // Remove from localStorage immediately
+    const updated = allApps.filter(a => a.id !== appId);
+    localStorage.setItem('quote_applications', JSON.stringify(updated));
+
+    // Refresh all visible containers for this policy
+    function refreshContainers() {
+        if (!policyId) return;
+        // Policy view modal container
+        var policyContainer = document.getElementById('application-submissions-container-policy_' + policyId);
+        if (policyContainer && window.renderPolicyApplicationSubmissions) {
+            policyContainer.innerHTML = window.renderPolicyApplicationSubmissions(policyId);
+        }
+        // Renewals panel container (mapped via _renewalContainerMap)
+        var clientId = window._renewalContainerMap && window._renewalContainerMap[policyId];
+        if (clientId) {
+            var renewalContainer = document.getElementById('application-submissions-container-' + clientId);
+            if (renewalContainer && window.renderPolicyApplicationSubmissions) {
+                renewalContainer.innerHTML = window.renderPolicyApplicationSubmissions(policyId);
+            }
+        }
+    }
+
+    refreshContainers();
+
+    // Also attempt server delete — silently ignore 404 (app may only exist in localStorage)
+    fetch('/api/quote-applications/' + appId, { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                console.log('✅ Quote application deleted from server:', appId);
+            } else {
+                console.log('ℹ️ Server delete returned:', data.error, '— already removed from localStorage');
+            }
+        })
+        .catch(function(err) {
+            console.log('ℹ️ Server delete failed (ignored):', err.message);
+        });
+};
+
 // Function to render policy application submissions
 window.renderPolicyApplicationSubmissions = function(policyId) {
     console.log('📋 renderPolicyApplicationSubmissions called for policy:', policyId);
 
     // Look in the correct storage location where applications are actually saved
-    const applications = JSON.parse(localStorage.getItem('appSubmissions') || '[]');
+    const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
     console.log('📊 Total applications in storage:', applications.length);
 
     // Filter for applications that belong to this policy (stored as policy_POLICYID format)
@@ -32280,8 +35641,10 @@ window.addCRMCOIEmailRecipientWithOptions = function() {
 
     // Add agent email if checkbox is checked
     if (addAgentCheck.checked) {
-        // Try to get agent email from policy or use default
-        const agentEmail = currentPolicy.agentEmail || 'hunter@vigagency.com'; // Default agent email
+        // Try to get agent email from policy, then fall back to name→email map
+        const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'Grant@vigagency.com', maureen: 'Maureen@vigagency.com', carson: 'Carson@vigagency.com' };
+        const _agentKey = (currentPolicy.agent || currentPolicy.assignedTo || '').toLowerCase().trim();
+        const agentEmail = currentPolicy.agentEmail || _agentEmailMap[_agentKey] || '';
 
         addCRMCOIEmailRecipient();
         const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
@@ -32332,7 +35695,9 @@ window.handleCheckboxChange = function(type) {
                 alert('No email address found in Contact Information for this policy.');
             }
         } else if (type === 'agent') {
-            const agentEmail = currentPolicy.agentEmail || 'hunter@vigagency.com';
+            const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'Grant@vigagency.com', maureen: 'Maureen@vigagency.com', carson: 'Carson@vigagency.com' };
+            const _agentKey = (currentPolicy.agent || currentPolicy.assignedTo || '').toLowerCase().trim();
+            const agentEmail = currentPolicy.agentEmail || _agentEmailMap[_agentKey] || '';
 
             addCRMCOIEmailRecipient();
             const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
@@ -32551,26 +35916,68 @@ window.submitCRMCOIModal = async function() {
         // First, try to get the COI document for this policy
         let coiDocument = null;
 
-        console.log('🔍 Looking for COI document for policy:', policyId);
+        // Collect all IDs this policy might be stored under
+        const fullPolicyId = currentPolicy?.id || '';
+        const policyNumber = currentPolicy?.policyNumber || policyId;
+        const coiSearchIds = [policyId, fullPolicyId, policyNumber].filter(Boolean);
+        console.log('🔍 Looking for COI document for policy:', policyId, '| search IDs:', coiSearchIds);
 
-        // Check localStorage for COI documents
+        // 1. Check insurance_policies localStorage — filter to the actual policy
         const storedPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
         for (const policy of storedPolicies) {
-            if (policy.coiDocuments && Array.isArray(policy.coiDocuments) && policy.coiDocuments.length > 0) {
-                console.log('📋 Found COI documents for policy:', policy.policyNumber || policy.id);
-                coiDocument = policy.coiDocuments[0]; // Use the first COI document
+            const matches = coiSearchIds.some(id =>
+                id && (policy.policyNumber === id || policy.id === id ||
+                       (policy.policyNumber && policy.policyNumber.trim() === id.trim()) ||
+                       (policy.id && policy.id.trim() === id.trim()))
+            );
+            if (matches && policy.coiDocuments && Array.isArray(policy.coiDocuments) && policy.coiDocuments.length > 0) {
+                console.log('📋 Found COI in insurance_policies for:', policy.policyNumber || policy.id);
+                coiDocument = policy.coiDocuments[policy.coiDocuments.length - 1]; // Use latest
                 break;
             }
         }
 
-        // If no COI found in localStorage, try API
+        // 2. Check legacy policy_coi_documents localStorage
+        if (!coiDocument) {
+            const legacyCOIs = JSON.parse(localStorage.getItem('policy_coi_documents') || '[]');
+            const match = legacyCOIs.find(doc => coiSearchIds.some(id => id && doc.policyId === id));
+            if (match) {
+                console.log('📋 Found COI in policy_coi_documents for policy:', match.policyId);
+                coiDocument = match;
+            }
+        }
+
+        // 3. Try to capture the current ACORD canvas directly (works even if Save wasn't clicked)
         if (!coiDocument) {
             try {
-                console.log('🔍 Fetching COI document from API for policy:', policyId);
-                const coiResponse = await fetch(`https://162-220-14-239.nip.io/api/coi/${policyId}`);
-                if (coiResponse.ok) {
-                    coiDocument = await coiResponse.json();
-                    console.log('✅ Found COI document via API:', coiDocument.name || 'unnamed');
+                const canvas = document.getElementById('realPdfCanvas') ||
+                               document.querySelector('#acordViewerContainer canvas') ||
+                               document.querySelector('.pdf-canvas-container canvas');
+                if (canvas && canvas.width > 100) {
+                    console.log('📸 Capturing current ACORD canvas for attachment...');
+                    const dataUrl = canvas.toDataURL('image/png', 0.95);
+                    if (dataUrl && dataUrl.length > 1000) {
+                        coiDocument = { dataUrl, name: `COI_${policyId}.png`, type: 'image/png' };
+                        console.log('✅ Captured COI from live canvas, size:', dataUrl.length);
+                    }
+                }
+            } catch (canvasErr) {
+                console.log('⚠️ Canvas capture failed:', canvasErr.message);
+            }
+        }
+
+        // 4. Fall back to API
+        if (!coiDocument) {
+            try {
+                // Try both the policy number and full ID
+                for (const searchId of coiSearchIds) {
+                    console.log('🔍 Fetching COI document from API for:', searchId);
+                    const coiResponse = await fetch(`https://162-220-14-239.nip.io/api/coi/${encodeURIComponent(searchId)}`);
+                    if (coiResponse.ok) {
+                        coiDocument = await coiResponse.json();
+                        console.log('✅ Found COI document via API:', coiDocument.name || 'unnamed');
+                        break;
+                    }
                 }
             } catch (error) {
                 console.log('⚠️ Could not fetch COI from API:', error.message);
@@ -32604,6 +36011,10 @@ window.submitCRMCOIModal = async function() {
 
         // Set sender email
         formData.append('from', 'contact@vigagency.com');
+
+        // Pass agent so backend can pick the correct sender address
+        const policyAgent = currentPolicy?.agent || '';
+        formData.append('agent', policyAgent);
 
         // Set recipient emails (all emails from the array)
         formData.append('to', emails.join(', '));
@@ -34567,7 +37978,9 @@ window.loadSimpleTodos = function loadSimpleTodos(skipFallback = false) {
 
     // Get todos based on current view
     const currentView = window.dashboardTodoView || 'personal';
-    const storageKey = currentView === 'personal' ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+    const _todoSessionUser = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase();
+    // Maureen is United agency — always use her personal pool, never Vanguard agency pool
+    const storageKey = (currentView === 'personal' || _todoSessionUser === 'maureen') ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
     const allTodos = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
     // If we don't have server data but we should, try to load it (only if not skipping fallback)
@@ -34590,6 +38003,9 @@ window.loadSimpleTodos = function loadSimpleTodos(skipFallback = false) {
     // Get current user for filtering
     const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
     const currentUser = sessionData.username || '';
+    // Maureen is in United agency — always scope to her own data regardless of view
+    const isMaureen = currentUser.toLowerCase() === 'maureen';
+    const effectiveView = isMaureen ? 'personal' : currentView;
 
     // Add calendar events as todo items
     const calendarEvents = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
@@ -34601,7 +38017,7 @@ window.loadSimpleTodos = function loadSimpleTodos(skipFallback = false) {
 
     const serverCalendarTodos = serverEvents
         .filter(event => {
-            if (currentView === 'personal') {
+            if (effectiveView === 'personal') {
                 return !event.created_by || event.created_by === currentUser;
             }
             return true; // Show all for agency view
@@ -34618,7 +38034,7 @@ window.loadSimpleTodos = function loadSimpleTodos(skipFallback = false) {
 
     const calendarTodos = calendarEvents
         .filter(event => {
-            if (currentView === 'personal') {
+            if (effectiveView === 'personal') {
                 return !event.assignedAgent || event.assignedAgent === currentUser;
             }
             return true; // Show all for agency view
@@ -34641,7 +38057,7 @@ window.loadSimpleTodos = function loadSimpleTodos(skipFallback = false) {
     console.log('🔍 DASHBOARD: calendarState.serverCallbacks exists:', !!window.calendarState?.serverCallbacks);
     const callbackTodos = serverCallbacks
         .filter(callback => {
-            if (currentView === 'personal') {
+            if (effectiveView === 'personal') {
                 return !callback.assigned_agent || callback.assigned_agent === currentUser;
             }
             return true; // Show all for agency view
@@ -35080,37 +38496,1040 @@ function filterTodosBySchedule(todos, scheduleView) {
     });
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEAM CHAT
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── Settings OSHA Import ─────────────────────────────────────────────────────
-window.settingsImportOSHA = function(input) {
-    var files = Array.from(input.files);
-    if (!files.length) return;
-    var progress = document.getElementById('settings-osha-progress');
-    var totalImported = 0, totalSkipped = 0, done = 0;
+(function() {
+    const CHAT_USERS = ['grant', 'hunter', 'carson'];
+    const CHAT_DISPLAY = { grant: 'Grant', hunter: 'Hunter', carson: 'Carson' };
+    const CHAT_COLORS  = { grant: '#3b82f6', hunter: '#10b981', carson: '#f59e0b' };
+    const CHAT_AVATARS = { grant: 'G', hunter: 'H', carson: 'C' };
+    const POLL_MS = 2000;
 
-    function uploadNext(i) {
-        if (i >= files.length) {
-            input.value = '';
-            if (progress) progress.innerHTML = '<i class="fas fa-check-circle" style="color:#10b981;"></i> All ' + files.length + ' files done — <strong>' + totalImported.toLocaleString() + ' records imported</strong>, ' + totalSkipped.toLocaleString() + ' skipped.';
+    let _chatTab = 'group';
+    let _chatPollTimer = null;
+    let _chatLastTs = {};
+    let _chatMessages = {};
+    let _chatUnreadCounts = {};
+    let _chatBubble = null;
+    let _chatTotalUnread = 0;
+    let _chatMinimized = false;
+    let _chatNotifStylesAdded = false;
+
+    function _currentUser() {
+        try { return (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase(); }
+        catch(e) { return ''; }
+    }
+
+    function _dmPeer(tab) { return tab.replace('dm_', ''); }
+
+    function _ensureChatStyles() {
+        if (_chatNotifStylesAdded) return;
+        _chatNotifStylesAdded = true;
+        const s = document.createElement('style');
+        s.textContent = `
+#team-chat-window { display:flex; flex-direction:column; background:#fff; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18); overflow:hidden; min-width:380px; min-height:320px; }
+.chat-layout { display:flex; flex:1; min-height:0; overflow:hidden; }
+.chat-sidebar { width:130px; flex-shrink:0; background:#f8fafc; border-right:1px solid #e5e7eb; display:flex; flex-direction:column; overflow-y:auto; }
+.chat-sidebar-label { font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.06em; padding:10px 10px 4px; }
+.chat-tab-btn { display:flex; align-items:center; gap:8px; padding:8px 10px; cursor:pointer; border:none; background:none; text-align:left; font-size:13px; color:#374151; position:relative; transition:background 0.12s; width:100%; }
+.chat-tab-btn:hover { background:#e5e7eb; }
+.chat-tab-btn.active { background:#dbeafe; color:#1d4ed8; font-weight:600; }
+.chat-tab-avatar { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
+.chat-tab-unread { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:#ef4444; color:#fff; border-radius:10px; padding:1px 6px; font-size:11px; font-weight:700; min-width:18px; text-align:center; display:none; }
+.chat-tab-unread.visible { display:block; }
+.chat-main { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; }
+.chat-header-bar { padding:8px 14px; border-bottom:1px solid #e5e7eb; font-size:13px; font-weight:600; color:#374151; background:#f9fafb; flex-shrink:0; }
+.chat-messages-area { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px; background:#fff; min-height:0; }
+.chat-msg { display:flex; gap:8px; align-items:flex-start; max-width:90%; }
+.chat-msg.mine { align-self:flex-end; flex-direction:row-reverse; }
+.chat-msg-avatar { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; flex-shrink:0; margin-top:2px; }
+.chat-msg-body { display:flex; flex-direction:column; gap:2px; }
+.chat-msg-name { font-size:11px; color:#9ca3af; font-weight:500; }
+.chat-msg.mine .chat-msg-name { text-align:right; }
+.chat-msg-bubble { padding:7px 11px; border-radius:14px; font-size:13.5px; line-height:1.4; word-break:break-word; background:#f3f4f6; color:#111827; }
+.chat-msg.mine .chat-msg-bubble { background:#2563eb; color:#fff; border-bottom-right-radius:4px; }
+.chat-msg:not(.mine) .chat-msg-bubble { border-bottom-left-radius:4px; }
+.chat-msg-time { font-size:10px; color:#d1d5db; margin-top:2px; }
+.chat-msg.mine .chat-msg-time { text-align:right; }
+.chat-date-divider { text-align:center; font-size:11px; color:#9ca3af; margin:4px 0; position:relative; }
+.chat-date-divider::before,.chat-date-divider::after { content:''; display:inline-block; width:60px; height:1px; background:#e5e7eb; vertical-align:middle; margin:0 6px; }
+.chat-input-area { display:flex; gap:8px; padding:10px 12px; border-top:1px solid #e5e7eb; background:#f9fafb; flex-shrink:0; }
+.chat-input-area textarea { flex:1; border:1px solid #d1d5db; border-radius:20px; padding:8px 14px; font-size:13px; resize:none; outline:none; line-height:1.4; max-height:80px; font-family:inherit; transition:border-color 0.15s; }
+.chat-input-area textarea:focus { border-color:#3b82f6; }
+.chat-send-btn { width:36px; height:36px; border-radius:50%; background:#2563eb; border:none; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; align-self:flex-end; transition:background 0.15s; font-size:14px; }
+.chat-send-btn:hover { background:#1d4ed8; }
+.chat-empty { text-align:center; color:#9ca3af; font-size:13px; margin:auto; padding:20px; }
+#chat-bubble-btn { position:fixed; bottom:20px; right:20px; width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#0066cc,#004499); border:none; color:#fff; box-shadow:0 4px 14px rgba(0,102,204,0.45); cursor:pointer; display:none; align-items:center; justify-content:center; font-size:22px; z-index:9998; transition:transform 0.15s; }
+#chat-bubble-btn:hover { transform:scale(1.08); }
+#chat-bubble-badge { position:absolute; top:-3px; right:-3px; background:#ef4444; color:#fff; border-radius:10px; padding:1px 5px; font-size:11px; font-weight:700; min-width:18px; text-align:center; display:none; }
+.chat-notif-stack { position:fixed; bottom:20px; right:80px; display:flex; flex-direction:column-reverse; gap:8px; z-index:10001; pointer-events:none; }
+.chat-notif-toast { background:#fff; border-left:4px solid #2563eb; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.16); padding:10px 14px; min-width:240px; max-width:300px; pointer-events:all; animation:chatNotifIn 0.25s ease; position:relative; overflow:hidden; }
+.chat-notif-toast.removing { animation:chatNotifOut 0.2s ease forwards; }
+@keyframes chatNotifIn { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
+@keyframes chatNotifOut { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(30px)} }
+.chat-notif-sender { font-weight:700; font-size:13px; color:#111827; margin-bottom:2px; }
+.chat-notif-preview { font-size:12px; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chat-notif-close { position:absolute; top:6px; right:8px; background:none; border:none; color:#9ca3af; cursor:pointer; font-size:15px; line-height:1; }
+.chat-notif-bar { position:absolute; bottom:0; left:0; right:0; height:3px; background:#e5e7eb; }
+.chat-notif-bar-fill { height:100%; background:#2563eb; width:100%; animation:chatNotifBar 5s linear forwards; }
+@keyframes chatNotifBar { from{width:100%} to{width:0%} }
+        `;
+        document.head.appendChild(s);
+    }
+
+    function _getStack() {
+        let s = document.getElementById('chat-notif-stack');
+        if (!s) { s = document.createElement('div'); s.id = 'chat-notif-stack'; s.className = 'chat-notif-stack'; document.body.appendChild(s); }
+        return s;
+    }
+
+    function _showChatNotif(senderName, preview, isDM) {
+        const existing = document.querySelector('.chat-popup-notification');
+        if (existing) existing.remove();
+        const safeSender = senderName.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const safePreview = preview.replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 100);
+        const timeStr = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        const popup = document.createElement('div');
+        popup.className = 'chat-popup-notification';
+        popup.innerHTML = `
+            <div class="popup-content" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);">
+                <div class="popup-icon"><i class="fas fa-${isDM ? 'user' : 'comments'}" style="color:#bfdbfe;"></i></div>
+                <div class="popup-text">
+                    <div class="popup-title">${isDM ? 'DIRECT MESSAGE' : 'TEAM CHAT'}</div>
+                    <div class="popup-message">${safeSender}: ${safePreview}</div>
+                    <div class="popup-time">${timeStr}</div>
+                </div>
+                <div class="popup-actions">
+                    <button class="popup-call-btn" onclick="openTeamChat();document.querySelector('.chat-popup-notification')&&document.querySelector('.chat-popup-notification').remove();">
+                        <i class="fas fa-comments"></i> OPEN
+                    </button>
+                    <button class="popup-dismiss-btn" onclick="this.closest('.chat-popup-notification').remove();">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>`;
+        document.body.insertBefore(popup, document.body.firstChild);
+        setTimeout(() => {
+            const p = document.querySelector('.chat-popup-notification');
+            if (p) { p.style.transform = 'translateY(-100%)'; setTimeout(() => p.remove(), 300); }
+        }, 8000);
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const n = new Notification(isDM ? `${senderName} (Direct Message)` : `${senderName} \u2014 Team Chat`, { body: preview, icon: '/favicon.ico', tag: 'chat-' + Date.now() });
+            n.onclick = () => { window.focus(); openTeamChat(); n.close(); };
+            setTimeout(() => n.close(), 8000);
+        }
+    }
+
+    function _formatTime(ts) { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+    function _formatDate(ts) {
+        const d = new Date(ts), today = new Date(), yest = new Date(today);
+        yest.setDate(today.getDate() - 1);
+        if (d.toDateString() === today.toDateString()) return 'Today';
+        if (d.toDateString() === yest.toDateString()) return 'Yesterday';
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    function _renderMessages(tab) {
+        const area = document.getElementById('chat-msgs-area');
+        if (!area) return;
+        const msgs = _chatMessages[tab] || [];
+        const me = _currentUser();
+        if (msgs.length === 0) {
+            area.innerHTML = `<div class="chat-empty"><i class="fas fa-comments" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>No messages yet. Say hi!</div>`;
             return;
         }
-        var file = files[i];
-        if (progress) progress.innerHTML = '<i class="fas fa-spinner fa-spin"></i> [' + (i+1) + '/' + files.length + '] Uploading <strong>' + file.name + '</strong> (' + (file.size/1024/1024).toFixed(0) + ' MB)...';
-        var formData = new FormData();
-        formData.append('file', file);
-        fetch('/api/commercial-leads/import-osha', { method: 'POST', body: formData })
-            .then(function(r){ return r.json(); })
-            .then(function(d) {
-                if (d.error) throw new Error(d.error);
-                totalImported += d.imported || 0;
-                totalSkipped += d.skipped || 0;
-                if (progress) progress.innerHTML = '<i class="fas fa-check-circle" style="color:#10b981;"></i> [' + (i+1) + '/' + files.length + '] ' + file.name + ': +' + (d.imported||0).toLocaleString() + ' imported. Total so far: ' + totalImported.toLocaleString();
-                uploadNext(i + 1);
-            })
-            .catch(function(e) {
-                if (progress) progress.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i> [' + (i+1) + '/' + files.length + '] ' + file.name + ' failed: ' + e.message + ' — <a href="#" onclick="settingsImportOSHA(document.getElementById(\'settings-osha-input\'))">retry</a>';
+        let html = '', lastDate = '';
+        msgs.forEach(m => {
+            const ds = _formatDate(m.timestamp);
+            if (ds !== lastDate) { html += `<div class="chat-date-divider">${ds}</div>`; lastDate = ds; }
+            const isMine = m.sender === me;
+            html += `<div class="chat-msg${isMine ? ' mine' : ''}">
+                <div class="chat-msg-avatar" style="background:${CHAT_COLORS[m.sender]||'#6b7280'}">${CHAT_AVATARS[m.sender]||'?'}</div>
+                <div class="chat-msg-body">
+                    ${!isMine ? `<div class="chat-msg-name">${CHAT_DISPLAY[m.sender]||m.sender}</div>` : ''}
+                    <div class="chat-msg-bubble">${m.message.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>
+                    <div class="chat-msg-time">${_formatTime(m.timestamp)}</div>
+                </div>
+            </div>`;
+        });
+        area.innerHTML = html;
+        area.scrollTop = area.scrollHeight;
+    }
+
+    function _renderSidebar(me) {
+        const sidebar = document.getElementById('chat-sidebar');
+        if (!sidebar) return;
+        const peers = CHAT_USERS.filter(u => u !== me);
+        sidebar.innerHTML = `
+            <div class="chat-sidebar-label">Channels</div>
+            <button class="chat-tab-btn${_chatTab==='group'?' active':''}" onclick="_teamChatSwitchTab('group')">
+                <div class="chat-tab-avatar" style="background:#6366f1;font-size:10px;">ALL</div>
+                <span>Team</span>
+                <span class="chat-tab-unread${(_chatUnreadCounts['group']||0)>0?' visible':''}" id="chat-unread-group">${_chatUnreadCounts['group']||0}</span>
+            </button>
+            <div class="chat-sidebar-label" style="margin-top:6px;">Direct</div>
+            ${peers.map(p=>`
+            <button class="chat-tab-btn${_chatTab==='dm_'+p?' active':''}" onclick="_teamChatSwitchTab('dm_${p}')">
+                <div class="chat-tab-avatar" style="background:${CHAT_COLORS[p]}">${CHAT_AVATARS[p]}</div>
+                <span>${CHAT_DISPLAY[p]}</span>
+                <span class="chat-tab-unread${(_chatUnreadCounts['dm_'+p]||0)>0?' visible':''}" id="chat-unread-dm_${p}">${_chatUnreadCounts['dm_'+p]||0}</span>
+            </button>`).join('')}`;
+    }
+
+    function _renderHeaderBar() {
+        const bar = document.getElementById('chat-header-bar');
+        if (!bar) return;
+        bar.textContent = _chatTab === 'group'
+            ? '\uD83C\uDF10 Team Chat \u2014 Grant, Hunter & Carson'
+            : '\uD83D\uDCAC Direct Message with ' + (CHAT_DISPLAY[_dmPeer(_chatTab)] || _dmPeer(_chatTab));
+    }
+
+    window._teamChatSwitchTab = function(tab) {
+        _chatTab = tab;
+        _renderSidebar(_currentUser());
+        _renderHeaderBar();
+        _renderMessages(tab);
+        _markTabRead(tab);
+    };
+
+    function _markTabRead(tab) {
+        const me = _currentUser();
+        const unread = (_chatMessages[tab]||[]).filter(m => m.sender !== me && !m.read_by.includes(me));
+        if (!unread.length) return;
+        fetch('/api/chat/mark-read', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ messageIds: unread.map(m=>m.id), username: me }) })
+            .then(() => {
+                unread.forEach(m => { if (!m.read_by.includes(me)) m.read_by.push(me); });
+                _chatUnreadCounts[tab] = 0;
+                _updateBadges();
             });
     }
 
-    uploadNext(0);
-};
+    function _updateBadges() {
+        _chatTotalUnread = Object.values(_chatUnreadCounts).reduce((a,b)=>a+b, 0);
+        Object.keys(_chatUnreadCounts).forEach(tab => {
+            const el = document.getElementById('chat-unread-' + tab);
+            if (el) { el.textContent = _chatUnreadCounts[tab]||0; el.classList.toggle('visible', (_chatUnreadCounts[tab]||0)>0); }
+        });
+        const badge = document.getElementById('chat-bubble-badge');
+        if (badge) { badge.textContent = _chatTotalUnread; badge.style.display = _chatTotalUnread > 0 ? 'block' : 'none'; }
+    }
+
+    async function _pollChat() {
+        const me = _currentUser();
+        if (!me || !CHAT_USERS.includes(me)) return;
+        const tabs = ['group', ...CHAT_USERS.filter(u=>u!==me).map(u=>'dm_'+u)];
+        for (const tab of tabs) {
+            const since = _chatLastTs[tab] || '1970-01-01T00:00:00.000Z';
+            const url = tab === 'group'
+                ? `/api/chat/messages?type=group&since=${encodeURIComponent(since)}`
+                : `/api/chat/messages?type=dm&user=${encodeURIComponent(me)}&with=${encodeURIComponent(_dmPeer(tab))}&since=${encodeURIComponent(since)}`;
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) continue;
+                const { messages: newMsgs = [] } = await resp.json();
+                if (!newMsgs.length) continue;
+                if (!_chatMessages[tab]) _chatMessages[tab] = [];
+                const existing = new Set(_chatMessages[tab].map(m=>m.id));
+                const fresh = newMsgs.filter(m=>!existing.has(m.id));
+                if (!fresh.length) continue;
+                _chatMessages[tab].push(...fresh);
+                _chatLastTs[tab] = _chatMessages[tab][_chatMessages[tab].length-1].timestamp;
+                const unread = fresh.filter(m=>m.sender!==me && !m.read_by.includes(me));
+                if (unread.length) {
+                    _chatUnreadCounts[tab] = (_chatUnreadCounts[tab]||0) + unread.length;
+                    const chatVisible = !!document.getElementById('team-chat-window') && !_chatMinimized;
+                    const isCurrentTab = chatVisible && _chatTab === tab;
+                    if (!isCurrentTab) {
+                        unread.forEach(m => _showChatNotif(CHAT_DISPLAY[m.sender]||m.sender, m.message, tab!=='group'));
+                    }
+                    if (chatVisible && _chatTab === tab) { _renderMessages(tab); _markTabRead(tab); }
+                    _updateBadges();
+                } else if (document.getElementById('team-chat-window') && !_chatMinimized && _chatTab === tab) {
+                    _renderMessages(tab);
+                }
+            } catch(e) { /* silent */ }
+        }
+    }
+
+    function startChatNotificationWatcher() {
+        if (_chatPollTimer) return;
+        _ensureBubble();
+        _chatBubble.style.display = 'flex';
+        _seedChatMessages();
+        _chatPollTimer = setInterval(_pollChat, POLL_MS);
+    }
+    window.startChatNotificationWatcher = startChatNotificationWatcher;
+
+    async function _seedChatMessages() {
+        const me = _currentUser();
+        if (!me || !CHAT_USERS.includes(me)) return;
+        const tabs = ['group', ...CHAT_USERS.filter(u=>u!==me).map(u=>'dm_'+u)];
+        for (const tab of tabs) {
+            const url = tab === 'group'
+                ? `/api/chat/messages?type=group&since=1970-01-01T00:00:00.000Z`
+                : `/api/chat/messages?type=dm&user=${encodeURIComponent(me)}&with=${encodeURIComponent(_dmPeer(tab))}&since=1970-01-01T00:00:00.000Z`;
+            try {
+                const resp = await fetch(url); if (!resp.ok) continue;
+                const { messages = [] } = await resp.json();
+                _chatMessages[tab] = messages;
+                if (messages.length) _chatLastTs[tab] = messages[messages.length-1].timestamp;
+                _chatUnreadCounts[tab] = messages.filter(m=>m.sender!==me && !m.read_by.includes(me)).length;
+            } catch(e) { /* silent */ }
+        }
+        _updateBadges();
+    }
+
+    async function _sendMessage() {
+        const me = _currentUser();
+        const input = document.getElementById('chat-input-box');
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = ''; input.style.height = 'auto';
+        const body = { sender: me, message: text };
+        if (_chatTab !== 'group') body.recipient = _dmPeer(_chatTab);
+        try {
+            const resp = await fetch('/api/chat/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+            const data = await resp.json();
+            if (data.message) {
+                if (!_chatMessages[_chatTab]) _chatMessages[_chatTab] = [];
+                _chatMessages[_chatTab].push(data.message);
+                _chatLastTs[_chatTab] = data.message.timestamp;
+                _renderMessages(_chatTab);
+            }
+        } catch(e) { /* silent */ }
+    }
+    window._chatSendMessage = _sendMessage;
+
+    window._chatInputKeydown = function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _sendMessage(); return; }
+        const ta = e.target; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 80) + 'px';
+    };
+
+    function _minimizeChat() {
+        const win = document.getElementById('team-chat-window');
+        if (win) win.style.display = 'none';
+        _chatMinimized = true;
+        _ensureBubble();
+        _chatBubble.style.display = 'flex';
+    }
+
+    function _restoreChat() {
+        const win = document.getElementById('team-chat-window');
+        if (win) win.style.display = 'flex';
+        _chatMinimized = false;
+        _markTabRead(_chatTab);
+        _renderMessages(_chatTab);
+        const area = document.getElementById('chat-msgs-area');
+        if (area) area.scrollTop = area.scrollHeight;
+    }
+    window._restoreChat = _restoreChat;
+
+    function _ensureBubble() {
+        if (_chatBubble) return;
+        _ensureChatStyles();
+        _chatBubble = document.createElement('button');
+        _chatBubble.id = 'chat-bubble-btn';
+        _chatBubble.title = 'Open Team Chat';
+        _chatBubble.innerHTML = `<i class="fas fa-comments"></i><span id="chat-bubble-badge" style="position:absolute;top:-3px;right:-3px;background:#ef4444;color:#fff;border-radius:10px;padding:1px 5px;font-size:11px;font-weight:700;min-width:18px;text-align:center;display:none;"></span>`;
+        _chatBubble.onclick = () => {
+            const win = document.getElementById('team-chat-window');
+            if (!win) { openTeamChat(); }
+            else if (_chatMinimized) { _restoreChat(); }
+            else if (typeof bringToFront === 'function') { bringToFront(win); }
+        };
+        document.body.appendChild(_chatBubble);
+    }
+
+    window.openTeamChat = function() {
+        if (document.getElementById('team-chat-window')) {
+            if (_chatMinimized) _restoreChat();
+            else { const w = document.getElementById('team-chat-window'); if (w && typeof bringToFront==='function') bringToFront(w); }
+            return;
+        }
+        _ensureChatStyles();
+        const me = _currentUser();
+        _chatMinimized = false;
+        _chatTab = 'group';
+
+        const win = document.createElement('div');
+        win.id = 'team-chat-window';
+        win.className = 'tool-window';
+        win.style.cssText = 'width:520px;height:460px;display:flex;flex-direction:column;';
+        const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+        win.style.left = Math.max(50, (vw-520)/2) + 'px';
+        win.style.top  = Math.max(50, (vh-460)/2) + 'px';
+
+        win.innerHTML = `
+            <div class="tool-window-header">
+                <div class="tool-window-title"><i class="fas fa-comments"></i><span>Team Chat</span></div>
+                <div class="tool-window-controls">
+                    <button class="tool-window-btn" title="Minimize" onclick="_minimizeChatWindow()"><i class="fas fa-minus"></i></button>
+                    <button class="tool-window-btn" title="Close" onclick="_closeTeamChat()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="chat-layout" style="flex:1;min-height:0;">
+                <div class="chat-sidebar" id="chat-sidebar"></div>
+                <div class="chat-main">
+                    <div class="chat-header-bar" id="chat-header-bar"></div>
+                    <div class="chat-messages-area" id="chat-msgs-area"></div>
+                    <div class="chat-input-area">
+                        <textarea id="chat-input-box" rows="1" placeholder="Type a message\u2026 (Enter to send, Shift+Enter for newline)" onkeydown="_chatInputKeydown(event)"></textarea>
+                        <button class="chat-send-btn" onclick="_chatSendMessage()" title="Send"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="resize-handle resize-handle-n"></div>
+            <div class="resize-handle resize-handle-s"></div>
+            <div class="resize-handle resize-handle-e"></div>
+            <div class="resize-handle resize-handle-w"></div>
+            <div class="resize-handle resize-handle-nw"></div>
+            <div class="resize-handle resize-handle-ne"></div>
+            <div class="resize-handle resize-handle-sw"></div>
+            <div class="resize-handle resize-handle-se"></div>`;
+
+        document.body.appendChild(win);
+        if (typeof makeDraggable==='function') makeDraggable(win);
+        if (typeof makeResizable==='function') makeResizable(win);
+        if (typeof bringToFront==='function') { win.addEventListener('mousedown',()=>bringToFront(win)); bringToFront(win); }
+
+        _renderSidebar(me);
+        _renderHeaderBar();
+        if (!_chatMessages['group']) {
+            _seedChatMessages().then(() => { _renderSidebar(me); _renderMessages(_chatTab); _markTabRead(_chatTab); });
+        } else {
+            _renderMessages('group');
+            _markTabRead('group');
+        }
+        _ensureBubble();
+    };
+
+    window._minimizeChatWindow = function() { _minimizeChat(); };
+    window._closeTeamChat = function() {
+        const win = document.getElementById('team-chat-window');
+        if (win) win.remove();
+        _chatMinimized = false;
+    };
+
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEAM CHAT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+(function() {
+    const CHAT_USERS = ['grant', 'hunter', 'carson'];
+    const CHAT_DISPLAY = { grant: 'Grant', hunter: 'Hunter', carson: 'Carson' };
+    const CHAT_COLORS  = { grant: '#3b82f6', hunter: '#10b981', carson: '#f59e0b' };
+    const CHAT_AVATARS = { grant: 'G', hunter: 'H', carson: 'C' };
+    const POLL_MS = 2000;
+
+    let _chatTab = 'group';
+    let _chatPollTimer = null;
+    let _chatLastTs = {};
+    let _chatMessages = {};
+    let _chatUnreadCounts = {};
+    let _chatBubble = null;
+    let _chatTotalUnread = 0;
+    let _chatMinimized = false;
+    let _chatNotifStylesAdded = false;
+
+    function _currentUser() {
+        try {
+            return (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase();
+        } catch(e) { return ''; }
+    }
+
+    function _dmPeer(tab) { return tab.replace('dm_', ''); }
+
+    function _ensureChatStyles() {
+        if (_chatNotifStylesAdded) return;
+        _chatNotifStylesAdded = true;
+        const s = document.createElement('style');
+        s.textContent = `
+#team-chat-window {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    overflow: hidden;
+    min-width: 380px;
+    min-height: 320px;
+}
+#team-chat-window .tool-window-header {
+    background: linear-gradient(135deg,#0066cc,#004499);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: move;
+    user-select: none;
+    flex-shrink: 0;
+}
+#team-chat-window .tool-window-title { color:#fff; font-weight:600; font-size:15px; display:flex; align-items:center; gap:8px; }
+#team-chat-window .tool-window-controls { display:flex; gap:6px; }
+#team-chat-window .tool-window-btn {
+    background: rgba(255,255,255,0.2);
+    border: none; color:#fff; width:26px; height:26px; border-radius:6px;
+    cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center;
+    transition: background 0.15s;
+}
+#team-chat-window .tool-window-btn:hover { background:rgba(255,255,255,0.35); }
+.chat-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.chat-sidebar {
+    width: 130px; flex-shrink: 0;
+    background: #f8fafc; border-right: 1px solid #e5e7eb;
+    display: flex; flex-direction: column; overflow-y: auto;
+}
+.chat-sidebar-label {
+    font-size: 10px; font-weight: 700; color: #9ca3af;
+    text-transform: uppercase; letter-spacing: .06em; padding: 10px 10px 4px;
+}
+.chat-tab-btn {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    cursor: pointer; border: none; background: none; text-align: left;
+    font-size: 13px; color: #374151; border-radius: 0; position: relative;
+    transition: background 0.12s; width: 100%;
+}
+.chat-tab-btn:hover { background: #e5e7eb; }
+.chat-tab-btn.active { background: #dbeafe; color: #1d4ed8; font-weight: 600; }
+.chat-tab-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.chat-tab-unread {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: #ef4444; color: #fff; border-radius: 10px;
+    padding: 1px 6px; font-size: 11px; font-weight: 700; min-width: 18px; text-align: center;
+    display: none;
+}
+.chat-tab-unread.visible { display: block; }
+.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.chat-header-bar {
+    padding: 8px 14px; border-bottom: 1px solid #e5e7eb;
+    font-size: 13px; font-weight: 600; color: #374151;
+    background: #f9fafb; flex-shrink: 0;
+}
+.chat-messages-area {
+    flex: 1; overflow-y: auto; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 6px;
+    background: #fff; min-height: 0;
+}
+.chat-msg { display: flex; gap: 8px; align-items: flex-start; max-width: 90%; }
+.chat-msg.mine { align-self: flex-end; flex-direction: row-reverse; }
+.chat-msg-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; margin-top: 2px;
+}
+.chat-msg-body { display: flex; flex-direction: column; gap: 2px; }
+.chat-msg-name { font-size: 11px; color: #9ca3af; font-weight: 500; }
+.chat-msg.mine .chat-msg-name { text-align: right; }
+.chat-msg-bubble {
+    padding: 7px 11px; border-radius: 14px; font-size: 13.5px;
+    line-height: 1.4; word-break: break-word;
+    background: #f3f4f6; color: #111827;
+}
+.chat-msg.mine .chat-msg-bubble { background: #2563eb; color: #fff; border-bottom-right-radius: 4px; }
+.chat-msg:not(.mine) .chat-msg-bubble { border-bottom-left-radius: 4px; }
+.chat-msg-time { font-size: 10px; color: #d1d5db; margin-top: 2px; }
+.chat-msg.mine .chat-msg-time { text-align: right; }
+.chat-date-divider {
+    text-align: center; font-size: 11px; color: #9ca3af; margin: 4px 0; position: relative;
+}
+.chat-date-divider::before, .chat-date-divider::after {
+    content: ''; display: inline-block; width: 60px; height: 1px;
+    background: #e5e7eb; vertical-align: middle; margin: 0 6px;
+}
+.chat-input-area {
+    display: flex; gap: 8px; padding: 10px 12px;
+    border-top: 1px solid #e5e7eb; background: #f9fafb; flex-shrink: 0;
+}
+.chat-input-area textarea {
+    flex: 1; border: 1px solid #d1d5db; border-radius: 20px;
+    padding: 8px 14px; font-size: 13px; resize: none; outline: none;
+    line-height: 1.4; max-height: 80px; font-family: inherit; transition: border-color 0.15s;
+}
+.chat-input-area textarea:focus { border-color: #3b82f6; }
+.chat-send-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #2563eb; border: none; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; align-self: flex-end;
+    transition: background 0.15s; font-size: 14px;
+}
+.chat-send-btn:hover { background: #1d4ed8; }
+.chat-empty { text-align: center; color: #9ca3af; font-size: 13px; margin: auto; padding: 20px; }
+
+#chat-bubble-btn {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: linear-gradient(135deg,#0066cc,#004499);
+    border: none; color: #fff;
+    box-shadow: 0 4px 14px rgba(0,102,204,0.45);
+    cursor: pointer; display: none;
+    align-items: center; justify-content: center;
+    font-size: 22px; z-index: 9998; transition: transform 0.15s;
+}
+#chat-bubble-btn:hover { transform: scale(1.08); }
+#chat-bubble-badge {
+    position: absolute; top: -3px; right: -3px;
+    background: #ef4444; color: #fff;
+    border-radius: 10px; padding: 1px 5px;
+    font-size: 11px; font-weight: 700; min-width: 18px; text-align: center; display: none;
+}
+
+.chat-notif-stack {
+    position: fixed; bottom: 20px; right: 80px;
+    display: flex; flex-direction: column-reverse; gap: 8px;
+    z-index: 10001; pointer-events: none;
+}
+.chat-notif-toast {
+    background: #fff; border-left: 4px solid #2563eb; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.16);
+    padding: 10px 14px; min-width: 240px; max-width: 300px;
+    pointer-events: all; animation: chatNotifIn 0.25s ease;
+    position: relative; overflow: hidden;
+}
+.chat-notif-toast.removing { animation: chatNotifOut 0.2s ease forwards; }
+@keyframes chatNotifIn  { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:translateX(0); } }
+@keyframes chatNotifOut { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(30px); } }
+.chat-notif-sender { font-weight: 700; font-size: 13px; color: #111827; margin-bottom: 2px; }
+.chat-notif-preview { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-notif-close { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 15px; line-height: 1; }
+.chat-notif-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #e5e7eb; }
+.chat-notif-bar-fill { height: 100%; background: #2563eb; width: 100%; animation: chatNotifBar 5s linear forwards; }
+@keyframes chatNotifBar { from { width:100%; } to { width:0%; } }
+        `;
+        document.head.appendChild(s);
+    }
+
+    function _getStack() {
+        let s = document.getElementById('chat-notif-stack');
+        if (!s) { s = document.createElement('div'); s.id = 'chat-notif-stack'; s.className = 'chat-notif-stack'; document.body.appendChild(s); }
+        return s;
+    }
+
+    function _showChatNotif(senderName, preview, isDM) {
+        const existing = document.querySelector('.chat-popup-notification');
+        if (existing) existing.remove();
+        const safeSender = senderName.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const safePreview = preview.replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 100);
+        const timeStr = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        const popup = document.createElement('div');
+        popup.className = 'chat-popup-notification';
+        popup.innerHTML = `
+            <div class="popup-content" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);">
+                <div class="popup-icon"><i class="fas fa-${isDM ? 'user' : 'comments'}" style="color:#bfdbfe;"></i></div>
+                <div class="popup-text">
+                    <div class="popup-title">${isDM ? 'DIRECT MESSAGE' : 'TEAM CHAT'}</div>
+                    <div class="popup-message">${safeSender}: ${safePreview}</div>
+                    <div class="popup-time">${timeStr}</div>
+                </div>
+                <div class="popup-actions">
+                    <button class="popup-call-btn" onclick="openTeamChat();document.querySelector('.chat-popup-notification')&&document.querySelector('.chat-popup-notification').remove();">
+                        <i class="fas fa-comments"></i> OPEN
+                    </button>
+                    <button class="popup-dismiss-btn" onclick="this.closest('.chat-popup-notification').remove();">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>`;
+        document.body.insertBefore(popup, document.body.firstChild);
+        setTimeout(() => {
+            const p = document.querySelector('.chat-popup-notification');
+            if (p) { p.style.transform = 'translateY(-100%)'; setTimeout(() => p.remove(), 300); }
+        }, 8000);
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const n = new Notification(isDM ? `${senderName} (Direct Message)` : `${senderName} \u2014 Team Chat`, { body: preview, icon: '/favicon.ico', tag: 'chat-' + Date.now() });
+            n.onclick = () => { window.focus(); openTeamChat(); n.close(); };
+            setTimeout(() => n.close(), 8000);
+        }
+    }
+
+    function _formatTime(ts) { const d = new Date(ts); return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+    function _formatDate(ts) {
+        const d = new Date(ts); const today = new Date();
+        const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+        if (d.toDateString() === today.toDateString()) return 'Today';
+        if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    function _renderMessages(tab) {
+        const area = document.getElementById('chat-msgs-area');
+        if (!area) return;
+        const msgs = _chatMessages[tab] || [];
+        const me = _currentUser();
+        if (msgs.length === 0) {
+            area.innerHTML = '<div class="chat-empty"><i class="fas fa-comments" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>No messages yet. Say hi!</div>';
+            return;
+        }
+        let html = '', lastDate = '';
+        msgs.forEach(m => {
+            const dateStr = _formatDate(m.timestamp);
+            if (dateStr !== lastDate) { html += `<div class="chat-date-divider">${dateStr}</div>`; lastDate = dateStr; }
+            const isMine = m.sender === me;
+            const color = CHAT_COLORS[m.sender] || '#6b7280';
+            const avatar = CHAT_AVATARS[m.sender] || '?';
+            const name = CHAT_DISPLAY[m.sender] || m.sender;
+            const safeMsg = m.message.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+            html += `<div class="chat-msg${isMine ? ' mine' : ''}">
+                <div class="chat-msg-avatar" style="background:${color}">${avatar}</div>
+                <div class="chat-msg-body">
+                    ${!isMine ? `<div class="chat-msg-name">${name}</div>` : ''}
+                    <div class="chat-msg-bubble">${safeMsg}</div>
+                    <div class="chat-msg-time">${_formatTime(m.timestamp)}</div>
+                </div>
+            </div>`;
+        });
+        area.innerHTML = html;
+        area.scrollTop = area.scrollHeight;
+    }
+
+    function _renderSidebar(me) {
+        const peers = CHAT_USERS.filter(u => u !== me);
+        const sidebar = document.getElementById('chat-sidebar');
+        if (!sidebar) return;
+        const grpCount = _chatUnreadCounts['group'] || 0;
+        let html = `
+            <div class="chat-sidebar-label">Channels</div>
+            <button class="chat-tab-btn${_chatTab === 'group' ? ' active' : ''}" onclick="_teamChatSwitchTab('group')">
+                <div class="chat-tab-avatar" style="background:#6366f1;font-size:10px;">ALL</div>
+                <span>Team</span>
+                <span class="chat-tab-unread${grpCount > 0 ? ' visible' : ''}" id="chat-unread-group">${grpCount}</span>
+            </button>
+            <div class="chat-sidebar-label" style="margin-top:6px;">Direct</div>`;
+        peers.forEach(p => {
+            const cnt = _chatUnreadCounts['dm_' + p] || 0;
+            html += `<button class="chat-tab-btn${_chatTab === 'dm_'+p ? ' active' : ''}" onclick="_teamChatSwitchTab('dm_${p}')">
+                <div class="chat-tab-avatar" style="background:${CHAT_COLORS[p]}">${CHAT_AVATARS[p]}</div>
+                <span>${CHAT_DISPLAY[p]}</span>
+                <span class="chat-tab-unread${cnt > 0 ? ' visible' : ''}" id="chat-unread-dm_${p}">${cnt}</span>
+            </button>`;
+        });
+        sidebar.innerHTML = html;
+    }
+
+    function _renderHeaderBar() {
+        const bar = document.getElementById('chat-header-bar');
+        if (!bar) return;
+        if (_chatTab === 'group') {
+            bar.textContent = 'Team Chat \u2014 Grant, Hunter & Carson';
+        } else {
+            const peer = _dmPeer(_chatTab);
+            bar.textContent = 'Direct Message with ' + (CHAT_DISPLAY[peer] || peer);
+        }
+    }
+
+    window._teamChatSwitchTab = function(tab) {
+        _chatTab = tab;
+        _renderSidebar(_currentUser());
+        _renderHeaderBar();
+        _renderMessages(tab);
+        _markTabRead(tab);
+    };
+
+    function _markTabRead(tab) {
+        const msgs = _chatMessages[tab] || [];
+        const me = _currentUser();
+        const unread = msgs.filter(m => m.sender !== me && !(m.read_by || []).includes(me));
+        if (unread.length === 0) return;
+        fetch('/api/chat/mark-read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messageIds: unread.map(m => m.id), username: me })
+        }).then(() => {
+            unread.forEach(m => { if (!m.read_by.includes(me)) m.read_by.push(me); });
+            _chatUnreadCounts[tab] = 0;
+            _updateBadges();
+        }).catch(() => {});
+    }
+
+    function _updateBadges() {
+        _chatTotalUnread = Object.values(_chatUnreadCounts).reduce((a, b) => a + b, 0);
+        Object.keys(_chatUnreadCounts).forEach(tab => {
+            const el = document.getElementById('chat-unread-' + tab);
+            if (el) { el.textContent = _chatUnreadCounts[tab] || 0; el.classList.toggle('visible', (_chatUnreadCounts[tab] || 0) > 0); }
+        });
+        const badge = document.getElementById('chat-bubble-badge');
+        if (badge) { badge.textContent = _chatTotalUnread; badge.style.display = _chatTotalUnread > 0 ? 'block' : 'none'; }
+    }
+
+    async function _pollChat() {
+        const me = _currentUser();
+        if (!me || !CHAT_USERS.includes(me)) return;
+        const tabs = ['group', ...CHAT_USERS.filter(u => u !== me).map(u => 'dm_' + u)];
+        for (const tab of tabs) {
+            const since = _chatLastTs[tab] || '1970-01-01T00:00:00.000Z';
+            let url;
+            if (tab === 'group') {
+                url = '/api/chat/messages?type=group&since=' + encodeURIComponent(since);
+            } else {
+                const peer = _dmPeer(tab);
+                url = '/api/chat/messages?type=dm&user=' + encodeURIComponent(me) + '&with=' + encodeURIComponent(peer) + '&since=' + encodeURIComponent(since);
+            }
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) continue;
+                const data = await resp.json();
+                const newMsgs = data.messages || [];
+                if (newMsgs.length === 0) continue;
+                if (!_chatMessages[tab]) _chatMessages[tab] = [];
+                const existing = new Set(_chatMessages[tab].map(m => m.id));
+                const fresh = newMsgs.filter(m => !existing.has(m.id));
+                if (fresh.length === 0) continue;
+                _chatMessages[tab].push(...fresh);
+                _chatLastTs[tab] = _chatMessages[tab][_chatMessages[tab].length - 1].timestamp;
+                const unread = fresh.filter(m => m.sender !== me && !(m.read_by || []).includes(me));
+                if (unread.length > 0) {
+                    _chatUnreadCounts[tab] = (_chatUnreadCounts[tab] || 0) + unread.length;
+                    const chatVisible = !!document.getElementById('team-chat-window') && !_chatMinimized;
+                    const isCurrentTab = chatVisible && _chatTab === tab;
+                    if (!isCurrentTab) {
+                        unread.forEach(m => _showChatNotif(CHAT_DISPLAY[m.sender] || m.sender, m.message, tab !== 'group'));
+                    }
+                    if (chatVisible && _chatTab === tab) { _renderMessages(tab); _markTabRead(tab); }
+                    _updateBadges();
+                } else if (document.getElementById('team-chat-window') && !_chatMinimized && _chatTab === tab) {
+                    _renderMessages(tab);
+                }
+            } catch(e) { /* silent */ }
+        }
+    }
+
+    function startChatNotificationWatcher() {
+        if (_chatPollTimer) return;
+        _ensureBubble();
+        _chatBubble.style.display = 'flex';
+        _seedChatMessages();
+        _chatPollTimer = setInterval(_pollChat, POLL_MS);
+    }
+    window.startChatNotificationWatcher = startChatNotificationWatcher;
+
+    async function _seedChatMessages() {
+        const me = _currentUser();
+        if (!me || !CHAT_USERS.includes(me)) return;
+        const tabs = ['group', ...CHAT_USERS.filter(u => u !== me).map(u => 'dm_' + u)];
+        for (const tab of tabs) {
+            let url;
+            if (tab === 'group') {
+                url = '/api/chat/messages?type=group&since=1970-01-01T00:00:00.000Z';
+            } else {
+                const peer = _dmPeer(tab);
+                url = '/api/chat/messages?type=dm&user=' + encodeURIComponent(me) + '&with=' + encodeURIComponent(peer) + '&since=1970-01-01T00:00:00.000Z';
+            }
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) continue;
+                const data = await resp.json();
+                _chatMessages[tab] = data.messages || [];
+                if (_chatMessages[tab].length > 0) _chatLastTs[tab] = _chatMessages[tab][_chatMessages[tab].length - 1].timestamp;
+                _chatUnreadCounts[tab] = (_chatMessages[tab] || []).filter(m => m.sender !== me && !(m.read_by || []).includes(me)).length;
+            } catch(e) { /* silent */ }
+        }
+        _updateBadges();
+    }
+
+    async function _sendMessage() {
+        const me = _currentUser();
+        const input = document.getElementById('chat-input-box');
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        input.style.height = 'auto';
+        const body = { sender: me, message: text };
+        if (_chatTab !== 'group') body.recipient = _dmPeer(_chatTab);
+        try {
+            const resp = await fetch('/api/chat/send', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await resp.json();
+            if (data.message) {
+                if (!_chatMessages[_chatTab]) _chatMessages[_chatTab] = [];
+                _chatMessages[_chatTab].push(data.message);
+                _chatLastTs[_chatTab] = data.message.timestamp;
+                _renderMessages(_chatTab);
+            }
+        } catch(e) { /* silent */ }
+    }
+    window._chatSendMessage = _sendMessage;
+
+    window._chatInputKeydown = function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _sendMessage(); }
+        const ta = e.target;
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 80) + 'px';
+    };
+
+    function _minimizeChat() {
+        const win = document.getElementById('team-chat-window');
+        if (win) win.style.display = 'none';
+        _chatMinimized = true;
+        _ensureBubble();
+        _chatBubble.style.display = 'flex';
+    }
+
+    function _restoreChat() {
+        const win = document.getElementById('team-chat-window');
+        if (win) { win.style.display = 'flex'; }
+        _chatMinimized = false;
+        _markTabRead(_chatTab);
+        _renderMessages(_chatTab);
+        const area = document.getElementById('chat-msgs-area');
+        if (area) area.scrollTop = area.scrollHeight;
+    }
+    window._restoreChat = _restoreChat;
+
+    function _ensureBubble() {
+        if (_chatBubble) return;
+        _ensureChatStyles();
+        _chatBubble = document.createElement('button');
+        _chatBubble.id = 'chat-bubble-btn';
+        _chatBubble.title = 'Open Team Chat';
+        _chatBubble.innerHTML = '<i class="fas fa-comments"></i><span id="chat-bubble-badge" style="position:absolute;top:-3px;right:-3px;background:#ef4444;color:#fff;border-radius:10px;padding:1px 5px;font-size:11px;font-weight:700;min-width:18px;text-align:center;display:none;"></span>';
+        _chatBubble.onclick = () => {
+            if (document.getElementById('team-chat-window')) { _restoreChat(); }
+            else { openTeamChat(); }
+        };
+        document.body.appendChild(_chatBubble);
+    }
+
+    window.openTeamChat = function() {
+        if (document.getElementById('team-chat-window')) {
+            if (_chatMinimized) { _restoreChat(); }
+            else { const w = document.getElementById('team-chat-window'); if (w && typeof bringToFront === 'function') bringToFront(w); }
+            return;
+        }
+        _ensureChatStyles();
+        const me = _currentUser();
+        _chatMinimized = false;
+        _chatTab = 'group';
+
+        const win = document.createElement('div');
+        win.id = 'team-chat-window';
+        win.className = 'tool-window';
+        win.style.cssText = 'width:520px;height:460px;display:flex;flex-direction:column;position:fixed;z-index:9000;';
+
+        const vw = document.documentElement.clientWidth;
+        const vh = document.documentElement.clientHeight;
+        win.style.left = Math.max(50, (vw - 520) / 2) + 'px';
+        win.style.top  = Math.max(50, (vh - 460) / 2) + 'px';
+
+        win.innerHTML = `
+            <div class="tool-window-header">
+                <div class="tool-window-title">
+                    <i class="fas fa-comments"></i>
+                    <span>Team Chat</span>
+                </div>
+                <div class="tool-window-controls">
+                    <button class="tool-window-btn" title="Minimize" onclick="_minimizeChatWindow()"><i class="fas fa-minus"></i></button>
+                    <button class="tool-window-btn" title="Close" onclick="_closeTeamChat()"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="chat-layout" style="flex:1;min-height:0;">
+                <div class="chat-sidebar" id="chat-sidebar"></div>
+                <div class="chat-main">
+                    <div class="chat-header-bar" id="chat-header-bar"></div>
+                    <div class="chat-messages-area" id="chat-msgs-area"></div>
+                    <div class="chat-input-area">
+                        <textarea id="chat-input-box" rows="1" placeholder="Type a message\u2026 (Enter to send, Shift+Enter for newline)" onkeydown="_chatInputKeydown(event)"></textarea>
+                        <button class="chat-send-btn" onclick="_chatSendMessage()" title="Send"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="resize-handle resize-handle-n"></div>
+            <div class="resize-handle resize-handle-s"></div>
+            <div class="resize-handle resize-handle-e"></div>
+            <div class="resize-handle resize-handle-w"></div>
+            <div class="resize-handle resize-handle-nw"></div>
+            <div class="resize-handle resize-handle-ne"></div>
+            <div class="resize-handle resize-handle-sw"></div>
+            <div class="resize-handle resize-handle-se"></div>
+        `;
+
+        document.body.appendChild(win);
+
+        if (typeof makeDraggable === 'function') makeDraggable(win);
+        if (typeof makeResizable === 'function') makeResizable(win);
+        if (typeof bringToFront === 'function') { win.addEventListener('mousedown', () => bringToFront(win)); bringToFront(win); }
+
+        _renderSidebar(me);
+        _renderHeaderBar();
+        _renderMessages('group');
+
+        if (!_chatMessages['group']) {
+            _seedChatMessages().then(() => { _renderSidebar(me); _renderMessages(_chatTab); _markTabRead(_chatTab); });
+        } else {
+            _markTabRead('group');
+        }
+
+        _ensureBubble();
+    };
+
+    window._minimizeChatWindow = function() { _minimizeChat(); };
+    window._closeTeamChat = function() {
+        const win = document.getElementById('team-chat-window');
+        if (win) win.remove();
+        _chatMinimized = false;
+    };
+
+    // Show bubble on startup — poll until user session is available (up to ~10s)
+    let _bubbleInitTries = 0;
+    (function _initBubble() {
+        const me = _currentUser();
+        if (me && CHAT_USERS.includes(me)) {
+            _ensureBubble();
+            _chatBubble.style.display = 'flex';
+        } else if (++_bubbleInitTries < 40) {
+            setTimeout(_initBubble, 250);
+        }
+    })();
+
+})(); // end Team Chat IIFE
+
+
+// Override deleteQuoteApplication after all scripts have loaded so this wins over final-profile-fix
+document.addEventListener('DOMContentLoaded', function() {
+    window.deleteQuoteApplication = function(appId) {
+        if (!confirm('Are you sure you want to delete this quote application?')) return;
+
+        // Remove from localStorage
+        var allApps = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+        var app = allApps.find(function(a) { return a.id === appId; });
+        var policyId = app ? (app.leadId || '').replace('policy_', '') : null;
+        var updated = allApps.filter(function(a) { return a.id !== appId; });
+        localStorage.setItem('quote_applications', JSON.stringify(updated));
+
+        // Send DELETE to server (ignore 404 — server may already have it)
+        fetch('/api/quote-applications/' + appId, { method: 'DELETE' })
+            .catch(function() {});
+
+        // Refresh the renewals submissions container from server
+        if (policyId) {
+            var policyLeadId = 'policy_' + policyId;
+            var aliasId = 'application-submissions-container-' + policyLeadId;
+            var clientId = window._renewalContainerMap && window._renewalContainerMap[policyId];
+            var visibleContainer = clientId ? document.getElementById('application-submissions-container-' + clientId) : null;
+
+            // Ensure alias div exists inside visible container
+            if (visibleContainer && !document.getElementById(aliasId)) {
+                visibleContainer.innerHTML = '<div id="' + aliasId + '" style="width:100%;"></div>';
+            }
+
+            // Fetch fresh list from server
+            if (window.showApplicationSubmissions) {
+                window.showApplicationSubmissions(policyLeadId);
+            }
+        }
+    };
+});

@@ -69,15 +69,22 @@ function getSignatureForAgency(agency) {
 }
 
 // Helper function to get company information based on agency
-function getCompanyInfoForAgency(agency) {
-    console.log('🏢 Determining company info for agency:', agency);
-    if (agency && agency.toLowerCase().includes('united')) {
+function getCompanyInfoForAgency(agency, agent) {
+    console.log('🏢 Determining company info for agency:', agency, '| agent:', agent);
+    const isUIG = (agency && agency.toLowerCase().includes('united')) ||
+                  (agent && agent.toLowerCase() === 'maureen');
+    if (isUIG) {
         console.log('🔄 Using United Insurance Group company info');
         return {
             producer: 'United Insurance Group',
             email: 'Contact@uigagency.com',
             phone: '(330) 259-7438',
-            fax: '(330) 259-7439'
+            fax: '(330) 259-7439',
+            address1: '2888 Nationwide Pkwy',
+            address2: '',
+            city: 'Brunswick',
+            state: 'OH',
+            zip: '44212'
         };
     } else {
         console.log('🔄 Using Vanguard Insurance Group LLC company info');
@@ -85,7 +92,12 @@ function getCompanyInfoForAgency(agency) {
             producer: 'Vanguard Insurance Group LLC',
             email: 'contact@vigagency.com',
             phone: '(866) 628-9441',
-            fax: '(330) 779-1097'
+            fax: '(330) 779-1097',
+            address1: '2888 Nationwide Pkwy',
+            address2: '',
+            city: 'Brunswick',
+            state: 'OH',
+            zip: '44212'
         };
     }
 }
@@ -243,12 +255,20 @@ window.createRealACORDViewer = async function(policyId, policyData = null) {
             position: absolute;
             top: 10px;
             right: 15px;
-            background: none;
+            background: #0066cc;
             border: none;
-            font-size: 24px;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            line-height: 1;
             cursor: pointer;
             z-index: 1000;
-            color: #666;
+            color: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         `;
         closeBtn.onclick = () => modal.remove();
 
@@ -354,9 +374,6 @@ window.createRealACORDViewer = async function(policyId, policyData = null) {
                     <button onclick="realPrintCOI()" class="btn-secondary" style="background: white; color: #0066cc; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
                         <i class="fas fa-print"></i> Print
                     </button>
-                    <button onclick="backToPolicyView('${policyId}')" class="btn-secondary" style="background: rgba(255,255,255,0.1); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                        <i class="fas fa-arrow-left"></i> Back
-                    </button>
                 </div>
             </div>
 
@@ -455,18 +472,27 @@ async function loadRealPDF(policyId, policyData) {
 
             console.log('🔥 FORCE UPDATE: Policy data:', { policyNum, effDate, expDate });
 
-            // Update General Liability row (ABOVE auto liability)
-            if (glPolicyField) {
-                glPolicyField.value = policyNum;
-                console.log('✅ GL Policy Number field populated:', policyNum);
-            }
-            if (glEffField) {
-                glEffField.value = effDate;
-                console.log('✅ GL Effective Date field populated:', effDate);
-            }
-            if (glExpField) {
-                glExpField.value = expDate;
-                console.log('✅ GL Expiration Date field populated:', expDate);
+            // Update General Liability row (ABOVE auto liability) — only if GL coverage is present
+            const glAggCheck = policyData?.coverage?.['coverage-general-aggregate'] ||
+                               policyData?.coverage?.['General Aggregate'] ||
+                               policyData?.coverage?.['General Liability'] ||
+                               policyData?.coverage?.['General Liability BI'] || '';
+            const glPresent = !!glAggCheck && glAggCheck !== 'excluded';
+            if (glPresent) {
+                if (glPolicyField) {
+                    glPolicyField.value = policyNum;
+                    console.log('✅ GL Policy Number field populated:', policyNum);
+                }
+                if (glEffField) {
+                    glEffField.value = effDate;
+                    console.log('✅ GL Effective Date field populated:', effDate);
+                }
+                if (glExpField) {
+                    glExpField.value = expDate;
+                    console.log('✅ GL Expiration Date field populated:', expDate);
+                }
+            } else {
+                console.log('ℹ️ GL coverage not present — skipping GL row prefill');
             }
 
             // Update auto liability row
@@ -566,6 +592,27 @@ function createRealFormFields(policyId, policyData) {
     // Clear any existing fields
     overlay.innerHTML = '';
 
+    // Determine if GL coverage is present and not excluded
+    const glAggregateRaw = policyData?.coverage?.['coverage-general-aggregate'] ||
+                           policyData?.coverage?.['General Aggregate'] ||
+                           policyData?.coverage?.['General Liability'] ||
+                           policyData?.coverage?.['General Liability BI'] || '';
+    const hasGL = !!glAggregateRaw && glAggregateRaw !== 'excluded';
+    // Helper: parse GL occurrence and aggregate from BI field (e.g. "1000000/2000000")
+    const _glBIRaw = policyData?.coverage?.['General Liability BI'] || '';
+    const _glBIParts = _glBIRaw.replace(/[$,]/g,'').split('/');
+    const _glOcc = _glBIParts[0] ? parseFloat(_glBIParts[0]) : 0;
+    const _glAgg = _glBIParts[1] ? parseFloat(_glBIParts[1]) : (_glOcc ? _glOcc * 2 : 0);
+
+    // Pre-compute cargo and physical damage presence
+    const _cargoLimitRaw = policyData?.coverage?.cargo_limit || policyData?.coverage?.['Cargo Limit'] || '';
+    const hasCargoRow = !!_cargoLimitRaw && _cargoLimitRaw !== '0' && _cargoLimitRaw !== 'None';
+    const _compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
+    const _collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
+    const hasPhysDmg = _compDedRaw !== 'None' && _collDedRaw !== 'None' &&
+                       parseFloat(String(_compDedRaw).replace(/[$,]/g,'')) > 0 &&
+                       parseFloat(String(_collDedRaw).replace(/[$,]/g,'')) > 0;
+
     // EXACT field positions extracted from ACORD 25 fillable PDF (scaled at 1.3x)
     const fields = [
         // === DATE (top right) ===
@@ -574,33 +621,36 @@ function createRealFormFields(policyId, policyData) {
 
         // === PRODUCER SECTION (top left) ===
         { id: 'producer', x: 29, y: 172, width: 364, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency).producer },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).producer },
         { id: 'producerAddress1', x: 29, y: 187, width: 364, height: 16,
-          value: '2888 Nationwide Pkwy' },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).address1 },
         { id: 'producerAddress2', x: 29, y: 203, width: 364, height: 16,
-          value: '' },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).address2 },
         { id: 'producerCity', x: 29, y: 218, width: 281, height: 16,
-          value: 'Brunswick' },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).city },
         { id: 'producerState', x: 309, y: 218, width: 23, height: 16,
-          value: 'OH' },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).state },
         { id: 'producerZip', x: 333, y: 218, width: 60, height: 16,
-          value: '44242' },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).zip },
 
         // === CONTACT INFO (right side of producer) ===
         { id: 'contactName', x: 450, y: 156, width: 317, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency).producer },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).producer },
         { id: 'phone', x: 459, y: 172, width: 164, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency).phone },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).phone },
         { id: 'fax', x: 673, y: 172, width: 94, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency).fax },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).fax },
         { id: 'email', x: 450, y: 187, width: 317, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency).email },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).email },
 
         // === INSURED SECTION ===
         { id: 'insured', x: 94, y: 250, width: 299, height: 16,
-          value: policyData?.clientName || policyData?.insured?.['Name/Business Name'] || policyData?.insured?.['Primary Named Insured'] || '', bold: true },
+          value: policyData?.insuredName || policyData?.insured?.['Name/Business Name'] || policyData?.insured?.['Primary Named Insured'] || policyData?.clientName || '', bold: true },
         { id: 'insuredAddress1', x: 94, y: 265, width: 299, height: 16,
           value: (() => {
+            // Check separate Address field first (IVANS format), then combined Mailing Address
+            const streetOnly = policyData?.contact?.['Address'] || policyData?.contact?.['Street Address'] || '';
+            if (streetOnly) return streetOnly;
             const fullAddress = policyData?.address || policyData?.contact?.['Mailing Address'] || '';
             if (fullAddress && typeof fullAddress === 'string') {
               // Split address to extract street address only
@@ -616,7 +666,7 @@ function createRealFormFields(policyId, policyData) {
             // Get city, state, zip from separate fields in policy data
             const city = policyData?.city || policyData?.contact?.City || '';
             const state = policyData?.state || policyData?.contact?.State || '';
-            const zip = policyData?.zip || policyData?.zipCode || policyData?.contact?.['ZIP Code'] || '';
+            const zip = policyData?.zip || policyData?.zipCode || policyData?.contact?.['ZIP Code'] || policyData?.contact?.['Zip Code'] || policyData?.contact?.['zip'] || '';
 
             console.log('🏙️ Building insuredAddress2 from separate fields:');
             console.log('  - City:', city);
@@ -639,25 +689,30 @@ function createRealFormFields(policyId, policyData) {
 
         // === INSURER SECTION (companies A-F) ===
         { id: 'insurerA', x: 454, y: 218, width: 243, height: 16,
-          value: (policyData?.carrier && policyData.carrier !== '') ?
-                 (policyData.carrier === 'Progressive' ? 'Progressive Preferred Insurance Company' :
-                  policyData.carrier === 'GEICO' ? 'GEICO MARINE INSURANCE COMPANY' : policyData.carrier) :
-                 (policyData?.overview?.['Carrier'] && policyData.overview['Carrier'] !== '') ?
-                 (policyData.overview['Carrier'] === 'Progressive' ? 'Progressive Preferred Insurance Company' :
-                  policyData.overview['Carrier'] === 'GEICO' ? 'GEICO MARINE INSURANCE COMPANY' : policyData.overview['Carrier']) :
-                 'Progressive Preferred Insurance Company' },
+          value: (() => {
+            const raw = policyData?.carrier || policyData?.overview?.['Carrier'] || '';
+            const lc = raw.toLowerCase().replace(/\s+/g, '');
+            if (lc.startsWith('geico')) return 'GEICO';
+            if (lc.startsWith('progressive')) return 'Progressive';
+            if (lc.startsWith('northland')) return 'NORTHLAND INSURANCE COMPANY';
+            return raw;
+          })() },
         { id: 'insurerANaic', x: 707, y: 218, width: 60, height: 16,
-          value: (policyData?.carrier === 'Progressive' || policyData?.overview?.['Carrier'] === 'Progressive' ||
-                 (!policyData?.carrier && !policyData?.overview?.['Carrier'])) ? '24260' :
-                 (policyData?.carrier === 'GEICO' || policyData?.overview?.['Carrier'] === 'GEICO') ? '37923' : '' },
+          value: (() => {
+            const c = (policyData?.carrier || policyData?.overview?.['Carrier'] || '').toLowerCase().replace(/\s+/g, '');
+            if (c.startsWith('progressive')) return '24260';
+            if (c.startsWith('geico')) return '37923';
+            if (c.startsWith('northland')) return '524126';
+            return '';
+          })() },
 
         // === GENERAL LIABILITY CHECKBOXES ===
         { id: 'glCheck', x: 47, y: 390, width: 18, height: 16,
-          type: 'checkbox', checked: true },
+          type: 'checkbox', checked: hasGL },
         { id: 'glClaimsMade', x: 65, y: 406, width: 20, height: 16,
           type: 'checkbox' },
         { id: 'glOccurrence', x: 150, y: 406, width: 20, height: 16,
-          type: 'checkbox', checked: true },
+          type: 'checkbox', checked: hasGL },
         { id: 'glOtherCov1', x: 47, y: 421, width: 18, height: 16,
           type: 'checkbox' },
         { id: 'glOtherCov2', x: 47, y: 437, width: 18, height: 16,
@@ -665,7 +720,7 @@ function createRealFormFields(policyId, policyData) {
 
         // === AGGREGATE LIMIT CHECKBOXES ===
         { id: 'aggPolicy', x: 47, y: 468, width: 18, height: 16,
-          type: 'checkbox', checked: true },
+          type: 'checkbox', checked: hasGL },
         { id: 'aggProject', x: 103, y: 468, width: 20, height: 16,
           type: 'checkbox' },
         { id: 'aggLocation', x: 159, y: 468, width: 20, height: 16,
@@ -723,108 +778,51 @@ function createRealFormFields(policyId, policyData) {
         { id: 'wcExpDate', x: 491, y: 647, width: 61, height: 16,
           value: '' },
 
-        // === MIDDLE ROW (y: 702) - PHYSICAL DAMAGE COVERAGE ===
+        // === MIDDLE ROW (y: 702) - PHYSICAL DAMAGE COVERAGE (only when cargo also present) ===
+        // When no cargo, physical damage slides up to y:686 row (handled in ABOVE section)
         { id: 'otherInsurer', x: 23, y: 702, width: 23, height: 16,
-          value: (function() {
-              const compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-              const collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
-
-              // Check for 'None' values first
-              if (compDedRaw === 'None' || collDedRaw === 'None') return '';
-
-              const compDed = parseFloat(String(compDedRaw).replace(/[$,]/g, ''));
-              const collDed = parseFloat(String(collDedRaw).replace(/[$,]/g, ''));
-
-              return (compDed > 0 && collDed > 0) ? 'A' : '';
-          })() },
+          skip: !hasCargoRow || !hasPhysDmg,
+          value: (hasCargoRow && hasPhysDmg) ? 'A' : '' },
         { id: 'otherAddlInsd', x: 229, y: 702, width: 23, height: 16,
+          skip: !hasCargoRow || !hasPhysDmg,
           value: '' },
         { id: 'otherSubrWvd', x: 252, y: 702, width: 23, height: 16,
+          skip: !hasCargoRow || !hasPhysDmg,
           value: '' },
         { id: 'otherPolicyNum', x: 281, y: 702, width: 146, height: 16,
-          value: (function() {
-              const compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-              const collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
-
-              // Check for 'None' values first
-              if (compDedRaw === 'None' || collDedRaw === 'None') return '';
-
-              const compDed = parseFloat(String(compDedRaw).replace(/[$,]/g, ''));
-              const collDed = parseFloat(String(collDedRaw).replace(/[$,]/g, ''));
-
-              return (compDed > 0 && collDed > 0) ? (policyData?.policy_number || policyData?.policyNumber || '') : '';
-          })() },
+          skip: !hasCargoRow || !hasPhysDmg,
+          value: (hasCargoRow && hasPhysDmg) ? (policyData?.policy_number || policyData?.policyNumber || '') : '' },
         { id: 'otherEffDate', x: 430, y: 702, width: 61, height: 16,
-          value: (function() {
-              const compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-              const collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
-
-              // Check for 'None' values first
-              if (compDedRaw === 'None' || collDedRaw === 'None') return '';
-
-              const compDed = parseFloat(String(compDedRaw).replace(/[$,]/g, ''));
-              const collDed = parseFloat(String(collDedRaw).replace(/[$,]/g, ''));
-
-              return (compDed > 0 && collDed > 0) ? formatDateForACORD(policyData?.effective_date) : '';
-          })() },
+          skip: !hasCargoRow || !hasPhysDmg,
+          value: (hasCargoRow && hasPhysDmg) ? formatDateForACORD(policyData?.effective_date || policyData?.effectiveDate) : '' },
         { id: 'otherExpDate', x: 491, y: 702, width: 61, height: 16,
-          value: (function() {
-              const compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-              const collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
-
-              // Check for 'None' values first
-              if (compDedRaw === 'None' || collDedRaw === 'None') return '';
-
-              const compDed = parseFloat(String(compDedRaw).replace(/[$,]/g, ''));
-              const collDed = parseFloat(String(collDedRaw).replace(/[$,]/g, ''));
-
-              return (compDed > 0 && collDed > 0) ? formatDateForACORD(policyData?.expiration_date) : '';
-          })() },
+          skip: !hasCargoRow || !hasPhysDmg,
+          value: (hasCargoRow && hasPhysDmg) ? formatDateForACORD(policyData?.expiration_date || policyData?.expirationDate) : '' },
         { id: 'otherLimits', x: 552, y: 702, width: 83, height: 16,
-          value: (function() {
-              const compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-              const collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
-
-              // Check for 'None' values first
-              if (compDedRaw === 'None' || collDedRaw === 'None') return '';
-
-              const compDed = parseFloat(String(compDedRaw).replace(/[$,]/g, ''));
-              const collDed = parseFloat(String(collDedRaw).replace(/[$,]/g, ''));
-
-              return (compDed > 0 && collDed > 0) ? 'COMP & COLLISION' : '';
-          })() },
+          skip: !hasCargoRow || !hasPhysDmg,
+          value: (hasCargoRow && hasPhysDmg) ? 'COMP & COLLISION' : '' },
         { id: 'otherDescription', x: 52, y: 702, width: 173, height: 16,
+          skip: !hasCargoRow || !hasPhysDmg,
           value: (function() {
-              // Enhanced parsing to handle currency formats like "$2,500"
-              const compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-              const collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
-
-              // Check for 'None' values first
-              if (compDedRaw === 'None' || collDedRaw === 'None') return '';
-
-              const compDed = parseFloat(String(compDedRaw).replace(/[$,]/g, ''));
-              const collDed = parseFloat(String(collDedRaw).replace(/[$,]/g, ''));
-
-              console.log('🔧 PHYSICAL DAMAGE DEBUG: compDed =', compDed, 'collDed =', collDed, 'both > 0?', compDed > 0 && collDed > 0);
-
-              return (compDed > 0 && collDed > 0) ? 'PHYSICAL DAMAGE' : '';
+              console.log('🔧 PHYSICAL DAMAGE DEBUG: hasCargoRow =', hasCargoRow, 'hasPhysDmg =', hasPhysDmg);
+              return (hasCargoRow && hasPhysDmg) ? 'PHYSICAL DAMAGE' : '';
           })() },
         { id: 'glInsurer', x: 23, y: 437, width: 23, height: 16,
-          value: 'A' },
+          value: hasGL ? 'A' : '' },
         { id: 'glAddlInsd', x: 229, y: 437, width: 23, height: 16,
           value: '' },
         { id: 'glSubrWvd', x: 252, y: 437, width: 23, height: 16,
           value: '' },
         { id: 'glPolicyNum', x: 281, y: 437, width: 146, height: 16,
-          value: (policyData?.policyType !== 'commercial-auto') ? (policyData?.policyNumber || '') : '' },
+          value: (hasGL && policyData?.policyType !== 'commercial-auto') ? (policyData?.policyNumber || '') : '' },
         { id: 'glEffDate', x: 430, y: 437, width: 61, height: 16,
-          value: (policyData?.policyType !== 'commercial-auto' && policyData?.effectiveDate) ?
+          value: (hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.effectiveDate) ?
                  formatDateForACORD(policyData.effectiveDate) :
-                 ((policyData?.policyType !== 'commercial-auto' && policyData?.overview?.['Effective Date']) ? formatDateForACORD(policyData.overview['Effective Date']) : '') },
+                 ((hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.overview?.['Effective Date']) ? formatDateForACORD(policyData.overview['Effective Date']) : '') },
         { id: 'glExpDate', x: 491, y: 437, width: 61, height: 16,
-          value: (policyData?.policyType !== 'commercial-auto' && policyData?.expirationDate) ?
+          value: (hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.expirationDate) ?
                  formatDateForACORD(policyData.expirationDate) :
-                 ((policyData?.policyType !== 'commercial-auto' && policyData?.overview?.['Expiration Date']) ? formatDateForACORD(policyData.overview['Expiration Date']) : '') },
+                 ((hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.overview?.['Expiration Date']) ? formatDateForACORD(policyData.overview['Expiration Date']) : '') },
 
         // === AUTOMOBILE LIABILITY FIELDS ===
         { id: 'autoInsurer', x: 23, y: 530, width: 23, height: 16,
@@ -854,7 +852,12 @@ function createRealFormFields(policyId, policyData) {
 
         // === AUTO LIABILITY LIMITS (ALL MISSING FIELDS) ===
         { id: 'autoCombinedSingle', x: 684, y: 499, width: 83, height: 16,
-          value: policyData?.coverage?.['Liability Limits'] || '' },
+          value: (function() {
+              const raw = policyData?.coverage?.['Liability Limits'] || '';
+              if (!raw) return '';
+              const num = parseFloat(String(raw).replace(/[$,\s]/g, ''));
+              return isNaN(num) ? raw : `$${num.toLocaleString()}`;
+          })() },
         { id: 'autoBodilyInjuryPerson', x: 684, y: 515, width: 83, height: 16,
           value: '' },
         { id: 'autoBodilyInjuryAccident', x: 684, y: 530, width: 83, height: 16,
@@ -897,93 +900,88 @@ function createRealFormFields(policyId, policyData) {
           value: '' },
 
         // === OTHER POLICY LIMITS ===
+        // otherLimit1 (y:686): cargo deductible if cargo present, else phys damage deductible
         { id: 'otherLimit1', x: 684, y: 686, width: 83, height: 16,
+          skip: !hasCargoRow && !hasPhysDmg,
           value: (function() {
-              const cargoLimit = policyData?.coverage?.cargo_limit || policyData?.coverage?.['Cargo Limit'] || '';
-              const cargoDeductible = policyData?.coverage?.cargo_deductible || policyData?.coverage?.['Cargo Deductible'] || '';
-              return (cargoLimit && cargoLimit !== '0' && cargoLimit !== '' && cargoLimit !== 'None' && cargoDeductible && cargoDeductible !== 'None') ?
-                     `DED. $${cargoDeductible.toString().replace(/^\$/, '')}` : '';
-          })() },
-        { id: 'otherLimit2', x: 684, y: 702, width: 83, height: 16,
-          value: (function() {
-              const compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-              const collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
-
-              // Check for 'None' values first
-              if (compDedRaw === 'None' || collDedRaw === 'None') return '';
-
-              const compDed = parseFloat(String(compDedRaw).replace(/[$,]/g, ''));
-              const collDed = parseFloat(String(collDedRaw).replace(/[$,]/g, ''));
-
-              if (compDed > 0 && collDed > 0) {
-                  // Check if both deductibles are the same
-                  if (compDed === collDed) {
-                      return `DED. $${compDed} EACH`;
-                  } else {
-                      return `DED. $${compDed}/$${collDed}`;
+              if (hasCargoRow) {
+                  const cargoDeductible = policyData?.coverage?.cargo_deductible || policyData?.coverage?.['Cargo Deductible'] || '';
+                  if (cargoDeductible && cargoDeductible !== 'None') {
+                      const dedNum = parseFloat(cargoDeductible.toString().replace(/[$,]/g,''));
+                      return `DED. $${isNaN(dedNum) ? cargoDeductible : dedNum.toLocaleString()}`;
                   }
+                  return '';
+              }
+              if (hasPhysDmg) {
+                  const compDed = parseFloat(String(_compDedRaw).replace(/[$,]/g,''));
+                  const collDed = parseFloat(String(_collDedRaw).replace(/[$,]/g,''));
+                  return compDed === collDed
+                      ? `DED. $${compDed.toLocaleString()} EACH`
+                      : `DED. $${compDed.toLocaleString()}/$${collDed.toLocaleString()}`;
               }
               return '';
+          })() },
+        // otherLimit2 (y:702): phys damage deductible only when cargo also occupies y:686
+        { id: 'otherLimit2', x: 684, y: 702, width: 83, height: 16,
+          skip: !hasCargoRow || !hasPhysDmg,
+          value: (function() {
+              if (!hasCargoRow || !hasPhysDmg) return '';
+              const compDed = parseFloat(String(_compDedRaw).replace(/[$,]/g,''));
+              const collDed = parseFloat(String(_collDedRaw).replace(/[$,]/g,''));
+              return compDed === collDed
+                  ? `DED. $${compDed.toLocaleString()} EACH`
+                  : `DED. $${compDed.toLocaleString()}/$${collDed.toLocaleString()}`;
           })() },
         { id: 'otherLimit3', x: 684, y: 718, width: 83, height: 16,
           value: '' },
 
-        // === ADDITIONAL TEXT BOXES ABOVE THE HORIZONTAL ROW (y: 686) - MOTOR TRUCK CARGO ===
+        // === FIRST "OTHER" ROW (y: 686) ===
+        // Shows Motor Truck Cargo if present; otherwise slides Physical Damage up here.
         { id: 'otherInsurerAbove', x: 23, y: 686, width: 23, height: 16,
-          value: 'A' },
+          skip: !hasCargoRow && !hasPhysDmg,
+          value: (hasCargoRow || hasPhysDmg) ? 'A' : '' },
         { id: 'otherDescriptionAbove', x: 52, y: 686, width: 173, height: 16,
-          value: (function() {
-              const cargoLimit = policyData?.coverage?.cargo_limit || policyData?.coverage?.['Cargo Limit'] || '';
-              // Show cargo if exists, otherwise show primary policy type
-              if (cargoLimit && cargoLimit !== '0' && cargoLimit !== '' && cargoLimit !== 'None') {
-                  return 'MOTOR TRUCK CARGO';
-              }
-              // Return primary policy description based on policy type
-              const policyType = policyData?.type || policyData?.policyType || '';
-              if (policyType.includes('auto') || policyType.includes('commercial')) {
-                  return 'COMMERCIAL AUTO LIABILITY';
-              }
-              return 'GENERAL LIABILITY';
-          })() },
+          skip: !hasCargoRow && !hasPhysDmg,
+          value: hasCargoRow ? 'MOTOR TRUCK CARGO' : (hasPhysDmg ? 'PHYSICAL DAMAGE' : '') },
         { id: 'otherAddlInsdAbove', x: 229, y: 686, width: 23, height: 16,
+          skip: !hasCargoRow && !hasPhysDmg,
           value: '' },
         { id: 'otherSubrWvdAbove', x: 252, y: 686, width: 23, height: 16,
+          skip: !hasCargoRow && !hasPhysDmg,
           value: '' },
         { id: 'otherPolicyNumAbove', x: 281, y: 686, width: 146, height: 16,
+          skip: !hasCargoRow && !hasPhysDmg,
           value: (function() {
+              if (!hasCargoRow && !hasPhysDmg) return '';
               const policyNum = policyData?.policy_number || policyData?.policyNumber || '';
               console.log('🔥 TOP ROW DEBUG: Policy Number =', policyNum);
               return policyNum;
           })() },
         { id: 'otherEffDateAbove', x: 430, y: 686, width: 61, height: 16,
+          skip: !hasCargoRow && !hasPhysDmg,
           value: (function() {
-              const effDate = formatDateForACORD(policyData?.effective_date) || '';
+              if (!hasCargoRow && !hasPhysDmg) return '';
+              const effDate = formatDateForACORD(policyData?.effective_date || policyData?.effectiveDate) || '';
               console.log('🔥 TOP ROW DEBUG: Effective Date =', effDate);
               return effDate;
           })() },
         { id: 'otherExpDateAbove', x: 491, y: 686, width: 61, height: 16,
+          skip: !hasCargoRow && !hasPhysDmg,
           value: (function() {
-              const expDate = formatDateForACORD(policyData?.expiration_date) || '';
+              if (!hasCargoRow && !hasPhysDmg) return '';
+              const expDate = formatDateForACORD(policyData?.expiration_date || policyData?.expirationDate) || '';
               console.log('🔥 TOP ROW DEBUG: Expiration Date =', expDate);
               return expDate;
           })() },
         { id: 'otherLimitsAbove', x: 552, y: 686, width: 83, height: 16,
+          skip: !hasCargoRow && !hasPhysDmg,
           value: (function() {
-              const cargoLimit = policyData?.coverage?.cargo_limit || policyData?.coverage?.['Cargo Limit'] || '';
-              // If there's cargo coverage, show it
-              if (cargoLimit && cargoLimit !== '0' && cargoLimit !== '' && cargoLimit !== 'None') {
-                  // Remove any existing $ sign to avoid double dollar signs
-                  const cleanLimit = cargoLimit.toString().replace(/^\$/, '');
-                  return `LIMIT $${cleanLimit}`;
+              if (!hasCargoRow && !hasPhysDmg) return '';
+              if (hasCargoRow) {
+                  const limitNum = parseFloat(_cargoLimitRaw.toString().replace(/[$,]/g,''));
+                  return `LIMIT $${isNaN(limitNum) ? _cargoLimitRaw : limitNum.toLocaleString()}`;
               }
-              // Otherwise show primary liability limit
-              const liabilityLimit = policyData?.coverage?.liability_limits || policyData?.coverage?.['Liability Limits'] || '';
-              if (liabilityLimit) {
-                  // Remove any existing $ sign and CSL text to avoid duplicates
-                  const cleanLiabilityLimit = liabilityLimit.toString().replace(/^\$/, '').replace(/\s*CSL\s*/i, '');
-                  return `$${cleanLiabilityLimit}`;
-              }
-              return '';
+              return 'COMP & COLLISION';
           })() },
 
         // === LAST ROW (y: 718) — Trailer Interchange if present, else Non-Owned Trailer ===
@@ -1064,21 +1062,43 @@ function createRealFormFields(policyId, policyData) {
 
         // === GENERAL LIABILITY LIMITS ===
         { id: 'eachOccurrence', x: 684, y: 390, width: 83, height: 16,
-          value: (policyData?.coverage?.liability_limits || policyData?.coverage?.['Liability Limits'] || '1,000,000').replace(/\s*CSL\s*/i, '').replace(/^\$/, '') },
+          value: hasGL ? (() => {
+              if (_glOcc > 0) return _glOcc.toLocaleString();
+              const raw = parseFloat((policyData?.coverage?.['Liability Limits'] || policyData?.coverage?.liability_limits || '1000000').toString().replace(/[$,\s]/g,'').replace(/CSL/i,''));
+              return isNaN(raw) ? '1,000,000' : raw.toLocaleString();
+          })() : '' },
         { id: 'damageRented', x: 684, y: 406, width: 83, height: 16,
-          value: '100,000' },
+          value: hasGL ? '100,000' : '' },
         { id: 'medExp', x: 684, y: 421, width: 83, height: 16,
           value: (function() {
+              if (!hasGL) return '';
               const medicalValue = policyData?.coverage?.medical_payments || policyData?.coverage?.['Medical Payments'] || '5,000';
               console.log('💊 Medical Payments value:', medicalValue, 'from coverage:', policyData?.coverage);
               return medicalValue;
           })() },
         { id: 'personalAdv', x: 684, y: 437, width: 83, height: 16,
-          value: (policyData?.coverage?.liability_limits || policyData?.coverage?.['Liability Limits'] || '1,000,000').replace(/\s*CSL\s*/i, '').replace(/^\$/, '') },
+          value: hasGL ? (() => {
+              if (_glOcc > 0) return _glOcc.toLocaleString();
+              const raw = parseFloat((policyData?.coverage?.['Liability Limits'] || policyData?.coverage?.liability_limits || '1000000').toString().replace(/[$,\s]/g,'').replace(/CSL/i,''));
+              return isNaN(raw) ? '1,000,000' : raw.toLocaleString();
+          })() : '' },
         { id: 'generalAgg', x: 684, y: 452, width: 83, height: 16,
-          value: policyData?.coverage?.general_aggregate || policyData?.coverage?.['General Aggregate'] || '2,000,000' },
+          value: hasGL ? (() => {
+              if (_glAgg > 0) return _glAgg.toLocaleString();
+              const raw = parseFloat((policyData?.coverage?.['General Aggregate'] || policyData?.coverage?.general_aggregate || '2000000').toString().replace(/[$,]/g,''));
+              return isNaN(raw) ? '2,000,000' : raw.toLocaleString();
+          })() : '' },
         { id: 'productsOps', x: 684, y: 468, width: 83, height: 16,
-          value: policyData?.coverage?.general_aggregate || policyData?.coverage?.['General Aggregate'] || '2,000,000' },
+          value: hasGL ? (() => {
+              const prodOps = policyData?.coverage?.['Products/Completed Ops'] || '';
+              if (prodOps) {
+                  const raw = parseFloat(prodOps.toString().replace(/[$,]/g,''));
+                  if (!isNaN(raw)) return raw.toLocaleString();
+              }
+              if (_glAgg > 0) return _glAgg.toLocaleString();
+              const raw = parseFloat((policyData?.coverage?.['General Aggregate'] || '2000000').toString().replace(/[$,]/g,''));
+              return isNaN(raw) ? '2,000,000' : raw.toLocaleString();
+          })() : '' },
         { id: 'glOtherLimit', x: 684, y: 484, width: 83, height: 16,
           value: '' },
 
@@ -1107,6 +1127,7 @@ function createRealFormFields(policyId, policyData) {
 
     // Create each field
     fields.forEach(field => {
+        if (field.skip) return;
         let element;
 
         if (field.type === 'checkbox') {
@@ -1543,25 +1564,10 @@ window.updateCertificateHolderAddress = function(value) {
 
 // Back to policy view - Return to COI Manager
 window.backToPolicyView = function(policyId) {
-    console.log('Going back to COI Manager policies list');
-
-    // Call loadCOIView to return to the main COI Manager view with all policies
-    if (typeof loadCOIView === 'function') {
-        loadCOIView();
-        console.log('Returned to COI Manager');
-    } else {
-        // Fallback: Try to manually navigate to COI section
-        window.location.hash = '#coi';
-
-        // Additional fallback: Try to find and click COI Manager nav item
-        const coiNavItems = document.querySelectorAll('a[href="#coi"], .nav-link[onclick*="coi"]');
-        for (let navItem of coiNavItems) {
-            navItem.click();
-            console.log('Clicked COI nav item');
-            return;
-        }
-
-        console.log('Could not navigate back to COI Manager');
+    // Close the ACORD viewer modal — same behaviour as the × button
+    const modal = document.getElementById('acordViewerModal');
+    if (modal) {
+        modal.remove();
     }
 };
 

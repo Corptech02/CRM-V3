@@ -278,7 +278,15 @@ function showTabbedPolicyForm(isEditing = false) {
             }
             if (document.getElementById('overview-carrier')) {
                 console.log('Setting carrier to:', policyData.carrier);
-                document.getElementById('overview-carrier').value = policyData.carrier || '';
+                const _cs = document.getElementById('overview-carrier');
+                const _cv = policyData.carrier || '';
+                _cs.value = _cv;
+                if (_cv && _cs.value !== _cv) {
+                    // Case-insensitive match against existing options
+                    const _lc = _cv.toLowerCase();
+                    const _m = Array.from(_cs.options).find(o => o.value.toLowerCase() === _lc || o.text.toLowerCase() === _lc);
+                    if (_m) { _cs.value = _m.value; }
+                }
             }
             if (document.getElementById('overview-status')) {
                 // Handle case-insensitive status matching
@@ -593,6 +601,14 @@ function generateTabContent(tabId, policyType) {
                     <h3>Primary Contact</h3>
                     <div class="form-grid">
                         <div class="form-group">
+                            <label>Owner Name</label>
+                            <input type="text" class="form-control" id="contact-owner-name" placeholder="Named Insured / Owner">
+                        </div>
+                        <div class="form-group">
+                            <label>Date of Birth</label>
+                            <input type="date" class="form-control" id="contact-dob">
+                        </div>
+                        <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
                             <input type="tel" class="form-control" id="contact-phone">
                         </div>
@@ -675,12 +691,17 @@ function generateTabContent(tabId, policyType) {
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>General Aggregate</label>
+                                <label>General Liability</label>
                                 <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-general-aggregate-text" placeholder="e.g. $2,000,000" style="display: none;">
+                                <input type="text" class="form-control coverage-text-input" id="coverage-general-aggregate-text" placeholder="e.g. $1,000,000/$2,000,000" style="display: none;">
                                 <!-- Dropdown (default) -->
                                 <select class="form-control coverage-dropdown" id="coverage-general-aggregate" style="display: block;">
-                                    <option value="">Select Aggregate Limit</option>
+                                    <option value="">Select General Liability Limit</option>
+                                    <option value="excluded">No Coverage</option>
+                                    <option value="1000/2000">$1,000/$2,000</option>
+                                    <option value="500000/1000000">$500,000/$1,000,000</option>
+                                    <option value="1000000/1000000">$1,000,000/$1,000,000</option>
+                                    <option value="1000000/2000000">$1,000,000/$2,000,000</option>
                                     <option value="1000000">$1,000,000</option>
                                     <option value="2000000">$2,000,000</option>
                                     <option value="3000000">$3,000,000</option>
@@ -706,6 +727,11 @@ function generateTabContent(tabId, policyType) {
                                     <option value="1000">$1,000</option>
                                     <option value="2500">$2,500</option>
                                     <option value="5000">$5,000</option>
+                                    <option value="7500">$7,500</option>
+                                    <option value="10000">$10,000</option>
+                                    <option value="15000">$15,000</option>
+                                    <option value="25000">$25,000</option>
+                                    <option value="50000">$50,000</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -721,6 +747,9 @@ function generateTabContent(tabId, policyType) {
                                     <option value="2500">$2,500</option>
                                     <option value="5000">$5,000</option>
                                     <option value="10000">$10,000</option>
+                                    <option value="15000">$15,000</option>
+                                    <option value="25000">$25,000</option>
+                                    <option value="50000">$50,000</option>
                                 </select>
                             </div>
                         </div>
@@ -732,7 +761,7 @@ function generateTabContent(tabId, policyType) {
                                 <!-- Text input (hidden by default) -->
                                 <input type="text" class="form-control coverage-text-input" id="coverage-cargo-limit-text" placeholder="e.g. $100,000" style="display: none;">
                                 <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-cargo-limit" style="display: block;">
+                                <select class="form-control coverage-dropdown" id="coverage-cargo-limit" style="display: block;" onchange="handleCargoLimitChange(this)">
                                     <option value="">Select Cargo Limit</option>
                                     <option value="0">No Cargo Coverage</option>
                                     <option value="10000">$10,000</option>
@@ -757,7 +786,10 @@ function generateTabContent(tabId, policyType) {
                                     <option value="1000">$1,000</option>
                                     <option value="2500">$2,500</option>
                                     <option value="5000">$5,000</option>
+                                    <option value="7500">$7,500</option>
                                     <option value="10000">$10,000</option>
+                                    <option value="15000">$15,000</option>
+                                    <option value="20000">$20,000</option>
                                 </select>
                             </div>
                         </div>
@@ -793,7 +825,9 @@ function generateTabContent(tabId, policyType) {
                                     <option value="75000">$75,000 CSL</option>
                                     <option value="100000">$100,000 CSL</option>
                                     <option value="250/500">$250K/$500K</option>
+                                    <option value="300000">$300,000 CSL</option>
                                     <option value="500/1000">$500K/$1M</option>
+                                    <option value="500000">$500,000 CSL</option>
                                     <option value="750000">$750,000 CSL</option>
                                     <option value="1000000">$1,000,000 CSL</option>
                                 </select>
@@ -824,6 +858,9 @@ function generateTabContent(tabId, policyType) {
                                     <option value="0">No Coverage</option>
                                     <option value="30/60/25">$30K/$60K/$25K</option>
                                     <option value="100/300/100">$100K/$300K/$100K</option>
+                                    <option value="300000">$300,000 CSL</option>
+                                    <option value="500000">$500,000 CSL</option>
+                                    <option value="750000">$750,000 CSL</option>
                                     <option value="1000000">$1,000,000 CSL</option>
                                 </select>
                             </div>
@@ -1485,6 +1522,8 @@ async function savePolicy() {
         const contactTab = document.getElementById('contact-content');
         if (contactTab) {
             policyData.contact = {
+                'Owner Name': document.getElementById('contact-owner-name')?.value || '',
+                'Date of Birth': document.getElementById('contact-dob')?.value || '',
                 'Phone': document.getElementById('contact-phone')?.value || '',
                 'Email': document.getElementById('contact-email')?.value || '',
                 'Address': document.getElementById('contact-address')?.value || '',
@@ -1644,9 +1683,11 @@ async function savePolicy() {
         
         // Collect vehicle and trailer data
         policyData.vehicles = [];
-        
+
         // Collect vehicles
         const vehicleEntries = document.querySelectorAll('.vehicle-entry');
+        // If vehicles tab was never opened, the DOM has no entries — preserve existing data
+        const vehiclesTabRendered = !!document.getElementById('vehiclesList');
         vehicleEntries.forEach(entry => {
             const vehicle = {};
             const inputs = entry.querySelectorAll('input, select');
@@ -1679,12 +1720,12 @@ async function savePolicy() {
         trailerEntries.forEach(entry => {
             const trailer = {};
             const inputs = entry.querySelectorAll('input');
-            
+
             inputs.forEach(field => {
                 if (field.value) {
                     // Map placeholders to proper field names
                     let fieldName = field.placeholder || '';
-                    
+
                     if (fieldName.includes('Year')) fieldName = 'Year';
                     else if (fieldName.includes('Make')) fieldName = 'Make';
                     else if (fieldName.includes('Type')) fieldName = 'Trailer Type';
@@ -1692,17 +1733,23 @@ async function savePolicy() {
                     else if (fieldName.includes('Length')) fieldName = 'Length';
                     else if (fieldName.includes('Value')) fieldName = 'Value';
                     else if (fieldName.includes('Deductible')) fieldName = 'Deductible';
-                    
+
                     trailer[fieldName] = field.value;
                 }
             });
-            
+
             if (Object.keys(trailer).length > 0) {
                 trailer.Type = 'Trailer';
                 policyData.vehicles.push(trailer);
             }
         });
-        
+
+        // If the vehicles tab was never opened (no DOM entries), preserve existing vehicle/trailer data
+        if (!vehiclesTabRendered && policyData.vehicles.length === 0 && currentPolicyData.vehicles?.length > 0) {
+            policyData.vehicles = currentPolicyData.vehicles;
+            console.log('Vehicles tab not opened — preserving existing vehicles:', policyData.vehicles.length);
+        }
+
         // Collect drivers data
         policyData.drivers = [];
         const driverEntries = document.querySelectorAll('.driver-entry');
@@ -1718,7 +1765,13 @@ async function savePolicy() {
                 policyData.drivers.push(driver);
             }
         });
-        
+
+        // If drivers tab was never opened, preserve existing driver data
+        if (!document.getElementById('driversList') && policyData.drivers.length === 0 && currentPolicyData.drivers?.length > 0) {
+            policyData.drivers = currentPolicyData.drivers;
+            console.log('Drivers tab not opened — preserving existing drivers:', policyData.drivers.length);
+        }
+
         // Collect Additional Coverages checkboxes (they're in .checkbox-group, not .form-group)
         const additionalCoverageMap = {
             'coverage-hired': 'Hired Auto Physical Damage',
@@ -2156,7 +2209,14 @@ if (!document.getElementById('policy-modal-styles')) {
 // Function to populate form fields when editing
 function populatePolicyForm(policyData) {
     console.log('Populating form with policy data:', policyData);
-    
+
+    // Convert MM/DD/YYYY → YYYY-MM-DD for <input type="date">
+    function toISODate(str) {
+        if (!str) return '';
+        const m = String(str).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        return m ? `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}` : String(str);
+    }
+
     // Helper function to find field value from various possible keys
     function findFieldValue(data, possibleKeys) {
         for (const key of possibleKeys) {
@@ -2170,7 +2230,7 @@ function populatePolicyForm(policyData) {
     // Helper function to set field value
     function setFieldValue(field, value) {
         if (value === null || value === undefined) return;
-        
+
         if (field.type === 'checkbox') {
             if (Array.isArray(value)) {
                 const checkboxLabel = field.parentElement.textContent.trim();
@@ -2180,6 +2240,24 @@ function populatePolicyForm(policyData) {
             }
         } else if (field.type === 'radio') {
             field.checked = field.value === value;
+        } else if (field.tagName === 'SELECT') {
+            // Normalize IVANS-formatted strings (e.g. "$1,000,000 ($100/yr)") to plain numeric
+            let normalVal = String(value).trim();
+            normalVal = normalVal.replace(/\s*\(\$[\d,]+\/yr\)/gi, '').trim(); // strip ($X/yr) suffix
+            normalVal = normalVal.replace(/[$,\s]/g, '');                       // strip $, commas, spaces
+            // Try setting the normalized value
+            field.value = normalVal;
+            if (field.value !== normalVal && normalVal !== '') {
+                // Value not in any existing option — inject it dynamically so it can be selected
+                const opt = document.createElement('option');
+                opt.value = normalVal;
+                const parts = normalVal.split('/');
+                opt.textContent = parts.every(p => /^\d+$/.test(p))
+                    ? parts.map(p => '$' + parseInt(p).toLocaleString()).join('/')
+                    : normalVal;
+                field.appendChild(opt);
+                field.value = normalVal;
+            }
         } else {
             field.value = value;
         }
@@ -2188,16 +2266,57 @@ function populatePolicyForm(policyData) {
     // Iterate through all form fields and populate them
     document.querySelectorAll('.tab-content').forEach(tabContent => {
         const tabId = tabContent.id.replace('-content', '');
-        
+
         // Check for data in various locations
         const tabData = policyData[tabId] || policyData;
-        
+
+        // For coverage tab: create a normalized copy that fixes IVANS key mismatches and compound values
+        let resolvedTabData = tabData;
+        if (tabId === 'coverage' && tabData && typeof tabData === 'object') {
+            resolvedTabData = Object.assign({}, tabData); // shallow copy — don't mutate real data
+
+            // Split "Motor Truck Cargo" ($limit/$deductible) into separate Cargo Limit + Cargo Deductible keys
+            const mtcRaw = resolvedTabData['Motor Truck Cargo'];
+            if (mtcRaw) {
+                const mtcClean = String(mtcRaw).replace(/\s*\(\$[\d,]+\/yr\)/gi, '').replace(/[$,\s]/g, '');
+                const [mtcLim, mtcDed] = mtcClean.split('/');
+                if (mtcLim && !resolvedTabData['Cargo Limit'])      resolvedTabData['Cargo Limit'] = mtcLim.trim();
+                if (mtcDed && !resolvedTabData['Cargo Deductible']) resolvedTabData['Cargo Deductible'] = mtcDed.trim();
+                delete resolvedTabData['Motor Truck Cargo'];
+            }
+
+            // Alias: "Uninsured Motorist CSL" / "Uninsured Motorist" → form label "Uninsured/Underinsured Motorist"
+            const umKey = resolvedTabData['Uninsured Motorist CSL'] ?? resolvedTabData['Uninsured Motorist'];
+            if (umKey !== undefined && resolvedTabData['Uninsured/Underinsured Motorist'] === undefined) {
+                resolvedTabData['Uninsured/Underinsured Motorist'] = umKey;
+            }
+
+            // Alias: IVANS codes that might still be stored as raw keys
+            const ivansCoverageAliases = {
+                'Combined Single Limit': 'Liability Limits',
+                'Comprehensive': 'Comprehensive Deductible',
+                'Collision': 'Collision Deductible',
+            };
+            Object.entries(ivansCoverageAliases).forEach(([alias, canonical]) => {
+                if (resolvedTabData[alias] !== undefined && resolvedTabData[canonical] === undefined) {
+                    resolvedTabData[canonical] = resolvedTabData[alias];
+                }
+            });
+
+            // Alias: if 'General Liability' (MTGL) is missing but 'General Liability BI' (GLCBI) exists,
+            // use the BI value to populate the coverage-general-aggregate dropdown
+            if (!resolvedTabData['General Liability'] && resolvedTabData['General Liability BI']) {
+                const glBiRaw = String(resolvedTabData['General Liability BI']).replace(/[$,\s]/g, '');
+                resolvedTabData['General Liability'] = glBiRaw;
+            }
+        }
+
         // Populate regular input fields
         tabContent.querySelectorAll('input, select, textarea').forEach(field => {
             const label = field.closest('.form-group')?.querySelector('label')?.textContent.replace(' *', '').replace(':', '').trim();
             const fieldId = field.id;
             const fieldName = field.name;
-            
+
             // Try multiple key variations
             const possibleKeys = [
                 label,
@@ -2217,14 +2336,14 @@ function populatePolicyForm(policyData) {
                 label?.replace('Operating Radius', 'operatingRadius'),
                 label?.replace('Vehicle Type', 'vehicleType')
             ].filter(Boolean);
-            
-            let value = findFieldValue(tabData, possibleKeys);
-            
+
+            let value = findFieldValue(resolvedTabData, possibleKeys);
+
             // Also check in the root policyData
-            if (!value) {
+            if (value === null || value === undefined) {
                 value = findFieldValue(policyData, possibleKeys);
             }
-            
+
             setFieldValue(field, value);
         });
     });
@@ -2233,70 +2352,85 @@ function populatePolicyForm(policyData) {
     if (policyData.vehicles && Array.isArray(policyData.vehicles)) {
         const vehiclesList = document.getElementById('vehiclesList');
         const trailersList = document.getElementById('trailersList');
-        
-        // Separate vehicles and trailers
-        const vehicles = policyData.vehicles.filter(v => v.Type !== 'Trailer');
-        const trailers = policyData.vehicles.filter(v => v.Type === 'Trailer');
-        
+
+        // Separate vehicles and trailers — check both capitalized and lowercase type keys
+        const isTrailer = v => (v.Type === 'Trailer' || v.type === 'Trailer' || v.type === 'trailer');
+        const vehicles = policyData.vehicles.filter(v => !isTrailer(v));
+        const trailers = policyData.vehicles.filter(v => isTrailer(v));
+
         // Populate vehicles
         if (vehiclesList && vehicles.length > 0) {
             vehiclesList.innerHTML = ''; // Clear existing
-            vehicles.forEach((vehicle, index) => {
+            vehicles.forEach((vehicle) => {
                 addVehicle();
-                // Populate the newly added vehicle fields
                 const vehicleEntry = vehiclesList.lastElementChild;
-                const inputs = vehicleEntry.querySelectorAll('input, select');
-                
-                // Map fields based on their placeholder
-                inputs.forEach((input) => {
-                    const placeholder = input.placeholder || '';
-                    
-                    if (placeholder.includes('Year') && vehicle.Year) {
-                        input.value = vehicle.Year;
-                    } else if (placeholder.includes('Make') && vehicle.Make) {
-                        input.value = vehicle.Make;
-                    } else if (placeholder.includes('Model') && vehicle.Model) {
-                        input.value = vehicle.Model;
-                    } else if (placeholder.includes('VIN') && vehicle.VIN) {
-                        input.value = vehicle.VIN;
-                    } else if (placeholder.includes('Value') && vehicle.Value) {
-                        input.value = vehicle.Value;
-                    } else if (placeholder.includes('Deductible') && vehicle.Deductible) {
-                        input.value = vehicle.Deductible;
-                    } else if (input.tagName === 'SELECT' && vehicle.Coverage) {
-                        input.value = vehicle.Coverage;
-                    }
-                });
+
+                // Get values from both capitalized (manual) and lowercase (IVANS) keys
+                const vYear  = vehicle.Year  || vehicle.year  || vehicle.modelYear  || '';
+                const vMake  = vehicle.Make  || vehicle.make  || '';
+                const vModel = vehicle.Model || vehicle.model || '';
+                const vVIN   = vehicle.VIN   || vehicle.vin   || vehicle.Vin || '';
+                const vValue = vehicle.Value || vehicle.value || '';
+                const vRadius = vehicle.Radius || vehicle.radius || vehicle.MileRadius || '';
+
+                // Prefer CSS class selectors (reliable across both addPolicyVehicle versions)
+                const yearEl   = vehicleEntry.querySelector('.vehicle-year');
+                const makeEl   = vehicleEntry.querySelector('.vehicle-make');
+                const modelEl  = vehicleEntry.querySelector('.vehicle-model');
+                const vinEl    = vehicleEntry.querySelector('.vehicle-vin');
+                const valueEl  = vehicleEntry.querySelector('.vehicle-value');
+                const radiusEl = vehicleEntry.querySelector('.vehicle-radius');
+
+                if (yearEl   && vYear)   yearEl.value   = vYear;
+                if (makeEl   && vMake)   makeEl.value   = vMake;
+                if (modelEl  && vModel)  modelEl.value  = vModel;
+                if (vinEl    && vVIN)    vinEl.value    = vVIN;
+                if (valueEl  && vValue)  valueEl.value  = vValue;
+                if (radiusEl && vRadius) radiusEl.value = vRadius;
+
+                // Fallback: placeholder-based matching for any remaining inputs
+                if (!yearEl || !makeEl || !modelEl || !vinEl) {
+                    vehicleEntry.querySelectorAll('input, select').forEach(input => {
+                        const ph = input.placeholder || '';
+                        if (!yearEl   && ph.includes('Year'))  { if (vYear)   input.value = vYear; }
+                        if (!makeEl   && ph.includes('Make'))  { if (vMake)   input.value = vMake; }
+                        if (!modelEl  && ph.includes('Model')) { if (vModel)  input.value = vModel; }
+                        if (!vinEl    && ph.includes('VIN'))   { if (vVIN)    input.value = vVIN; }
+                        if (!valueEl  && ph.includes('Value')) { if (vValue)  input.value = vValue; }
+                    });
+                }
             });
         }
-        
+
         // Populate trailers
         if (trailersList && trailers.length > 0) {
             trailersList.innerHTML = ''; // Clear existing
-            trailers.forEach((trailer, index) => {
+            trailers.forEach((trailer) => {
                 addTrailer();
-                // Populate the newly added trailer fields
                 const trailerEntry = trailersList.lastElementChild;
-                const inputs = trailerEntry.querySelectorAll('input');
-                
-                // Map fields based on their placeholder
+                const inputs = trailerEntry.querySelectorAll('input, select');
+
+                const tYear  = trailer.Year  || trailer.year  || '';
+                const tMake  = trailer.Make  || trailer.make  || '';
+                const tType  = trailer['Trailer Type'] || trailer.trailerType || trailer.type || trailer.Type || '';
+                const tVIN   = trailer.VIN   || trailer.vin   || '';
+                const tLen   = trailer.Length || trailer.length || '';
+                const tVal   = trailer.Value  || trailer.value  || '';
+
                 inputs.forEach((input) => {
                     const placeholder = input.placeholder || '';
-                    
-                    if (placeholder.includes('Year') && trailer.Year) {
-                        input.value = trailer.Year;
-                    } else if (placeholder.includes('Make') && trailer.Make) {
-                        input.value = trailer.Make;
-                    } else if (placeholder.includes('Type') && trailer['Trailer Type']) {
-                        input.value = trailer['Trailer Type'];
-                    } else if (placeholder.includes('VIN') && trailer.VIN) {
-                        input.value = trailer.VIN;
-                    } else if (placeholder.includes('Length') && trailer.Length) {
-                        input.value = trailer.Length;
-                    } else if (placeholder.includes('Value') && trailer.Value) {
-                        input.value = trailer.Value;
-                    } else if (placeholder.includes('Deductible') && trailer.Deductible) {
-                        input.value = trailer.Deductible;
+                    if (placeholder.includes('Year')) {
+                        if (tYear) input.value = tYear;
+                    } else if (placeholder.includes('Make')) {
+                        if (tMake) input.value = tMake;
+                    } else if (input.classList.contains('trailer-type') && tType) {
+                        input.value = tType;
+                    } else if (placeholder.includes('VIN')) {
+                        if (tVIN) input.value = tVIN;
+                    } else if (placeholder.includes('Length')) {
+                        if (tLen) input.value = tLen;
+                    } else if (placeholder.includes('Value')) {
+                        if (tVal) input.value = tVal;
                     }
                 });
             });
@@ -2315,12 +2449,32 @@ function populatePolicyForm(policyData) {
                 const inputs = driverEntry.querySelectorAll('input, select');
                 
                 // Map driver data to fields
-                if (inputs[0]) inputs[0].value = driver.name || driver['Full Name'] || driver.fullName || '';
-                if (inputs[1]) inputs[1].value = driver.dob || driver['Date of Birth'] || driver.dateOfBirth || '';
-                if (inputs[2]) inputs[2].value = driver.license || driver['License Number'] || driver.licenseNumber || '';
-                if (inputs[3]) inputs[3].value = driver.type || driver.driverType || driver['Driver Type'] || '';
-                if (inputs[4]) inputs[4].value = driver.experience || driver.yearsExperience || driver['Years Experience'] || '';
-                if (inputs[5]) inputs[5].value = driver.violations || driver.movingViolations || '';
+                const driverName = driver.name || driver['Full Name'] || driver.fullName || '';
+                const driverDOB  = toISODate(driver.dob || driver['Date of Birth'] || driver.dateOfBirth || '');
+                const driverLic  = driver.license || driver['License Number'] || driver.licenseNumber || '';
+                const driverType = driver.type || driver.driverType || driver['Driver Type'] || '';
+                const driverExp  = driver.experience || driver.yearsExperience || driver['Years Experience'] || '';
+                const driverViol = driver.violations || driver.movingViolations || '';
+
+                // Use placeholder matching (works regardless of which addPolicyDriver version created the entry)
+                let nameSet = false, dobSet = false, licSet = false, typeSet = false;
+                inputs.forEach(input => {
+                    if (input.type === 'checkbox') return;
+                    const ph = (input.placeholder || '').toLowerCase();
+                    if (!nameSet && (ph.includes('full name') || ph.includes('name'))) {
+                        input.value = driverName; nameSet = true;
+                    } else if (!dobSet && (input.type === 'date' || ph.includes('birth') || ph.includes('dob'))) {
+                        input.value = driverDOB; dobSet = true;
+                    } else if (!licSet && ph.includes('license')) {
+                        input.value = driverLic; licSet = true;
+                    } else if (!typeSet && input.tagName === 'SELECT') {
+                        if (driverType) input.value = driverType; typeSet = true;
+                    } else if (ph.includes('experience') || ph.includes('years')) {
+                        input.value = driverExp;
+                    } else if (ph.includes('violation')) {
+                        input.value = driverViol;
+                    }
+                });
                 
                 // Handle CDL fields if present
                 const cdlCheckbox = driverEntry.querySelector('input[type="checkbox"][id*="cdl"]');
@@ -2409,8 +2563,25 @@ function populatePolicyForm(policyData) {
                          policyData.policyType ? policyData.policyType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : '';
         document.getElementById('overview-policy-type').value = typeLabel;
     }
-    if (document.getElementById('overview-carrier')) {
-        document.getElementById('overview-carrier').value = policyData.carrier || '';
+    const carrierSelect = document.getElementById('overview-carrier');
+    if (carrierSelect) {
+        const carrierVal = policyData.carrier || '';
+        carrierSelect.value = carrierVal;
+        if (carrierVal && carrierSelect.value !== carrierVal) {
+            // Try case-insensitive match against existing options first
+            const lc = carrierVal.toLowerCase();
+            const match = Array.from(carrierSelect.options).find(o => o.value.toLowerCase() === lc || o.text.toLowerCase() === lc);
+            if (match) {
+                carrierSelect.value = match.value;
+            } else {
+                // Carrier not in dropdown — inject a new option so it can be selected
+                const opt = document.createElement('option');
+                opt.value = carrierVal;
+                opt.textContent = carrierVal;
+                carrierSelect.appendChild(opt);
+                carrierSelect.value = carrierVal;
+            }
+        }
     }
     if (document.getElementById('overview-status')) {
         const statusValue = policyData.policyStatus || policyData.status || 'Active';
@@ -2419,10 +2590,10 @@ function populatePolicyForm(policyData) {
         document.getElementById('overview-status').value = formattedStatus;
     }
     if (document.getElementById('overview-effective-date')) {
-        document.getElementById('overview-effective-date').value = policyData.effectiveDate || '';
+        document.getElementById('overview-effective-date').value = toISODate(policyData.effectiveDate || '');
     }
     if (document.getElementById('overview-expiration-date')) {
-        document.getElementById('overview-expiration-date').value = policyData.expirationDate || '';
+        document.getElementById('overview-expiration-date').value = toISODate(policyData.expirationDate || '');
     }
     if (document.getElementById('overview-premium')) {
         console.log('Setting premium field to:', policyData.premium);
@@ -2486,6 +2657,92 @@ function populatePolicyForm(policyData) {
     }
     
     console.log('Form population complete');
+
+    // Deferred re-apply: re-set overview fields 500ms later to handle any race conditions
+    // (e.g., other scripts that might clear fields after initial population)
+    const _pd = policyData;
+    setTimeout(() => {
+        const pnEl = document.getElementById('overview-policy-number');
+        if (pnEl && _pd.policyNumber) pnEl.value = _pd.policyNumber;
+
+        const carrierEl = document.getElementById('overview-carrier');
+        if (carrierEl && _pd.carrier) {
+            carrierEl.value = _pd.carrier;
+            if (carrierEl.value !== _pd.carrier) {
+                const opt = document.createElement('option');
+                opt.value = _pd.carrier; opt.textContent = _pd.carrier;
+                carrierEl.appendChild(opt);
+                carrierEl.value = _pd.carrier;
+            }
+        }
+
+        const statusEl = document.getElementById('overview-status');
+        if (statusEl && (_pd.policyStatus || _pd.status)) {
+            const sv = (_pd.policyStatus || _pd.status || '').replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            statusEl.value = sv;
+        }
+
+        const effEl = document.getElementById('overview-effective-date');
+        if (effEl && _pd.effectiveDate) effEl.value = toISODate(_pd.effectiveDate);
+
+        const expEl = document.getElementById('overview-expiration-date');
+        if (expEl && _pd.expirationDate) expEl.value = toISODate(_pd.expirationDate);
+
+        const premEl = document.getElementById('overview-premium');
+        if (premEl && (_pd.premium || _pd.monthlyPremium)) premEl.value = _pd.premium || _pd.monthlyPremium;
+
+        const dotEl = document.getElementById('overview-dot-number');
+        if (dotEl && (_pd.dotNumber || _pd['DOT Number'])) dotEl.value = _pd.dotNumber || _pd['DOT Number'];
+
+        const mcEl = document.getElementById('overview-mc-number');
+        if (mcEl && (_pd.mcNumber || _pd['MC Number'])) mcEl.value = _pd.mcNumber || _pd['MC Number'];
+
+        // Re-apply vehicle values using CSS class selectors
+        if (_pd.vehicles && Array.isArray(_pd.vehicles)) {
+            const vList = document.getElementById('vehiclesList');
+            if (vList) {
+                const entries = vList.querySelectorAll('.vehicle-entry');
+                const nonTrailers = _pd.vehicles.filter(v => !(v.Type === 'Trailer' || v.type === 'Trailer' || v.type === 'trailer'));
+                entries.forEach((entry, i) => {
+                    const v = nonTrailers[i];
+                    if (!v) return;
+                    const yr = v.Year || v.year || '';
+                    const mk = v.Make || v.make || '';
+                    const mo = v.Model || v.model || '';
+                    const vi = v.VIN || v.vin || '';
+                    const el = n => entry.querySelector(n);
+                    if (yr && el('.vehicle-year'))  el('.vehicle-year').value  = yr;
+                    if (mk && el('.vehicle-make'))  el('.vehicle-make').value  = mk;
+                    if (mo && el('.vehicle-model')) el('.vehicle-model').value = mo;
+                    if (vi && el('.vehicle-vin'))   el('.vehicle-vin').value   = vi;
+                });
+            }
+        }
+
+        // Re-apply driver values
+        if (_pd.drivers && Array.isArray(_pd.drivers)) {
+            const dList = document.getElementById('driversList');
+            if (dList) {
+                const entries = dList.querySelectorAll('.driver-entry');
+                entries.forEach((entry, i) => {
+                    const d = _pd.drivers[i];
+                    if (!d) return;
+                    const dn = d.name || d['Full Name'] || d.fullName || '';
+                    const dd = toISODate(d.dob || d['Date of Birth'] || d.dateOfBirth || '');
+                    const dl = d.license || d['License Number'] || d.licenseNumber || '';
+                    entry.querySelectorAll('input, select').forEach(input => {
+                        if (input.type === 'checkbox') return;
+                        const ph = (input.placeholder || '').toLowerCase();
+                        if (dn && (ph.includes('full name') || ph.includes('name'))) input.value = dn;
+                        else if (dd && (input.type === 'date' || ph.includes('birth'))) input.value = dd;
+                        else if (dl && ph.includes('license')) input.value = dl;
+                    });
+                });
+            }
+        }
+
+        console.log('✅ Deferred re-apply complete');
+    }, 500);
 }
 
 // Export policy-specific functions to global scope
@@ -2522,6 +2779,26 @@ window.toggleCoverageMode = function(mode) {
             select.style.display = 'block';
         });
         console.log('✅ Switched to dropdown mode');
+    }
+};
+
+// Handle cargo limit change — auto-exclude deductible when no cargo coverage
+window.handleCargoLimitChange = function(select) {
+    const isExcluded = select.value === '0' || select.value === '';
+    const deductSelect = document.getElementById('coverage-cargo-deduct');
+    const deductTextInput = document.getElementById('coverage-cargo-deduct-text');
+    const deductGroup = deductSelect ? deductSelect.closest('.form-group') : null;
+
+    if (deductGroup) {
+        if (isExcluded && select.value === '0') {
+            deductGroup.style.opacity = '0.4';
+            deductGroup.style.pointerEvents = 'none';
+            deductSelect.value = '';
+            if (deductTextInput) deductTextInput.value = '';
+        } else {
+            deductGroup.style.opacity = '';
+            deductGroup.style.pointerEvents = '';
+        }
     }
 };
 

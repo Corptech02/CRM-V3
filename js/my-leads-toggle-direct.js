@@ -1,7 +1,7 @@
 // My Leads Toggle - Direct Element Targeting
 console.log('🚀 Direct My Leads Toggle loading...');
 
-window.myLeadsOnlyActive = false;
+window.myLeadsOnlyActive = true;
 
 function getCurrentUser() {
     try {
@@ -17,109 +17,71 @@ function getCurrentUser() {
 }
 
 window.toggleMyLeadsFilter = function(enabled) {
-    console.log('🔄 DIRECT TOGGLE:', enabled ? 'ENABLED' : 'DISABLED');
-    window.myLeadsOnlyActive = enabled;
+    window.myLeadsOnlyActive = !!enabled;
+    const currentUser = getCurrentUser().toLowerCase();
+    console.log('🔄 MY LEADS FILTER:', enabled ? 'ON' : 'OFF', '| User:', currentUser);
 
-    const currentUser = getCurrentUser();
-    console.log('👤 Current user:', currentUser);
-
-    // Inject a style rule to force display:none with !important when class is applied
-    if (!document.getElementById('my-leads-hide-style')) {
-        const s = document.createElement('style');
-        s.id = 'my-leads-hide-style';
-        s.textContent = '.ml-hidden { display: none !important; }';
-        document.head.appendChild(s);
+    const tableBody = document.getElementById('leadsTableBody');
+    if (!tableBody) {
+        updateToggleButtonUI();
+        return;
     }
 
-    function hideRow(row) { row.classList.add('ml-hidden'); }
-    function showRow(row) { row.classList.remove('ml-hidden'); }
+    // Re-render the table using the cached leads — no server round-trip needed
+    // Fall back to localStorage if currentActiveLeads hasn't been set yet
+    const allLeads = window.currentActiveLeads ||
+        JSON.parse(localStorage.getItem('insurance_leads') || '[]').filter(l => !l.archived);
 
-    function isMySection(text) {
-        return text.includes(`${currentUser}'s Leads`) ||
-               text.toLowerCase().includes(`${currentUser.toLowerCase()}'s leads`);
-    }
-    function isSpecialSection(text) {
-        return text.includes('Unassigned') || text.includes('Closed') || text.includes('New Leads');
-    }
-    function isLeadsSectionText(text) {
-        return text.includes("'s Leads") || text.includes(" Leads");
-    }
-
-    // Get all table rows
-    const allRows = Array.from(document.querySelectorAll('tbody tr, table tr'));
-    console.log(`📋 Found ${allRows.length} total table rows`);
-
-    let hiddenCount = 0;
-    let shownCount = 0;
-    let currentSection = '';
-
-    allRows.forEach(row => {
-        // lead-divider rows — use data-agent or text to determine section
-        if (row.classList.contains('lead-divider')) {
-            const td = row.querySelector('td');
-            const headerText = td ? td.textContent : '';
-            if (isLeadsSectionText(headerText)) {
-                currentSection = headerText;
-                if (enabled) {
-                    if (isMySection(headerText) || isSpecialSection(headerText)) {
-                        showRow(row);
-                    } else {
-                        hideRow(row);
-                        hiddenCount++;
-                    }
-                } else {
-                    showRow(row);
-                }
-            }
-            return;
+    if (allLeads.length > 0 && typeof window.generateSimpleLeadRowsWithDividers === 'function') {
+        if (!enabled || !currentUser) {
+            // Filter OFF: show all leads
+            tableBody.innerHTML = window.generateSimpleLeadRowsWithDividers(allLeads);
+        } else {
+            // Filter ON: only this user's leads
+            const myLeads = allLeads.filter(lead =>
+                (lead.assignedTo || '').toLowerCase() === currentUser
+            );
+            console.log(`👤 Showing ${myLeads.length} of ${allLeads.length} leads for "${currentUser}"`);
+            tableBody.innerHTML = window.generateSimpleLeadRowsWithDividers(myLeads);
         }
 
-        // Other section header rows (colspan td with section name)
-        const colspanTd = row.querySelector('td[colspan]');
-        if (colspanTd) {
-            const headerText = colspanTd.textContent || '';
-            if (isLeadsSectionText(headerText)) {
-                currentSection = headerText;
-                if (enabled) {
-                    if (isMySection(headerText) || isSpecialSection(headerText)) {
-                        showRow(row);
-                    } else {
-                        hideRow(row);
-                        hiddenCount++;
-                    }
-                } else {
-                    showRow(row);
-                }
-                return;
-            }
+        // Re-apply visual enhancements after re-render
+        setTimeout(() => {
+            if (window.applyReachOutCompleteHighlighting) window.applyReachOutCompleteHighlighting();
+            if (window.forceAllHighlighting) window.forceAllHighlighting();
+        }, 50);
+
+    } else {
+        // Fallback: DOM show/hide using data-agent on checkboxes
+        if (!document.getElementById('my-leads-hide-style')) {
+            const s = document.createElement('style');
+            s.id = 'my-leads-hide-style';
+            s.textContent = '.ml-hidden { display: none !important; }';
+            document.head.appendChild(s);
         }
-
-        // Lead rows
-        const isLeadRow = row.hasAttribute('data-lead-id') ||
-                         row.classList.contains('timestamp-red') ||
-                         row.classList.contains('timestamp-yellow') ||
-                         row.classList.contains('timestamp-green') ||
-                         row.querySelector('input.lead-checkbox') != null;
-
-        if (isLeadRow) {
-            const leadName = row.getAttribute('data-lead-name') || 'Unknown';
-            const mine = isMySection(currentSection) || isSpecialSection(currentSection);
-            if (enabled) {
-                if (mine) { showRow(row); shownCount++; }
-                else { hideRow(row); hiddenCount++; }
+        tableBody.querySelectorAll('tr').forEach(row => {
+            if (!enabled) { row.classList.remove('ml-hidden'); return; }
+            if (row.classList.contains('lead-divider')) {
+                const agentCb = row.querySelector('input.agent-group-checkbox');
+                (agentCb && agentCb.dataset.agent === currentUser)
+                    ? row.classList.remove('ml-hidden')
+                    : row.classList.add('ml-hidden');
             } else {
-                showRow(row);
-                shownCount++;
+                const leadCb = row.querySelector('input.lead-checkbox');
+                if (leadCb) {
+                    (leadCb.dataset.agent === currentUser)
+                        ? row.classList.remove('ml-hidden')
+                        : row.classList.add('ml-hidden');
+                }
             }
-        }
-    });
+        });
+    }
 
-    console.log(`📊 ${enabled ? `Hidden ${hiddenCount}, shown ${shownCount}` : `Restored ${shownCount} items`}`);
-    updateToggleUI(enabled);
+    updateToggleButtonUI();
 };
 
 function updateToggleUI(enabled) {
-    updateToggleButtonUI();
+    updateToggleButtonUI(); // kept for backward compatibility
 }
 
 // Function to remove all toggle buttons - AGGRESSIVE REMOVAL
@@ -246,20 +208,8 @@ function insertToggle() {
     }, 100); // Close the setTimeout
 }
 
-// Setup toggle behavior for button-style toggle
+// Setup toggle behavior — just sync the UI state; onclick in HTML handles clicks
 function setupToggleBehavior() {
-    const toggleButton = document.getElementById('myLeadsToggle');
-    if (!toggleButton) return;
-
-    // Remove onclick and use addEventListener
-    toggleButton.removeAttribute('onclick');
-
-    toggleButton.addEventListener('click', function() {
-        window.myLeadsOnlyActive = !window.myLeadsOnlyActive;
-        window.toggleMyLeadsFilter(window.myLeadsOnlyActive);
-        updateToggleButtonUI();
-    });
-
     updateToggleButtonUI();
 }
 

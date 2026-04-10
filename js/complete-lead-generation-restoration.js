@@ -584,24 +584,24 @@ function getCompleteGenerateLeadsContent() {
                     </div>
                     <div class="form-actions" style="margin-top: 1rem;">
                         <div class="button-row">
-                            <button class="btn-primary" onclick="generateLeadsFromForm()" style="padding: 10px 24px; font-size: 1rem;">
+                            <button class="btn-primary" onclick="generateLeadsFromForm()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
                                 <i class="fas fa-magic"></i> Generate Leads Now
                             </button>
-                            <button class="btn-success" onclick="uploadToVicidialWithCriteria()" style="padding: 10px 24px; font-size: 1rem;">
+                            <button class="btn-success" onclick="uploadToVicidialWithCriteria()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
                                 <i class="fas fa-upload"></i> Upload to Vicidial
-                            </button>
-                            <button class="btn-info" onclick="openLeadSplitPopup()" style="padding: 10px 24px; font-size: 1rem;" id="leadSplitBtn">
-                                <i class="fas fa-cut"></i> Lead Split
                             </button>
                         </div>
                         <div class="button-row">
-                            <button class="btn-primary" onclick="sendEmailBlast()" style="padding: 10px 24px; font-size: 1rem;">
+                            <button class="btn-primary" onclick="sendEmailBlast()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
                                 <i class="fas fa-envelope"></i> Email Blast
                             </button>
-                            <button class="btn-warning" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem;">
+                            <button class="btn-primary" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
                                 <i class="fas fa-sms"></i> SMS Blast
                             </button>
-                            <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 20px;">
+                            <button class="btn-info" onclick="openLeadSplitPopup()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;" id="leadSplitBtn">
+                                <i class="fas fa-cut"></i> Lead Split
+                            </button>
+                            <button class="btn-secondary" onclick="resetGenerateForm()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
                                 <i class="fas fa-redo"></i> Reset Form
                             </button>
                         </div>
@@ -848,17 +848,26 @@ function getCompleteGenerateLeadsContent() {
                         </div>
                     </div>
                     <div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-                        <button class="btn-primary" onclick="generateCBLeads()" id="cb-generate-btn" style="padding: 10px 28px; font-size: 1rem;">
+                        <button class="btn-primary" onclick="generateCBLeads()" id="cb-generate-btn" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
                             <i class="fas fa-bolt"></i> Generate Leads
                         </button>
-                        <button class="btn-secondary" onclick="resetCBForm()" style="padding: 10px 20px;">
-                            <i class="fas fa-redo"></i> Reset
+                        <button class="btn-primary" onclick="sendEmailBlast()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
+                            <i class="fas fa-envelope"></i> Email Blast
                         </button>
-                        <button onclick="enrichAllCBLeads()" id="cb-enrich-btn" style="background:#0ea5e9;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:0.9rem;display:none;">
+                        <button class="btn-primary" onclick="sendSMSBlast()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
+                            <i class="fas fa-sms"></i> SMS Blast
+                        </button>
+                        <button class="btn-info" onclick="openLeadSplitPopup()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;" id="cb-leadSplitBtn">
+                            <i class="fas fa-cut"></i> Lead Split
+                        </button>
+                        <button onclick="enrichAllCBLeads()" id="cb-enrich-btn" style="background:#0ea5e9;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:1rem;display:none;transition:0.2s;">
                             <i class="fas fa-search"></i> Enrich Phones
                         </button>
-                        <button onclick="uploadCBLeadsToVicidial()" id="cb-vicidial-btn" style="background:#059669;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:0.9rem;display:none;">
+                        <button onclick="uploadCBLeadsToVicidial()" id="cb-vicidial-btn" style="background:#059669;color:white;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:1rem;display:none;transition:0.2s;">
                             <i class="fas fa-upload"></i> Upload to Vicidial
+                        </button>
+                        <button class="btn-secondary" onclick="resetCBForm()" style="padding: 10px 24px; font-size: 1rem; transition: 0.2s;">
+                            <i class="fas fa-redo"></i> Reset
                         </button>
                         <span id="cb-gen-status" style="font-size:0.85rem; color:#6b7280;"></span>
                     </div>
@@ -1242,6 +1251,90 @@ window.refreshCBSourceStatus = function() {
         .catch(function(){});
 };
 
+// Paginated lead table renderer — called after results load and on page navigation
+window.renderCBLeadsPage = function(page) {
+    var PAGE_SIZE = 50;
+    var allLeads = window._cbGeneratedLeads || [];
+    var totalPages = Math.max(1, Math.ceil(allLeads.length / PAGE_SIZE));
+    page = Math.max(0, Math.min(page, totalPages - 1));
+    window._cbLeadsPage = page;
+
+    var offset = page * PAGE_SIZE;
+    var slice = allLeads.slice(offset, offset + PAGE_SIZE);
+
+    var rows = slice.map(function(l, si) {
+        var i = offset + si;
+        var lines = (l.targetLines || []).slice(0, 3).join(', ');
+        var bg = si % 2 === 0 ? '#fff' : '#f9fafb';
+        var phoneCell = l.phone
+            ? '<span style="color:#059669;font-weight:600;">' + l.phone + '</span>'
+            : '<button onclick="enrichSingleCBLead(' + i + ', this)" title="Look up via Google Places" style="background:#0ea5e9;border:none;color:white;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:0.72rem;white-space:nowrap;"><i class="fas fa-search"></i> Find</button>';
+        var websiteCell = l.website
+            ? '<a href="' + l.website + '" target="_blank" rel="noopener" style="color:#3b82f6;font-size:0.75rem;word-break:break-all;" title="' + l.website + '">' + l.website.replace(/^https?:\/\/(www\.)?/,'').split('/')[0] + '</a>'
+            : '<span id="cb-web-' + i + '" style="color:#d1d5db;font-size:0.75rem;">—</span>';
+        var emailCell = l.email
+            ? '<a href="mailto:' + l.email + '" style="color:#7c3aed;font-size:0.75rem;">' + l.email + '</a>'
+            : '<span id="cb-email-' + i + '" style="color:#d1d5db;font-size:0.75rem;">—</span>';
+        return '<tr style="background:' + bg + ';border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'' + bg + '\'">' +
+            '<td style="padding:8px 10px;">' + cbPriorityBadge(l.priority) + '</td>' +
+            '<td style="padding:8px 10px;font-weight:600;font-size:0.85rem;">' + (l.businessName || '') + '</td>' +
+            '<td style="padding:8px 10px;font-size:0.82rem;color:#374151;">' + (l.city ? l.city + ', ' : '') + (l.state || '') + '</td>' +
+            '<td style="padding:8px 10px;font-size:0.82rem;"><span style="background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:10px;font-size:0.75rem;">' + (l.vertical || '') + '</span></td>' +
+            '<td style="padding:8px 10px;font-size:0.78rem;color:#6b7280;">' + (l.subVertical || '') + '</td>' +
+            '<td style="padding:8px 10px;font-size:0.78rem;color:#374151;">' + lines + '</td>' +
+            '<td id="cb-phone-' + i + '" style="padding:8px 10px;font-size:0.8rem;color:#374151;">' + phoneCell + '</td>' +
+            '<td id="cb-web-wrap-' + i + '" style="padding:8px 10px;max-width:140px;overflow:hidden;">' + websiteCell + '</td>' +
+            '<td id="cb-email-wrap-' + i + '" style="padding:8px 10px;max-width:160px;overflow:hidden;">' + emailCell + '</td>' +
+            '<td style="padding:8px 10px;font-size:0.75rem;color:#9ca3af;">' + (l.source || '') + '</td>' +
+            '</tr>';
+    }).join('');
+
+    var start = offset + 1;
+    var end = Math.min(offset + PAGE_SIZE, allLeads.length);
+    var prevDis = page === 0;
+    var nextDis = page >= totalPages - 1;
+    var paginationHtml = totalPages > 1
+        ? '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #e5e7eb;background:#f9fafb;border-radius:0 0 8px 8px;">' +
+          '<button onclick="window.renderCBLeadsPage(' + (page - 1) + ')" ' + (prevDis ? 'disabled ' : '') + 'style="padding:5px 14px;background:#1e3a5f;color:white;border:none;border-radius:6px;font-size:0.82rem;opacity:' + (prevDis ? '0.4' : '1') + ';cursor:' + (prevDis ? 'default' : 'pointer') + ';">&#8592; Prev</button>' +
+          '<span style="font-size:0.82rem;color:#374151;">Showing <strong>' + start.toLocaleString() + '–' + end.toLocaleString() + '</strong> of <strong>' + allLeads.length.toLocaleString() + '</strong> &nbsp;|&nbsp; Page <strong>' + (page + 1) + '</strong> of ' + totalPages + '</span>' +
+          '<button onclick="window.renderCBLeadsPage(' + (page + 1) + ')" ' + (nextDis ? 'disabled ' : '') + 'style="padding:5px 14px;background:#1e3a5f;color:white;border:none;border-radius:6px;font-size:0.82rem;opacity:' + (nextDis ? '0.4' : '1') + ';cursor:' + (nextDis ? 'default' : 'pointer') + ';">Next &#8594;</button>' +
+          '</div>'
+        : '';
+
+    // If table already exists, only swap tbody + pagination (fast, no full rebuild)
+    var tbody = document.getElementById('cb-leads-tbody');
+    if (tbody) {
+        tbody.innerHTML = rows;
+        var pEl = document.getElementById('cb-leads-pagination');
+        if (pEl) pEl.innerHTML = paginationHtml;
+        var scrollEl = document.getElementById('cb-leads-scroll');
+        if (scrollEl) scrollEl.scrollTop = 0;
+        return;
+    }
+
+    // First render — build full table structure
+    var cont = document.getElementById('cbResultsContainer');
+    if (!cont) return;
+    cont.innerHTML =
+        '<div id="cb-leads-scroll" style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+        '<thead><tr style="position:sticky;top:0;z-index:1;">' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Priority</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Business Name</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Location</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Vertical</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Sub-Type</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Target Lines</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Phone</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Website</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Email</th>' +
+        '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Source</th>' +
+        '</tr></thead>' +
+        '<tbody id="cb-leads-tbody">' + rows + '</tbody></table>' +
+        '<div id="cb-leads-pagination">' + paginationHtml + '</div>' +
+        '</div>';
+};
+
 // Main generate — calls backend API
 window.generateCBLeads = function() {
     var btn = document.getElementById('cb-generate-btn');
@@ -1300,17 +1393,22 @@ window.generateCBLeads = function() {
         if (sub) sub.textContent = Math.round(pct) + '% complete';
     }, 400);
 
-    fetch('/api/commercial-leads/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(criteria)
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
+    // Process completed job results
+    var _handleGenResults = function(data) {
         clearInterval(pInterval);
         var bar = document.getElementById('cb-progress-bar');
         if (bar) bar.style.width = '100%';
-        if (data.error) throw new Error(data.error);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bolt"></i> Generate Leads'; }
+        if (data.error) {
+            var emsg = data.error.length < 200 ? data.error : 'Generation failed. Try narrowing your filters.';
+            if (statusEl) statusEl.textContent = '';
+            if (container) container.innerHTML =
+                '<div style="padding:1.5rem;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:1rem 0;">' +
+                '<div style="display:flex;align-items:center;gap:10px;color:#dc2626;font-weight:700;margin-bottom:6px;">' +
+                '<i class="fas fa-exclamation-circle"></i> Error Generating Leads</div>' +
+                '<div style="font-size:0.85rem;color:#7f1d1d;">' + emsg + '</div></div>';
+            return;
+        }
         var leads = data.leads || [];
         window._cbGeneratedLeads = leads;
 
@@ -1376,52 +1474,52 @@ window.generateCBLeads = function() {
             return;
         }
 
-        // Render results table
-        var rows = leads.map(function(l, i) {
-            var lines = (l.targetLines || []).slice(0, 3).join(', ');
-            var bg = i%2===0?'#fff':'#f9fafb';
-            var phoneCell = l.phone
-                ? '<span style="color:#059669;font-weight:600;">' + l.phone + '</span>'
-                : '<button onclick="enrichSingleCBLead(' + i + ', this)" title="Look up via Google Places" style="background:#0ea5e9;border:none;color:white;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:0.72rem;white-space:nowrap;"><i class="fas fa-search"></i> Find</button>';
-            var websiteCell = l.website
-                ? '<a href="' + l.website + '" target="_blank" rel="noopener" style="color:#3b82f6;font-size:0.75rem;word-break:break-all;" title="' + l.website + '">' + l.website.replace(/^https?:\/\/(www\.)?/,'').split('/')[0] + '</a>'
-                : '<span id="cb-web-' + i + '" style="color:#d1d5db;font-size:0.75rem;">—</span>';
-            var emailCell = l.email
-                ? '<a href="mailto:' + l.email + '" style="color:#7c3aed;font-size:0.75rem;">' + l.email + '</a>'
-                : '<span id="cb-email-' + i + '" style="color:#d1d5db;font-size:0.75rem;">—</span>';
-            return '<tr style="background:' + bg + ';border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'' + bg + '\'">' +
-                '<td style="padding:8px 10px;">' + cbPriorityBadge(l.priority) + '</td>' +
-                '<td style="padding:8px 10px;font-weight:600;font-size:0.85rem;">' + (l.businessName || '') + '</td>' +
-                '<td style="padding:8px 10px;font-size:0.82rem;color:#374151;">' + (l.city ? l.city + ', ' : '') + (l.state || '') + '</td>' +
-                '<td style="padding:8px 10px;font-size:0.82rem;"><span style="background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:10px;font-size:0.75rem;">' + (l.vertical || '') + '</span></td>' +
-                '<td style="padding:8px 10px;font-size:0.78rem;color:#6b7280;">' + (l.subVertical || '') + '</td>' +
-                '<td style="padding:8px 10px;font-size:0.78rem;color:#374151;">' + lines + '</td>' +
-                '<td id="cb-phone-' + i + '" style="padding:8px 10px;font-size:0.8rem;color:#374151;">' + phoneCell + '</td>' +
-                '<td id="cb-web-wrap-' + i + '" style="padding:8px 10px;max-width:140px;overflow:hidden;">' + websiteCell + '</td>' +
-                '<td id="cb-email-wrap-' + i + '" style="padding:8px 10px;max-width:160px;overflow:hidden;">' + emailCell + '</td>' +
-                '<td style="padding:8px 10px;font-size:0.75rem;color:#9ca3af;">' + (l.source || '') + '</td>' +
-                '</tr>';
-        }).join('');
+        // Render first page (clears old table so renderCBLeadsPage builds fresh)
+        document.getElementById('cb-leads-tbody') && (document.getElementById('cb-leads-tbody').id = '');
+        window.renderCBLeadsPage(0);
+    };
 
-        container.innerHTML = '<div style="overflow-x:auto;max-height:600px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;">' +
-            '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
-            '<thead><tr style="position:sticky;top:0;z-index:1;">' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Priority</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Business Name</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Location</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Vertical</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Sub-Type</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Target Lines</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Phone</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Website</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Email</th>' +
-            '<th style="padding:8px 10px;text-align:left;background:#1e3a5f;color:white;white-space:nowrap;">Source</th>' +
-            '</tr></thead>' +
-            '<tbody>' + rows + '</tbody></table></div>';
+    // Start async generate job and poll for results
+    fetch('/api/commercial-leads/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(criteria)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(startData) {
+        if (startData.error) throw new Error(startData.error);
+        // If backend returned jobId, poll for completion
+        if (startData.jobId) {
+            var jobId = startData.jobId;
+            var pollFails = 0;
+            var pollTimer = setInterval(function() {
+                fetch('/api/commercial-leads/sync-status/' + jobId)
+                .then(function(r){ return r.json(); })
+                .then(function(job) {
+                    if (job.status === 'done') {
+                        clearInterval(pollTimer);
+                        _handleGenResults(job);
+                    } else if (job.status === 'error') {
+                        clearInterval(pollTimer);
+                        _handleGenResults({ error: job.error || 'Generation failed' });
+                    }
+                    // else still running — keep polling
+                })
+                .catch(function() {
+                    if (++pollFails > 15) {
+                        clearInterval(pollTimer);
+                        _handleGenResults({ error: 'Lost connection while waiting for results. Please try again.' });
+                    }
+                });
+            }, 2000);
+        } else {
+            // Legacy synchronous response
+            _handleGenResults(startData);
+        }
     })
     .catch(function(e) {
         clearInterval(pInterval);
-        var msg = e.message && e.message.length < 200 ? e.message : 'Request timed out. Try narrowing your filters or reducing max results.';
+        var msg = e.message && e.message.length < 200 ? e.message : 'Request failed. Try narrowing your filters or reducing max results.';
         if (statusEl) statusEl.textContent = '';
         if (container) container.innerHTML =
             '<div style="padding:1.5rem;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:1rem 0;">' +
@@ -1429,8 +1527,6 @@ window.generateCBLeads = function() {
             '<i class="fas fa-exclamation-circle"></i> Error Generating Leads</div>' +
             '<div style="font-size:0.85rem;color:#7f1d1d;">' + msg + '</div>' +
             '</div>';
-    })
-    .finally(function() {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bolt"></i> Generate Leads'; }
     });
 };
@@ -1561,48 +1657,58 @@ window.enrichAllCBLeads = function() {
     var leads = window._cbGeneratedLeads || [];
     if (!leads.length) { alert('Generate leads first.'); return; }
     var btn = document.getElementById('cb-enrich-btn');
+    if (btn && btn.disabled) return; // already running
 
-    // Skip only leads that are FULLY enriched (phone + email + website all present)
-    // Leads with a phone but no email/website still need Google Places + site scrape
-    var needsEnrich = [], alreadyHas = 0;
+    var needsEnrich = [];
     leads.forEach(function(l, i) {
-        var hasPhone   = !!(l.phone   && l.phone.trim());
-        var hasEmail   = !!(l.email   && l.email.trim());
-        var hasWebsite = !!(l.website && l.website.trim());
-        if (hasPhone && hasEmail && hasWebsite) { alreadyHas++; }
-        else { needsEnrich.push({ idx: i, lead: l }); }
+        if (!((l.phone && l.phone.trim()) && (l.email && l.email.trim()) && (l.website && l.website.trim()))) {
+            needsEnrich.push({ idx: i, lead: l });
+        }
     });
 
     if (!needsEnrich.length) {
-        if (btn) btn.innerHTML = '<i class="fas fa-check"></i> All ' + leads.length + ' already enriched';
+        if (btn) { btn.style.background = '#0ea5e9'; btn.innerHTML = '<i class="fas fa-check"></i> All ' + leads.length + ' already enriched'; }
         return;
     }
 
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enriching ' + needsEnrich.length + '...'; }
+    var total = needsEnrich.length;
+    var completed = 0;
+    var found = 0;
+    var CONCURRENCY = 3;
 
-    var businesses = needsEnrich.map(function(item) {
-        return { name: item.lead.businessName, city: item.lead.city, state: item.lead.state, sourceId: item.lead.sourceId || null };
-    });
+    // Button fill-progress: grey base, blue fill sweeps left-to-right
+    function updateBtn() {
+        if (!btn) return;
+        var pct = total > 0 ? Math.round(completed / total * 100) : 0;
+        btn.disabled = true;
+        btn.style.background = 'linear-gradient(to right, #0284c7 ' + pct + '%, #94a3b8 ' + pct + '%)';
+        btn.style.color = 'white';
+        btn.style.transition = 'background 0.25s ease';
+        btn.innerHTML = completed + ' / ' + total + ' &nbsp;<span style="font-size:0.82em;opacity:0.9;">(' + pct + '%)</span>';
+    }
 
-    fetch('/api/commercial-leads/enrich', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businesses: businesses })
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-        var results = d.results || [];
-        var found = 0, fromCache = 0;
-        results.forEach(function(result, j) {
-            var item = needsEnrich[j];
-            if (!item) return;
+    function finishBtn() {
+        if (!btn) return;
+        btn.disabled = false;
+        btn.style.background = found === total ? '#059669' : '#0ea5e9';
+        btn.style.transition = '';
+        btn.innerHTML = '<i class="fas fa-check"></i> ' + found + '/' + total + ' found';
+    }
+
+    function processOne(item, done) {
+        fetch('/api/commercial-leads/enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ businesses: [{ name: item.lead.businessName, city: item.lead.city, state: item.lead.state }] })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var result = (d.results || [])[0] || {};
             if (result.phone) {
                 item.lead.phone = result.phone;
                 found++;
-                if (result.cached) fromCache++;
-                var color = result.cached ? '#3b82f6' : '#059669';
                 var phoneCell = document.getElementById('cb-phone-' + item.idx);
-                if (phoneCell) phoneCell.innerHTML = '<span style="color:' + color + ';font-weight:600;">' + result.phone + '</span>';
+                if (phoneCell) phoneCell.innerHTML = '<span style="color:#059669;font-weight:600;">' + result.phone + '</span>';
             }
             if (result.website) {
                 item.lead.website = result.website;
@@ -1614,17 +1720,35 @@ window.enrichAllCBLeads = function() {
                 var emailCell = document.getElementById('cb-email-wrap-' + item.idx);
                 if (emailCell) emailCell.innerHTML = '<a href="mailto:' + result.email + '" style="color:#7c3aed;font-size:0.75rem;">' + result.email + '</a>';
             }
-            if (result.streetAddress) {
-                item.lead.streetAddress = result.streetAddress;
-            }
+            if (result.streetAddress) item.lead.streetAddress = result.streetAddress;
+        })
+        .catch(function() {}) // skip failed lookups silently
+        .then(function() {    // always runs (finally equivalent)
+            completed++;
+            updateBtn();
+            done();
         });
-        var cacheNote = fromCache > 0 ? ' (' + fromCache + ' cached)' : '';
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> ' + found + '/' + needsEnrich.length + ' found' + cacheNote; }
-    })
-    .catch(function(e) {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Enrich Phones'; }
-        alert('Enrichment failed: ' + e.message);
-    });
+    }
+
+    // Concurrency-limited queue
+    var queue = needsEnrich.slice();
+    var active = 0;
+
+    function next() {
+        if (!queue.length && active === 0) { finishBtn(); return; }
+        while (active < CONCURRENCY && queue.length) {
+            active++;
+            (function(item) {
+                processOne(item, function() {
+                    active--;
+                    next();
+                });
+            })(queue.shift());
+        }
+    }
+
+    updateBtn();
+    next();
 };
 
 window.uploadCBLeadsToVicidial = function() {

@@ -231,6 +231,29 @@
                 showNotification(`Stage updated to "${newStage}"`, 'success');
             }
 
+            // When moving to closed: delete all scheduled callbacks for this lead
+            if (newStage === 'closed') {
+                try {
+                    // Delete from server — fetch all callbacks then delete any matching this lead
+                    const cbRes = await fetch('/api/callbacks').catch(() => null);
+                    if (cbRes && cbRes.ok) {
+                        const allCallbacks = await cbRes.json().catch(() => []);
+                        const toDelete = allCallbacks.filter(cb => String(cb.lead_id) === String(leadId) && !cb.completed);
+                        await Promise.all(toDelete.map(cb => fetch(`/api/callbacks/${cb.id}`, { method: 'DELETE' }).catch(() => {})));
+                        if (toDelete.length > 0) console.log(`🗑️ Deleted ${toDelete.length} callback(s) for closed lead ${leadId}`);
+                    }
+                    // Clear from localStorage
+                    const localCBs = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+                    if (localCBs[leadId]) { delete localCBs[leadId]; localStorage.setItem('scheduled_callbacks', JSON.stringify(localCBs)); }
+                    // Refresh display in open profile if present
+                    const cbContainer = document.getElementById(`scheduled-callbacks-${leadId}`);
+                    const cbSection = cbContainer && cbContainer.closest('.profile-section');
+                    if (cbSection) {
+                        cbSection.innerHTML = '<div style="padding:14px;background:#f3f4f6;border-radius:8px;border:1px solid #d1d5db;text-align:center;color:#9ca3af;font-size:13px;"><i class="fas fa-ban" style="margin-right:6px;"></i>Callbacks disabled — lead is closed</div>';
+                    }
+                } catch(e) { console.warn('Failed to delete callbacks on close:', e); }
+            }
+
             // Update TO DO text in profile and table immediately after stage change
             setTimeout(() => {
                 console.log('🔄 Updating TO DO text after stage change...');
@@ -606,4 +629,30 @@
             }
         }
     };
+    // One-time startup cleanup: delete all server callbacks for closed leads
+    (async function cleanupClosedLeadCallbacks() {
+        try {
+            const [leadsRes, callbacksRes] = await Promise.all([
+                fetch('/api/leads').catch(() => null),
+                fetch('/api/callbacks').catch(() => null)
+            ]);
+            if (!leadsRes || !leadsRes.ok || !callbacksRes || !callbacksRes.ok) return;
+            const leads = await leadsRes.json().catch(() => []);
+            const callbacks = await callbacksRes.json().catch(() => []);
+            const closedLeadIds = new Set(
+                leads.filter(l => l.stage === 'closed' || l.stage === 'Closed').map(l => String(l.id))
+            );
+            const toDelete = callbacks.filter(cb => closedLeadIds.has(String(cb.lead_id)) && !cb.completed);
+            if (toDelete.length === 0) return;
+            console.log(`🧹 Cleaning up ${toDelete.length} callback(s) for closed leads...`);
+            await Promise.all(toDelete.map(cb => fetch(`/api/callbacks/${cb.id}`, { method: 'DELETE' }).catch(() => {})));
+            // Clear from localStorage too
+            const localCBs = JSON.parse(localStorage.getItem('scheduled_callbacks') || '{}');
+            let changed = false;
+            closedLeadIds.forEach(lid => { if (localCBs[lid]) { delete localCBs[lid]; changed = true; } });
+            if (changed) localStorage.setItem('scheduled_callbacks', JSON.stringify(localCBs));
+            console.log(`✅ Cleaned up callbacks for ${closedLeadIds.size} closed lead(s)`);
+        } catch(e) { console.warn('Callback cleanup error:', e); }
+    })();
+
 })();

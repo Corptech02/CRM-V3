@@ -215,6 +215,16 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                 </div>
 
                 <!-- Callback Scheduler -->
+                ${lead.stage === 'closed' ? `
+                <div class="profile-section" style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #d1d5db;">
+                    <div style="display: flex; align-items: center; gap: 10px; color: #9ca3af;">
+                        <i class="fas fa-ban" style="font-size: 18px;"></i>
+                        <div>
+                            <div style="font-weight: 700; font-size: 14px;">Callbacks Disabled</div>
+                            <div style="font-size: 12px;">This lead is closed — scheduled callbacks are not available.</div>
+                        </div>
+                    </div>
+                </div>` : `
                 <div class="profile-section" style="background: #e0f2fe; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3 style="margin: 0; font-weight: bold;"><i class="fas fa-calendar-alt"></i> <span style="color: #0277bd;">Schedule Callback</span></h3>
@@ -258,7 +268,7 @@ protectedFunctions.createEnhancedProfile = function(lead) {
                             <!-- Scheduled callbacks will be displayed here -->
                         </div>
                     </div>
-                </div>
+                </div>`}
 
                 <!-- Reach Out Checklist -->
                 <div class="profile-section" style="background: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
@@ -1250,6 +1260,12 @@ protectedFunctions.createEmailComposer = function(lead, subject, attachments) {
         opacity: 1;
     `;
 
+    // Determine recipient based on lead state (NJ/NY → Helen, otherwise Amanda)
+    const leadState = (lead.state || '').trim().toUpperCase();
+    const recipientEmail = (leadState === 'NJ' || leadState === 'NY')
+        ? 'Helen_Feygin@rpsins.com'
+        : 'amanda_miller@rpsins.com';
+
     // Broker-focused email body template
     const agentName = lead.assignedTo || 'NULL';
     const agentEmail = getAgentEmail(lead.assignedTo);
@@ -1284,7 +1300,7 @@ Thank you,`;
                 <!-- To Field -->
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; color: #374151;">To:</label>
-                    <input type="email" id="email-to-field" value="amanda_miller@rpsins.com" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    <input type="email" id="email-to-field" value="${recipientEmail}" placeholder="recipient@example.com" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                 </div>
 
                 <!-- Agent CC Field -->
@@ -9927,6 +9943,14 @@ window.getReachOutStatus = function(lead) {
 
 // Callback Scheduler Functions
 window.scheduleCallback = async function(leadId) {
+    // Block scheduling for closed leads
+    const allLeads = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+    const lead = allLeads.find(l => String(l.id) === String(leadId));
+    if (lead && lead.stage === 'closed') {
+        showNotification('Cannot schedule callbacks for closed leads', 'error');
+        return;
+    }
+
     const dateInput = document.getElementById(`callback-date-${leadId}`);
     const timeInput = document.getElementById(`callback-time-${leadId}`);
     const notesInput = document.getElementById(`callback-notes-${leadId}`);

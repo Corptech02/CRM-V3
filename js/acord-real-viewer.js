@@ -358,14 +358,20 @@ function createRealFormFields(policyId, policyData) {
 
         // === INSURER SECTION (companies A-F) ===
         { id: 'insurerA', x: 454, y: 218, width: 243, height: 16,
-          value: (policyData?.carrier && policyData.carrier !== '') ?
-                 (policyData.carrier === 'Progressive' ? 'Progressive Preferred Insurance Company' : policyData.carrier) :
-                 (policyData?.overview?.['Carrier'] && policyData.overview['Carrier'] !== '') ?
-                 (policyData.overview['Carrier'] === 'Progressive' ? 'Progressive Preferred Insurance Company' : policyData.overview['Carrier']) :
-                 'Progressive Preferred Insurance Company' },
+          value: (() => {
+            const raw = policyData?.carrier || policyData?.overview?.['Carrier'] || '';
+            const lc = raw.toLowerCase().replace(/\s+/g, '');
+            if (lc.startsWith('progressive')) return 'Progressive Preferred Insurance Company';
+            if (lc.startsWith('northland')) return 'NORTHLAND INSURANCE COMPANY';
+            return raw || 'Progressive Preferred Insurance Company';
+          })() },
         { id: 'insurerANaic', x: 707, y: 218, width: 60, height: 16,
-          value: (policyData?.carrier === 'Progressive' || policyData?.overview?.['Carrier'] === 'Progressive' ||
-                 (!policyData?.carrier && !policyData?.overview?.['Carrier'])) ? '24260' : '' },
+          value: (() => {
+            const c = (policyData?.carrier || policyData?.overview?.['Carrier'] || '').toLowerCase().replace(/\s+/g, '');
+            if (c.startsWith('progressive') || !c) return '24260';
+            if (c.startsWith('northland')) return '524126';
+            return '';
+          })() },
 
         // === GENERAL LIABILITY CHECKBOXES ===
         { id: 'glCheck', x: 47, y: 390, width: 18, height: 16,

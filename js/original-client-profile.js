@@ -97,6 +97,16 @@ window.viewClientOriginal = async function(id) {
         totalPremium += numericPremium;
     });
 
+    // Resolve full name: prefer stored fields, then fall back to linked policy contact/driver data
+    const resolvedFullName = client.fullName || client.contactName || (() => {
+        for (const p of clientPolicies) {
+            const n = (p.contact && p.contact['Owner Name']) || p.clientName || p.insuredName ||
+                      (Array.isArray(p.drivers) && p.drivers[0] && p.drivers[0].name) || '';
+            if (n) return n;
+        }
+        return '';
+    })();
+
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 
@@ -199,7 +209,7 @@ window.viewClientOriginal = async function(id) {
                     <div style="display: grid; gap: 24px;">
                         <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
                             <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Full Name</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937; font-weight: 500;">${client.fullName || client.contactName || 'N/A'}</p>
+                            <p style="margin: 0; font-size: 16px; color: #1f2937; font-weight: 500;">${resolvedFullName || 'N/A'}</p>
                         </div>
 
                         <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
@@ -858,132 +868,65 @@ window.editClientPortalEmail = function(clientId, currentEmail) {
 
 // Function to create client portal password
 window.createClientPortalPassword = function(clientId) {
-    console.log('🔒 Creating client portal password for client:', clientId);
-
-    const newPassword = prompt('Enter new portal password (minimum 6 characters):');
-    if (newPassword === null) return; // User cancelled
-
-    if (!newPassword || newPassword.length < 6) {
-        alert('Password must be at least 6 characters long');
-        return;
-    }
-
-    try {
-        // Update localStorage first
-        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-        const clientIndex = clients.findIndex(c => c.id === clientId);
-
-        if (clientIndex !== -1) {
-            clients[clientIndex].portalPassword = newPassword;
-            // Also set password field for website integration
-            clients[clientIndex].password = newPassword;
-            localStorage.setItem('insurance_clients', JSON.stringify(clients));
-            console.log('✅ Client password created in localStorage');
-        }
-
-        // Update database via API - sync both portalPassword and password fields
-        fetch('/api/clients', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                id: clientId,
-                portalPassword: newPassword,
-                password: newPassword  // Add this for website login compatibility
-            })
-        }).then(response => {
-            if (response.ok) {
-                console.log('✅ Client password created in database');
-                if (window.showNotification) {
-                    window.showNotification('Portal password created successfully! Client can now login at vigagency.com', 'success');
-                }
-                // Refresh the client profile to show password is now set
-                window.viewClient(clientId);
-            } else {
-                console.warn('⚠️ Failed to create password in database');
-                if (window.showNotification) {
-                    window.showNotification('Password created locally only', 'warning');
-                }
-            }
-        }).catch(error => {
-            console.error('❌ Error creating password:', error);
-            if (window.showNotification) {
-                window.showNotification('Password created locally only', 'warning');
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ Error creating client password:', error);
-        if (window.showNotification) {
-            window.showNotification('Error creating password', 'error');
-        }
-    }
+    window.changeClientPortalPassword(clientId);
 };
 
 // Function to change client portal password
 window.changeClientPortalPassword = function(clientId) {
     console.log('🔄 Changing client portal password for client:', clientId);
 
-    const newPassword = prompt('Enter new portal password (minimum 6 characters):');
+    const newPassword = prompt('Enter new portal password (minimum 8 characters):');
     if (newPassword === null) return; // User cancelled
 
-    if (!newPassword || newPassword.length < 6) {
-        alert('Password must be at least 6 characters long');
+    if (!newPassword || newPassword.length < 8) {
+        alert('Password must be at least 8 characters long');
         return;
     }
 
-    try {
-        // Update localStorage
-        const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-        const clientIndex = clients.findIndex(c => c.id === clientId);
-
-        if (clientIndex !== -1) {
-            clients[clientIndex].portalPassword = newPassword;
-            // Also update password field for website integration
-            clients[clientIndex].password = newPassword;
-            localStorage.setItem('insurance_clients', JSON.stringify(clients));
-            console.log('✅ Client password changed in localStorage');
-        }
-
-        // Update database via API - sync both portalPassword and password fields
-        fetch('/api/clients', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                id: clientId,
-                portalPassword: newPassword,
-                password: newPassword  // Add this for website login compatibility
-            })
-        }).then(response => {
-            if (response.ok) {
-                console.log('✅ Client password changed in database');
-                if (window.showNotification) {
-                    window.showNotification('Portal password changed successfully! Updated on vigagency.com', 'success');
-                }
-                // Refresh the client profile to show updated status
-                window.viewClient(clientId);
-            } else {
-                console.warn('⚠️ Failed to change password in database');
-                if (window.showNotification) {
-                    window.showNotification('Password changed locally only', 'warning');
-                }
-            }
-        }).catch(error => {
-            console.error('❌ Error changing password:', error);
-            if (window.showNotification) {
-                window.showNotification('Password changed locally only', 'warning');
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ Error changing client password:', error);
-        if (window.showNotification) {
-            window.showNotification('Error changing password', 'error');
-        }
+    // Get client email — try API first, fall back to localStorage
+    function getClientEmail() {
+        return fetch('/api/clients/' + clientId)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null)
+            .then(client => {
+                if (client && (client.email || client.clientEmail)) return client.email || client.clientEmail;
+                const locals = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+                const local = locals.find(c => c.id === clientId);
+                return local ? (local.email || local.clientEmail || '') : '';
+            });
     }
+
+    getClientEmail().then(email => {
+        if (!email) {
+            if (window.showNotification) window.showNotification('Could not find client email', 'error');
+            return;
+        }
+
+        return fetch('/api/portal/crm/set-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientId: clientId, email: email, password: newPassword })
+        }).then(res => res.json().then(data => ({ ok: res.ok, data })));
+    }).then(result => {
+        if (!result) return;
+        if (result.ok) {
+            // Update localStorage to reflect new password
+            try {
+                const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+                const idx = clients.findIndex(c => c.id === clientId);
+                if (idx !== -1) { clients[idx].portalPassword = newPassword; localStorage.setItem('insurance_clients', JSON.stringify(clients)); }
+            } catch (e) { /* ignore */ }
+            console.log('✅ Portal password updated');
+            if (window.showNotification) window.showNotification('Portal password changed successfully!', 'success');
+            window.viewClient(clientId);
+        } else {
+            console.warn('⚠️ Failed:', result.data);
+            if (window.showNotification) window.showNotification(result.data.error || 'Failed to change password', 'error');
+        }
+    }).catch(error => {
+        console.error('❌ Error changing password:', error);
+        if (window.showNotification) window.showNotification('Error changing password', 'error');
+    });
 };
 
 // Function to toggle password visibility

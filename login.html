@@ -395,8 +395,11 @@
             window.location.href = '/';
         }
 
-        // Valid users (username and password are the same)
-        const validUsers = ['Maureen', 'Grant', 'Hunter', 'Carson'];
+        // Remember this login portal so expired sessions redirect back here
+        localStorage.setItem('vanguard_login_portal', 'vanguard');
+
+        // Maureen must use the United Insurance Group login portal
+        const validUsers = ['Grant', 'Hunter', 'Carson'];
 
         function togglePasswordVisibility() {
             const passwordInput = document.getElementById('password');

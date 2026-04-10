@@ -59,10 +59,11 @@ router.get('/emails', async (req, res) => {
             if (!responseSent) {
                 responseSent = true;
                 console.log('Email fetch timed out, returning empty inbox');
+                const acct = req.query.account === 'uig' ? 'contact@uigagency.com' : 'contact@vigagency.com';
                 res.json({
                     success: true,
                     emails: [],
-                    account: 'contact@vigagency.com',
+                    account: acct,
                     notice: 'Email server connection timed out. Using offline mode.'
                 });
             }
@@ -72,9 +73,15 @@ router.get('/emails', async (req, res) => {
         const Imap = require('imap');
         const { simpleParser } = require('mailparser');
 
+        // Support both VIG and UIG accounts
+        const account = req.query.account || 'vig';
+        const isUIG = account === 'uig';
+        const imapUser = isUIG ? 'contact@uigagency.com' : (process.env.OUTLOOK_EMAIL || 'contact@vigagency.com');
+        const imapPass = isUIG ? '@Jacob2007' : (process.env.OUTLOOK_PASSWORD || '25nickc124!');
+
         const imap = new Imap({
-            user: process.env.OUTLOOK_EMAIL || 'contact@vigagency.com',
-            password: process.env.OUTLOOK_PASSWORD || '25nickc124!',
+            user: imapUser,
+            password: imapPass,
             host: process.env.OUTLOOK_IMAP_HOST || 'imap.secureserver.net',
             port: parseInt(process.env.OUTLOOK_IMAP_PORT) || 993,
             tls: true,
@@ -110,7 +117,7 @@ router.get('/emails', async (req, res) => {
                         return res.json({
                             success: true,
                             emails: [],
-                            account: 'contact@vigagency.com',
+                            account: imapUser,
                             notice: 'Inbox is empty'
                         });
                     }
@@ -182,7 +189,7 @@ router.get('/emails', async (req, res) => {
                         res.json({
                             success: true,
                             emails: emails.reverse(), // Newest first
-                            account: 'contact@vigagency.com',
+                            account: imapUser,
                             totalCount: emails.length
                         });
                     }
@@ -210,7 +217,7 @@ router.get('/emails', async (req, res) => {
                 res.json({
                     success: false, // Mark as false when there's an actual error
                     emails: [],
-                    account: 'contact@vigagency.com',
+                    account: imapUser,
                     notice: notice,
                     error: err.message,
                     errorType: errorType
@@ -730,7 +737,12 @@ router.get('/test-connection', async (req, res) => {
  */
 router.post('/send-smtp', async (req, res) => {
     try {
-        const { to, cc, bcc, subject, body, attachments } = req.body;
+        const { to, cc, bcc, subject, body, attachments, account } = req.body;
+
+        // Support UIG account when requested (e.g. Maureen's emails)
+        const isUIG = account === 'uig';
+        const smtpUser = isUIG ? 'contact@uigagency.com' : (process.env.OUTLOOK_EMAIL || 'contact@vigagency.com');
+        const smtpPass = isUIG ? '@Jacob2007' : (process.env.OUTLOOK_PASSWORD || '25nickc124!');
 
         // Create SMTP transporter using Titan/GoDaddy credentials
         const transporter = nodemailer.createTransport({
@@ -738,8 +750,8 @@ router.post('/send-smtp', async (req, res) => {
             port: parseInt(process.env.OUTLOOK_SMTP_PORT) || 465,
             secure: true, // Use SSL
             auth: {
-                user: process.env.OUTLOOK_EMAIL || 'contact@vigagency.com',
-                pass: process.env.OUTLOOK_PASSWORD || '25nickc124!'
+                user: smtpUser,
+                pass: smtpPass
             },
             tls: {
                 rejectUnauthorized: false
@@ -748,7 +760,7 @@ router.post('/send-smtp', async (req, res) => {
 
         // Prepare email options
         const mailOptions = {
-            from: process.env.OUTLOOK_EMAIL || 'contact@vigagency.com',
+            from: smtpUser,
             to: to,
             cc: cc || undefined,
             bcc: bcc || undefined,

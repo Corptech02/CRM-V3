@@ -3,24 +3,103 @@
 
 console.log('✅ Policy Server Sync ENABLED with delete conflict fixes');
 
+// Sync any policies in localStorage that aren't on the server yet
+async function syncLocalPoliciesToServer(serverPolicies) {
+    try {
+        const localPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        const serverIds = new Set(serverPolicies.map(p => p.id || p.policyNumber));
+        const serverNumbers = new Set(serverPolicies.map(p => p.policyNumber).filter(Boolean));
+
+        const unsynced = localPolicies.filter(p => {
+            const id = p.id || p.policyNumber;
+            return id && !serverIds.has(id) && !serverNumbers.has(p.policyNumber);
+        });
+
+        if (unsynced.length === 0) return;
+        console.log(`🔄 Syncing ${unsynced.length} local-only policies to server...`);
+
+        for (const policy of unsynced) {
+            try {
+                const response = await fetch('/api/policies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(policy)
+                });
+                if (response.ok) {
+                    console.log(`✅ Synced policy ${policy.policyNumber || policy.id} to server`);
+                }
+            } catch (e) {
+                console.error('Error syncing policy:', e);
+            }
+        }
+    } catch (e) {
+        console.error('Error in syncLocalPoliciesToServer:', e);
+    }
+}
+
+// Sync any localStorage-only calendar events to the server
+async function syncLocalCalendarEventsToServer() {
+    try {
+        const localEvents = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
+        const localOnlyEvents = localEvents.filter(e => e.isLocalOnly);
+        if (localOnlyEvents.length === 0) return;
+
+        console.log(`🔄 Syncing ${localOnlyEvents.length} local-only calendar events to server...`);
+        const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+        const currentUser = sessionData.username || '';
+
+        for (const event of localOnlyEvents) {
+            try {
+                const response = await fetch('/api/calendar-events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: event.title,
+                        time: event.time || '09:00',
+                        description: event.type || '',
+                        date: event.date,
+                        userId: event.assignedAgent || currentUser
+                    })
+                });
+                if (response.ok) {
+                    console.log(`✅ Synced calendar event "${event.title}" to server`);
+                    // Mark as no longer local-only
+                    event.isLocalOnly = false;
+                }
+            } catch (e) {
+                console.error('Error syncing calendar event:', e);
+            }
+        }
+
+        // Update localStorage to remove isLocalOnly flags from synced events
+        localStorage.setItem('calendarEvents', JSON.stringify(localEvents));
+    } catch (e) {
+        console.error('Error in syncLocalCalendarEventsToServer:', e);
+    }
+}
+
 // Load policies from server on page load/refresh
 window.addEventListener('DOMContentLoaded', async () => {
     console.log('DOM loaded, fetching policies from server...');
 
     try {
-        const API_URL = 'http://162-220-14-239.nip.io:3001';
-
-        const response = await fetch(`${API_URL}/api/policies?includeInactive=true`);
+        const response = await fetch(`/api/policies?includeInactive=true`);
         if (response.ok) {
             const serverPolicies = await response.json();
 
             // Update localStorage with server data
             localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
             console.log(`Initial load: ${serverPolicies.length} policies from server`);
+
+            // Sync any localStorage-only policies to the server
+            await syncLocalPoliciesToServer(serverPolicies);
         }
     } catch (error) {
         console.error('Error loading initial policies:', error);
     }
+
+    // Also sync any localStorage-only calendar events
+    await syncLocalCalendarEventsToServer();
 });
 
 // Override the loadPoliciesView function to fetch from server
@@ -39,9 +118,7 @@ window.loadPoliciesView = async function() {
 
     try {
         // Fetch policies from server
-        const API_URL = 'http://162-220-14-239.nip.io:3001';
-
-        const response = await fetch(`${API_URL}/api/policies?includeInactive=true`);
+        const response = await fetch(`/api/policies?includeInactive=true`);
         if (response.ok) {
             const serverPolicies = await response.json();
 
@@ -193,13 +270,7 @@ setInterval(async () => {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (dashboardContent && dashboardContent.querySelector('.policies-view')) {
         try {
-            const API_URL = window.location.hostname.includes('nip.io')
-                ? `http://${window.location.hostname.split('.')[0]}:3001/api`
-                : window.location.hostname === 'localhost'
-                ? 'http://localhost:3001/api'
-                : 'http://162.220.14.239:3001/api';
-
-            const response = await fetch(`${API_URL}/api/policies?includeInactive=true`);
+            const response = await fetch(`/api/policies?includeInactive=true`);
             if (response.ok) {
                 const serverPolicies = await response.json();
 

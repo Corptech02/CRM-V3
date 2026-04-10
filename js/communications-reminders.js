@@ -29,11 +29,18 @@ class CommunicationsReminders {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // Detect current user for agent-based filtering
+        const _remSessionUser = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase();
+        const _isMaureen = _remSessionUser === 'maureen';
+
         // Get new policies from the last 7 days
         const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
         const sevenDaysAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
 
-        policies.forEach(policy => {
+        policies.filter(policy => {
+            if (_isMaureen) return (policy.agent || '').toLowerCase().includes('maureen');
+            return true;
+        }).forEach(policy => {
             const createdDate = new Date(policy.createdAt || policy.date);
             if (createdDate >= sevenDaysAgo && createdDate <= new Date()) {
                 // Use same client name hierarchy as other components (Named Insured first, then fallbacks)
@@ -72,7 +79,10 @@ class CommunicationsReminders {
         const viewDays = window.currentBirthdayViewDays || 30;
         const viewDaysFromNow = new Date(today.getTime() + (viewDays * 24 * 60 * 60 * 1000));
 
-        clients.forEach(client => {
+        clients.filter(client => {
+            if (_isMaureen) return (client.agent || '').toLowerCase().includes('maureen');
+            return true;
+        }).forEach(client => {
             if (client.dateOfBirth) {
                 const birthDate = new Date(client.dateOfBirth);
                 const thisYearBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
@@ -107,7 +117,10 @@ class CommunicationsReminders {
         // Also get birthdays from insurance policies' named insured data
         const insurancePolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
 
-        insurancePolicies.forEach(policy => {
+        insurancePolicies.filter(policy => {
+            if (_isMaureen) return (policy.agent || '').toLowerCase().includes('maureen');
+            return true;
+        }).forEach(policy => {
             // Check if policy has Date of Birth/Inception in insured data
             if (policy.insured && policy.insured['Date of Birth/Inception']) {
                 const dateOfBirth = policy.insured['Date of Birth/Inception'];
@@ -194,7 +207,10 @@ class CommunicationsReminders {
     async loadRecentClients() {
         try {
             console.log('📅 Loading recent clients from API...');
-            const response = await fetch('/api/clients/recent?days=7');
+            const _rcSessionUser = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase();
+            const _rcIsMaureen = _rcSessionUser === 'maureen';
+            const recentUrl = _rcIsMaureen ? '/api/clients/recent?days=7&agent=maureen' : '/api/clients/recent?days=7';
+            const response = await fetch(recentUrl);
 
             if (response.ok) {
                 const recentClients = await response.json();

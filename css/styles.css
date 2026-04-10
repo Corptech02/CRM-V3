@@ -960,10 +960,15 @@ body {
 /* Buttons */
 .btn-primary,
 .btn-secondary,
-.btn-success {
+.btn-success,
+.btn-info,
+.btn-warning {
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
+    font-size: 1rem;
     font-weight: 500;
+    line-height: 1.4;
+    box-sizing: border-box;
     border: none;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -4433,16 +4438,6 @@ input:checked + .slider:before {
 .btn-success {
     background-color: #10b981;
     color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
 }
 
 .btn-success:hover {
@@ -4454,16 +4449,6 @@ input:checked + .slider:before {
 .btn-info {
     background-color: #3b82f6;
     color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
 }
 
 .btn-info:hover {
@@ -5606,6 +5591,17 @@ input:checked + .slider:before {
 .notification-item.unread {
     background: #f0f9ff;
     border-left: 3px solid var(--primary-blue);
+}
+
+/* Chat Popup Notification */
+.chat-popup-notification {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10001;
+    transform: translateY(-100%);
+    animation: slideDown 0.3s ease-out forwards;
 }
 
 /* Popup Notification Styles */

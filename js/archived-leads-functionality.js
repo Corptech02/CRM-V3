@@ -26,9 +26,36 @@ function switchLeadTab(tabName) {
         activeButton.classList.add('active');
     }
 
-    // Show/hide tab content
-    document.getElementById('active-leads-tab').style.display = tabName === 'active' ? 'block' : 'none';
-    document.getElementById('archived-leads-tab').style.display = tabName === 'archived' ? 'block' : 'none';
+    // Show/hide tab content — use setProperty with !important to override any CSS rule
+    const activeTab = document.getElementById('active-leads-tab');
+    const archivedTab = document.getElementById('archived-leads-tab');
+
+    if (activeTab) {
+        if (tabName === 'active') {
+            activeTab.style.removeProperty('display');
+            activeTab.style.setProperty('display', 'flex', 'important');
+        } else {
+            activeTab.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    if (archivedTab) {
+        if (tabName === 'archived') {
+            archivedTab.style.removeProperty('display');
+            archivedTab.style.setProperty('display', 'flex', 'important');
+            archivedTab.style.setProperty('flex-direction', 'column', 'important');
+            archivedTab.style.setProperty('flex', '1', 'important');
+            archivedTab.style.setProperty('overflow', 'auto', 'important');
+        } else {
+            archivedTab.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    // Scroll back to top of the leads view
+    const leadsView = document.querySelector('.leads-view');
+    if (leadsView) leadsView.scrollTop = 0;
+    const pane = document.querySelector('.dashboard-content') || document.querySelector('.main-content');
+    if (pane) pane.scrollTop = 0;
 
     // Load archived leads data if switching to archived tab
     if (tabName === 'archived') {
@@ -39,59 +66,74 @@ function switchLeadTab(tabName) {
 // Function to generate archived lead rows
 function generateArchivedLeadRows(archivedLeads) {
     if (!archivedLeads || archivedLeads.length === 0) {
-        return '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280;">No archived leads found</td></tr>';
+        return '<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #6b7280;">No archived leads found</td></tr>';
     }
 
     return archivedLeads.map(lead => {
         const archivedDate = lead.archivedDate ? new Date(lead.archivedDate).toLocaleDateString() : 'Unknown';
 
+        // Sent to market indicator
+        const sentToMarket = !!(lead.appStage?.app || lead.stage === 'app_sent' ||
+            lead.stage === 'app_quote_received' || lead.stage === 'app_quote_sent');
+        const marketCircle = sentToMarket
+            ? `<span style="width:22px;height:22px;border-radius:50%;background:#10b981;color:white;font-size:11px;display:inline-flex;align-items:center;justify-content:center;pointer-events:none;" title="Sent to market"><i class="fas fa-check"></i></span>`
+            : `<span style="width:22px;height:22px;border-radius:50%;background:#d1d5db;color:#9ca3af;font-size:11px;display:inline-flex;align-items:center;justify-content:center;pointer-events:none;" title="Not sent to market"><i class="fas fa-times"></i></span>`;
+
+        // Renewal date
+        const renewalDisplay = lead.renewalDate
+            ? `<span style="color:#374151;font-size:13px;">${lead.renewalDate}</span>`
+            : `<span style="color:#d1d5db;font-size:13px;">—</span>`;
+
+        // Call time bar
+        const timeMeter = (typeof window.generateTimeMeter === 'function')
+            ? window.generateTimeMeter(lead)
+            : '<span style="color:#d1d5db;font-size:12px;">—</span>';
+
         return `
-            <tr style="opacity: 0.8;">
+            <tr class="gold-border-lead" data-lead-id="${lead.id || ''}" data-lead-name="${(lead.name || '').replace(/"/g, '&quot;')}" style="opacity:0.9;">
                 <td>
                     <input type="checkbox" class="archived-lead-checkbox" value="${lead.archiveId || lead.id}" onchange="updateBulkDeleteArchivedButton()">
+                </td>
+                <td style="width:28px;padding:4px;text-align:center;">
+                    ${marketCircle}
                 </td>
                 <td>
                     <div class="lead-info">
                         <strong>${lead.name || 'Unknown'}</strong>
-                        ${lead.company ? `<br><small style="color: #6b7280;">${lead.company}</small>` : ''}
+                        ${lead.company ? `<br><small style="color:#6b7280;">${lead.company}</small>` : ''}
                     </div>
                 </td>
                 <td>
                     <div class="contact-info">
-                        ${lead.phone ? `<div><i class="fas fa-phone" style="color: #10b981;"></i> ${lead.phone}</div>` : ''}
-                        ${lead.email ? `<div><i class="fas fa-envelope" style="color: #3b82f6;"></i> ${lead.email}</div>` : ''}
+                        ${lead.phone ? `<div><i class="fas fa-phone" style="color:#10b981;"></i> ${lead.phone}</div>` : ''}
+                        ${lead.email ? `<div><i class="fas fa-envelope" style="color:#3b82f6;"></i> ${lead.email}</div>` : ''}
                     </div>
                 </td>
                 <td>
-                    <span class="product-badge ${lead.product ? lead.product.toLowerCase() : ''}" style="opacity: 0.7;">
+                    <span class="product-badge ${lead.product ? lead.product.toLowerCase().replace(/\s+/g,'-') : ''}" style="opacity:0.7;">
                         ${lead.product || 'Not specified'}
                     </span>
                 </td>
                 <td>
                     <div class="premium-amount">
-                        ${lead.premium ? '$' + parseFloat(lead.premium).toLocaleString() : '-'}
+                        ${lead.premium ? '$' + parseFloat(String(lead.premium).replace(/[^0-9.]/g,'')).toLocaleString() : '—'}
                     </div>
                 </td>
-                <td>
-                    <span class="stage-badge ${lead.stage || 'closed'}" style="opacity: 0.7;">
-                        ${window.formatStageName ? window.formatStageName(lead.stage || 'closed') : (lead.stage || 'closed')}
-                    </span>
-                </td>
+                <td>${renewalDisplay}</td>
+                <td style="min-width:80px;padding-top:6px;">${timeMeter}</td>
                 <td>${lead.assignedTo || 'Unassigned'}</td>
                 <td>
-                    <span style="color: #6b7280; font-size: 13px;">
-                        ${archivedDate}
-                    </span>
+                    <span style="color:#6b7280;font-size:13px;">${archivedDate}</span>
                 </td>
                 <td>
                     <div class="action-buttons">
-                        <button onclick="restoreLead('${lead.archiveId}')" class="btn-icon" title="Restore to Active" style="background: #10b981; color: white;">
+                        <button onclick="restoreLead('${lead.archiveId}')" class="btn-icon" title="Restore to Active" style="background:#10b981;color:white;">
                             <i class="fas fa-undo"></i>
                         </button>
                         <button onclick="viewArchivedLead('${lead.id}')" class="btn-icon" title="View Details">
                             <i class="fas fa-eye"></i>
                         </button>
-                        <button onclick="permanentlyDeleteLead('${lead.archiveId}')" class="btn-icon" title="Delete Permanently" style="background: #ef4444; color: white;">
+                        <button onclick="permanentlyDeleteLead('${lead.archiveId}')" class="btn-icon" title="Delete Permanently" style="background:#ef4444;color:white;">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -111,7 +153,7 @@ function loadArchivedLeads() {
 
     const tableBody = document.getElementById('archivedLeadsTableBody');
     if (tableBody) {
-        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280;">⏳ Loading archived leads...</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #6b7280;">⏳ Loading archived leads...</td></tr>';
     }
 
     fetch('/api/archived-leads')
@@ -130,14 +172,14 @@ function loadArchivedLeads() {
             } else {
                 console.error('Error loading archived leads:', data.error);
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #ef4444;">Error loading archived leads</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #ef4444;">Error loading archived leads</td></tr>';
                 }
             }
         })
         .catch(error => {
             console.error('Error loading archived leads:', error);
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #ef4444;">Error loading archived leads</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #ef4444;">Error loading archived leads</td></tr>';
             }
         });
 }
@@ -153,42 +195,31 @@ function setupMonthlyTabs(archivedLeads) {
     const monthlyTabsContainer = document.getElementById('monthlyArchiveTabs');
     if (!monthlyTabsContainer) return;
 
-    // Group leads by month
+    // Group leads by renewal date month only (ignore year — all Januaries together, etc.)
     const monthGroups = {};
     archivedLeads.forEach(lead => {
-        const archivedDate = new Date(lead.archivedDate);
-        const monthKey = `${archivedDate.getFullYear()}-${String(archivedDate.getMonth() + 1).padStart(2, '0')}`;
-
-        if (!monthGroups[monthKey]) {
-            monthGroups[monthKey] = [];
-        }
-        monthGroups[monthKey].push(lead);
+        const dateStr = lead.renewalDate || lead.renewal_date || lead.insurance_expiry || '';
+        if (!dateStr) return;
+        const renewalDate = new Date(dateStr);
+        if (isNaN(renewalDate.getTime())) return;
+        const mo = String(renewalDate.getMonth() + 1).padStart(2, '0');
+        if (!monthGroups[mo]) monthGroups[mo] = [];
+        monthGroups[mo].push(lead);
     });
 
-    // Create all 12 months for current year (regardless of whether they have leads)
+    // Build all 12 month tabs (01–12); default active = current month
     const currentDate = new Date();
-    const currentYear = currentDate.getFullYear(); // Use current year instead of hardcoded 2025
-    const currentMonth = currentDate.getMonth() + 1; // Current month (1-12)
-    const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    const currentMonthKey = String(currentDate.getMonth() + 1).padStart(2, '0');
 
     const allMonths = [];
-    for (let month = 1; month <= 12; month++) {
-        const monthKey = `${currentYear}-${String(month).padStart(2, '0')}`;
-        const monthName = new Date(currentYear, month - 1, 1).toLocaleString('default', { month: 'long' });
+    for (let m = 1; m <= 12; m++) {
+        const monthKey = String(m).padStart(2, '0');
+        const monthName = new Date(2000, m - 1, 1).toLocaleString('default', { month: 'long' });
         const count = monthGroups[monthKey] ? monthGroups[monthKey].length : 0;
-        const isActive = monthKey === currentMonthKey; // Make current month active
-
-        allMonths.push({
-            monthKey,
-            monthName,
-            count,
-            isActive,
-            monthNumber: month
-        });
+        const isActive = monthKey === currentMonthKey;
+        if (isActive) window.currentArchivedMonth = monthKey;
+        allMonths.push({ monthKey, monthName, count, isActive, monthNumber: m });
     }
-
-    // Sort months by month number (January first)
-    allMonths.sort((a, b) => a.monthNumber - b.monthNumber);
 
     // Create tabs HTML
     const tabsHTML = allMonths.map(monthData => {
@@ -205,9 +236,6 @@ function setupMonthlyTabs(archivedLeads) {
     }).join('');
 
     monthlyTabsContainer.innerHTML = tabsHTML;
-
-    // Set current month to the current month of 2025
-    window.currentArchivedMonth = currentMonthKey;
 }
 
 // Switch to a specific month
@@ -238,31 +266,27 @@ function loadArchivedLeadsByMonth(monthKey) {
     const tableBody = document.getElementById('archivedLeadsTableBody');
     if (!tableBody) return;
 
-    // Filter leads by month
+    // Filter leads by renewal month only (ignore year)
     const monthLeads = window.allArchivedLeads.filter(lead => {
-        // Handle leads without archivedDate (assign to current month)
-        if (!lead.archivedDate) {
-            console.warn(`Lead ${lead.id} has no archivedDate, assigning to current month`);
-            const currentDate = new Date();
-            const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-            return currentMonthKey === monthKey;
-        }
-
-        const archivedDate = new Date(lead.archivedDate);
-        if (isNaN(archivedDate.getTime())) {
-            console.warn(`Lead ${lead.id} has invalid archivedDate: ${lead.archivedDate}`);
-            return false;
-        }
-
-        const leadMonthKey = `${archivedDate.getFullYear()}-${String(archivedDate.getMonth() + 1).padStart(2, '0')}`;
-        return leadMonthKey === monthKey;
+        const dateStr = lead.renewalDate || lead.renewal_date || lead.insurance_expiry || '';
+        if (!dateStr) return false;
+        const renewalDate = new Date(dateStr);
+        if (isNaN(renewalDate.getTime())) return false;
+        return String(renewalDate.getMonth() + 1).padStart(2, '0') === monthKey;
     });
 
     console.log(`Found ${monthLeads.length} leads for ${monthKey}`);
 
+    // Sort by renewal date ascending (soonest renewal first; no date goes to bottom)
+    monthLeads.sort((a, b) => {
+        const da = a.renewalDate ? new Date(a.renewalDate).getTime() : Infinity;
+        const db = b.renewalDate ? new Date(b.renewalDate).getTime() : Infinity;
+        return da - db;
+    });
+
     // Update table
     if (monthLeads.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280;">No archived leads found for this month</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #6b7280;">No archived leads found for this month</td></tr>';
     } else {
         tableBody.innerHTML = generateArchivedLeadRows(monthLeads);
     }
@@ -431,7 +455,7 @@ function showArchiveConfirmation(leadId) {
             </h3>
             <p style="margin: 0 0 24px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
                 Are you sure you want to archive this lead?<br>
-                It will be moved to the Archived Leads tab.
+                It will be moved to the Archived Leads page.
             </p>
         </div>
         <div style="padding: 16px 24px 24px 24px; display: flex; gap: 12px;">
@@ -543,9 +567,8 @@ function proceedWithArchive(leadId) {
                 }
             }
 
-            // If archived leads tab is currently active, refresh it to show the new archived lead
-            const archivedTab = document.getElementById('archived-leads-tab');
-            if (archivedTab && archivedTab.style.display !== 'none') {
+            // If we're on the archived leads standalone page, refresh it
+            if (window.location.hash === '#archived-leads') {
                 console.log('🔄 Refreshing archived leads view to show newly archived lead');
                 if (typeof loadArchivedLeads === 'function') {
                     loadArchivedLeads();
@@ -693,6 +716,109 @@ function permanentlyDeleteLead(archiveId) {
         console.error('❌ Delete error:', error);
         alert('Error deleting lead. Please try again.');
     });
+}
+
+// ============================================
+// DELETE DUPLICATE ARCHIVED LEADS
+// ============================================
+async function deleteDuplicateArchivedLeads() {
+    // Fetch all archived leads fresh from server
+    let allLeads;
+    try {
+        const resp = await fetch('/api/archived-leads');
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Failed to fetch');
+        allLeads = data.archivedLeads;
+    } catch (e) {
+        alert('Error fetching archived leads: ' + e.message);
+        return;
+    }
+
+    if (!allLeads || allLeads.length === 0) {
+        alert('No archived leads found.');
+        return;
+    }
+
+    // Identify duplicates: group by originalLeadId first, then by cleaned phone
+    // Keep the one with the most recent archivedDate; mark others for deletion
+    const toDelete = []; // archiveIds to delete
+
+    // Pass 1: deduplicate by originalLeadId
+    const byOriginalId = {};
+    allLeads.forEach(lead => {
+        const key = String(lead.originalLeadId || lead.id || '');
+        if (!key) return;
+        if (!byOriginalId[key]) {
+            byOriginalId[key] = lead;
+        } else {
+            // Keep the more recently archived one
+            const existing = byOriginalId[key];
+            const existingDate = new Date(existing.archivedDate || 0).getTime();
+            const thisDate = new Date(lead.archivedDate || 0).getTime();
+            if (thisDate >= existingDate) {
+                toDelete.push(existing.archiveId);
+                byOriginalId[key] = lead;
+            } else {
+                toDelete.push(lead.archiveId);
+            }
+        }
+    });
+
+    // Pass 2: among survivors, deduplicate by phone number
+    const survivors = Object.values(byOriginalId);
+    const byPhone = {};
+    survivors.forEach(lead => {
+        const phone = (lead.phone || '').replace(/\D/g, '');
+        if (!phone || phone.length < 7) return; // skip if no useful phone
+        if (!byPhone[phone]) {
+            byPhone[phone] = lead;
+        } else {
+            const existing = byPhone[phone];
+            const existingDate = new Date(existing.archivedDate || 0).getTime();
+            const thisDate = new Date(lead.archivedDate || 0).getTime();
+            if (thisDate >= existingDate) {
+                toDelete.push(existing.archiveId);
+                byPhone[phone] = lead;
+            } else {
+                toDelete.push(lead.archiveId);
+            }
+        }
+    });
+
+    // Deduplicate the toDelete list itself (same archiveId may appear twice)
+    const uniqueToDelete = [...new Set(toDelete.filter(Boolean))];
+
+    if (uniqueToDelete.length === 0) {
+        alert('No duplicate archived leads found. All records are unique.');
+        return;
+    }
+
+    if (!confirm(`Found ${uniqueToDelete.length} duplicate archived lead${uniqueToDelete.length > 1 ? 's' : ''}.\n\nThe most recently archived copy of each lead will be kept. Delete the duplicates now?`)) {
+        return;
+    }
+
+    // Delete each duplicate sequentially
+    let deleted = 0;
+    let failed = 0;
+    for (const archiveId of uniqueToDelete) {
+        try {
+            const r = await fetch(`/api/archived-leads/${archiveId}`, { method: 'DELETE' });
+            const d = await r.json();
+            if (d.success) deleted++;
+            else failed++;
+        } catch (e) {
+            failed++;
+        }
+    }
+
+    const msg = failed > 0
+        ? `Deleted ${deleted} duplicate${deleted !== 1 ? 's' : ''}. ${failed} failed.`
+        : `Successfully deleted ${deleted} duplicate archived lead${deleted !== 1 ? 's' : ''}.`;
+
+    alert(msg);
+
+    // Refresh the view
+    loadArchivedLeads();
 }
 
 // Export archived leads for current month

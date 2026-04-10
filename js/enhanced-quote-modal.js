@@ -744,6 +744,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured Motorist Property Damage:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                            <option value="Not Included">Not Included</option>
                             <option value="$50,000">$50,000</option>
                             <option value="$100,000" selected>$100,000</option>
                             <option value="$150,000">$150,000</option>
@@ -823,6 +824,7 @@ window.createQuoteApplicationSimple = function(leadId) {
                             <option value="$1,500,000">$1,500,000</option>
                             <option value="$2,000,000">$2,000,000</option>
                             <option value="$5,000,000">$5,000,000</option>
+                            <option value="Not Included">Not Included</option>
                         </select>
                     </div>
                     <div>
@@ -1794,6 +1796,11 @@ window.saveQuoteApplication = async function() {
         // Success message removed - no popup needed
         console.log('✅ Quote Application saved successfully');
 
+        // Fire renewals post-save callback if set (updates the renewals panel container)
+        if (typeof window._renewalPostSaveCallback === 'function') {
+            window._renewalPostSaveCallback();
+        }
+
         // Hide loading overlay
         hideLoadingOverlay();
 
@@ -2289,7 +2296,7 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">Uninsured Motorist Property Damage:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$50,000', '$100,000', '$150,000', '$200,000', '$250,000', '$500,000', '$1,000,000'], getSavedValue('Uninsured Motorist Property Damage', '$100,000'))}
+                            ${generateDropdownOptions(['Not Included', '$50,000', '$100,000', '$150,000', '$200,000', '$250,000', '$500,000', '$1,000,000'], getSavedValue('Uninsured Motorist Property Damage', '$100,000'))}
                         </select>
                     </div>
                     <div>
@@ -2325,7 +2332,7 @@ window.showEnhancedQuoteApplicationWithData = function(leadId, application) {
                     <div>
                         <label style="display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px;">General Liability:</label>
                         <select style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
-                            ${generateDropdownOptions(['$500,000', '$1,000,000', '$1,500,000', '$2,000,000', '$5,000,000'], getSavedValue('General Liability', '$1,000,000'))}
+                            ${generateDropdownOptions(['$500,000', '$1,000,000', '$1,500,000', '$2,000,000', '$5,000,000', 'Not Included'], getSavedValue('General Liability', '$1,000,000'))}
                         </select>
                     </div>
                     <div>

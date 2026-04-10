@@ -196,7 +196,7 @@
     };
 
     // Mass archive function for selected leads
-    window.massArchiveLeads = function() {
+    window.massArchiveLeads = async function() {
         const selectedCheckboxes = document.querySelectorAll('.lead-checkbox:checked');
         const selectedLeadIds = Array.from(selectedCheckboxes).map(cb => cb.value);
 
@@ -211,24 +211,43 @@
 
         console.log(`📦 Mass archiving ${selectedLeadIds.length} leads:`, selectedLeadIds);
 
-        let archiveCount = 0;
-        const totalToArchive = selectedLeadIds.length;
+        const u = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+        const archivedBy = u.username
+            ? u.username.charAt(0).toUpperCase() + u.username.slice(1).toLowerCase()
+            : 'System';
 
-        selectedLeadIds.forEach(leadId => {
-            // Use existing archive function
-            if (typeof window.archiveLead === 'function') {
-                // Call archive function and track completion
-                window.archiveLead(leadId);
-                archiveCount++;
+        const results = await Promise.all(selectedLeadIds.map(id =>
+            fetch(`/api/archive-lead/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ archivedBy })
+            }).then(r => r.json()).catch(() => ({ success: false }))
+        ));
 
-                // Check if all archives are complete
-                if (archiveCount === totalToArchive) {
-                    setTimeout(() => {
-                        showNotification(`${totalToArchive} leads archived successfully`, 'success');
-                    }, 1000);
-                }
+        const ok = results.filter(r => r.success).length;
+        const failed = results.length - ok;
+
+        // Remove ALL selected leads from localStorage regardless of server result.
+        // Leads that got 404 (localStorage-only, not in server DB) need to be cleared too.
+        // Leads that succeeded are now in archived_leads on server; ViciDial sync is blocked from re-inserting them.
+        try {
+            const allSelectedIds = new Set(selectedLeadIds.map(String));
+            const stored = JSON.parse(localStorage.getItem('insurance_leads') || '[]');
+            const filtered = stored.filter(l => !allSelectedIds.has(String(l.id)));
+            localStorage.setItem('insurance_leads', JSON.stringify(filtered));
+        } catch(e) {}
+
+        if (ok > 0 || failed < selectedLeadIds.length) {
+            const msg = ok > 0
+                ? `${ok} lead(s) archived successfully${failed ? ` (${failed} not found on server — removed locally)` : ''}`
+                : `${failed} lead(s) removed from local list (not found on server)`;
+            showNotification(msg, ok > 0 ? 'success' : 'warning');
+            if (typeof window.loadLeadsView === 'function') {
+                window.loadLeadsView();
             }
-        });
+        } else {
+            showNotification('Failed to archive leads. Please try again.', 'error');
+        }
     };
 
     // Helper function to update table after deletion

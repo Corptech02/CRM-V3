@@ -3,8 +3,22 @@ console.log('Policy Display Fix: Addressing 2-policy display limitation');
 
 // Override generatePolicyRows to ensure all policies are displayed
 const originalGeneratePolicyRows = window.generatePolicyRows;
-window.generatePolicyRows = function() {
-    let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+window.generatePolicyRows = async function() {
+    // Sync with server first so carrier/other fields reflect latest saved data
+    let policies = [];
+    if (window.loadPoliciesFromServer) {
+        try {
+            const serverPolicies = await window.loadPoliciesFromServer();
+            if (serverPolicies && serverPolicies.length > 0) {
+                policies = serverPolicies;
+            }
+        } catch (e) {
+            console.warn('Policy Display Fix: server sync failed, using localStorage', e);
+        }
+    }
+    if (policies.length === 0) {
+        policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    }
     console.log(`📊 Policy Display Fix: Found ${policies.length} total policies`);
 
     // Get current user and check if they are admin
@@ -123,7 +137,11 @@ window.generatePolicyRows = function() {
         let clientName = 'N/A';
 
         // PRIORITY 1: Check Named Insured tab data first (most accurate)
-        if (policy.insured?.['Name/Business Name']) {
+        if (policy.insured?.['Business Name']) {
+            clientName = policy.insured['Business Name'];
+        } else if (policy.contact?.['Business Name']) {
+            clientName = policy.contact['Business Name'];
+        } else if (policy.insured?.['Name/Business Name']) {
             clientName = policy.insured['Name/Business Name'];
         } else if (policy.insured?.['Primary Named Insured']) {
             clientName = policy.insured['Primary Named Insured'];
@@ -141,8 +159,8 @@ window.generatePolicyRows = function() {
             }
         }
 
-        // Get carrier name
-        const carrier = policy.overview?.['Carrier'] || policy.carrier || 'N/A';
+        // Get carrier name — top-level carrier is authoritative; overview.Carrier can be stale
+        const carrier = policy.carrier || policy.overview?.['Carrier'] || 'N/A';
 
         // Get effective and expiration dates
         const effectiveDate = policy.effectiveDate ? new Date(policy.effectiveDate).toLocaleDateString() : 'N/A';

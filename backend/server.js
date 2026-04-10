@@ -1,4 +1,14 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env'), override: true });
+
+// Keep the process alive on non-fatal errors so pm2 doesn't have to restart
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException] Non-fatal — keeping process alive:', err.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+    const msg = reason && reason.message ? reason.message : String(reason);
+    console.error('[unhandledRejection] Non-fatal — keeping process alive:', msg);
+});
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -420,6 +430,8 @@ function initializeDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
+    // Per-user data isolation: add owner column if not present (existing rows default to 'grant')
+    db.run(`ALTER TABLE financial_transactions ADD COLUMN owner TEXT DEFAULT 'grant'`, () => {});
 
     // Invoices sent to carriers / clients
     db.run(`CREATE TABLE IF NOT EXISTS invoices (
@@ -464,6 +476,16 @@ function initializeDatabase() {
         amount REAL NOT NULL DEFAULT 0,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(year, month, category)
+    )`);
+
+    // Team chat messages
+    db.run(`CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender TEXT NOT NULL,
+        recipient TEXT,
+        message TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        read_by TEXT DEFAULT '[]'
     )`);
 
     console.log('Database tables initialized');
@@ -627,6 +649,75 @@ app.post('/api/clients', (req, res) => {
     );
 });
 
+// Get recently added clients (last 7 days) — MUST be before /api/clients/:id to avoid route shadowing
+app.get('/api/clients/recent', (req, res) => {
+    const daysBack = req.query.days || 7;
+    console.log(`📅 Fetching clients added in the last ${daysBack} days`);
+
+    const query = `
+        SELECT id, data, created_at, updated_at
+        FROM clients
+        WHERE date(created_at) >= date('now', '-${parseInt(daysBack)} days')
+        ORDER BY created_at DESC
+    `;
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            console.error('❌ Error fetching recent clients:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        console.log(`✅ Found ${rows.length} clients added in the last ${daysBack} days`);
+
+        const recentClients = rows.map(row => {
+            let clientData = {};
+            try {
+                clientData = JSON.parse(row.data);
+            } catch (e) {
+                console.warn('Error parsing client data for ID:', row.id);
+                clientData = { name: 'Unknown Client' };
+            }
+
+            const createdDate = new Date(row.created_at);
+            const now = new Date();
+            const diffTime = Math.abs(now - createdDate);
+            const daysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return {
+                id: row.id,
+                clientName: clientData.businessName || clientData.name || clientData.fullName || 'Unknown Client',
+                clientType: clientData.businessType || 'Business',
+                createdAt: row.created_at,
+                daysAgo: daysAgo,
+                phone: clientData.phone || null,
+                email: clientData.email || null,
+                state: clientData.state || null,
+                giftSent: false
+            };
+        });
+
+        res.json(recentClients);
+    });
+});
+
+// Get single client by ID
+app.get('/api/clients/:id', (req, res) => {
+    const id = req.params.id;
+    const idDot = id.includes('.') ? id : id + '.0';
+    const idRaw = id.replace(/\.0$/, '');
+    db.get(
+        `SELECT data FROM clients WHERE id=? OR id=? OR id=? OR json_extract(data,'$.id')=? OR json_extract(data,'$.id')=?`,
+        [id, idDot, idRaw, id, idRaw],
+        (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!row) return res.status(404).json({ error: 'Client not found' });
+            try { res.json(JSON.parse(row.data)); }
+            catch { res.status(500).json({ error: 'Failed to parse client data' }); }
+        }
+    );
+});
+
 // Delete client
 app.delete('/api/clients/:id', (req, res) => {
     const id = req.params.id;
@@ -649,60 +740,6 @@ app.delete('/api/clients/:id', (req, res) => {
     });
 });
 
-// Get recently added clients (last 7 days) for new client gifts
-app.get('/api/clients/recent', (req, res) => {
-    const daysBack = req.query.days || 7;
-    console.log(`📅 Fetching clients added in the last ${daysBack} days`);
-
-    // Query for clients created in the last N days
-    const query = `
-        SELECT id, data, created_at, updated_at
-        FROM clients
-        WHERE date(created_at) >= date('now', '-${parseInt(daysBack)} days')
-        ORDER BY created_at DESC
-    `;
-
-    db.all(query, [], (err, rows) => {
-        if (err) {
-            console.error('❌ Error fetching recent clients:', err);
-            res.status(500).json({ error: err.message });
-            return;
-        }
-
-        console.log(`✅ Found ${rows.length} clients added in the last ${daysBack} days`);
-
-        // Transform the data for frontend
-        const recentClients = rows.map(row => {
-            let clientData = {};
-            try {
-                clientData = JSON.parse(row.data);
-            } catch (e) {
-                console.warn('Error parsing client data for ID:', row.id);
-                clientData = { name: 'Unknown Client' };
-            }
-
-            // Calculate days ago
-            const createdDate = new Date(row.created_at);
-            const now = new Date();
-            const diffTime = Math.abs(now - createdDate);
-            const daysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-            return {
-                id: row.id,
-                clientName: clientData.businessName || clientData.name || clientData.fullName || 'Unknown Client',
-                clientType: clientData.businessType || 'Business',
-                createdAt: row.created_at,
-                daysAgo: daysAgo,
-                phone: clientData.phone || null,
-                email: clientData.email || null,
-                state: clientData.state || null,
-                giftSent: false // Default - could be tracked in a separate table later
-            };
-        });
-
-        res.json(recentClients);
-    });
-});
 
 // Get agent/producer statistics based on actual client data
 app.get('/api/agents/stats', (req, res) => {
@@ -874,8 +911,9 @@ app.get('/api/policies', (req, res) => {
                             console.log(`🔍 STATUS: No status found in data for policy ${normalizedNumber}`);
                         }
 
-                        // Filter inactive policies unless explicitly requested
-                        const isActive = (policy.status || policy.policyStatus || 'Active') === 'Active';
+                        // Filter inactive policies unless explicitly requested (case-insensitive)
+                        const _statusVal = (policy.status || policy.policyStatus || 'active').toLowerCase();
+                        const isActive = _statusVal === 'active' || _statusVal === 'in-force' || _statusVal === 'current';
 
                         if (!isActive && !includeInactive) {
                             console.log(`🔍 SERVER: Skipping inactive policy ${normalizedNumber} (includeInactive: ${includeInactive})`);
@@ -947,8 +985,8 @@ app.get('/api/policies/:id', (req, res) => {
                     policies = [data];
                 }
 
-                // Find matching policy
-                const policy = policies.find(p => p.id === policyId);
+                // Find matching policy by id or policyNumber
+                const policy = policies.find(p => p.id === policyId || p.policyNumber === policyId || String(p.id) === String(policyId));
                 if (policy) {
                     console.log(`✅ Found policy by ID: ${policyId} - ${policy.insured_name || policy.clientName}`);
                     res.json(policy);
@@ -1158,18 +1196,32 @@ app.put('/api/policies/:id', (req, res) => {
         // Need to update the policy within the nested structure
         const originalData = JSON.parse(targetRow.data);
 
-        // Update the specific policy in the nested structure
+        // Update the specific policy in the nested structure (handles single- and double-nested)
         if (originalData.policies && Array.isArray(originalData.policies)) {
-            for (const item of originalData.policies) {
+            let updated = false;
+            for (let i = 0; i < originalData.policies.length; i++) {
+                const item = originalData.policies[i];
                 if (item.policies && Array.isArray(item.policies)) {
-                    // Find and update the specific policy
+                    // Double-nested: data.policies[i].policies[j]
                     const policyIndex = item.policies.findIndex(p => p.id === policyId);
                     if (policyIndex !== -1) {
                         item.policies[policyIndex] = mergedPolicy;
+                        updated = true;
                         break;
                     }
+                } else if (item.id === policyId) {
+                    // Single-nested: data.policies[i] is the policy directly
+                    originalData.policies[i] = mergedPolicy;
+                    updated = true;
+                    break;
                 }
             }
+            if (!updated) {
+                console.warn(`⚠️ Policy ${policyId} found in search but not located in nested structure for update`);
+            }
+        } else {
+            // Direct policy object at root
+            Object.assign(originalData, mergedPolicy);
         }
 
         const dataToStore = JSON.stringify(originalData);
@@ -1630,7 +1682,13 @@ app.post('/api/leads', (req, res) => {
         if (delRow) {
             return res.json({ id: id, success: true, skipped: 'permanently deleted' });
         }
-        insertOrUpdateLead(id, lead, res);
+        // Reject if this lead has been archived — ViciDial sync must not re-insert archived leads
+        db.get('SELECT id FROM archived_leads WHERE original_lead_id = ?', [id], (archErr, archRow) => {
+            if (archRow) {
+                return res.json({ id: id, success: true, skipped: 'archived' });
+            }
+            insertOrUpdateLead(id, lead, res);
+        });
     });
 });
 
@@ -1703,9 +1761,6 @@ app.put('/api/leads/:id', (req, res) => {
         // Parse existing data and merge with updates
         let existingLead = JSON.parse(row.data);
         let updatedLead = { ...existingLead, ...updates };
-        if (updates.stage === 'app_sent' && !existingLead.appSentAt) {
-            updatedLead.appSentAt = new Date().toISOString();
-        }
         const data = JSON.stringify(updatedLead);
 
         // Save the updated lead
@@ -2436,7 +2491,7 @@ app.get('/api/vicidial/lists', async (req, res) => {
         const VICI_HOST = '204.13.233.29';
         const VICI_USER = '6666';
         const VICI_PASS = 'corp06';
-        const KNOWN_LISTS = ['998', '999', '1000', '1001', '1002', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025'];
+        const KNOWN_LISTS = ['998', '999', '1000', '1001', '1002', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025', '1026', '1027', '1028', '1029', '1030', '1031', '1032', '1033', '1034', '1035', '1036', '1037', '1038', '1039', '1040', '1041', '1042'];
 
         // Fetch a single list's info via Node.js HTTPS (no Python subprocess needed)
         function fetchListInfo(listId) {
@@ -2534,7 +2589,7 @@ app.get('/api/vicidial/performance-report', async (req, res) => {
     });
     params.append('group[]',      '--ALL--');
     params.append('user_group[]', '--ALL--');
-    users.split(',').map(u => u.trim()).filter(Boolean).forEach(u => params.append('users[]', u));
+    [].concat(users).forEach(u => params.append('users[]', u));
 
     const url = `http://${VICI_HOST}/vicidial/AST_agent_performance_detail.php?${params}`;
     console.log('📊 Fetching ViciDial performance report:', url);
@@ -2548,6 +2603,255 @@ app.get('/api/vicidial/performance-report', async (req, res) => {
         res.json({ success: true, html: response.data });
     } catch (error) {
         console.error('❌ ViciDial performance report error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Helper: extract disposition counts from a ViciDial TEXT report
+// Helper: parse CALL STATUS STATS pipe table; returns { rows, totals }
+function parseCSSTable(text) {
+    const lines = text.split('\n');
+    const start = lines.findIndex(l => l.includes('CALL STATUS STATS'));
+    const rows = [], totals = {};
+    if (start < 0) return { rows, totals };
+    for (let i = start + 1; i < Math.min(start + 150, lines.length); i++) {
+        const l = lines[i];
+        const t = l.trim();
+        if (t.startsWith('----------')) break;
+        if (!t.startsWith('|') || t.startsWith('+-')) continue;
+        const cols = l.split('|').map(s => s.trim()).filter((_, j, a) => j > 0 && j < a.length - 1);
+        if (cols.length < 3 || !cols[0]) continue;
+        // Strip trailing whitespace and colon (TOTAL row: "TOTAL                :")
+        const c0 = cols[0].replace(/[\s:]+$/, '').trim();
+        if (c0 === 'STATUS' || c0 === 'DESCRIPTION') continue; // header row
+        if (c0.toUpperCase() === 'TOTAL' || c0.toUpperCase() === 'TOTALS') {
+            // TOTAL row has no PCT% col: cols[1]=calls, cols[2]=total_time, cols[3]=avg_time
+            totals.calls    = parseInt((cols[1]||'').replace(/[^\d]/g,''), 10) || 0;
+            totals.callTime = cols[2] || '';
+            totals.avgTime  = cols[3] || '';
+        } else {
+            // Data row: cols[0]=STATUS, cols[1]=DESC, cols[2]=PCT%, cols[3]=CALLS, cols[4]=CALL_TIME, cols[5]=AVG_TIME, cols[6]=CALLS_HR
+            const count = parseInt((cols[3]||cols[2]||'').replace(/[^\d]/g,''), 10) || 0;
+            rows.push({ status: cols[0], description: cols[1]||'', calls: count,
+                callTime: cols[4]||cols[3]||'', agentTime: cols[5]||cols[4]||'', callsHr: cols[6]||cols[5]||'' });
+        }
+    }
+    return { rows, totals };
+}
+
+// Helper: parse AGENT TIME STATS pipe table; returns { [uid]: {calls,time,avg}, __total__: {calls,time,avg} }
+function parseViciAgentTimeStats(text) {
+    const result = {};
+    const lines = text.split('\n');
+    const start = lines.findIndex(l => l.includes('AGENT TIME STATS'));
+    if (start < 0) return result;
+    for (let i = start + 1; i < Math.min(start + 100, lines.length); i++) {
+        const l = lines[i];
+        const t = l.trim();
+        if (t.startsWith('----------')) break;
+        if (!t.startsWith('|') || t.startsWith('+-')) continue;
+        const cols = l.split('|').map(s => s.trim()).filter((_, j, a) => j > 0 && j < a.length - 1);
+        if (cols.length < 4) continue;
+        const c0 = cols[0];
+        if (!c0 || c0 === 'USER') continue; // header row
+        const c0key = c0.replace(/[\s:]+$/, '').trim().toUpperCase();
+        if (c0key === 'TOTAL' || c0key === 'TOTALS') {
+            // TOTAL row: cols[1]=FULL_NAME or CALLS, try both layouts
+            const calls = parseInt((cols[2]||cols[1]||'').replace(/[^\d]/g,''), 10) || 0;
+            result['__total__'] = { calls, time: cols[3]||cols[2]||'', avg: cols[4]||cols[3]||'' };
+        } else {
+            // Agent row: cols[0]=USER, cols[1]=FULL_NAME, cols[2]=CALLS, cols[3]=TALK_TIME, cols[4]=AVG_TIME
+            const calls = parseInt((cols[2]||'').replace(/[^\d]/g,''), 10) || 0;
+            result[c0] = { calls, time: cols[3]||'', avg: cols[4]||'' };
+        }
+    }
+    return result;
+}
+
+// Helper: format seconds as H:MM:SS
+function fmtSec(sec) {
+    const s = Math.round(sec), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+    return `${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+}
+
+// Helper: convert H:MM:SS or H:MM string to total seconds
+function toSec(t) {
+    if (!t) return 0;
+    const p = String(t).split(':').map(Number);
+    return (p[0]||0)*3600 + (p[1]||0)*60 + (p[2]||0);
+}
+
+// Parse main campaign summary — derived from CALL STATUS STATS + AGENT TIME STATS
+function parseViciMainSummary(text) {
+    const { rows, totals } = parseCSSTable(text);
+    const totalCalls = totals.calls || rows.reduce((s,r)=>s+r.calls,0);
+    const naRow  = rows.find(r => r.status==='NA' || r.status==='NOANSWER');
+    const aRow   = rows.find(r => r.status==='A');
+    const noAnswer   = naRow ? naRow.calls : 0;
+    const machineAns = aRow  ? aRow.calls  : 0;
+    const drops  = rows.filter(r=>r.status==='DROP'||r.status==='PDROP').reduce((s,r)=>s+r.calls,0);
+    const humanAnswers = totalCalls - noAnswer - machineAns;
+    const dropPct = totalCalls > 0 ? ((drops/totalCalls)*100).toFixed(1)+'%' : '0%';
+    // Use AGENT TIME STATS TOTAL row for H:MM:SS time data
+    const agentTimeStats = parseViciAgentTimeStats(text);
+    const agTot = agentTimeStats['__total__'];
+    let totalTime  = (agTot && agTot.time) || totals.callTime || '';
+    let avgCallLen = (agTot && agTot.avg)  || '';
+    if (!avgCallLen && totalTime && totalCalls > 0) {
+        avgCallLen = fmtSec(toSec(totalTime) / totalCalls);
+    }
+    return { totalCalls, humanAnswers, drops, dropPct, noAnswer, avgCallLen, totalTime };
+}
+
+// Parse per-agent summary — from AGENT TIME STATS section (H:MM:SS format)
+function parseViciAgentSummary(text) {
+    const agentTimeStats = parseViciAgentTimeStats(text);
+    // For per-agent reports there's exactly one agent entry
+    const entries = Object.entries(agentTimeStats).filter(([k]) => k !== '__total__');
+    if (entries.length >= 1) {
+        const [, s] = entries[0];
+        return { calls: s.calls, time: s.time, avg: s.avg };
+    }
+    // Fall back to CALL STATUS STATS if AGENT TIME STATS section missing
+    const { rows, totals } = parseCSSTable(text);
+    const calls = totals.calls || rows.reduce((s,r)=>s+r.calls,0);
+    const time  = totals.callTime || '';
+    const avg   = totals.avgTime  || (time && calls > 0 ? fmtSec(toSec(time) / calls) : '');
+    return { calls, time, avg };
+}
+
+// Parse per-list call counts from LIST ID STATS section
+function parseViciListCounts(text) {
+    const counts = {};
+    const lines = text.split('\n');
+    const start = lines.findIndex(l => l.includes('---------- LIST ID STATS'));
+    if (start < 0) return counts;
+    const end = lines.findIndex((l, i) => i > start && l.startsWith('----------'));
+    lines.slice(start, end >= 0 ? end : start + 300).forEach(l => {
+        const t = l.trim();
+        if (!t.startsWith('|') || t.startsWith('+-') || t.includes('LIST') || t.includes('TOTAL')) return;
+        const cols = l.split('|').map(s => s.trim()).filter((_, j, a) => j > 0 && j < a.length - 1);
+        if (cols.length < 2) return;
+        const id = cols[0].split(' ')[0].trim();
+        if (id && /^\d+$/.test(id)) {
+            const calls = parseInt((cols[1]||'').replace(/[^\d]/g,''),10)||0;
+            counts[id] = { name: cols[0], calls };
+        }
+    });
+    return counts;
+}
+
+// Parse CALL STATUS STATS rows from text (reuses parseCSSTable)
+function parseViciCallStatus(text) {
+    return parseCSSTable(text).rows;
+}
+
+function parseViciDispositions(text) {
+    const TRACKED = ['A','SALE','NI','NP','DROP','DNC'];
+    const counts = Object.fromEntries(TRACKED.map(k => [k, 0]));
+    const lines = text.split('\n');
+    const start = lines.findIndex(l => l.includes('CALL STATUS STATS'));
+    if (start < 0) return counts;
+    for (let i = start + 1; i < Math.min(start + 60, lines.length); i++) {
+        const l = lines[i];
+        if (l.trim().startsWith('----------')) break;
+        if (!l.trim().startsWith('|') || l.trim().startsWith('+-') || l.includes('STATUS') || l.includes('TOTAL')) continue;
+        const cols = l.split('|').map(s => s.trim()).filter((_, j, a) => j > 0 && j < a.length - 1);
+        if (cols.length < 4) continue;
+        const code = cols[0];
+        const n = parseInt((cols[3] || '').replace(/[^\d]/g, ''), 10) || 0;
+        if (code in counts) counts[code] = n;
+    }
+    return counts;
+}
+
+app.get('/api/vicidial/campaign-stats', async (req, res) => {
+    const axios = require('axios');
+    const VICI_URL = 'http://204.13.233.29/vicidial/AST_VDADstats.php';
+    const AUTH = { username: '6666', password: 'corp06' };
+    const AX_CFG = { auth: AUTH, timeout: 25000, responseType: 'text', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const queryDate = req.query.query_date || today;
+    const endDate   = req.query.end_date   || today;
+    const shift     = req.query.shift      || 'ALL';
+    const rollover  = req.query.include_rollover || 'NO';
+
+    const rawGroups = req.query['group[]'];
+    const rawLists  = req.query['list_ids[]'];
+    const groups  = rawGroups ? (Array.isArray(rawGroups) ? rawGroups : [rawGroups]) : ['AgentsCM','ILun','INun','PAun','Sweitzer','TXun'];
+    const listIds = rawLists  ? (Array.isArray(rawLists)  ? rawLists  : [rawLists])  : ['998','1001','1007'];
+
+    const BASE = { agent_hours:'', DB:'0', outbound_rate:'', costformat:'', print_calls:'',
+                   query_date: queryDate, end_date: endDate, include_rollover: rollover,
+                   bottom_graph:'NO', carrier_stats:'NO', report_display_type:'TEXT', shift, SUBMIT:'SUBMIT' };
+
+    // Build URLSearchParams and POST to ViciDial, return clean text
+    const fetchVici = async (grps, lists) => {
+        const p = new URLSearchParams(BASE);
+        grps.forEach(g => p.append('group[]', g));
+        if (!lists.includes('--ALL--')) lists.forEach(l => p.append('list_ids[]', l));
+        const r = await axios.post(VICI_URL, p.toString(), AX_CFG);
+        const m = r.data.match(/<PRE[^>]*>([\s\S]*?)<\/PRE>/i);
+        return (m ? m[1] : r.data).replace(/<[^>]+>/g, '');
+    };
+
+    // Agent → primary campaign mapping (campaigns are named per-agent)
+    const AGENT_CAMPAIGNS = { '1001': ['ILun'], '1002': ['INun'], '1003': ['Sweitzer'] };
+
+    // Helper: extract list IDs that appear in the LIST ID STATS section of a TEXT report
+    const extractListIds = (text) => {
+        const lines = text.split('\n');
+        const start = lines.findIndex(l => l.includes('---------- LIST ID STATS'));
+        if (start < 0) return [];
+        const end = lines.findIndex((l, i) => i > start && l.startsWith('----------'));
+        const ids = [];
+        lines.slice(start, end >= 0 ? end : start + 60).forEach(l => {
+            if (!l.trim().startsWith('|') || l.trim().startsWith('+-') || l.includes('LIST') || l.includes('TOTAL')) return;
+            const cols = l.split('|').map(s => s.trim()).filter((_, j, a) => j > 0 && j < a.length - 1);
+            if (cols.length >= 2) {
+                const id = cols[0].split(' ')[0];
+                if (id && /^\d+$/.test(id)) ids.push(id);
+            }
+        });
+        return ids;
+    };
+
+    console.log('📊 Fetching ViciDial campaign stats + agent/list detail');
+
+    try {
+        // First get main text so we know which lists actually have data
+        const mainText = await fetchVici(groups, listIds);
+
+        // Determine lists to fetch detail for:
+        // if specific lists were selected use those (cap 10), otherwise extract from results (cap 10)
+        const detailLists = listIds.includes('--ALL--')
+            ? extractListIds(mainText).slice(0, 20)
+            : listIds.slice(0, 20);
+
+        // Agent + list detail calls in parallel
+        const detailTexts = await Promise.all([
+            ...Object.values(AGENT_CAMPAIGNS).map(camps => fetchVici(camps, ['--ALL--'])),
+            ...detailLists.map(lid => fetchVici(groups, [lid]))
+        ]);
+
+        const agentEntries = Object.keys(AGENT_CAMPAIGNS);
+        const agentDisp = {};
+        agentEntries.forEach((uid, i) => { agentDisp[uid] = parseViciDispositions(detailTexts[i]); });
+
+        const agentSummary = {};
+        agentEntries.forEach((uid, i) => { agentSummary[uid] = parseViciAgentSummary(detailTexts[i]); });
+
+        const listDisp = {};
+        detailLists.forEach((lid, i) => { listDisp[lid] = parseViciDispositions(detailTexts[agentEntries.length + i]); });
+
+        const listCounts = parseViciListCounts(mainText);
+        const mainSummary = parseViciMainSummary(mainText);
+        const callStatusRows = parseViciCallStatus(mainText);
+
+        res.json({ success: true, text: mainText, agentDisp, listDisp, agentSummary, listCounts, mainSummary, callStatusRows });
+    } catch (error) {
+        console.error('❌ ViciDial campaign stats error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -5434,7 +5738,7 @@ app.post('/api/coi/send-request', (req, res, next) => {
     console.log('   Body fields:', Object.keys(req.body));
     console.log('   Files:', req.files ? req.files.length : 0);
 
-    const { from, to, subject, policyId } = req.body;
+    const { from, to, subject, policyId, agent } = req.body;
 
     // Fix email formatting - remove bare CR characters that cause SMTP errors
     const message = req.body.message ? req.body.message.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : '';
@@ -5478,14 +5782,22 @@ app.post('/api/coi/send-request', (req, res, next) => {
         // Use nodemailer to send email
         const nodemailer = require('nodemailer');
 
-        // Create transporter using GoDaddy SMTP settings
+        // Pick sender based on agent — Maureen's policies send from UIG
+        const isUIG = agent && agent.toLowerCase() === 'maureen';
+        const senderEmail = isUIG ? 'contact@uigagency.com' : 'contact@vigagency.com';
+        const senderName  = isUIG ? 'UIG Agency'            : 'VIG Agency';
+        const senderPass  = isUIG ? '@Jacob2007'             : (process.env.GODADDY_PASSWORD || '25nickc124!');
+
+        console.log(`📧 COI sender: ${senderEmail} (agent: ${agent || 'none'})`);
+
+        // Create transporter — both UIG and VIG use GoDaddy SMTP (secureserver.net)
         const transporter = nodemailer.createTransport({
             host: 'smtpout.secureserver.net',
             port: 465,
             secure: true,
             auth: {
-                user: 'contact@vigagency.com',
-                pass: process.env.GODADDY_PASSWORD || '25nickc124!'
+                user: senderEmail,
+                pass: senderPass
             }
         });
 
@@ -5583,15 +5895,17 @@ app.post('/api/coi/send-request', (req, res, next) => {
         }
 
         // Send email with attachments
+        const agencyDisplayName = isUIG ? 'United Insurance Group' : 'Vanguard Insurance Agency';
+
         const info = await transporter.sendMail({
-            from: '"VIG Agency" <contact@vigagency.com>',
+            from: `"${senderName}" <${senderEmail}>`,
             to: to,
             subject: subject,
             text: message,
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <div style="background: linear-gradient(135deg, #0066cc 0%, #004499 100%); color: white; padding: 20px; text-align: center;">
-                        <h1 style="margin: 0; font-size: 24px;">Vanguard Insurance Agency</h1>
+                        <h1 style="margin: 0; font-size: 24px;">${agencyDisplayName}</h1>
                         <p style="margin: 5px 0 0 0; opacity: 0.9;">Documentation Request</p>
                     </div>
 
@@ -5613,8 +5927,8 @@ app.post('/api/coi/send-request', (req, res, next) => {
                     </div>
 
                     <div style="background: #374151; color: white; padding: 20px; text-align: center; font-size: 14px;">
-                        <p style="margin: 0;">Best regards,<br><strong>Vanguard Insurance Agency</strong></p>
-                        <p style="margin: 10px 0 0 0; opacity: 0.8;">contact@vigagency.com</p>
+                        <p style="margin: 0;">Best regards,<br><strong>${agencyDisplayName}</strong></p>
+                        <p style="margin: 10px 0 0 0; opacity: 0.8;">${senderEmail}</p>
                     </div>
                 </div>
             `,
@@ -8433,6 +8747,170 @@ app.delete('/api/documents/:docId', (req, res) => {
     });
 });
 
+// Agency Files (Settings Upload) endpoints
+const agencyUploadDir = '/var/www/vanguard/uploads/agency/';
+if (!fs.existsSync(agencyUploadDir)) {
+    fs.mkdirSync(agencyUploadDir, { recursive: true });
+}
+
+const agencyFileStorage = multer.diskStorage({
+    destination: (req, file, cb) => { cb(null, agencyUploadDir); },
+    filename: (req, file, cb) => {
+        const ts = Date.now();
+        const rand = Math.random().toString(36).substr(2, 8);
+        const ext = path.extname(file.originalname);
+        cb(null, `agency_${ts}_${rand}${ext}`);
+    }
+});
+
+const uploadAgencyFile = multer({
+    storage: agencyFileStorage,
+    limits: { fileSize: 50 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            'application/pdf','application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'image/jpeg','image/png','image/gif','text/plain',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/csv','application/json','application/octet-stream',
+            'text/xml','application/xml',
+            'application/zip','application/x-zip-compressed','application/x-zip',
+            'multipart/x-zip'
+        ];
+        // Accept if in allowed list OR if it's a text-based file (al3, txt, csv, etc.)
+        if (allowed.includes(file.mimetype) || file.mimetype.startsWith('text/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('File type not allowed: ' + file.mimetype), false);
+        }
+    }
+});
+
+app.post('/api/agency-files', (req, res) => {
+    uploadAgencyFile.single('file')(req, res, (err) => {
+        if (err) return res.status(400).json({ success: false, error: err.message });
+        if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+        const docId = 'agf_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const { uploadedBy } = req.body;
+
+        db.run(
+            `INSERT INTO documents (id, client_id, policy_id, filename, original_name, file_path, file_size, file_type, uploaded_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [docId, 'AGENCY_GENERAL', null, req.file.filename, req.file.originalname,
+             req.file.path, req.file.size, req.file.mimetype, uploadedBy || 'Agency'],
+            function(dbErr) {
+                if (dbErr) {
+                    fs.unlink(req.file.path, () => {});
+                    return res.status(500).json({ success: false, error: dbErr.message });
+                }
+                res.json({
+                    success: true,
+                    file: {
+                        id: docId,
+                        name: req.file.originalname,
+                        type: req.file.mimetype,
+                        size: req.file.size,
+                        uploadDate: new Date().toISOString()
+                    }
+                });
+            }
+        );
+    });
+});
+
+app.get('/api/agency-files', (req, res) => {
+    db.all(
+        `SELECT id, original_name as name, file_type as type, file_size as size, upload_date as uploadDate, uploaded_by as uploadedBy
+         FROM documents WHERE client_id = 'AGENCY_GENERAL' ORDER BY upload_date DESC`,
+        [],
+        (err, rows) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            res.json({ success: true, files: rows || [] });
+        }
+    );
+});
+
+// Return raw text content of an agency file (unzips ZIP files automatically)
+app.get('/api/agency-files/:fileId/content', (req, res) => {
+    db.get(
+        'SELECT file_path, original_name FROM documents WHERE id = ? AND client_id = ?',
+        [req.params.fileId, 'AGENCY_GENERAL'],
+        (err, doc) => {
+            if (err || !doc) return res.status(404).json({ success: false, error: 'File not found' });
+            const isZip = doc.original_name.toLowerCase().endsWith('.zip');
+            if (isZip) {
+                const { exec } = require('child_process');
+                exec(`unzip -p "${doc.file_path}"`, { maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
+                    if (error) return res.status(500).json({ success: false, error: 'Unzip failed: ' + stderr });
+                    const innerName = doc.original_name.replace(/\.zip$/i, '');
+                    res.json({ success: true, content: stdout, filename: innerName });
+                });
+            } else {
+                fs.readFile(doc.file_path, 'utf8', (readErr, content) => {
+                    if (readErr) return res.status(500).json({ success: false, error: readErr.message });
+                    res.json({ success: true, content, filename: doc.original_name });
+                });
+            }
+        }
+    );
+});
+
+app.delete('/api/agency-files/:fileId', (req, res) => {
+    const fileId = req.params.fileId;
+    db.get('SELECT file_path FROM documents WHERE id = ? AND client_id = ?', [fileId, 'AGENCY_GENERAL'], (err, doc) => {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+        if (!doc) return res.status(404).json({ success: false, error: 'File not found' });
+        db.run('DELETE FROM documents WHERE id = ?', [fileId], function(err) {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            fs.unlink(doc.file_path, () => {});
+            res.json({ success: true, message: 'File deleted' });
+        });
+    });
+});
+
+// IVANS ZIP upload — receive a ZIP, unzip it, return the inner text content
+const ivansUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+app.post('/api/ivans/unzip', ivansUpload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const tmpZip = `/tmp/ivans_${id}.zip`;
+    const tmpOut = `/tmp/ivans_${id}.out`;
+    const { exec } = require('child_process');
+    try {
+        fs.writeFileSync(tmpZip, req.file.buffer);
+        exec(`unzip -l "${tmpZip}"`, (listErr, listing) => {
+            const innerMatch = listing && listing.match(/\s(\S+\.(dat|al3|txt|xml))/i);
+            const innerName = innerMatch ? innerMatch[1] : req.file.originalname.replace(/\.zip$/i, '');
+            const extractCmd = innerMatch
+                ? `unzip -p "${tmpZip}" "${innerMatch[1]}" > "${tmpOut}"`
+                : `unzip -p "${tmpZip}" > "${tmpOut}"`;
+            exec(extractCmd, (err) => {
+                fs.unlink(tmpZip, () => {});
+                if (err && !fs.existsSync(tmpOut)) {
+                    return res.status(500).json({ success: false, error: 'Unzip failed' });
+                }
+                try {
+                    // Read as latin1 to preserve all byte values without encoding corruption
+                    const buf = fs.readFileSync(tmpOut);
+                    fs.unlink(tmpOut, () => {});
+                    const content = buf.toString('latin1');
+                    // Diagnostic: hex of first 300 bytes to identify record separators
+                    const hexPreview = Array.from(buf.slice(0, 300)).map(b => b.toString(16).padStart(2,'0')).join(' ');
+                    res.json({ success: true, content, filename: innerName, hexPreview, totalBytes: buf.length });
+                } catch (readErr) {
+                    fs.unlink(tmpOut, () => {});
+                    res.status(500).json({ success: false, error: readErr.message });
+                }
+            });
+        });
+    } catch (e) {
+        try { fs.unlinkSync(tmpZip); } catch (_) {}
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // Agent Dev Stats API endpoints
 // Save dev stats to server
 app.post('/api/agent-dev-stats', (req, res) => {
@@ -10243,6 +10721,11 @@ app.get('/api/accounting/summary', async (req, res) => {
         const now = new Date();
         const yearStart = `${now.getFullYear()}-01-01`;
         const defaultRate = parseFloat(process.env.DEFAULT_COMMISSION_RATE || '0.15');
+        const owner = (req.query.owner || 'grant').toLowerCase();
+
+        // Agent filter: Maureen sees only her own policies
+        const OWNER_AGENTS = { 'maureen': ['maureen'] };
+        const agentFilter = OWNER_AGENTS[owner] ? OWNER_AGENTS[owner].map(a => a.toLowerCase()) : null;
 
         // --- Load all policies ---
         const policies = await new Promise((resolve, reject) => {
@@ -10276,6 +10759,11 @@ app.get('/api/accounting/summary', async (req, res) => {
                 const pList = Array.isArray(data.policies) ? data.policies : [data];
                 for (const p of pList) {
                     if (!p.premium && !p.annualPremium) continue;
+                    // Filter by agent if owner requires it
+                    if (agentFilter) {
+                        const pAgent = (p.agent || '').toLowerCase();
+                        if (!agentFilter.some(a => pAgent.includes(a))) continue;
+                    }
                     const rawPremium = (p.premium || p.annualPremium || '0').toString().replace(/[^0-9.]/g, '');
                     const premium = parseFloat(rawPremium) || 0;
                     if (premium <= 0) continue;
@@ -10433,13 +10921,14 @@ function parseAmount(v) { return parseFloat((v || '0').toString().replace(/[$,\s
 // ---- Transactions (General Ledger) ----
 
 app.get('/api/finance/transactions', (req, res) => {
-    const { start, end, category, source } = req.query;
+    const { start, end, category, source, owner } = req.query;
     let sql = 'SELECT * FROM financial_transactions WHERE 1=1';
     const params = [];
     if (start) { sql += ' AND date >= ?'; params.push(start); }
     if (end)   { sql += ' AND date <= ?'; params.push(end); }
     if (category) { sql += ' AND category = ?'; params.push(category); }
     if (source)   { sql += ' AND source = ?'; params.push(source); }
+    if (owner)    { sql += ' AND (owner = ? OR (owner IS NULL AND ? = \'grant\'))'; params.push(owner, owner); }
     sql += ' ORDER BY date DESC, created_at DESC';
     db.all(sql, params, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -10448,13 +10937,13 @@ app.get('/api/finance/transactions', (req, res) => {
 });
 
 app.post('/api/finance/transactions', (req, res) => {
-    const { date, description, amount, category, subcategory, vendor, client, notes, source } = req.body;
+    const { date, description, amount, category, subcategory, vendor, client, notes, source, owner } = req.body;
     if (!date || !description || amount === undefined) return res.status(400).json({ error: 'date, description, amount required' });
     const id = `TXN-${Date.now()}-${Math.random().toString(36).substr(2,6)}`;
     db.run(
-        `INSERT INTO financial_transactions (id,date,description,amount,category,subcategory,vendor,client,notes,source)
-         VALUES (?,?,?,?,?,?,?,?,?,?)`,
-        [id, date, description, parseAmount(amount.toString()), category||'Uncategorized', subcategory||'', vendor||'', client||'', notes||'', source||'manual'],
+        `INSERT INTO financial_transactions (id,date,description,amount,category,subcategory,vendor,client,notes,source,owner)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        [id, date, description, parseAmount(amount.toString()), category||'Uncategorized', subcategory||'', vendor||'', client||'', notes||'', source||'manual', owner||'grant'],
         function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ id, success: true }); }
     );
 });
@@ -10481,17 +10970,18 @@ app.delete('/api/finance/transactions/:id', (req, res) => {
 
 // Bulk import from CSV (persistent)
 app.post('/api/finance/transactions/bulk', (req, res) => {
-    const { transactions, source } = req.body;
+    const { transactions, source, owner } = req.body;
     if (!Array.isArray(transactions) || !transactions.length) return res.status(400).json({ error: 'transactions array required' });
+    const txOwner = owner || 'grant';
     let imported = 0, skipped = 0;
     const stmt = db.prepare(
-        `INSERT OR IGNORE INTO financial_transactions (id,date,description,amount,category,subcategory,vendor,client,source)
-         VALUES (?,?,?,?,?,?,?,?,?)`
+        `INSERT OR IGNORE INTO financial_transactions (id,date,description,amount,category,subcategory,vendor,client,source,owner)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`
     );
     for (const t of transactions) {
-        const id = `TXN-${t.date}-${Math.abs(t.amount).toFixed(2)}-${(t.name||'').slice(0,20).replace(/\s/g,'')}`.replace(/[^a-zA-Z0-9\-_.]/g,'');
+        const id = `TXN-${txOwner}-${t.date}-${Math.abs(t.amount).toFixed(2)}-${(t.name||t.description||'').slice(0,20).replace(/\s/g,'')}`.replace(/[^a-zA-Z0-9\-_.]/g,'');
         stmt.run([id, t.date, t.name||t.description||'Unknown', t.amount,
-                  t.category||'Uncategorized', t.subcategory||'', t.merchant_name||t.name||'', '', source||'csv'],
+                  t.category||'Uncategorized', t.subcategory||'', t.merchant_name||t.name||'', '', source||'csv', txOwner],
                  function(err) { if (!err && this.changes > 0) imported++; else skipped++; });
     }
     stmt.finalize(() => res.json({ success: true, imported, skipped, total: transactions.length }));
@@ -10503,10 +10993,11 @@ app.get('/api/finance/pl', async (req, res) => {
         const year = parseInt(req.query.year) || new Date().getFullYear();
         const startDate = `${year}-01-01`, endDate = `${year}-12-31`;
         const defaultRate = parseFloat(process.env.DEFAULT_COMMISSION_RATE || '0.15');
+        const owner = req.query.owner || 'grant';
 
-        // Transactions for the year
+        // Transactions for the year (scoped by owner)
         const txns = await new Promise((resolve, reject) => {
-            db.all('SELECT * FROM financial_transactions WHERE date>=? AND date<=?', [startDate, endDate], (err,rows) => err ? reject(err) : resolve(rows||[]));
+            db.all('SELECT * FROM financial_transactions WHERE date>=? AND date<=? AND (owner=? OR (owner IS NULL AND ?=\'grant\'))', [startDate, endDate, owner, owner], (err,rows) => err ? reject(err) : resolve(rows||[]));
         });
 
         // Commission income (marked paid)
@@ -10524,14 +11015,12 @@ app.get('/api/finance/pl', async (req, res) => {
             db.all('SELECT * FROM contractor_payments WHERE payment_date>=? AND payment_date<=?', [startDate, endDate], (err,rows) => err ? reject(err) : resolve(rows||[]));
         });
 
-        // Build income items
+        // Build income items — bank transactions only
         const income = [];
-        // Commission income from paid commissions
-        const commIncome = paidComm.reduce((s,c) => s + (c.commission_amount||0), 0);
-        if (commIncome > 0) income.push({ category: 'Commission Income', amount: commIncome });
 
-        // Other income from positive transactions
-        const txnIncome = txns.filter(t => t.amount > 0);
+        // Income from positive bank transactions only — exclude equity/capital contributions
+        const EQUITY_CATEGORIES = new Set(['Capital Contribution', 'Owner Contribution', 'Equity Contribution', 'Owner Deposit']);
+        const txnIncome = txns.filter(t => t.amount > 0 && !EQUITY_CATEGORIES.has(t.category));
         const txnIncomeCats = {};
         for (const t of txnIncome) {
             const cat = t.category || 'Other Income';
@@ -10560,22 +11049,18 @@ app.get('/api/finance/pl', async (req, res) => {
         const totalExpenses = expenseItems.reduce((s,i) => s + i.amount, 0);
         const netIncome = grossProfit - totalExpenses;
 
-        // Monthly breakdown
+        // Monthly breakdown — exclude equity contributions from income
         const monthly = Array.from({length:12}, (_,i) => ({ month: i+1, label: new Date(year,i,1).toLocaleString('en-US',{month:'short'}), income:0, expenses:0, net:0 }));
         for (const t of txns) {
             const m = parseInt(t.date.split('-')[1]) - 1;
             if (m < 0 || m > 11) continue;
-            if (t.amount > 0) monthly[m].income += t.amount;
-            else monthly[m].expenses += Math.abs(t.amount);
-        }
-        for (const c of paidComm) {
-            const d = new Date(c.payment_date); if (isNaN(d)) continue;
-            const m = d.getMonth();
-            monthly[m].income += c.commission_amount || 0;
+            if (t.amount > 0 && !EQUITY_CATEGORIES.has(t.category)) monthly[m].income += t.amount;
+            else if (t.amount < 0) monthly[m].expenses += Math.abs(t.amount);
         }
         for (const m of monthly) m.net = m.income - m.expenses;
 
-        // Commission pipeline (from policies, not yet paid)
+        // Commission pipeline (from policies, not yet paid) — agent-scoped
+        const PIPELINE_AGENT_FILTER = owner === 'maureen' ? ['maureen'] : null;
         let pipelineArr = [];
         const paidPolicyIds = new Set(paidComm.map(p => p.policy_id));
         for (const row of allPolicies) {
@@ -10584,6 +11069,10 @@ app.get('/api/finance/pl', async (req, res) => {
                 const pList = Array.isArray(data.policies) ? data.policies : [data];
                 for (const p of pList) {
                     if (!p.premium && !p.annualPremium) continue;
+                    if (PIPELINE_AGENT_FILTER) {
+                        const pAgent = (p.agent || '').toLowerCase();
+                        if (!PIPELINE_AGENT_FILTER.some(a => pAgent.includes(a))) continue;
+                    }
                     const premium = parseFloat((p.premium||p.annualPremium||'0').toString().replace(/[^0-9.]/g,'')) || 0;
                     if (premium <= 0) continue;
                     const pId = p.id || row.id;
@@ -10608,8 +11097,9 @@ app.get('/api/finance/pl', async (req, res) => {
 // ---- Cash Flow ----
 app.get('/api/finance/cashflow', (req, res) => {
     const year = parseInt(req.query.year) || new Date().getFullYear();
+    const owner = req.query.owner || 'grant';
     const startDate = `${year}-01-01`, endDate = `${year}-12-31`;
-    db.all('SELECT date, amount FROM financial_transactions WHERE date>=? AND date<=? ORDER BY date', [startDate, endDate], (err, rows) => {
+    db.all('SELECT date, amount FROM financial_transactions WHERE date>=? AND date<=? AND (owner=? OR (owner IS NULL AND ?=\'grant\')) ORDER BY date', [startDate, endDate, owner, owner], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         const monthly = Array.from({length:12}, (_,i) => ({
             month: i+1, label: new Date(year,i,1).toLocaleString('en-US',{month:'short'}),
@@ -10727,14 +11217,15 @@ app.get('/api/finance/tax-summary', async (req, res) => {
     try {
         const year = parseInt(req.query.year) || new Date().getFullYear();
         const start = `${year}-01-01`, end = `${year}-12-31`;
+        const owner = req.query.owner || 'grant';
 
-        // Net income
-        const txns = await new Promise((resolve,reject) => db.all('SELECT amount FROM financial_transactions WHERE date>=? AND date<=?', [start,end], (err,rows) => err?reject(err):resolve(rows||[])));
+        // Net income (scoped by owner)
+        const txns = await new Promise((resolve,reject) => db.all('SELECT amount, category FROM financial_transactions WHERE date>=? AND date<=? AND (owner=? OR (owner IS NULL AND ?=\'grant\'))', [start,end,owner,owner], (err,rows) => err?reject(err):resolve(rows||[])));
         const paidComm = await new Promise((resolve,reject) => db.all('SELECT commission_amount FROM commission_payments WHERE payment_date>=? AND payment_date<=?', [start,end], (err,rows) => err?reject(err):resolve(rows||[])));
         const contractors = await new Promise((resolve,reject) => db.all('SELECT amount FROM contractor_payments WHERE payment_date>=? AND payment_date<=?', [start,end], (err,rows) => err?reject(err):resolve(rows||[])));
 
-        const grossIncome = txns.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0)
-                          + paidComm.reduce((s,c)=>s+(c.commission_amount||0),0);
+        const EQUITY_CATS = new Set(['Capital Contribution', 'Owner Contribution', 'Equity Contribution', 'Owner Deposit']);
+        const grossIncome = txns.filter(t=>t.amount>0 && !EQUITY_CATS.has(t.category)).reduce((s,t)=>s+t.amount,0);
         const totalExpenses = txns.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0)
                             + contractors.reduce((s,c)=>s+c.amount,0);
         const netIncome = grossIncome - totalExpenses;
@@ -10897,255 +11388,227 @@ app.post('/api/state-generation-status', (req, res) => {
     );
 });
 
-// ─── Commercial Lead Generation Routes ───────────────────────────────────────
-const clEngine = require('./commercial-leads');
+// ─── Team Chat API ────────────────────────────────────────────────────────────
 
-// POST /api/commercial-leads/generate
-// Body: { sources, state, naicsPrefix, industry, employeesMin, employeesMax,
-//         daysBack, targetLines, verticals, minScore, maxResults, socrataEndpoint }
-app.post('/api/commercial-leads/generate', async (req, res) => {
-    try {
-        // Inject server-side env token if client didn't provide one
-        const body = Object.assign({}, req.body || {});
-        if (!body.ocApiToken && process.env.OPENCORPORATES_API_TOKEN) {
-            body.ocApiToken = process.env.OPENCORPORATES_API_TOKEN;
-        }
-        const result = await clEngine.generateCommercialLeads(body);
-        res.json(result);
-    } catch (err) {
-        console.error('Commercial leads generate error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
+// GET /api/chat/messages?type=group&since=ISO  or  ?type=dm&user=X&with=Y&since=ISO
+app.get('/api/chat/messages', (req, res) => {
+    const { type, user, with: withUser, since } = req.query;
+    let sql, params;
+    // SQLite stores CURRENT_TIMESTAMP as "YYYY-MM-DD HH:MM:SS" (space, not T).
+    // Convert since to the same format so string comparison works correctly.
+    const sinceTs = since ? new Date(since).toISOString().replace('T', ' ').slice(0, 19) : '1970-01-01 00:00:00';
 
-// GET /api/commercial-leads/source-status
-app.get('/api/commercial-leads/source-status', async (req, res) => {
-    try {
-        const status = await clEngine.getSourceStatus();
-        res.json(status);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// POST /api/commercial-leads/import-osha   (multipart: file=osha_csv, state=OH)
-// Accepts OSHA enforcement CSV from enforcedata.dol.gov
-const oshaUpload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
-    fileFilter: (req, file, cb) => {
-        if (file.originalname.match(/\.(csv|txt)$/i)) cb(null, true);
-        else cb(new Error('Only CSV files accepted'));
-    }
-});
-
-app.post('/api/commercial-leads/import-osha', oshaUpload.single('file'), async (req, res) => {
-    try {
-        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        const csvText = req.file.buffer.toString('utf-8');
-        const stateFilter = req.body.state || null;
-        const result = await clEngine.importOSHACSV(csvText, stateFilter);
-        res.json({ success: true, ...result, message: `Imported ${result.imported} records, skipped ${result.skipped}` });
-    } catch (err) {
-        console.error('OSHA import error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// In-memory job store for background OSHA syncs (single-process, survives restarts via PM2)
-const _oshaSyncJobs = new Map();
-
-// POST /api/commercial-leads/sync-osha-api
-// Returns immediately with a jobId — client polls /sync-status/:jobId for progress
-app.post('/api/commercial-leads/sync-osha-api', (req, res) => {
-    const { apiKey, states, daysBack, maxRecords } = req.body || {};
-    const jobId = `osha_${Date.now()}`;
-
-    const job = {
-        status: 'running',
-        progress: [],
-        imported: 0,
-        skipped: 0,
-        started: Date.now(),
-    };
-    _oshaSyncJobs.set(jobId, job);
-
-    // Purge jobs older than 2 hours
-    for (const [id, j] of _oshaSyncJobs) {
-        if (Date.now() - j.started > 7200000) _oshaSyncJobs.delete(id);
+    if (type === 'group') {
+        sql = `SELECT * FROM chat_messages WHERE recipient IS NULL AND timestamp > ? ORDER BY timestamp ASC`;
+        params = [sinceTs];
+    } else if (type === 'dm' && user && withUser) {
+        sql = `SELECT * FROM chat_messages WHERE recipient IS NOT NULL
+               AND ((sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?))
+               AND timestamp > ?
+               ORDER BY timestamp ASC`;
+        params = [user, withUser, withUser, user, sinceTs];
+    } else {
+        return res.status(400).json({ error: 'Invalid params' });
     }
 
-    // Fire-and-forget — DO NOT await
-    clEngine.syncOSHAFromAPI({
-        apiKey: apiKey || process.env.DOL_API_KEY,
-        states: Array.isArray(states) ? states : (states ? [states] : []),
-        daysBack: parseInt(daysBack) || 365,
-        maxRecords: parseInt(maxRecords) || 50000,
-        onProgress: (update) => {
-            job.progress.push(update.message);
-            job.imported = update.imported;
-            job.skipped  = update.skipped;
-        },
-    }).then((result) => {
-        job.status   = 'done';
-        job.imported = result.imported;
-        job.skipped  = result.skipped;
-        job.pages    = result.pages;
-        job.message  = result.message;
-        job.log      = result.log;
-        job.finished = Date.now();
-    }).catch((err) => {
-        console.error('OSHA API sync error:', err);
-        job.status  = 'error';
-        job.error   = err.message;
-        job.finished = Date.now();
+    db.all(sql, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const messages = (rows || []).map(r => ({
+            ...r,
+            read_by: (() => { try { return JSON.parse(r.read_by || '[]'); } catch(e) { return []; } })()
+        }));
+        res.json({ messages });
     });
-
-    res.json({ jobId, status: 'running', message: 'Sync started in background' });
 });
 
-// GET /api/commercial-leads/sync-status/:jobId
+// POST /api/chat/send  { sender, recipient, message }
+app.post('/api/chat/send', (req, res) => {
+    const { sender, recipient, message } = req.body || {};
+    if (!sender || !message) return res.status(400).json({ error: 'Missing fields' });
+    const readBy = JSON.stringify([sender]);
+    db.run(
+        `INSERT INTO chat_messages (sender, recipient, message, read_by) VALUES (?, ?, ?, ?)`,
+        [sender.toLowerCase(), recipient ? recipient.toLowerCase() : null, message, readBy],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            db.get('SELECT * FROM chat_messages WHERE id = ?', [this.lastID], (err2, row) => {
+                if (err2 || !row) return res.json({ ok: true, id: this.lastID });
+                res.json({ ok: true, message: { ...row, read_by: JSON.parse(row.read_by || '[]') } });
+            });
+        }
+    );
+});
+
+// POST /api/chat/mark-read  { messageIds: [1,2,3], username: 'grant' }
+app.post('/api/chat/mark-read', (req, res) => {
+    const { messageIds, username } = req.body || {};
+    if (!Array.isArray(messageIds) || !username) return res.status(400).json({ error: 'Missing fields' });
+    const user = username.toLowerCase();
+    let pending = messageIds.length;
+    if (pending === 0) return res.json({ ok: true });
+    messageIds.forEach(id => {
+        db.get('SELECT read_by FROM chat_messages WHERE id = ?', [id], (err, row) => {
+            if (!err && row) {
+                let readers = [];
+                try { readers = JSON.parse(row.read_by || '[]'); } catch(e) {}
+                if (!readers.includes(user)) {
+                    readers.push(user);
+                    db.run('UPDATE chat_messages SET read_by = ? WHERE id = ?', [JSON.stringify(readers), id]);
+                }
+            }
+            if (--pending === 0) res.json({ ok: true });
+        });
+    });
+});
+
+// GET /api/chat/unread-count?username=grant
+app.get('/api/chat/unread-count', (req, res) => {
+    const { username } = req.query;
+    if (!username) return res.status(400).json({ error: 'Missing username' });
+    const user = username.toLowerCase();
+    db.all(
+        `SELECT id, read_by FROM chat_messages WHERE sender != ? AND (recipient IS NULL OR recipient = ?)`,
+        [user, user],
+        (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            let count = 0;
+            (rows || []).forEach(r => {
+                try {
+                    const readers = JSON.parse(r.read_by || '[]');
+                    if (!readers.includes(user)) count++;
+                } catch(e) {}
+            });
+            res.json({ count });
+        }
+    );
+});
+
+// POST /api/chat/typing  { sender, tab }
+const _chatTypingState = {}; // { tab: { username: timestamp } }
+app.post('/api/chat/typing', (req, res) => {
+    const { sender, tab } = req.body || {};
+    if (!sender || !tab) return res.status(400).json({ error: 'Missing fields' });
+    if (!_chatTypingState[tab]) _chatTypingState[tab] = {};
+    _chatTypingState[tab][sender.toLowerCase()] = Date.now();
+    res.json({ ok: true });
+});
+
+// GET /api/chat/typing?tab=group&me=hunter
+app.get('/api/chat/typing', (req, res) => {
+    const { tab, me } = req.query;
+    if (!tab) return res.status(400).json({ error: 'Missing tab' });
+    const now = Date.now();
+    const typing = Object.entries(_chatTypingState[tab] || {})
+        .filter(([user, ts]) => now - ts < 4000 && user !== (me || '').toLowerCase())
+        .map(([user]) => user);
+    res.json({ typing });
+});
+
+// ─── End Team Chat API ────────────────────────────────────────────────────────
+
+// ─── Commercial Leads API ─────────────────────────────────────────────────────
+const cl = require('./commercial-leads');
+const clUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+const _clJobs = {}; // in-memory async job store
+
+// NAICS map for industry autocomplete
+app.get('/api/commercial-leads/naics-map', (req, res) => {
+    res.json(cl.NAICS_MAP.map(e => ({ sub: e.sub, vertical: e.vertical, prefix: e.prefix })));
+});
+
+// Source status (record counts, last sync)
+app.get('/api/commercial-leads/source-status', async (req, res) => {
+    try { res.json(await cl.getSourceStatus()); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Generate leads from local DB + live sources
+app.post('/api/commercial-leads/generate', (req, res) => {
+    const jobId = 'gen-' + Date.now();
+    _clJobs[jobId] = { status: 'running', leads: [], errors: [] };
+    cl.generateCommercialLeads(req.body || {}).then(result => {
+        const job = _clJobs[jobId];
+        if (job) { job.status = 'done'; job.leads = result.leads || []; job.errors = result.errors || []; }
+    }).catch(err => {
+        const job = _clJobs[jobId];
+        if (job) { job.status = 'error'; job.error = err.message; }
+    });
+    res.json({ jobId });
+});
+
+// Start async OSHA sync from DOL API — returns a jobId to poll
+app.post('/api/commercial-leads/sync-osha-api', (req, res) => {
+    const jobId = 'osha-' + Date.now();
+    _clJobs[jobId] = { status: 'running', imported: 0, skipped: 0, progress: [] };
+    cl.syncOSHAFromAPI({
+        ...req.body,
+        onProgress: (msg) => {
+            const job = _clJobs[jobId];
+            if (!job) return;
+            if (msg.type === 'progress' || msg.type === 'error') {
+                job.imported = msg.imported || job.imported;
+                job.skipped  = msg.skipped  || job.skipped;
+                job.progress.push(msg.message || String(msg));
+                if (job.progress.length > 50) job.progress.shift();
+            }
+        },
+    }).then(result => {
+        const job = _clJobs[jobId];
+        if (job) { job.status = 'done'; job.imported = result.imported; job.skipped = result.skipped; job.log = result.log || job.progress; }
+    }).catch(err => {
+        const job = _clJobs[jobId];
+        if (job) { job.status = 'error'; job.error = err.message; }
+    });
+    res.json({ jobId });
+});
+
+// Poll job status
 app.get('/api/commercial-leads/sync-status/:jobId', (req, res) => {
-    const job = _oshaSyncJobs.get(req.params.jobId);
-    if (!job) return res.status(404).json({ error: 'Job not found or expired' });
+    const job = _clJobs[req.params.jobId];
+    if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
 });
 
-// GET /api/commercial-leads/naics-map  — returns classification reference
-app.get('/api/commercial-leads/naics-map', (req, res) => {
-    res.json(clEngine.NAICS_MAP);
-});
-
-// POST /api/commercial-leads/enrich  — Google Places phone lookup for one or more businesses
-// Body: { businesses: [{name, city, state, sourceId?}] }
-// Cache-first: checks cl_businesses by source_id before calling Google.
-// Saves enriched phone/website back to cl_businesses so repeat enrichments are free.
-app.post('/api/commercial-leads/enrich', async (req, res) => {
-    const PLACES_KEY = process.env.GOOGLE_PLACES_API_KEY;
-    if (!PLACES_KEY) return res.status(500).json({ error: 'GOOGLE_PLACES_API_KEY not configured' });
-
-    const list = req.body.businesses
-        ? req.body.businesses
-        : [{ name: req.body.name, city: req.body.city, state: req.body.state, sourceId: req.body.sourceId }];
-
-    // Helper: read cached enrichment from DB by source_id
-    function getCached(sourceId) {
-        return new Promise(resolve => {
-            if (!sourceId) return resolve(null);
-            db.get('SELECT phone, website, email, address FROM cl_businesses WHERE source_id=? AND phone IS NOT NULL AND phone != ""', [sourceId], (err, row) => {
-                resolve(err || !row ? null : { phone: row.phone, website: row.website, email: row.email, streetAddress: row.address || null });
-            });
-        });
-    }
-
-    // Helper: persist enriched data back to DB
-    function saveEnriched(sourceId, phone, website, email) {
-        if (!sourceId || !phone) return;
-        db.run('UPDATE cl_businesses SET phone=?, website=?, email=? WHERE source_id=?', [phone, website || null, email || null, sourceId]);
-    }
-
-    // Helper: scrape a website homepage for email addresses (3s timeout)
-    async function scrapeEmail(websiteUrl) {
-        if (!websiteUrl) return null;
-        try {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 3000);
-            const res = await fetch(websiteUrl, {
-                signal: ctrl.signal,
-                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VanguardCRM/1.0)' },
-            });
-            clearTimeout(timer);
-            if (!res.ok) return null;
-            const html = await res.text();
-            const mailtoMatch = html.match(/mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
-            if (mailtoMatch) return mailtoMatch[1].toLowerCase();
-            const emailMatch = html.match(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g);
-            if (emailMatch) {
-                const filtered = emailMatch.filter(e =>
-                    !e.match(/\.(png|jpg|gif|svg|css|js|woff|ttf)$/i) &&
-                    !e.includes('sentry') && !e.includes('example') && !e.includes('noreply') && !e.includes('no-reply')
-                );
-                if (filtered.length) return filtered[0].toLowerCase();
-            }
-        } catch (_) { /* timeout or network error — skip */ }
-        return null;
-    }
-
-    // Process one business: cache check → Google Places → website scrape
-    async function enrichOne(biz) {
-        try {
-            const cached = await getCached(biz.sourceId);
-            if (cached) return { ...biz, phone: cached.phone, website: cached.website, email: cached.email, streetAddress: cached.streetAddress, cached: true };
-
-            const searchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Goog-Api-Key': PLACES_KEY,
-                    'X-Goog-FieldMask': 'places.id,places.displayName,places.nationalPhoneNumber,places.websiteUri,places.formattedAddress',
-                },
-                body: JSON.stringify({ textQuery: `${biz.name} ${biz.city} ${biz.state}` }),
-            });
-            const searchData = await searchRes.json();
-            const place   = (searchData.places || [])[0];
-            const phone   = place?.nationalPhoneNumber || null;
-            const website = place?.websiteUri || null;
-            const email   = await scrapeEmail(website);
-            // Street address only (everything before the first comma)
-            const streetAddress = place?.formattedAddress
-                ? place.formattedAddress.split(',')[0].trim()
-                : null;
-
-            saveEnriched(biz.sourceId, phone, website, email);
-            return { ...biz, phone, website, email, streetAddress, cached: false };
-        } catch (e) {
-            return { ...biz, phone: null, website: null, email: null, error: e.message };
-        }
-    }
-
-    // Run in parallel batches of 10 to stay within Google QPS limits
-    const BATCH = 10;
-    const results = new Array(list.length);
-    for (let i = 0; i < list.length; i += BATCH) {
-        const batch = list.slice(i, i + BATCH);
-        const batchResults = await Promise.all(batch.map(enrichOne));
-        batchResults.forEach((r, j) => { results[i + j] = r; });
-        // Brief pause between batches
-        if (i + BATCH < list.length) await new Promise(r => setTimeout(r, 200));
-    }
-    res.json({ results });
-});
-
-// ─── Settings File Manager ────────────────────────────────────────────────────
-const UPLOADS_DIR = '/home/corp06/uploads';
-const fileUpload = multer({ storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-    filename: (req, file, cb) => cb(null, file.originalname),
-}) });
-
-app.post('/api/files/upload', fileUpload.single('file'), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file received' });
-    res.json({ filename: req.file.originalname, size: req.file.size, path: `${UPLOADS_DIR}/${req.file.originalname}` });
-});
-
-app.get('/api/files/list', (req, res) => {
-    const fs = require('fs');
+// Import OSHA CSV file
+app.post('/api/commercial-leads/import-osha', clUpload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     try {
-        const files = fs.readdirSync(UPLOADS_DIR).map(name => {
-            const stat = fs.statSync(`${UPLOADS_DIR}/${name}`);
-            return { name, size: stat.size, path: `${UPLOADS_DIR}/${name}`, modified: stat.mtime.toLocaleDateString() };
-        }).sort((a, b) => b.modified - a.modified);
-        res.json({ files });
-    } catch (e) { res.json({ files: [] }); }
+        const csvText = req.file.buffer.toString('utf8');
+        const stateFilter = req.body.state || '';
+        const result = await cl.importOSHACSV(csvText, stateFilter);
+        res.json(result);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/files/delete', (req, res) => {
-    const fs = require('fs');
-    const { filename } = req.body || {};
-    if (!filename || filename.includes('/') || filename.includes('..')) return res.status(400).json({ error: 'Invalid filename' });
-    try { fs.unlinkSync(`${UPLOADS_DIR}/${filename}`); res.json({ ok: true }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+// Enrich businesses via Google Places (passes through to generateCommercialLeads)
+app.post('/api/commercial-leads/enrich', async (req, res) => {
+    try {
+        const { businesses, name, city, state } = req.body || {};
+        const list = businesses || (name ? [{ name, city, state }] : []);
+        if (!list.length) return res.json({ results: [] });
+        const results = [];
+        for (const biz of list) {
+            try {
+                const r = await cl.generateCommercialLeads({
+                    sources: ['google_places'],
+                    industry: biz.name,
+                    state: biz.state || '',
+                    gpMax: 1,
+                    maxResults: 1,
+                });
+                const lead = (r.leads || [])[0] || {};
+                results.push({ phone: lead.phone || '', website: lead.website || '', email: lead.email || '', streetAddress: lead.streetAddress || lead.address || '' });
+            } catch { results.push({}); }
+        }
+        res.json({ results });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// ─── End Commercial Leads API ─────────────────────────────────────────────────
+
+// ─── iOS Client Portal API ────────────────────────────────────────────────────
+const portalApi = require('./portal-api');
+app.use('/api/portal', portalApi);
+// ─── End iOS Client Portal API ───────────────────────────────────────────────
 
 // Export database for use in other modules
 module.exports = { db };

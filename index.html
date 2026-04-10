@@ -43,9 +43,15 @@
     <script src="js/fix-localStorage-quota.js?v=1"></script>
     <script src="js/disable-heavy-scripts.js?v=1"></script>
     <script>
-        // Check authentication first
+        // Redirect #mobile hash to the client portal app
+        if (window.location.hash === '#mobile') {
+            window.location.href = '/mobile.html';
+        }
+
+        // Check authentication first — redirect to the portal the user last used
         if (!sessionStorage.getItem('vanguard_user')) {
-            window.location.href = '/login.html';
+            const portal = localStorage.getItem('vanguard_login_portal');
+            window.location.href = (portal === 'united') ? '/login-united.html' : '/login.html';
         }
 
         // Set up PDF.js worker
@@ -648,6 +654,7 @@
                             <a href="#" onclick="openNotepad(); return false;"><i class="fas fa-sticky-note"></i> Notepad</a>
                             <a href="#" onclick="openTodoList(); return false;"><i class="fas fa-tasks"></i> Todo List</a>
                             <a href="#" onclick="openCalendar(); return false;"><i class="fas fa-calendar-alt"></i> Calendar</a>
+                            <a href="#" onclick="openTeamChat(); return false;"><i class="fas fa-comments"></i> Team Chat</a>
                         </div>
                     </li>
                     <li><a href="#integrations" class="nav-link">Integrations</a></li>
@@ -757,10 +764,20 @@
                                     brandText.textContent = 'United Software';
                                     console.log('🏢 Updated company name to United Software for Maureen');
                                 }
+                                const logo = document.querySelector('.nav-brand .logo');
+                                if (logo) {
+                                    logo.src = 'https://raw.githubusercontent.com/Corptech02/LLCinfo/main/United_Insurance.webp';
+                                    logo.alt = 'United Insurance';
+                                }
                             } else {
                                 const brandText = document.querySelector('.brand-text h1');
                                 if (brandText) {
                                     brandText.textContent = 'Vanguard Software';
+                                }
+                                const logo = document.querySelector('.nav-brand .logo');
+                                if (logo) {
+                                    logo.src = 'images/V-Logo.png';
+                                    logo.alt = 'Vanguard Insurance Group';
                                 }
                             }
 
@@ -1045,6 +1062,12 @@
                                 <span>Leads</span>
                             </a>
                         </li>
+                        <li id="archived-leads-nav-item" style="display: none;">
+                            <a href="#archived-leads" data-tooltip="Archived Leads">
+                                <i class="fas fa-archive"></i>
+                                <span>Archived Leads</span>
+                            </a>
+                        </li>
                         <li>
                             <a href="#clients" data-tooltip="Clients">
                                 <i class="fas fa-users"></i>
@@ -1088,7 +1111,7 @@
                         </li>
                     </ul>
                 </div>
-                <div class="menu-section">
+                <div class="menu-section" id="admin-menu-section">
                     <h3>Administration</h3>
                     <ul>
                         <li>
@@ -1656,7 +1679,7 @@
     <script src="js/vanguard-softphone.js?v=9"></script>
     <script src="js/sip-integration-bridge.js?v=1"></script>
     <script src="js/force-policies-refresh.js?v=1"></script>
-    <script src="js/app.js?v=STATE_LABELS_V5"></script>
+    <script src="js/app.js?v=20260410s"></script>
 
     <!-- Vicidial Stage Sync - Bidirectional synchronization -->
     <script src="js/vicidial-stage-sync.js?v=1"></script>
@@ -1816,7 +1839,7 @@
 
     <!-- My Leads Only Toggle - Direct Implementation -->
     <!-- <script src="js/my-leads-toggle.js?v=9"></script> DISABLED - Complex approach -->
-    <script src="js/my-leads-toggle-direct.js?v=3"></script>
+    <script src="js/my-leads-toggle-direct.js?v=4"></script>
 
     <!-- Twilio Voice WebRTC Softphone (proper Twilio implementation) -->
     <script src="js/twilio-voice-webrtc-phone.js?v=9"></script>
@@ -1825,7 +1848,7 @@
     <script src="asterisk-sip-config.js?v=1"></script>
 
     <!-- Archived Leads Functionality -->
-    <script src="js/archived-leads-functionality.js?v=3"></script>
+    <script src="js/archived-leads-functionality.js?v=STANDALONE_V1"></script>
 
     <!-- NUCLEAR HIGHLIGHTING FIX - Bulletproof highlighting that cannot be removed -->
     <!-- <script src="js/nuclear-highlighting-fix.js?v=6"></script> DISABLED - Intercepting viewLead -->
@@ -1849,12 +1872,12 @@
     <script src="js/fix-archived-leads-permanent.js?v=2"></script>
     <script src="js/ai-functions-fallback.js"></script>
     <script src="debug-agent-save.js"></script>
-    <script src="js/policy-modal.js?v=33"></script>
+    <script src="js/policy-modal.js?v=35"></script>
     <script src="js/policy-quickfill.js?v=1"></script>
     <script src="js/fix-policy-server-save.js?v=1"></script>
     <script src="js/policy-to-client-auto-sync.js?v=1"></script>
     <script src="js/admin-coi-upload-enhancement.js?v=1"></script>
-    <script src="js/debug-policy-modal.js?v=1"></script>
+    <script src="js/debug-policy-modal.js?v=2"></script>
     <script src="js/universal-coi-upload.js?v=1"></script>
     <script src="js/fix-policy-types.js"></script>
     <!-- Removed carrier-profile-fixed.js to avoid conflicts -->
@@ -2014,7 +2037,7 @@
     <script src="js/fix-policy-stats.js?v=1"></script>
 
     <!-- Fix Policy Display Limit - Resolves 2-policy display limitation -->
-    <script src="js/fix-policy-display-limit.js?v=1"></script>
+    <script src="js/fix-policy-display-limit.js?v=2"></script>
 
     <!-- Policy Fix - Ensures policies always load from server first -->
     <script src="js/policy-fix.js?v=1"></script>
@@ -2611,7 +2634,7 @@
     <script src="js/force-freeze-timestamps.js"></script>
     <script src="js/force-quote-modal-front.js"></script>
     <script src="js/enhanced-quote-form.js"></script>
-    <script src="js/enhanced-quote-modal.js?v=NOT_40K_1K_v33"></script>
+    <script src="js/enhanced-quote-modal.js?v=NOT_40K_1K_v36"></script>
 
     <!-- Independent Agent Tracking System - Load Early -->
     <script src="js/independent-agent-tracking.js"></script>
@@ -3715,5 +3738,7 @@
     <!-- REMOVED: Scripts moved earlier to ensure loading -->
     <!-- Plaid Link SDK -->
     <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+
+
 </body>
 </html>
