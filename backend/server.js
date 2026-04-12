@@ -287,6 +287,13 @@ function initializeDatabase() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Renewal tasks table (tasks stored by policy ID)
+    db.run(`CREATE TABLE IF NOT EXISTS renewal_tasks (
+        policy_id TEXT PRIMARY KEY,
+        tasks TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // COI Email tables
     db.run(`CREATE TABLE IF NOT EXISTS coi_emails (
         id TEXT PRIMARY KEY,
@@ -6279,6 +6286,27 @@ app.delete('/api/renewal-completions/:policyKey', (req, res) => {
         }
         res.json({ success: true, deleted: this.changes });
     });
+});
+
+// Renewal tasks endpoints (tasks stored by policy ID)
+app.get('/api/renewal-tasks/:policyId', (req, res) => {
+    db.get('SELECT tasks FROM renewal_tasks WHERE policy_id = ?', [req.params.policyId], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ tasks: row ? JSON.parse(row.tasks) : null });
+    });
+});
+
+app.post('/api/renewal-tasks/:policyId', (req, res) => {
+    const { tasks } = req.body;
+    if (!tasks) return res.status(400).json({ error: 'tasks required' });
+    db.run(
+        `INSERT OR REPLACE INTO renewal_tasks (policy_id, tasks, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+        [req.params.policyId, JSON.stringify(tasks)],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
 });
 
 // Serve uploaded files
