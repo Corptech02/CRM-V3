@@ -323,8 +323,38 @@ async function loadClientsFromServer(limit = 500) {
             const serverClientIds = new Set(serverClients.map(c => String(c.id)));
             const localOnlyClients = existingLocalClients.filter(c => c.id && !serverClientIds.has(String(c.id)));
             const mergedClients = [...serverClients, ...localOnlyClients];
-            localStorage.setItem('insurance_clients', JSON.stringify(mergedClients));
-            console.log(`💾 Stored ${mergedClients.length} clients in localStorage (${localOnlyClients.length} local-only preserved)`);
+
+            // === Suppress business-name-only duplicate records ===
+            // E.g. "CHRIS STEVENS TRUCKING LLC" is suppressed because person client
+            // "Christopher Stevens" already has businessName = "Chris Stevens Trucking LLC".
+            const _BIZ_RE   = /\b(llc|l\.l\.c|inc|incorporated|corp|corporation|ltd|limited|lp|l\.p|trucking|transport|transportation|logistics|hauling|construction|farms|enterprises|services|solutions|towing)\b/i;
+            const _isBizOnly = (c) => _BIZ_RE.test(c.name || '');
+            const _nb        = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+            const _np        = (ph) => (ph || '').replace(/\D/g, '');
+
+            const _pBizKeys = new Set();
+            const _pPhones  = new Set();
+            mergedClients.forEach(c => {
+                if (_isBizOnly(c)) return;
+                if (c.businessName) _pBizKeys.add(_nb(c.businessName));
+                const ph = _np(c.phone);
+                if (ph.length >= 10) _pPhones.add(ph);
+            });
+            const _toSuppress = new Set();
+            mergedClients.forEach(c => {
+                if (!_isBizOnly(c)) return;
+                const bk = _nb(c.name);
+                const ph = _np(c.phone);
+                if ((bk && _pBizKeys.has(bk)) || (ph.length >= 10 && _pPhones.has(ph))) {
+                    _toSuppress.add(String(c.id));
+                }
+            });
+            const dedupedClients = _toSuppress.size > 0
+                ? mergedClients.filter(c => !_toSuppress.has(String(c.id)))
+                : mergedClients;
+
+            localStorage.setItem('insurance_clients', JSON.stringify(dedupedClients));
+            console.log(`💾 Stored ${dedupedClients.length} clients in localStorage (${mergedClients.length - dedupedClients.length} biz-name dupes suppressed, ${localOnlyClients.length} local-only preserved)`);
 
             // Store pagination info for later use
             if (data.total) {
@@ -4447,6 +4477,13 @@ function loadContent(section) {
     console.log('🔥 DEBUG: loadContent called with section:', section);
     console.log('🔥 DEBUG: Current location:', window.location.href);
 
+    // Increment navigation generation counter — async view loaders check this to abort stale renders
+    window._navGen = (window._navGen || 0) + 1;
+
+    // Remove the no-flash CSS injected early in index.html (if present)
+    const _dcHide = document.getElementById('_dcHide');
+    if (_dcHide) _dcHide.remove();
+
     // Get dashboard content area
     let dashboardContent = document.querySelector('.dashboard-content');
     console.log('🔥 DEBUG: Dashboard content element found:', !!dashboardContent);
@@ -7763,6 +7800,9 @@ window.generateLeadsReport = function() {
 async function loadLeadsView() {
     console.log('loadLeadsView called - loading leads view');
 
+    // Capture navigation generation so we can abort if user navigates away during async work
+    const _myNavGen = window._navGen || 0;
+
     // Clear any timeouts immediately
     if (window.leadsViewTimeout) {
         clearTimeout(window.leadsViewTimeout);
@@ -8731,6 +8771,12 @@ async function loadLeadsView() {
         </div>
     `;
         
+        // Abort if user navigated away while we were loading
+        if (window._navGen !== _myNavGen) {
+            console.log('⚡ loadLeadsView: navigation changed during load, aborting render');
+            return;
+        }
+
         // Set the HTML
         dashboardContent.innerHTML = html;
 
@@ -8780,7 +8826,9 @@ async function loadLeadsView() {
         console.error('Error in loadLeadsView:', error);
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
-        dashboardContent.innerHTML = `<div class="error-message">Error loading leads view: ${error.message}</div>`;
+        if (window._navGen === _myNavGen) {
+            dashboardContent.innerHTML = `<div class="error-message">Error loading leads view: ${error.message}</div>`;
+        }
     }
     // Removed finally block and loading flags - no more blocking
 }
@@ -10812,7 +10860,60 @@ async function generateClientRows(page = 1) {
         }
     });
 
-    clients = uniqueClients;
+    // === Second pass: suppress business-name-only duplicate client records ===
+    // When IVANS auto-creates a client from a business name (e.g. "CHRIS STEVENS TRUCKING LLC"),
+    // a real person record also exists (e.g. "Christopher Stevens" with businessName = "Chris Stevens Trucking LLC").
+    // Suppress the business-name-only record so only the person record is shown.
+    const _BIZ_SUFFIX_RE = /\b(llc|l\.l\.c|inc|incorporated|corp|corporation|ltd|limited|lp|l\.p|trucking|transport|transportation|logistics|hauling|construction|farms|enterprises|services|solutions|towing)\b/i;
+    const _isBizNameOnly = (c) => _BIZ_SUFFIX_RE.test(c.name || '');
+    const _normPhone     = (ph) => (ph || '').replace(/\D/g, '');
+    const _normBiz       = (s)  => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+    // Collect business name keys and phones claimed by real person clients
+    const _personBizKeys  = new Set();
+    const _personPhones   = new Set();
+    uniqueClients.forEach(c => {
+        if (_isBizNameOnly(c)) return;
+        if (c.businessName) _personBizKeys.add(_normBiz(c.businessName));
+        const ph = _normPhone(c.phone);
+        if (ph.length >= 10) _personPhones.add(ph);
+    });
+
+    const _suppressedIds = new Set();
+    uniqueClients.forEach(c => {
+        if (!_isBizNameOnly(c)) return;
+        const myBizKey = _normBiz(c.name);
+        const myPhone  = _normPhone(c.phone);
+        // Suppress if a person client claims this business name OR shares the same phone
+        if ((myBizKey && _personBizKeys.has(myBizKey)) ||
+            (myPhone.length >= 10 && _personPhones.has(myPhone))) {
+            _suppressedIds.add(c.id);
+        }
+    });
+
+    // Also suppress duplicate person-name records sharing the same phone
+    // (e.g. "BRIGETTE LOREN EVANS" vs "BRIGETTE Evans") — keep mixed-case / oldest
+    const _personPhoneGroups = {};
+    uniqueClients.forEach(c => {
+        if (_isBizNameOnly(c) || _suppressedIds.has(c.id)) return;
+        const ph = _normPhone(c.phone);
+        if (ph.length >= 10) {
+            if (!_personPhoneGroups[ph]) _personPhoneGroups[ph] = [];
+            _personPhoneGroups[ph].push(c);
+        }
+    });
+    Object.values(_personPhoneGroups).forEach(group => {
+        if (group.length < 2) return;
+        const sorted = [...group].sort((a, b) => {
+            const aAllCaps = (a.name || '') === (a.name || '').toUpperCase();
+            const bAllCaps = (b.name || '') === (b.name || '').toUpperCase();
+            if (aAllCaps !== bAllCaps) return aAllCaps ? 1 : -1; // prefer mixed-case (manual entry)
+            return String(a.id) < String(b.id) ? -1 : 1;         // prefer older (first-created)
+        });
+        sorted.slice(1).forEach(c => _suppressedIds.add(c.id));
+    });
+
+    clients = uniqueClients.filter(c => !_suppressedIds.has(c.id));
     console.log('generateClientRows - Found unique clients:', clients.length);
     
     // If no clients, show a message
@@ -11384,6 +11485,21 @@ function loadPoliciesView() {
     // Load policies from localStorage first, then update from server in background
     let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
     console.log('📊 Loading policies from localStorage:', policies.length);
+
+    // ── Filter by agent BEFORE computing stats — prevents total premium leaking to non-admins ──
+    if (currentUser && currentUser.toLowerCase() === 'maureen') {
+        policies = policies.filter(p => {
+            const a = (p.assignedTo || p.agent || p.assignedAgent || p.producer || 'Grant').toLowerCase();
+            return a === 'maureen';
+        });
+    } else if (!isAdmin && currentUser) {
+        const _cu = currentUser.toLowerCase();
+        policies = policies.filter(p => {
+            const a = (p.assignedTo || p.agent || p.assignedAgent || p.producer || 'Grant').toLowerCase();
+            return a === _cu;
+        });
+    }
+    // ─────────────────────────────────────────────────────────────────────────────────────────
 
     // Update from server in background (non-blocking)
     if (window.loadPoliciesFromServer) {
@@ -12222,17 +12338,12 @@ function showRenewalProfile(policyId) {
         
         <div class="profile-layout" style="display: block;">
             <div class="profile-main-content" style="width: 100%;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div class="profile-tabs">
-                        <button class="profile-tab active" onclick="switchProfileTab('tasks')">
-                            <i class="fas fa-tasks"></i> Tasks
-                        </button>
-                        <button class="profile-tab" onclick="switchProfileTab('submissions')">
-                            <i class="fas fa-file-alt"></i> Submissions
-                        </button>
-                    </div>
-                    <button onclick="viewPolicy('${policyId}')" style="background: #3b82f6; color: white; border: none; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap;">
-                        <i class="fas fa-external-link-alt"></i> View Policy
+                <div class="profile-tabs">
+                    <button class="profile-tab active" onclick="switchProfileTab('tasks')">
+                        <i class="fas fa-tasks"></i> Tasks
+                    </button>
+                    <button class="profile-tab" onclick="switchProfileTab('submissions')">
+                        <i class="fas fa-file-alt"></i> Submissions
                     </button>
                 </div>
                 <div id="profileTabContent" class="tab-content">
@@ -12361,39 +12472,16 @@ function renderSubmissionsTab() {
     const progressivePremium = savedQuotes.progressive || '';
     const geicoPremium = savedQuotes.geico || '';
 
-    // Current policy premium for comparison
-    const currentPremiumRaw = rawPolicy.premium || rawPolicy.annualPremium || '';
-    const currentPremiumVal = parseFloat(currentPremiumRaw.toString().replace(/[^0-9.]/g, '')) || 0;
-
-    // Returns card border style based on quote vs current premium
-    function quoteBorder(val) {
-        const n = parseFloat((val + '').replace(/[^0-9.]/g, ''));
-        if (!val || isNaN(n) || currentPremiumVal === 0) return '2px solid #e5e7eb';
-        if (n > currentPremiumVal) return '2px solid #ef4444';
-        if (n < currentPremiumVal) return '2px solid #10b981';
-        return '2px solid #e5e7eb';
-    }
-    function quoteBg(val) {
-        const n = parseFloat((val + '').replace(/[^0-9.]/g, ''));
-        if (!val || isNaN(n) || currentPremiumVal === 0) return 'white';
-        if (n > currentPremiumVal) return '#fff5f5';
-        if (n < currentPremiumVal) return '#f0fff4';
-        return 'white';
-    }
-
     return `
         <div class="submissions-tab" style="padding: 5px 0;">
 
             <!-- Quote Submissions -->
             <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #e5e7eb;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0; color: #111827; font-size: 15px; font-weight: 600;">
-                        <i class="fas fa-file-alt" style="color: #0066cc; margin-right: 6px;"></i> Quote Submissions
-                    </h3>
-                    ${currentPremiumVal > 0 ? `<span style="font-size: 12px; color: #6b7280;">Current premium: <strong style="color: #111827;">$${currentPremiumVal.toLocaleString()}</strong></span>` : ''}
-                </div>
+                <h3 style="margin: 0 0 15px 0; color: #111827; font-size: 15px; font-weight: 600;">
+                    <i class="fas fa-file-alt" style="color: #0066cc; margin-right: 6px;"></i> Quote Submissions
+                </h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div data-quote-card="progressive-${currentPolicyId}" style="background: ${quoteBg(progressivePremium)}; padding: 15px; border-radius: 8px; border: ${quoteBorder(progressivePremium)}; transition: border 0.2s, background 0.2s;">
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 2px solid #e5e7eb;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                             <div style="width: 32px; height: 32px; background: #0066cc; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                 <i class="fas fa-car" style="color: white; font-size: 13px;"></i>
@@ -12405,10 +12493,9 @@ function renderSubmissionsTab() {
                                value="${progressivePremium}"
                                placeholder="$0.00"
                                style="width: 100%; margin-top: 5px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;"
-                               oninput="window._updateQuoteCardColor(this, ${currentPremiumVal})"
                                onblur="saveRenewalQuote('${currentPolicyId}', 'progressive', this.value)">
                     </div>
-                    <div data-quote-card="geico-${currentPolicyId}" style="background: ${quoteBg(geicoPremium)}; padding: 15px; border-radius: 8px; border: ${quoteBorder(geicoPremium)}; transition: border 0.2s, background 0.2s;">
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 2px solid #e5e7eb;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                             <div style="width: 32px; height: 32px; background: #00a651; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                 <i class="fas fa-shield-alt" style="color: white; font-size: 13px;"></i>
@@ -12420,7 +12507,6 @@ function renderSubmissionsTab() {
                                value="${geicoPremium}"
                                placeholder="$0.00"
                                style="width: 100%; margin-top: 5px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;"
-                               oninput="window._updateQuoteCardColor(this, ${currentPremiumVal})"
                                onblur="saveRenewalQuote('${currentPolicyId}', 'geico', this.value)">
                     </div>
                 </div>
@@ -12433,21 +12519,12 @@ function renderSubmissionsTab() {
                         <i class="fas fa-file-signature" style="margin-right: 6px;"></i> Application Submissions
                     </h3>
                     <button style="background: #10b981; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;"
-                            onclick="window._openRenewalQuoteApp ? window._openRenewalQuoteApp('${currentPolicyId}','${clientId}') : createQuoteApplicationForPolicy('${currentPolicyId}')">
+                            onclick="createQuoteApplicationForPolicy('${currentPolicyId}')">
                         <i class="fas fa-file-alt"></i> Quote Application
                     </button>
                 </div>
                 <div id="application-submissions-container-${clientId}" data-loading="false">
-                    ${(function(){
-                        if (window._renewalContainerMap) window._renewalContainerMap[currentPolicyId] = clientId;
-                        var policyLeadId = 'policy_' + currentPolicyId;
-                        var aliasId = 'application-submissions-container-' + policyLeadId;
-                        setTimeout(function() {
-                            var alias = document.getElementById(aliasId);
-                            if (alias && window.showApplicationSubmissions) window.showApplicationSubmissions(policyLeadId);
-                        }, 100);
-                        return '<div id="' + aliasId + '" style="width:100%;"><p style="color:#9ca3af;text-align:center;padding:20px;margin:0;">Loading...</p></div>';
-                    })()}
+                    <p style="color: #9ca3af; text-align: center; padding: 20px; margin: 0;">No applications submitted yet</p>
                 </div>
             </div>
 
@@ -12458,7 +12535,7 @@ function renderSubmissionsTab() {
                         <i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Loss Runs and Other Documentation
                     </h3>
                     <div style="display: flex; gap: 8px;">
-                        <button onclick="window._openRenewalEmailDocumentation ? window._openRenewalEmailDocumentation('${currentPolicyId}','${clientId}') : checkFilesAndOpenEmail('${clientId}')"
+                        <button onclick="checkFilesAndOpenEmail('${clientId}')"
                                 style="background: #0066cc; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
                             <i class="fas fa-envelope"></i> Email Documentation
                         </button>
@@ -12469,15 +12546,7 @@ function renderSubmissionsTab() {
                     </div>
                 </div>
                 <div id="loss-runs-container-${clientId}">
-                    ${(function(){
-                        var cid = clientId;
-                        setTimeout(function() {
-                            if (typeof protectedFunctions !== 'undefined' && protectedFunctions.loadLossRuns) {
-                                protectedFunctions.loadLossRuns(cid);
-                            }
-                        }, 150);
-                        return '<p style="color:#9ca3af;text-align:center;padding:20px;margin:0;">Loading...</p>';
-                    })()}
+                    <p style="color: #9ca3af; text-align: center; padding: 20px; margin: 0;">No loss runs uploaded yet</p>
                 </div>
             </div>
 
@@ -19005,7 +19074,7 @@ async function viewClient(id) {
     let client = null;
 
     try {
-        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
+        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
         console.log('📡 Fetching clients from:', `${API_URL}/api/clients`);
         const response = await fetch(`${API_URL}/api/clients`, {
             headers: {
@@ -19065,9 +19134,23 @@ async function viewClient(id) {
         console.log('✅ CLIENT FOUND! Proceeding to show profile for:', client.name);
     }
     
-    // Get all policies for this client from insurance_policies storage
-    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    
+    // Get all policies for this client - fetch from API first, fallback to localStorage
+    let allPolicies = [];
+    try {
+        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
+        const polRes = await fetch(`${API_URL}/api/policies?includeInactive=true`, {
+            headers: { 'Cache-Control': 'no-cache', 'Bypass-Tunnel-Reminder': 'true' }
+        });
+        if (polRes.ok) {
+            allPolicies = await polRes.json();
+        }
+    } catch(e) {
+        console.warn('Policy API fetch failed, using localStorage:', e);
+    }
+    if (!allPolicies.length) {
+        allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    }
+
     // Filter policies that belong to this client
     // Check by client ID, client name, or insured name
     const clientPolicies = allPolicies.filter(policy => {
@@ -20700,18 +20783,18 @@ function showPolicyDetailsModal(policy) {
                 </div>
                 
                 <!-- Tab Navigation -->
-                <div class="pv-tab-nav" style="margin-bottom: 30px; padding: 5px; background: #f3f4f6; border-radius: 10px; display: flex; flex-wrap: wrap;">
+                <div class="policy-tabs" style="margin-bottom: 30px; padding: 5px; background: #f3f4f6; border-radius: 10px;">
                     ${tabs.map((tab, index) => `
-                        <button class="pv-tab-btn ${index === 0 ? 'pv-active' : ''}" data-tab="${tab.id}" onclick="(function(btn,id){var m=document.getElementById('policyViewModal');if(!m)return;m.querySelectorAll('.pv-tab-section').forEach(function(el){el.style.display='none'});m.querySelectorAll('.pv-tab-btn').forEach(function(b){b.classList.remove('pv-active');b.style.background='transparent';b.style.color='#374151';b.style.boxShadow='none'});var tc=document.getElementById(id+'-view-content');if(tc){tc.style.display='block'}btn.classList.add('pv-active');btn.style.background='#0066cc';btn.style.color='white';btn.style.boxShadow='0 2px 4px rgba(0,102,204,0.3)'})(this,'${tab.id}')" style="padding: 14px 24px; font-size: 14px; border-radius: 8px; transition: all 0.2s; margin: 2px; border: none; cursor: pointer; font-weight: 500; background: ${index === 0 ? '#0066cc' : 'transparent'}; color: ${index === 0 ? 'white' : '#374151'}; box-shadow: ${index === 0 ? '0 2px 4px rgba(0,102,204,0.3)' : 'none'};">
+                        <button class="tab-btn ${index === 0 ? 'active' : ''}" data-tab="${tab.id}" onclick="switchViewTab('${tab.id}')" style="padding: 14px 24px; font-size: 14px; border-radius: 8px; transition: all 0.2s; margin: 2px;">
                             <i class="${tab.icon}" style="margin-right: 6px;"></i> ${tab.name}
                         </button>
                     `).join('')}
                 </div>
-
+                
                 <!-- Tab Contents -->
-                <div style="padding: 35px; background: #ffffff; border: 2px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                <div class="tab-contents" style="padding: 35px; background: #ffffff; border: 2px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
                     ${tabs.map((tab, index) => `
-                        <div id="${tab.id}-view-content" class="pv-tab-section" style="padding: 15px; display: ${index === 0 ? 'block' : 'none'};">
+                        <div id="${tab.id}-view-content" class="tab-content ${index === 0 ? 'active' : ''}" style="padding: 15px; display: ${index === 0 ? 'block' : 'none'};">
                             ${generateViewTabContent(tab.id, policy)}
                         </div>
                     `).join('')}
@@ -20732,30 +20815,7 @@ function showPolicyDetailsModal(policy) {
         </div>
     `;
 
-    // Remove any stale modal with the same ID before appending
-    const _existingModal = document.getElementById('policyViewModal');
-    if (_existingModal) _existingModal.remove();
-
     document.body.appendChild(modalOverlay);
-
-    // Install a clean, direct switchViewTab for this modal instance.
-    // All three addon scripts capture `window.switchViewTab` only at page-load time
-    // so overriding it here at runtime is safe and will persist until the next open.
-    window.switchViewTab = function(tabId) {
-        const _m = document.getElementById('policyViewModal');
-        if (!_m) return;
-        _m.querySelectorAll('.tab-content').forEach(function(el) {
-            el.style.display = 'none';
-            el.classList.remove('active');
-        });
-        _m.querySelectorAll('.tab-btn').forEach(function(btn) {
-            btn.classList.remove('active');
-        });
-        const _tc = document.getElementById(tabId + '-view-content');
-        if (_tc) { _tc.style.display = 'block'; _tc.classList.add('active'); }
-        const _tb = _m.querySelector('.tab-btn[data-tab="' + tabId + '"]');
-        if (_tb) _tb.classList.add('active');
-    };
 
     // Initialize ID cards display for this policy
     setTimeout(() => {
@@ -21092,27 +21152,16 @@ function generateViewTabContent(tabId, policy) {
                     </div>
                 `;
             }
-            const DRIVER_LABELS = {
-                name: 'Name', firstName: 'First Name', lastName: 'Last Name',
-                licenseNumber: 'License Number', licenseState: 'License State',
-                dateOfBirth: 'Date of Birth', dob: 'Date of Birth',
-                maritalStatus: 'Marital Status', relationship: 'Relationship',
-                yearsExperience: 'Years Experience', violations: 'Violations',
-                accidents: 'Accidents', excluded: 'Excluded',
-                cdl: 'CDL', cdlNumber: 'CDL Number', cdlClass: 'CDL Class',
-                hireDate: 'Hire Date', terminationDate: 'Termination Date',
-                gender: 'Gender', occupation: 'Occupation'
-            };
             return `
                 <div class="form-section" style="padding: 20px; background: #f9fafb; border-radius: 8px;">
                     <h3 style="margin-top: 0; margin-bottom: 25px; color: #111827; font-size: 20px;">Drivers</h3>
                     ${drivers.map((driver, index) => `
                         <div style="background: #ffffff; padding: 30px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
-                            <h4 style="margin-top: 0; color: #374151;">Driver ${index + 1}${driver.name ? ' — ' + driver.name : (driver.firstName ? ' — ' + driver.firstName + (driver.lastName ? ' ' + driver.lastName : '') : '')}</h4>
+                            <h4 style="margin-top: 0; color: #374151;">Driver ${index + 1}</h4>
                             <div class="view-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                 ${Object.entries(driver).filter(([key]) => key !== 'endorsements').map(([key, value]) => `
                                     <div class="view-item">
-                                        <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${DRIVER_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</label>
+                                        <label style="color: #6b7280; font-size: 13px; text-transform: uppercase; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.05em;">${key}</label>
                                         <p style="font-size: 14px; margin: 0;">${value || 'N/A'}</p>
                                     </div>
                                 `).join('')}
@@ -34725,228 +34774,12 @@ window.createQuoteApplicationForPolicy = function(policyId) {
     }
 };
 
-// Opens the quote application modal from the renewals profile and refreshes
-// the submissions container when the modal closes.
-// Map policyId → clientId so deleteQuoteApplication can refresh the renewals container
-window._renewalContainerMap = window._renewalContainerMap || {};
-
-// Email Documentation from renewals context — builds pseudo-lead from policy data
-window._openRenewalEmailDocumentation = async function(policyId, clientId) {
-    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    const policy = allPolicies.find(function(p) { return p.id === policyId; });
-    if (!policy) {
-        alert('Policy not found');
-        return;
-    }
-
-    const assignedTo = policy.assignedTo || policy.agent || '';
-    const isMaureen = assignedTo.toLowerCase() === 'maureen';
-
-    // Build a pseudo-lead object from policy fields so createEmailComposer works
-    // Must set .id = clientId so sendEmail() fetches files with the correct leadId
-    const pseudoLead = {
-        id: clientId,
-        name: policy.insuredName || policy.clientName || '',
-        dotNumber: policy.dotNumber || policy.dot || '',
-        renewalDate: policy.renewalDate || policy.expirationDate || policy.expDate || '',
-        assignedTo: assignedTo,
-        state: policy.state || (policy.insuredData && policy.insuredData['State']) || '',
-        email: policy.email || (policy.contact && policy.contact.email) || ''
-    };
-
-    // Build subject line
-    const renewalDate = pseudoLead.renewalDate
-        ? pseudoLead.renewalDate.replace(/\/\d{4}$/, '/2026').replace(/-\d{4}$/, '-2026')
-        : 'NULL';
-    const subject = 'Renewal: ' + renewalDate + ' - USDOT: ' + (pseudoLead.dotNumber || 'NULL') + ' - ' + (pseudoLead.name || 'NULL');
-
-    // Collect files from server using clientId
-    let allFiles = [];
-    try {
-        const response = await fetch('/api/loss-runs-upload?leadId=' + encodeURIComponent(clientId));
-        const serverData = await response.json();
-        if (serverData.success && serverData.files.length > 0) {
-            serverData.files.forEach(function(serverFile) {
-                const originalName = serverFile.file_name
-                    ? serverFile.file_name.replace(/^[a-f0-9]+_[0-9]+_/, '')
-                    : serverFile.filename;
-                allFiles.push({
-                    filename: serverFile.file_name || serverFile.filename,
-                    originalName: originalName,
-                    originalname: originalName,
-                    size: serverFile.file_size ? Math.round(serverFile.file_size / 1024) + ' KB' : '',
-                    type: serverFile.content_type || 'application/pdf',
-                    isServerFile: true,
-                    fileId: serverFile.id
-                });
-            });
-        }
-    } catch (e) {
-        console.warn('Could not load server files for renewal email:', e);
-    }
-
-    // For Maureen: install a self-restoring fetch interceptor BEFORE opening the modal.
-    // It fires exactly once on the /send-smtp call, swaps branding + routes to UIG account,
-    // then restores the original fetch. No DOMContentLoaded wrapper needed.
-    if (isMaureen) {
-        var _uigOrigFetch = window.fetch;
-        window.fetch = async function(url, options) {
-            if (typeof url === 'string' && url.includes('/api/outlook/send-smtp') && options && options.body) {
-                // Self-restore immediately so only this one call is intercepted
-                window.fetch = _uigOrigFetch;
-                try {
-                    var data = JSON.parse(options.body);
-                    if (data.body) {
-                        data.body = data.body
-                            .replace(/Vanguard Insurance Group LLC/g, 'United Insurance Group LLC')
-                            .replace(/Vanguard Insurance/g, 'United Insurance')
-                            .replace(/&copy; Vanguard/g, '&copy; United')
-                            .replace(/vigagency\.com/g, 'uigagency.com')
-                            .replace(/contact@vigagency\.com/gi, 'Contact@uigagency.com')
-                            .replace(/Visit vigagency\.com/g, 'Visit uigagency.com');
-                    }
-                    data.bcc = 'Contact@uigagency.com';
-                    data.account = 'uig';
-                    return _uigOrigFetch('/api/outlook/send-smtp', Object.assign({}, options, { body: JSON.stringify(data) }));
-                } catch(e) {
-                    return _uigOrigFetch(url, options);
-                }
-            }
-            return _uigOrigFetch(url, options);
-        };
-    }
-
-    if (typeof protectedFunctions !== 'undefined' && protectedFunctions.createEmailComposer) {
-        protectedFunctions.createEmailComposer(pseudoLead, subject, allFiles);
-
-        // For Maureen: swap VIG→UIG branding in the editable body textarea
-        if (isMaureen) {
-            setTimeout(function() {
-                var bodyField = document.getElementById('email-body-field');
-                if (bodyField) {
-                    bodyField.value = bodyField.value
-                        .replace(/Vanguard Insurance Group LLC/g, 'United Insurance Group LLC')
-                        .replace(/Vanguard Insurance/g, 'United Insurance')
-                        .replace(/vigagency\.com/g, 'uigagency.com')
-                        .replace(/contact@vigagency\.com/gi, 'Contact@uigagency.com')
-                        .replace(/VIG/g, 'UIG');
-                }
-            }, 50);
-        }
-    } else {
-        // Restore fetch if composer unavailable
-        if (isMaureen) window.fetch = _uigOrigFetch;
-        alert('Email composer not available');
-    }
-};
-
-// Live color update for quote cards vs current policy premium
-window._updateQuoteCardColor = function(input, currentPremiumVal) {
-    const card = input.closest('[data-quote-card]');
-    if (!card) return;
-    const n = parseFloat((input.value + '').replace(/[^0-9.]/g, ''));
-    if (!input.value || isNaN(n) || currentPremiumVal === 0) {
-        card.style.border = '2px solid #e5e7eb';
-        card.style.background = 'white';
-    } else if (n > currentPremiumVal) {
-        card.style.border = '2px solid #ef4444';
-        card.style.background = '#fff5f5';
-    } else {
-        card.style.border = '2px solid #10b981';
-        card.style.background = '#f0fff4';
-    }
-};
-
-window._openRenewalQuoteApp = function(policyId, clientId) {
-    const policyLeadId = 'policy_' + policyId;
-    const aliasId = 'application-submissions-container-' + policyLeadId;
-
-    // Track policyId→clientId so delete can refresh this container
-    window._renewalContainerMap[policyId] = clientId;
-
-    // showApplicationSubmissions looks for a container by policyLeadId.
-    // Create an alias div with that ID inside the visible renewals container so
-    // it finds it and renders the card directly there — no interception needed.
-    const visibleContainer = document.getElementById('application-submissions-container-' + clientId);
-    if (visibleContainer) {
-        visibleContainer.innerHTML = '<div id="' + aliasId + '" style="width:100%;"></div>';
-    }
-
-    // Register a post-save callback that enhanced-quote-modal checks for.
-    // This fires after the app is written to quote_applications in localStorage.
-    window._renewalPostSaveCallback = function() {
-        delete window._renewalPostSaveCallback;
-        setTimeout(function() {
-            // Ensure alias div still exists (may have been cleared)
-            const visContainer = document.getElementById('application-submissions-container-' + clientId);
-            if (visContainer && !document.getElementById(aliasId)) {
-                visContainer.innerHTML = '<div id="' + aliasId + '" style="width:100%;"></div>';
-            }
-            // Fetch fresh from server
-            if (window.showApplicationSubmissions) {
-                window.showApplicationSubmissions(policyLeadId);
-            }
-        }, 200);
-    };
-
-    window.createQuoteApplicationForPolicy(policyId);
-};
-
-// Override deleteQuoteApplication to always remove from localStorage (server may 404)
-// and refresh any visible renewals or policy-view containers for this policy.
-window.deleteQuoteApplication = function(appId) {
-    if (!confirm('Are you sure you want to delete this quote application?')) return;
-
-    // Find the app in localStorage to get its policyId
-    const allApps = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-    const app = allApps.find(a => a.id === appId);
-    const policyId = app ? (app.leadId || '').replace('policy_', '') : null;
-
-    // Remove from localStorage immediately
-    const updated = allApps.filter(a => a.id !== appId);
-    localStorage.setItem('quote_applications', JSON.stringify(updated));
-
-    // Refresh all visible containers for this policy
-    function refreshContainers() {
-        if (!policyId) return;
-        // Policy view modal container
-        var policyContainer = document.getElementById('application-submissions-container-policy_' + policyId);
-        if (policyContainer && window.renderPolicyApplicationSubmissions) {
-            policyContainer.innerHTML = window.renderPolicyApplicationSubmissions(policyId);
-        }
-        // Renewals panel container (mapped via _renewalContainerMap)
-        var clientId = window._renewalContainerMap && window._renewalContainerMap[policyId];
-        if (clientId) {
-            var renewalContainer = document.getElementById('application-submissions-container-' + clientId);
-            if (renewalContainer && window.renderPolicyApplicationSubmissions) {
-                renewalContainer.innerHTML = window.renderPolicyApplicationSubmissions(policyId);
-            }
-        }
-    }
-
-    refreshContainers();
-
-    // Also attempt server delete — silently ignore 404 (app may only exist in localStorage)
-    fetch('/api/quote-applications/' + appId, { method: 'DELETE' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success) {
-                console.log('✅ Quote application deleted from server:', appId);
-            } else {
-                console.log('ℹ️ Server delete returned:', data.error, '— already removed from localStorage');
-            }
-        })
-        .catch(function(err) {
-            console.log('ℹ️ Server delete failed (ignored):', err.message);
-        });
-};
-
 // Function to render policy application submissions
 window.renderPolicyApplicationSubmissions = function(policyId) {
     console.log('📋 renderPolicyApplicationSubmissions called for policy:', policyId);
 
     // Look in the correct storage location where applications are actually saved
-    const applications = JSON.parse(localStorage.getItem('quote_applications') || '[]');
+    const applications = JSON.parse(localStorage.getItem('appSubmissions') || '[]');
     console.log('📊 Total applications in storage:', applications.length);
 
     // Filter for applications that belong to this policy (stored as policy_POLICYID format)
@@ -35695,8 +35528,9 @@ window.handleCheckboxChange = function(type) {
                 alert('No email address found in Contact Information for this policy.');
             }
         } else if (type === 'agent') {
-            const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'Grant@vigagency.com', maureen: 'Maureen@vigagency.com', carson: 'Carson@vigagency.com' };
-            const _agentKey = (currentPolicy.agent || currentPolicy.assignedTo || '').toLowerCase().trim();
+            const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'grant@vigagency.com', maureen: 'maureen.corp@uigagency.com', carson: 'carson@vigagency.com' };
+            const _agentRaw = (currentPolicy.agent || currentPolicy.assignedTo || '').toLowerCase().trim();
+            const _agentKey = Object.keys(_agentEmailMap).find(k => _agentRaw.includes(k)) || _agentRaw;
             const agentEmail = currentPolicy.agentEmail || _agentEmailMap[_agentKey] || '';
 
             addCRMCOIEmailRecipient();
@@ -39496,40 +39330,3 @@ function filterTodosBySchedule(todos, scheduleView) {
     })();
 
 })(); // end Team Chat IIFE
-
-
-// Override deleteQuoteApplication after all scripts have loaded so this wins over final-profile-fix
-document.addEventListener('DOMContentLoaded', function() {
-    window.deleteQuoteApplication = function(appId) {
-        if (!confirm('Are you sure you want to delete this quote application?')) return;
-
-        // Remove from localStorage
-        var allApps = JSON.parse(localStorage.getItem('quote_applications') || '[]');
-        var app = allApps.find(function(a) { return a.id === appId; });
-        var policyId = app ? (app.leadId || '').replace('policy_', '') : null;
-        var updated = allApps.filter(function(a) { return a.id !== appId; });
-        localStorage.setItem('quote_applications', JSON.stringify(updated));
-
-        // Send DELETE to server (ignore 404 — server may already have it)
-        fetch('/api/quote-applications/' + appId, { method: 'DELETE' })
-            .catch(function() {});
-
-        // Refresh the renewals submissions container from server
-        if (policyId) {
-            var policyLeadId = 'policy_' + policyId;
-            var aliasId = 'application-submissions-container-' + policyLeadId;
-            var clientId = window._renewalContainerMap && window._renewalContainerMap[policyId];
-            var visibleContainer = clientId ? document.getElementById('application-submissions-container-' + clientId) : null;
-
-            // Ensure alias div exists inside visible container
-            if (visibleContainer && !document.getElementById(aliasId)) {
-                visibleContainer.innerHTML = '<div id="' + aliasId + '" style="width:100%;"></div>';
-            }
-
-            // Fetch fresh list from server
-            if (window.showApplicationSubmissions) {
-                window.showApplicationSubmissions(policyLeadId);
-            }
-        }
-    };
-});

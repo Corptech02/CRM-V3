@@ -16,7 +16,8 @@ window.generateClientRows = async function() {
         });
 
         if (response.ok) {
-            allClients = await response.json();
+            const _apiData = await response.json();
+            allClients = Array.isArray(_apiData) ? _apiData : (_apiData.clients || []);
             console.log(`✅ Loaded ${allClients.length} real clients from API`);
         } else {
             throw new Error('API failed');
@@ -41,8 +42,64 @@ window.generateClientRows = async function() {
         });
     }
 
-    console.log('Total clients:', allClients.length);
-    
+    console.log('Total clients (raw):', allClients.length);
+
+    // ── Deduplicate clients ──────────────────────────────────────────────────
+    // Pass 1: name+DOB identity key dedup
+    const _seenKeys = new Set();
+    const _uniqueAll = [];
+    allClients.forEach(c => {
+        const dob = c.dateOfBirth || c['Date of Birth'] || '';
+        const n   = (c.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+        const key = (n && dob) ? `${n}|${dob}` : n;
+        if (key && !_seenKeys.has(key)) { _seenKeys.add(key); _uniqueAll.push(c); }
+        else if (!key) { _uniqueAll.push(c); }
+    });
+
+    // Pass 2: suppress business-name-only records (LLC, Inc, Trucking, etc.)
+    // when a real person client already claims that business name or shares the same phone.
+    const _BIZ_RE  = /\b(llc|l\.l\.c|inc|incorporated|corp|corporation|ltd|limited|lp|l\.p|trucking|transport|transportation|logistics|hauling|construction|farms|enterprises|services|solutions|towing)\b/i;
+    const _isBiz   = (c) => _BIZ_RE.test(c.name || '');
+    const _np      = (ph) => (ph || '').replace(/\D/g, '');
+    const _nb      = (s)  => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+    const _pBizKeys = new Set();
+    const _pPhones  = new Set();
+    _uniqueAll.forEach(c => {
+        if (_isBiz(c)) return;
+        if (c.businessName) _pBizKeys.add(_nb(c.businessName));
+        const ph = _np(c.phone); if (ph.length >= 10) _pPhones.add(ph);
+    });
+    const _suppressed = new Set();
+    _uniqueAll.forEach(c => {
+        if (!_isBiz(c)) return;
+        const bk = _nb(c.name), ph = _np(c.phone);
+        if ((bk && _pBizKeys.has(bk)) || (ph.length >= 10 && _pPhones.has(ph))) _suppressed.add(String(c.id));
+    });
+
+    // Pass 3: person-name dedup by phone — keep mixed-case over ALL-CAPS, else older id
+    const _phoneGrp = {};
+    _uniqueAll.forEach(c => {
+        if (_isBiz(c) || _suppressed.has(String(c.id))) return;
+        const ph = _np(c.phone); if (ph.length < 10) return;
+        if (!_phoneGrp[ph]) _phoneGrp[ph] = [];
+        _phoneGrp[ph].push(c);
+    });
+    Object.values(_phoneGrp).forEach(grp => {
+        if (grp.length < 2) return;
+        const sorted = [...grp].sort((a, b) => {
+            const aC = (a.name||'') === (a.name||'').toUpperCase();
+            const bC = (b.name||'') === (b.name||'').toUpperCase();
+            if (aC !== bC) return aC ? 1 : -1;
+            return String(a.id) < String(b.id) ? -1 : 1;
+        });
+        sorted.slice(1).forEach(c => _suppressed.add(String(c.id)));
+    });
+
+    allClients = _uniqueAll.filter(c => !_suppressed.has(String(c.id)));
+    console.log(`Total clients after dedup: ${allClients.length} (suppressed ${_suppressed.size} dupes)`);
+    // ────────────────────────────────────────────────────────────────────────
+
     // Get current user and check if they are admin - filter clients for non-admin users
     const sessionData = sessionStorage.getItem('vanguard_user');
     let currentUser = null;
@@ -125,7 +182,7 @@ window.generateClientRows = async function() {
                             ${initials}
                         </div>
                         <div>
-                            <div class="client-name">${client.name || 'Unknown'}</div>
+                            <div class="client-name">${client.fullName || client.name || 'Unknown'}</div>
                             ${client.convertedFrom ? '<span style="font-size: 11px; color: #10b981;">Converted Lead</span>' : ''}
                         </div>
                     </div>

@@ -58,6 +58,19 @@
         if (typeof pdfjsLib !== 'undefined') {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
         }
+
+        // Prevent dashboard flash: immediately hide .dashboard-content when not on #dashboard.
+        // This runs synchronously before the rest of the page renders, so there is zero flash.
+        (function() {
+            var h = window.location.hash || '#dashboard';
+            if (h !== '#dashboard' && h !== '#' && h !== '') {
+                // Inject a style that hides the dashboard area until JS removes it.
+                var s = document.createElement('style');
+                s.id = '_dcHide';
+                s.textContent = '.dashboard-content { visibility: hidden !important; min-height: 0 !important; }';
+                document.head.appendChild(s);
+            }
+        })();
     </script>
     <!-- COI Email Timeout Fix -->
     <script src="js/fix-coi-email-timeout.js?v=999"></script>
@@ -1177,99 +1190,7 @@
         </aside>
 
         <!-- Dashboard Content -->
-        <section class="dashboard-content">
-            <!-- Stats Overview -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon blue">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="stat-details">
-                        <h3>Active Clients</h3>
-                        <p class="stat-number stat-value">0</p>
-                        <span class="stat-change positive">
-                            <i class="fas fa-arrow-up"></i> 0% from last month
-                        </span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon green">
-                        <i class="fas fa-file-contract"></i>
-                    </div>
-                    <div class="stat-details">
-                        <h3>Active Policies</h3>
-                        <p class="stat-number stat-value">0</p>
-                        <span class="stat-change positive">
-                            <i class="fas fa-arrow-up"></i> 0% from last month
-                        </span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon purple">
-                        <i class="fas fa-dollar-sign"></i>
-                    </div>
-                    <div class="stat-details">
-                        <h3>Last 2 Month New Premium</h3>
-                        <p class="stat-number stat-value">$0</p>
-                        <span class="stat-change positive">
-                            <i class="fas fa-arrow-up"></i> 0% from last month
-                        </span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon orange">
-                        <i class="fas fa-dollar-sign"></i>
-                    </div>
-                    <div class="stat-details">
-                        <h3>Monthly Lead Premium</h3>
-                        <p class="stat-number stat-value">$0</p>
-                        <span class="stat-change positive">
-                            <i class="fas fa-arrow-up"></i> 0% from last month
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="quick-actions">
-                <h2>Quick Actions</h2>
-                <div class="actions-grid">
-                    <button class="action-btn" onclick="showNewQuote()">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>New Quote</span>
-                    </button>
-                    <button class="action-btn" onclick="showNewClient()">
-                        <i class="fas fa-user-plus"></i>
-                        <span>Add Client</span>
-                    </button>
-                    <button class="action-btn" onclick="showRatingEngine()">
-                        <i class="fas fa-calculator"></i>
-                        <span>Compare Rates</span>
-                    </button>
-                    <button class="action-btn" onclick="showRenewalsList()">
-                        <i class="fas fa-sync"></i>
-                        <span>Renewals</span>
-                    </button>
-                    <button class="action-btn" onclick="showClaims()">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span>Claims</span>
-                    </button>
-                    <button class="action-btn" onclick="showReports()">
-                        <i class="fas fa-chart-pie"></i>
-                        <span>Reports</span>
-                    </button>
-                    <button class="action-btn" onclick="showAppSubmissions()">
-                        <i class="fas fa-file-contract"></i>
-                        <span>App Submissions</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Main dashboard sections will be dynamically generated by loadFullDashboard() JavaScript function -->
-            <!-- Removed static conflicting HTML to prevent conflicts with JavaScript-generated dashboard -->
-
-            <!-- Charts Section Removed -->
-        </section>
+        <section class="dashboard-content" id="dashboardContent"></section>
 
         <!-- Market Content -->
         <section class="market-content" style="display: none;">
@@ -1679,7 +1600,7 @@
     <script src="js/vanguard-softphone.js?v=9"></script>
     <script src="js/sip-integration-bridge.js?v=1"></script>
     <script src="js/force-policies-refresh.js?v=1"></script>
-    <script src="js/app.js?v=20260410s"></script>
+    <script src="js/app.js?v=20260412k"></script>
 
     <!-- Vicidial Stage Sync - Bidirectional synchronization -->
     <script src="js/vicidial-stage-sync.js?v=1"></script>
@@ -1910,7 +1831,7 @@
     <script src="js/debug-script-loading.js?v=1"></script>
     <script src="js/add-test-button.js"></script>
     <!-- Fixed with role-based filtering and assigned column -->
-    <script src="js/fix-clients-view.js?v=1733252400_NO_CONFLICTS"></script>
+    <script src="js/fix-clients-view.js?v=20260412_UNWRAP"></script>
     <!-- DISABLED: Conflicts with original-client-profile.js
     <script src="js/fix-client-profile-policies.js"></script> -->
     <!-- TEMPORARILY DISABLED - This was blocking Vicidial lead imports -->
@@ -2058,7 +1979,7 @@
     -->
 
     <!-- ORIGINAL CLIENT PROFILE - Must be LAST to override all other viewClient functions -->
-    <script src="js/original-client-profile.js?v=CLIENT_LOOKUP_FIX"></script>
+    <script src="js/original-client-profile.js?v=BIZ_NAME_MATCH_FIX"></script>
 
     <!-- FINAL PROFILE FIX - Must load AFTER all other lead profile scripts to ensure functions are available -->
     <!-- <script src="js/final-profile-fix.js?v=1005"></script> REPLACED WITH PROTECTED VERSION -->
@@ -3659,10 +3580,9 @@
 
     <!-- FINAL APP SENT FIX - Ultimate override for all TODO generation -->
     <script src="js/final-app-sent-fix.js?v=CALLBACK_FIX_v1"></script>
-    <!-- ADD AL'S TOWING LLC POLICY -->
-    <script src="js/add-als-towing-policy.js?v=1"></script>
-    <!-- ADD BLUE SKY LOGISTICS POLICY -->
-    <script src="js/add-second-policy.js?v=1"></script>
+    <!-- DISABLED: These scripts hijacked the view on every refresh by calling loadPoliciesView() -->
+    <!-- <script src="js/add-als-towing-policy.js?v=1"></script> -->
+    <!-- <script src="js/add-second-policy.js?v=1"></script> -->
     <!-- FIX POLICY TABS DISPLAY -->
     <script src="js/fix-policy-tabs-display.js?v=1"></script>
     <!-- POLICY TAB CONTENT FILLER -->

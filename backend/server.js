@@ -9987,6 +9987,130 @@ app.delete('/api/calendar-events/:id', (req, res) => {
     stmt.finalize();
 });
 
+// ===== iCAL FEED FOR TITAN EMAIL CALENDAR SYNC =====
+// Subscribe via Titan Email → Add External Calendar → paste this URL:
+//   https://162-220-14-239.nip.io/api/calendar/feed.ics
+// Optional: filter by user with ?userId=Carson or ?userId=all (default: all)
+
+app.get('/api/calendar/feed.ics', (req, res) => {
+    const userId = req.query.userId || null; // null = all users
+
+    const escape = (s) => (s || '').replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+
+    const toIcsDate = (dateStr, timeStr) => {
+        // Returns YYYYMMDDTHHMMSS or YYYYMMDD
+        if (!dateStr) return null;
+        const d = dateStr.replace(/-/g, '');
+        if (timeStr) {
+            const t = timeStr.replace(/:/g, '').substring(0, 4) + '00';
+            return `${d}T${t}`;
+        }
+        return d;
+    };
+
+    const toIcsDateFromISO = (iso) => {
+        if (!iso) return null;
+        const dt = new Date(iso);
+        if (isNaN(dt)) return null;
+        const pad = n => String(n).padStart(2, '0');
+        return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth()+1)}${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}${pad(dt.getUTCMinutes())}00Z`;
+    };
+
+    const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+    const calEvents = new Promise((resolve, reject) => {
+        const q = userId
+            ? 'SELECT * FROM calendar_events WHERE created_by = ? ORDER BY date ASC'
+            : 'SELECT * FROM calendar_events ORDER BY date ASC';
+        const params = userId ? [userId] : [];
+        db.all(q, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+
+    const callbacks = new Promise((resolve, reject) => {
+        db.all('SELECT * FROM scheduled_callbacks WHERE completed = 0 ORDER BY date_time ASC', [], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+
+    const todos = new Promise((resolve, reject) => {
+        const q = userId
+            ? 'SELECT * FROM tracked_todos WHERE completed = 0 AND user_id = ? ORDER BY target_date ASC'
+            : 'SELECT * FROM tracked_todos WHERE completed = 0 ORDER BY target_date ASC';
+        const params = userId ? [userId] : [];
+        db.all(q, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+
+    Promise.all([calEvents, callbacks, todos]).then(([events, cbs, tdos]) => {
+        const lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Vanguard CRM//EN',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'X-WR-CALNAME:Vanguard CRM',
+            'X-WR-TIMEZONE:America/New_York',
+        ];
+
+        // Calendar Events
+        events.forEach(ev => {
+            const dtStart = toIcsDate(ev.date, ev.time);
+            if (!dtStart) return;
+            const dtEnd = toIcsDate(ev.date, ev.time); // same time; all-day if no time
+            const isAllDay = !ev.time;
+            lines.push('BEGIN:VEVENT');
+            lines.push(`UID:crm-event-${ev.id}@vanguard`);
+            lines.push(`DTSTAMP:${now}`);
+            lines.push(isAllDay ? `DTSTART;VALUE=DATE:${dtStart}` : `DTSTART:${dtStart}`);
+            lines.push(isAllDay ? `DTEND;VALUE=DATE:${dtEnd}` : `DTEND:${dtEnd}`);
+            lines.push(`SUMMARY:${escape(ev.title)}`);
+            if (ev.description) lines.push(`DESCRIPTION:${escape(ev.description)}`);
+            lines.push(`CATEGORIES:CRM Event`);
+            lines.push(`CREATED:${toIcsDateFromISO(ev.created_at) || now}`);
+            lines.push('END:VEVENT');
+        });
+
+        // Scheduled Callbacks
+        cbs.forEach(cb => {
+            const dtStart = toIcsDateFromISO(cb.date_time);
+            if (!dtStart) return;
+            lines.push('BEGIN:VEVENT');
+            lines.push(`UID:crm-callback-${cb.id}@vanguard`);
+            lines.push(`DTSTAMP:${now}`);
+            lines.push(`DTSTART:${dtStart}`);
+            lines.push(`DTEND:${dtStart}`);
+            lines.push(`SUMMARY:📞 Callback${cb.notes ? ': ' + escape(cb.notes).substring(0, 60) : ''}`);
+            if (cb.notes) lines.push(`DESCRIPTION:${escape(cb.notes)}`);
+            lines.push(`CATEGORIES:Callback`);
+            lines.push('END:VEVENT');
+        });
+
+        // Tracked Todos with target dates
+        tdos.forEach(td => {
+            const dtStart = toIcsDateFromISO(td.target_date) || toIcsDate(td.target_date, null);
+            if (!dtStart) return;
+            const isAllDay = !dtStart.includes('T');
+            lines.push('BEGIN:VEVENT');
+            lines.push(`UID:crm-todo-${td.id}@vanguard`);
+            lines.push(`DTSTAMP:${now}`);
+            lines.push(isAllDay ? `DTSTART;VALUE=DATE:${dtStart}` : `DTSTART:${dtStart}`);
+            lines.push(isAllDay ? `DTEND;VALUE=DATE:${dtStart}` : `DTEND:${dtStart}`);
+            lines.push(`SUMMARY:✅ ${escape(td.text)}`);
+            lines.push(`CATEGORIES:Task`);
+            lines.push('END:VEVENT');
+        });
+
+        lines.push('END:VCALENDAR');
+
+        const icsBody = lines.join('\r\n') + '\r\n';
+        res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="vanguard-crm.ics"');
+        res.setHeader('Cache-Control', 'no-cache, no-store');
+        res.send(icsBody);
+        console.log(`📅 iCal feed served: ${events.length} events, ${cbs.length} callbacks, ${tdos.length} todos`);
+    }).catch(err => {
+        console.error('iCal feed error:', err);
+        res.status(500).json({ error: err.message });
+    });
+});
+
 // ===== TODO SYNC ENDPOINTS FOR NOTIFICATIONS =====
 
 // Sync todos to backend for notification tracking

@@ -10,7 +10,7 @@ window.viewClientOriginal = async function(id) {
     try {
         const response = await fetch('/api/clients');
         const data = await response.json();
-        const clients = data.clients || [];
+        const clients = Array.isArray(data) ? data : (data.clients || []);
         client = clients.find(c => c.id == id);
 
         if (!client) {
@@ -53,26 +53,42 @@ window.viewClientOriginal = async function(id) {
     console.log('Total policies in storage:', allPolicies.length);
     console.log('Client ID:', id, 'Client Name:', client.name);
 
-    const clientPolicies = allPolicies.filter(policy => {
-        console.log('🔍 DEBUG: Checking policy:', policy.policyNumber, 'clientId:', policy.clientId, 'target client:', id);
-        console.log('🔍 DEBUG: Policy status values:', {status: policy.status, policyStatus: policy.policyStatus});
-        // Match by clientId
-        if (policy.clientId && String(policy.clientId) === String(id)) {
-            console.log('Policy matched by clientId:', policy.policyNumber);
-            return true;
-        }
+    // Build identity key for this client (name + DOB) for fuzzy matching
+    const clientDob = client.dateOfBirth || client['Date of Birth'] || '';
+    const clientKey = _clientIdentityKey(client.name || client.businessName || '', clientDob);
 
-        // Match by insured name
+    const clientPolicies = allPolicies.filter(policy => {
+        // 1. Exact clientId match — always wins
+        if (policy.clientId && String(policy.clientId) === String(id)) return true;
+
+        // 2. Identity key: owner name + DOB (catches policies linked to duplicate auto-created client records)
+        const polOwner = policy.contact?.['Owner Name'] || policy.insuredName || '';
+        const polDob   = policy.contact?.['Date of Birth'] || '';
+        const polKey   = _clientIdentityKey(polOwner, polDob);
+        if (clientKey && polKey && polKey === clientKey) return true;
+
+        // 3. Insured name exact match against client name
         const insuredName = policy.insured?.['Name/Business Name'] ||
                            policy.insured?.['Primary Named Insured'] ||
-                           policy.insuredName;
-        if (insuredName && client.name && insuredName.toLowerCase() === client.name.toLowerCase()) {
-            console.log('Policy matched by insured name:', policy.policyNumber, 'Insured:', insuredName);
-            return true;
+                           policy.insured?.['Full Name'] ||
+                           policy.insured?.['Business Name'] ||
+                           policy.insuredName ||
+                           policy.clientName;
+        if (insuredName && client.name && insuredName.toLowerCase() === client.name.toLowerCase()) return true;
+
+        // 4. Fuzzy identity key on insured/client name
+        if (insuredName) {
+            const polKeyFallback = _clientIdentityKey(insuredName, '');
+            if (clientKey && polKeyFallback && polKeyFallback === clientKey) return true;
         }
 
-        // DO NOT check client.policies array as it may be outdated
-        // Only use the fresh data from insurance_policies storage
+        // 5. Business name match (catches policies where auto-created client biz name = real client biz name)
+        const polBizName = policy.contact?.['Business Name'] || policy.clientName || '';
+        if (polBizName && client.businessName) {
+            const polBizKey    = _clientIdentityKey(polBizName, '');
+            const clientBizKey = _clientIdentityKey(client.businessName, '');
+            if (polBizKey && clientBizKey && polBizKey === clientBizKey) return true;
+        }
 
         return false;
     });

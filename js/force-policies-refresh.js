@@ -59,7 +59,12 @@
             // Trigger policy view refresh if we're on the policies page
             if (window.location.hash === '#policies' && window.loadPoliciesView) {
                 console.log('🔄 Refreshing policies view...');
-                setTimeout(() => window.loadPoliciesView(), 100);
+                setTimeout(() => {
+                    // Only refresh if still on policies tab
+                    if (window.location.hash === '#policies') {
+                        window.loadPoliciesView();
+                    }
+                }, 100);
             }
 
             return cleanPolicies;
