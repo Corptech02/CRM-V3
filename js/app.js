@@ -12611,29 +12611,46 @@ function updatePolicyStats(totalPolicies, activePolicies, pendingRenewal, totalP
 let currentRenewalView = 'month';
 let selectedRenewalPolicyId = null;
 
-function loadRenewalsView() {
+async function loadRenewalsView() {
     const dashboardContent = document.querySelector('.dashboard-content');
     if (!dashboardContent) return;
 
-    // Get real policy data from localStorage
-    let allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-
-    // Get current user and check if they are admin
+    // Get current user and check role first
     const sessionData = sessionStorage.getItem('vanguard_user');
     let currentUser = null;
     let isAdmin = false;
+    let isCsrUser = false;
 
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
             isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
-            console.log(`🔍 Renewals filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+            isCsrUser = (user.role || '') === 'csr';
+            console.log(`🔍 Renewals filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
             console.error('Error parsing session data:', error);
         }
     }
+
+    // For CSR: fetch all policies and clients from server so nothing is missed
+    if (isCsrUser) {
+        try {
+            await loadPoliciesFromServer();
+        } catch (e) { console.warn('Renewals: server policy fetch failed, using localStorage', e); }
+        try {
+            const r = await fetch('/api/clients?limit=500&offset=0');
+            if (r.ok) {
+                const data = await r.json();
+                const serverClients = Array.isArray(data) ? data : (data.clients || []);
+                if (serverClients.length > 0) localStorage.setItem('insurance_clients', JSON.stringify(serverClients));
+            }
+        } catch (e) { console.warn('Renewals: server client fetch failed, using localStorage', e); }
+    }
+
+    // Get real policy data from localStorage (now fresh for CSR)
+    let allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
 
     // Agency → agent mapping (same as Carriers tab)
     const RENEWAL_AGENCY_AGENTS = {
@@ -12660,6 +12677,9 @@ function loadRenewalsView() {
         });
 
         console.log(`🔒 Maureen special renewals filter: Policies ${originalPolicyCount} -> ${allPolicies.length}, Clients ${originalClientCount} -> ${clients.length}`);
+    } else if (isCsrUser) {
+        // CSR: show all policies/clients (they service everyone)
+        console.log(`🎧 Renewals: CSR user - showing all ${allPolicies.length} policies`);
     } else if (!isAdmin && currentUser) {
         // Regular non-admin filtering
         const originalPolicyCount = allPolicies.length;
