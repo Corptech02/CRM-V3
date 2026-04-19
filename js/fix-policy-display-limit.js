@@ -211,7 +211,7 @@ window.generatePolicyRows = async function() {
                 <td>
                     ${expirationDate}
                 </td>
-                <td>
+                <td style="display: none; visibility: hidden;">
                     ${premium}/yr
                 </td>
                 <td>

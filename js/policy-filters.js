@@ -23,26 +23,14 @@ window.filterPolicies = function() {
     // Check user role
     const sessionData = sessionStorage.getItem('vanguard_user');
     let isMaureen = false;
-    let isCsr = false;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             isMaureen = user.username && user.username.toLowerCase() === 'maureen';
-            isCsr = (user.role || '') === 'csr';
         } catch (error) {
             console.error('Error checking user in filterPolicies:', error);
         }
     }
-
-    // CSR 4-char gate: hide all rows until 4+ characters are typed
-    if (isCsr && searchValue.length < 4) {
-        rows.forEach(row => { row.style.display = 'none'; });
-        const countDisplay = document.querySelector('.showing-info');
-        if (countDisplay) countDisplay.textContent = 'Type 4+ characters to search policies';
-        return;
-    }
-
-    console.log(`🔍 Filtering policies: Type="${typeValue}", Carrier="${carrierValue}", Status="${statusValue}", Search="${searchValue}"`);
 
     // Get all policy table rows
     const tbody = document.getElementById('policyTableBody');
@@ -52,6 +40,16 @@ window.filterPolicies = function() {
     }
 
     const rows = tbody.querySelectorAll('tr');
+
+    // 4-char gate: hide all rows until 4+ characters are typed
+    if (searchValue.length < 4) {
+        rows.forEach(row => { row.style.display = 'none'; });
+        const countDisplay = document.querySelector('.showing-info');
+        if (countDisplay) countDisplay.textContent = 'Type 4+ characters to search policies';
+        return;
+    }
+
+    console.log(`🔍 Filtering policies: Type="${typeValue}", Carrier="${carrierValue}", Status="${statusValue}", Search="${searchValue}"`);
     let visibleCount = 0;
 
     // Variables to track filtered stats
