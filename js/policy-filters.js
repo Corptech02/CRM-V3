@@ -20,16 +20,26 @@ window.filterPolicies = function() {
     const agentValue = agentFilter ? agentFilter.value : '';
     const searchValue = searchInput ? searchInput.value.toLowerCase() : '';
 
-    // Check if Maureen is logged in
+    // Check user role
     const sessionData = sessionStorage.getItem('vanguard_user');
     let isMaureen = false;
+    let isCsr = false;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             isMaureen = user.username && user.username.toLowerCase() === 'maureen';
+            isCsr = (user.role || '') === 'csr';
         } catch (error) {
             console.error('Error checking user in filterPolicies:', error);
         }
+    }
+
+    // CSR 4-char gate: hide all rows until 4+ characters are typed
+    if (isCsr && searchValue.length < 4) {
+        rows.forEach(row => { row.style.display = 'none'; });
+        const countDisplay = document.querySelector('.showing-info');
+        if (countDisplay) countDisplay.textContent = 'Type 4+ characters to search policies';
+        return;
     }
 
     console.log(`🔍 Filtering policies: Type="${typeValue}", Carrier="${carrierValue}", Status="${statusValue}", Search="${searchValue}"`);

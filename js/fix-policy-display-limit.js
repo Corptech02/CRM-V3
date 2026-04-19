@@ -26,20 +26,24 @@ window.generatePolicyRows = async function() {
     let currentUser = null;
     let isAdmin = false;
 
+    let isCsrUser = false;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
             isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
-            console.log(`🔍 Policy Display Fix - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+            isCsrUser = (user.role || '') === 'csr';
+            console.log(`🔍 Policy Display Fix - Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
             console.error('Error parsing session data:', error);
         }
     }
 
     // Filter policies based on user role
-    // Maureen can only see her own policies (no agent dropdown for others)
-    // Admins and other users: render ALL policies, let filterPolicies() handle visibility
+    // Maureen: only her own policies
+    // CSR: all policies (search-gated in filterPolicies)
+    // Admins: all policies
+    // Agents: only their own
     if (currentUser && currentUser.toLowerCase() === 'maureen') {
         const originalCount = policies.length;
         policies = policies.filter(policy => {
@@ -47,13 +51,15 @@ window.generatePolicyRows = async function() {
             return assignedTo === 'maureen';
         });
         console.log(`🔒 Policy Display Fix: Filtered to Maureen's policies: ${originalCount} -> ${policies.length}`);
-    } else if (!isAdmin && currentUser) {
+    } else if (!isAdmin && !isCsrUser && currentUser) {
         const originalCount = policies.length;
         policies = policies.filter(policy => {
             const assignedTo = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || 'Grant').toLowerCase();
             return assignedTo === currentUser.toLowerCase();
         });
         console.log(`🔒 Policy Display Fix: Filtered policies: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
+    } else if (isCsrUser) {
+        console.log(`🎧 Policy Display Fix: CSR user - loading all ${policies.length} policies (search-gated)`);
     }
     // Admins: render all policies — filterPolicies() will handle agent visibility
 
