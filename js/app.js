@@ -12518,6 +12518,10 @@ function filterPolicies() {
         const assignedAgent = (row.cells[7]?.textContent || '').trim();
         const premiumText = row.cells[6]?.textContent || '$0';
 
+        // Check search text against full row content
+        const rowText = row.textContent.toLowerCase();
+        const matchesSearch = !policySearchValue || rowText.includes(policySearchValue);
+
         // Check type filter
         const matchesType = !selectedType || type.includes(selectedType);
 
@@ -12549,7 +12553,7 @@ function filterPolicies() {
         }
 
         // Show row only if it matches all filters
-        const shouldShow = matchesType && matchesCarrier && matchesStatus && matchesAgent;
+        const shouldShow = matchesSearch && matchesType && matchesCarrier && matchesStatus && matchesAgent;
         row.style.display = shouldShow ? '' : 'none';
 
         // If row is visible, count it in stats
@@ -22629,30 +22633,28 @@ function filterClients() {
     const tbody = document.getElementById('clientsTableBody');
     if (!tbody) return;
 
-    // CSR: require 4+ characters before showing any clients
+    // All users: require 4+ characters before showing any clients
     const _csrSession = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
     const _isCsr = (_csrSession.role || '') === 'csr';
-    if (_isCsr) {
-        const dataRows = tbody.querySelectorAll('tr:not(#csrClientSearchPrompt)');
-        let promptRow = document.getElementById('csrClientSearchPrompt');
-        if (searchValue.length < 4) {
-            dataRows.forEach(r => r.style.display = 'none');
-            if (!promptRow) {
-                promptRow = document.createElement('tr');
-                promptRow.id = 'csrClientSearchPrompt';
-                promptRow.innerHTML = `<td colspan="8" style="text-align:center;padding:40px;color:#6b7280;">
-                    <i class="fas fa-search" style="font-size:48px;margin-bottom:16px;opacity:0.3;"></i>
-                    <p style="font-size:16px;margin:0;">Search for clients in the top left</p>
-                    <p style="font-size:14px;margin-top:8px;">Type 4 or more characters to display results</p>
-                </td>`;
-                tbody.appendChild(promptRow);
-            } else {
-                promptRow.style.display = '';
-            }
-            return;
+    const dataRows = tbody.querySelectorAll('tr:not(#csrClientSearchPrompt)');
+    let promptRow = document.getElementById('csrClientSearchPrompt');
+    if (searchValue.length < 4) {
+        dataRows.forEach(r => r.style.display = 'none');
+        if (!promptRow) {
+            promptRow = document.createElement('tr');
+            promptRow.id = 'csrClientSearchPrompt';
+            promptRow.innerHTML = `<td colspan="8" style="text-align:center;padding:40px;color:#6b7280;">
+                <i class="fas fa-search" style="font-size:48px;margin-bottom:16px;opacity:0.3;"></i>
+                <p style="font-size:16px;margin:0;">Search for clients in the top left</p>
+                <p style="font-size:14px;margin-top:8px;">Type 4 or more characters to display results</p>
+            </td>`;
+            tbody.appendChild(promptRow);
+        } else {
+            promptRow.style.display = '';
         }
-        if (promptRow) promptRow.style.display = 'none';
+        return;
     }
+    if (promptRow) promptRow.style.display = 'none';
 
     // Remove existing warning banner rows
     tbody.querySelectorAll('.missing-data-warning-row').forEach(r => r.remove());
@@ -23748,19 +23750,21 @@ async function generatePolicyRows() {
     let currentUser = null;
     let isAdmin = false;
 
+    let isCsrUser = false;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
             isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
-            console.log(`🔍 Policy filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+            isCsrUser = (user.role || '') === 'csr';
+            console.log(`🔍 Policy filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
             console.error('Error parsing session data:', error);
         }
     }
 
-    // Filter policies based on user role
-    if (!isAdmin && currentUser) {
+    // Filter policies based on user role — CSR sees all policies (gated by search in UI)
+    if (!isAdmin && !isCsrUser && currentUser) {
         const originalCount = policies.length;
         policies = policies.filter(policy => {
             const assignedTo = policy.assignedTo ||
@@ -23773,6 +23777,8 @@ async function generatePolicyRows() {
         console.log(`🔒 Filtered policies: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
     } else if (isAdmin) {
         console.log(`👑 Admin user - showing all ${policies.length} policies`);
+    } else if (isCsrUser) {
+        console.log(`🎧 CSR user - showing all ${policies.length} policies (search-gated)`);
     }
 
     if (policies.length === 0) {
