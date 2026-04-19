@@ -37,21 +37,25 @@ window.generatePolicyRows = async function() {
         }
     }
 
-    // Filter policies based on user role (same as client filtering logic)
-    if (!isAdmin && currentUser) {
+    // Filter policies based on user role
+    // Maureen can only see her own policies (no agent dropdown for others)
+    // Admins and other users: render ALL policies, let filterPolicies() handle visibility
+    if (currentUser && currentUser.toLowerCase() === 'maureen') {
         const originalCount = policies.length;
         policies = policies.filter(policy => {
-            const assignedTo = policy.assignedTo ||
-                              policy.agent ||
-                              policy.assignedAgent ||
-                              policy.producer ||
-                              'Grant'; // Default to Grant if no assignment
-            return assignedTo.toLowerCase() === currentUser.toLowerCase();
+            const assignedTo = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || 'Grant').toLowerCase();
+            return assignedTo === 'maureen';
+        });
+        console.log(`🔒 Policy Display Fix: Filtered to Maureen's policies: ${originalCount} -> ${policies.length}`);
+    } else if (!isAdmin && currentUser) {
+        const originalCount = policies.length;
+        policies = policies.filter(policy => {
+            const assignedTo = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || 'Grant').toLowerCase();
+            return assignedTo === currentUser.toLowerCase();
         });
         console.log(`🔒 Policy Display Fix: Filtered policies: ${originalCount} -> ${policies.length} (showing only ${currentUser}'s policies)`);
-    } else if (isAdmin) {
-        console.log(`👑 Policy Display Fix: Admin user - showing all ${policies.length} policies`);
     }
+    // Admins: render all policies — filterPolicies() will handle agent visibility
 
     if (policies.length === 0) {
         // Show message when no policies exist
@@ -107,6 +111,11 @@ window.generatePolicyRows = async function() {
         // Check if policy is expired based on expiration date
         let statusClass = window.getStatusClass ? window.getStatusClass(policy.policyStatus || policy.status) : 'badge-secondary';
         let displayStatus = policy.policyStatus || policy.status || 'Active';
+        // Normalize any DB-stored "UPDATE POLICY" status
+        if (displayStatus.toUpperCase() === 'UPDATE POLICY') {
+            displayStatus = 'Inactive';
+            statusClass = 'inactive';
+        }
 
         // Override status if policy has expired
         if (policy.expirationDate) {
@@ -114,8 +123,8 @@ window.generatePolicyRows = async function() {
             const expirationDate = new Date(policy.expirationDate);
 
             if (expirationDate < today) {
-                statusClass = 'pending'; // This will map to orange styling
-                displayStatus = 'UPDATE POLICY';
+                statusClass = 'inactive'; // Grey styling for expired policies
+                displayStatus = 'Inactive';
             }
         }
 

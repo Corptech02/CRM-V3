@@ -6,8 +6,10 @@
  * Works independently of user login status
  */
 
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const axios = require('axios');
 const EmailService = require('./email-service');
 
 // Database connection
@@ -83,6 +85,29 @@ db.run(`CREATE TABLE IF NOT EXISTS tracked_todos (
 const activeNotifications = new Set();
 // Store sent email reminders to avoid duplicates
 const sentEmailReminders = new Set();
+// Store sent Slack alerts to avoid duplicate pings
+const sentSlackAlerts = new Set();
+
+// Post a message to a Slack channel via bot token
+async function postSlackAlert(channel, text) {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token || !channel) {
+        console.warn(`[Slack Alert] Skipped — token:${!!token} channel:${channel}`);
+        return;
+    }
+    try {
+        const resp = await axios.post('https://slack.com/api/chat.postMessage', { channel, text }, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (resp.data.ok) {
+            console.log(`[Slack Alert] ✅ Posted to ${channel}`);
+        } else {
+            console.error(`[Slack Alert] Slack error for ${channel}:`, resp.data.error);
+        }
+    } catch (e) {
+        console.error(`[Slack Alert] Failed to post to ${channel}:`, e.message);
+    }
+}
 
 // Helper function to create notification with deduplication
 function createNotification(type, title, message, leadId = null, callbackId = null, priority = 'medium', metadata = {}) {
@@ -376,21 +401,24 @@ function checkCallbacks() {
                         return;
                     }
 
+                    const minutesOverdue = Math.round((now - callbackTime) / (1000 * 60));
                     createNotification(
                         'callback_overdue',
                         '🔴 Callback Overdue',
-                        `Callback for ${leadName} was due ${Math.round((now - callbackTime) / (1000 * 60))} minutes ago`,
+                        `Callback for ${leadName} was due ${minutesOverdue} minutes ago`,
                         leadId,
                         callbackId,
                         'high',
                         {
                             dueTime: callback.date_time,
-                            minutesOverdue: Math.round((now - callbackTime) / (1000 * 60)),
+                            minutesOverdue: minutesOverdue,
                             notes: callback.notes,
                             leadData: leadData,
                             assignedAgent: leadData ? leadData.assignedTo : null
                         }
                     );
+
+                    // No Slack alert for overdue — only "due soon" and "due now" go to Slack
                 });
             }
             // Check if due soon (warning) - also send email if within 30 minutes
@@ -420,6 +448,15 @@ function checkCallbacks() {
                             assignedAgent: leadData ? leadData.assignedTo : null
                         }
                     );
+
+                    // Slack alert — once per callback
+                    const slackKey = `cb_soon_${callbackId}`;
+                    if (!sentSlackAlerts.has(slackKey)) {
+                        sentSlackAlerts.add(slackKey);
+                        const agent = (leadData && leadData.assignedTo) ? ` · Agent: ${leadData.assignedTo}` : '';
+                        postSlackAlert(process.env.SLACK_CALLBACKS_CHANNEL,
+                            `⚡ *Callback Due Soon* — ${leadName}\nDue in *${minutesUntil} min*${agent}`);
+                    }
 
                     // Send email reminder if within 30 minutes
                     if (minutesUntil <= CALLBACK_WARNING_MINUTES) {
@@ -472,6 +509,17 @@ function checkCallbacks() {
                             assignedAgent: leadData ? leadData.assignedTo : null
                         }
                     );
+
+                    // Slack alert — once per callback at due time
+                    const slackKey = `cb_now_${callbackId}`;
+                    if (!sentSlackAlerts.has(slackKey)) {
+                        sentSlackAlerts.add(slackKey);
+                        const agent = (leadData && leadData.assignedTo) ? ` · Agent: ${leadData.assignedTo}` : '';
+                        const slackMsg = minutesFromDue > 0
+                            ? `🚨 *Callback Due in ${minutesFromDue} min* — ${leadName}${agent}`
+                            : `🔴 *CALLBACK DUE NOW* — ${leadName}${agent}`;
+                        postSlackAlert(process.env.SLACK_CALLBACKS_CHANNEL, slackMsg);
+                    }
                 });
             }
         });
@@ -520,18 +568,22 @@ function checkTrackedTodos(now, warningTime, overdueTime) {
         console.log(`📋 Found ${todos.length} active tracked todos`);
 
         todos.forEach(todo => {
-            const todoTime = new Date(todo.target_date);
+            // If stored without timezone (no Z or +), treat as Eastern time (EDT = UTC-4)
+            const rawDate = todo.target_date;
+            const hasTimezone = /Z|[+-]\d{2}:?\d{2}$/.test(rawDate);
+            const todoTime = hasTimezone ? new Date(rawDate) : new Date(rawDate + '-04:00');
             const todoId = todo.id;
             const userId = todo.user_id;
 
-            // Check if overdue
+            // Check if overdue (cap at 30 min — no more alerts beyond that)
             if (todoTime < overdueTime) {
                 const minutesOverdue = Math.round((now - todoTime) / (1000 * 60));
+                if (minutesOverdue > 30) return; // stop all notifications after 30 min overdue
                 createNotification(
                     'todo_overdue',
                     '🔴 Todo Overdue',
                     `Todo "${todo.text}" was due ${minutesOverdue} minutes ago`,
-                    null, // no lead_id for todos
+                    null,
                     todoId,
                     'high',
                     {
@@ -543,26 +595,46 @@ function checkTrackedTodos(now, warningTime, overdueTime) {
                         source: todo.source
                     }
                 );
+
+                const slackKey = `todo_overdue_${todoId}_${Math.floor(minutesOverdue / 30)}`;
+                if (!sentSlackAlerts.has(slackKey)) {
+                    sentSlackAlerts.add(slackKey);
+                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL,
+                        `🔴 *Reminder Overdue* — ${todo.text}\nWas due *${minutesOverdue} min ago*${userId ? ` · ${userId}` : ''}`);
+                }
             }
-            // Check if due soon (warning)
-            else if (todoTime <= warningTime && todoTime > now) {
-                const minutesUntilDue = Math.round((todoTime - now) / (1000 * 60));
+            // Check if due soon OR just became due (bridges the 0–15 min gap)
+            else if (todoTime <= warningTime && todoTime > overdueTime) {
+                const minutesFromNow = Math.round((todoTime - now) / (1000 * 60));
+                const label = minutesFromNow > 0
+                    ? `is due in ${minutesFromNow} minutes`
+                    : minutesFromNow === 0 ? 'is due RIGHT NOW' : `was due ${Math.abs(minutesFromNow)} minute${Math.abs(minutesFromNow) === 1 ? '' : 's'} ago`;
                 createNotification(
                     'todo_due_soon',
-                    '⏰ Todo Due Soon',
-                    `Todo "${todo.text}" is due in ${minutesUntilDue} minutes`,
+                    minutesFromNow > 0 ? '⏰ Todo Due Soon' : '🔔 Todo Due Now',
+                    `Todo "${todo.text}" ${label}`,
                     null,
                     todoId,
-                    'medium',
+                    minutesFromNow > 0 ? 'medium' : 'high',
                     {
                         todoId: todoId,
                         userId: userId,
                         dueTime: todo.target_date,
-                        minutesUntilDue: minutesUntilDue,
+                        minutesFromNow: minutesFromNow,
                         todoType: todo.todo_type,
                         source: todo.source
                     }
                 );
+
+                const slackKey = `todo_soon_${todoId}`;
+                if (!sentSlackAlerts.has(slackKey)) {
+                    sentSlackAlerts.add(slackKey);
+                    const who = userId ? ` · ${userId}` : '';
+                    const slackMsg = minutesFromNow > 0
+                        ? `⏰ *Reminder Due Soon* — ${todo.text}\nDue in *${minutesFromNow} min*${who}`
+                        : `🔔 *Reminder Due Now* — ${todo.text}${who}`;
+                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL, slackMsg);
+                }
             }
         });
     });
@@ -583,14 +655,21 @@ function checkCalendarEvents(now, warningTime, overdueTime) {
         console.log(`📅 Found ${events.length} calendar events`);
 
         events.forEach(event => {
-            // Combine date and time for comparison
-            const eventDateTime = new Date(event.date + 'T' + (event.time || '09:00'));
+            // Skip events that are actually callbacks synced from CRM (CB: prefix)
+            if (/^CB:/i.test(event.title) || /call.?back/i.test(event.title)) return;
+
+            // Parse as Eastern time (EDT = UTC-4, EST = UTC-5)
+            // Append offset so Date math is correct regardless of server timezone
+            const estOffset = '-04:00'; // EDT (Apr–Nov); change to -05:00 Nov–Mar
+            const timeStr = event.time || '09:00';
+            const eventDateTime = new Date(event.date + 'T' + timeStr + ':00' + estOffset);
             const eventId = event.id;
             const userId = event.created_by;
 
-            // Check if overdue
+            // Check if overdue (cap at 30 min — no more alerts beyond that)
             if (eventDateTime < overdueTime) {
                 const minutesOverdue = Math.round((now - eventDateTime) / (1000 * 60));
+                if (minutesOverdue > 30) return; // stop all notifications after 30 min overdue
                 createNotification(
                     'event_overdue',
                     '🔴 Event Overdue',
@@ -607,26 +686,46 @@ function checkCalendarEvents(now, warningTime, overdueTime) {
                         eventType: 'calendar_event'
                     }
                 );
+
+                const slackKey = `event_overdue_${eventId}_${Math.floor(minutesOverdue / 30)}`;
+                if (!sentSlackAlerts.has(slackKey)) {
+                    sentSlackAlerts.add(slackKey);
+                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL,
+                        `🔴 *Event Overdue* — ${event.title}\nWas due *${minutesOverdue} min ago*${userId ? ` · ${userId}` : ''}`);
+                }
             }
-            // Check if due soon (warning)
-            else if (eventDateTime <= warningTime && eventDateTime > now) {
-                const minutesUntilDue = Math.round((eventDateTime - now) / (1000 * 60));
+            // Check if due soon OR just became due (bridges the 0–15 min gap)
+            else if (eventDateTime <= warningTime && eventDateTime > overdueTime) {
+                const minutesFromNow = Math.round((eventDateTime - now) / (1000 * 60));
+                const label = minutesFromNow > 0
+                    ? `is due in ${minutesFromNow} minutes`
+                    : minutesFromNow === 0 ? 'is due RIGHT NOW' : `was due ${Math.abs(minutesFromNow)} minute${Math.abs(minutesFromNow) === 1 ? '' : 's'} ago`;
                 createNotification(
                     'event_due_soon',
-                    '⏰ Event Due Soon',
-                    `Event "${event.title}" is due in ${minutesUntilDue} minutes`,
+                    minutesFromNow > 0 ? '⏰ Event Due Soon' : '🔔 Event Due Now',
+                    `Event "${event.title}" ${label}`,
                     null,
                     eventId.toString(),
-                    'medium',
+                    minutesFromNow > 0 ? 'medium' : 'high',
                     {
                         eventId: eventId,
                         userId: userId,
                         dueTime: eventDateTime.toISOString(),
-                        minutesUntilDue: minutesUntilDue,
+                        minutesFromNow: minutesFromNow,
                         description: event.description,
                         eventType: 'calendar_event'
                     }
                 );
+
+                const slackKey = `event_soon_${eventId}`;
+                if (!sentSlackAlerts.has(slackKey)) {
+                    sentSlackAlerts.add(slackKey);
+                    const who = userId ? ` · ${userId}` : '';
+                    const slackMsg = minutesFromNow > 0
+                        ? `📅 *Reminder Due Soon* — ${event.title}\nDue in *${minutesFromNow} min*${who}`
+                        : `🔔 *Reminder Due Now* — ${event.title}${who}`;
+                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL, slackMsg);
+                }
             }
         });
     });

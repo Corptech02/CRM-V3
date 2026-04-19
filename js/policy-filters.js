@@ -89,8 +89,8 @@ window.filterPolicies = function() {
         // Carrier matching
         const carrierMatch = !carrierValue || carrier.includes(carrierValue);
 
-        // Status matching
-        const statusMatch = !statusValue || status.includes(statusValue);
+        // Status matching (exact match to prevent "active" matching "inactive")
+        const statusMatch = !statusValue || status.trim() === statusValue;
 
         // Search matching (policy number or client name)
         const searchMatch = !searchValue ||
@@ -98,24 +98,25 @@ window.filterPolicies = function() {
             clientName.includes(searchValue) ||
             carrier.includes(searchValue);
 
-        // Agent filtering with special logic
+        // Agent filtering with agency group support
+        const vanguardAgents = ['Grant', 'Carson', 'Hunter'];
+        const unitedAgents = ['Maureen'];
         let agentMatch = true;
         if (isMaureen) {
-            // For Maureen: if no specific agent selected ("All My Policies"), still only show Maureen's policies
             if (!agentValue) {
                 agentMatch = assignedAgent === 'Maureen';
-                console.log(`🔍 Maureen "All My Policies" filter: ${agentMatch ? 'SHOW' : 'HIDE'} policy assigned to "${assignedAgent}"`);
             } else {
                 agentMatch = assignedAgent === agentValue;
             }
+        } else if (!agentValue) {
+            // "All Agencies" — show everyone
+            agentMatch = true;
+        } else if (agentValue === 'Vanguard') {
+            agentMatch = vanguardAgents.includes(assignedAgent);
+        } else if (agentValue === 'United') {
+            agentMatch = unitedAgents.includes(assignedAgent);
         } else {
-            // For non-Maureen users: exclude Maureen policies when "All Agents" is selected
-            if (!agentValue) {
-                agentMatch = assignedAgent !== 'Maureen';
-                console.log(`🔍 "All Agents" filter: ${agentMatch ? 'SHOW' : 'HIDE'} policy assigned to "${assignedAgent}"`);
-            } else {
-                agentMatch = assignedAgent === agentValue;
-            }
+            agentMatch = assignedAgent === agentValue;
         }
 
         // Show/hide row based on all filters
@@ -128,13 +129,13 @@ window.filterPolicies = function() {
             // Track stats for visible policies
             visibleTotal++;
 
-            // Count active policies (assuming status contains 'active')
-            if (status.includes('active')) {
+            // Count active policies (exact match)
+            if (status.trim() === 'active') {
                 visibleActive++;
             }
 
             // Count pending renewal policies
-            if (status.includes('pending') || status.includes('renewal')) {
+            if (status.trim() === 'pending' || status.includes('renewal')) {
                 visiblePendingRenewal++;
             }
 

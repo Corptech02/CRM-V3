@@ -19,15 +19,7 @@ if (typeof window.loadLeadGenerationView !== 'function' && !window.completeLeadG
                     <h1>Lead Generation Database</h1>
                 </header>
 
-                <!-- Folder-style tabs -->
-                <div class="folder-tabs">
-                    <button class="folder-tab ${activeTab === 'lookup' ? 'active' : ''}" onclick="switchLeadSection('lookup')">
-                        <i class="fas fa-search"></i> Carrier Lookup
-                    </button>
-                    <button class="folder-tab ${activeTab === 'generate' ? 'active' : ''}" onclick="switchLeadSection('generate')">
-                        <i class="fas fa-magic"></i> Generate Leads
-                    </button>
-                </div>
+                <!-- Tabs removed — navigation is via sidebar sub-menu -->
 
                 <div class="lead-gen-container">
                     <!-- Carrier Lookup Section -->

@@ -79,8 +79,11 @@ function renderClientsViewWithFreshData(allPolicies) {
                         <option value="Hunter">Hunter</option>
                         <option value="Maureen" style="color: #2563eb;">MAUREEN</option>`}
                     </select>` : ''}
-                    <button class="btn-filter">
-                        <i class="fas fa-filter"></i> More Filters
+                    <button class="btn-filter" id="missing-data-btn" onclick="toggleMissingDataFilter()" style="transition:0.2s;">
+                        <i class="fas fa-exclamation-triangle"></i> Missing Data
+                    </button>
+                    <button class="btn-filter" onclick="showMergeDuplicates()" style="transition:0.2s;background:#fef3c7;color:#92400e;border-color:#f59e0b;">
+                        <i class="fas fa-compress-alt"></i> Merge Duplicates
                     </button>
                 </div>
             </div>

@@ -77,7 +77,7 @@ router.get('/emails', async (req, res) => {
         const account = req.query.account || 'vig';
         const isUIG = account === 'uig';
         const imapUser = isUIG ? 'contact@uigagency.com' : (process.env.OUTLOOK_EMAIL || 'contact@vigagency.com');
-        const imapPass = isUIG ? '@Jacob2007' : (process.env.OUTLOOK_PASSWORD || '25nickc124!');
+        const imapPass = isUIG ? 'Jacob2007' : (process.env.OUTLOOK_PASSWORD || '25nickc124!');
 
         const imap = new Imap({
             user: imapUser,
@@ -742,7 +742,7 @@ router.post('/send-smtp', async (req, res) => {
         // Support UIG account when requested (e.g. Maureen's emails)
         const isUIG = account === 'uig';
         const smtpUser = isUIG ? 'contact@uigagency.com' : (process.env.OUTLOOK_EMAIL || 'contact@vigagency.com');
-        const smtpPass = isUIG ? '@Jacob2007' : (process.env.OUTLOOK_PASSWORD || '25nickc124!');
+        const smtpPass = isUIG ? 'Jacob2007' : (process.env.OUTLOOK_PASSWORD || '25nickc124!');
 
         // Create SMTP transporter using Titan/GoDaddy credentials
         const transporter = nodemailer.createTransport({

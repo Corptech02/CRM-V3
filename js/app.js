@@ -644,6 +644,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load the correct view immediately — no delay needed
     loadContent(_initialHash);
     updateActiveMenuItem(_initialHash);
+
+    // Deep-link support: ?clientId=XXX auto-opens the client profile
+    const _dlParams = new URLSearchParams(window.location.search);
+    const _dlClientId = _dlParams.get('clientId');
+    if (_dlClientId) {
+        // Navigate to clients view, then open the profile once data is loaded
+        if (_initialHash !== '#clients') {
+            window.location.hash = '#clients';
+        }
+        const _openDeepLinkedClient = () => {
+            if (typeof viewClient === 'function') {
+                viewClient(_dlClientId);
+                // Clean the URL without reloading
+                window.history.replaceState({}, '', window.location.origin + window.location.pathname + '#clients');
+            }
+        };
+        // Give clients view time to render before opening profile
+        setTimeout(_openDeepLinkedClient, 1500);
+    }
 });
 
 // Dashboard data refresh once all resources are loaded (images, etc.)
@@ -2755,6 +2774,25 @@ function openCalendar() {
                     </div>
                 </div>
 
+                <!-- Google Calendar Sync Bar -->
+                <div id="gcalSyncBar" style="display: flex; align-items: center; justify-content: space-between; background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px;">
+                    <div id="gcalStatus" style="display: flex; align-items: center; gap: 8px; color: #6b7280;">
+                        <i class="fab fa-google" style="font-size: 15px;"></i>
+                        <span id="gcalStatusText">Checking Google Calendar...</span>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button id="gcalConnectBtn" onclick="connectGoogleCalendar()" style="display:none; padding: 5px 10px; background: #4285f4; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;">
+                            Connect
+                        </button>
+                        <button id="gcalSyncBtn" onclick="syncGoogleCalendar()" style="display:none; padding: 5px 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;">
+                            <i class="fas fa-sync-alt"></i> Sync Now
+                        </button>
+                        <button id="gcalDisconnectBtn" onclick="disconnectGoogleCalendar()" style="display:none; padding: 5px 10px; background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                            Disconnect
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Calendar Grid -->
                 <div id="calendarGrid" style="flex: 1; background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 8px; overflow: auto;">
                     ${generateCalendarGrid(currentYear, currentMonth)}
@@ -2847,6 +2885,9 @@ function openCalendar() {
         const agencyViewBtn = document.getElementById('agencyViewBtn');
         if (agencyViewBtn) agencyViewBtn.style.display = 'none';
     }
+
+    // Check Google Calendar connection status
+    checkGoogleCalendarStatus();
 
     // Load server data and refresh calendar display
     Promise.all([
@@ -2961,7 +3002,7 @@ function generateCalendarGrid(year, month) {
                  onmouseover="this.style.background='#f3f4f6'"
                  onmouseout="this.style.background='${isToday ? '#eff6ff' : 'white'}'">
                 <div style="font-weight: ${isToday ? '700' : '500'}; color: ${isToday ? '#1e40af' : '#374151'}; font-size: 13px; line-height: 1;">${day}</div>
-                ${events.length > 0 ? `<div style="margin-top: 2px; flex: 1;">${events.map(e => `<div style="background: ${getEventColor(e.type)}; color: white; font-size: 8px; padding: 1px 2px; border-radius: 2px; margin-bottom: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2;" title="${e.title}">${e.title}</div>`).join('')}</div>` : ''}
+                ${events.length > 0 ? `<div style="margin-top: 2px; flex: 1;">${events.map(e => `<div style="background: ${e.isServerCallback ? getAgentColor(e.assignedAgent) : getEventColor(e.type)}; color: white; font-size: 8px; padding: 1px 2px; border-radius: 2px; margin-bottom: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2;" title="${e.title}">${e.title}</div>`).join('')}</div>` : ''}
             </div>
         `;
     }
@@ -2976,6 +3017,138 @@ function generateCalendarGrid(year, month) {
     html += `</div>`;
     return html;
 }
+
+// ─── Google Calendar Sync ────────────────────────────────────────────────────
+
+async function checkGoogleCalendarStatus() {
+    const userId = (typeof getCurrentUser === 'function') ? getCurrentUser() : (window.currentUser || localStorage.getItem('currentUser'));
+    if (!userId || userId === 'User') return;
+    try {
+        const resp = await fetch(`/api/google-calendar/status?userId=${encodeURIComponent(userId)}`);
+        const data = await resp.json();
+
+        const statusText = document.getElementById('gcalStatusText');
+        const connectBtn = document.getElementById('gcalConnectBtn');
+        const syncBtn    = document.getElementById('gcalSyncBtn');
+        const disconnBtn = document.getElementById('gcalDisconnectBtn');
+        if (!statusText) return;
+
+        if (!data.configured) {
+            statusText.innerHTML = '<span style="color:#9ca3af;">Google Calendar (not configured)</span>';
+            return;
+        }
+
+        if (data.connected) {
+            statusText.innerHTML = `<span style="color:#22c55e;font-weight:600;">● Synced</span> <span style="color:#6b7280;">${data.email || ''}</span>`;
+            if (connectBtn) connectBtn.style.display = 'none';
+            if (syncBtn)    syncBtn.style.display    = 'inline-block';
+            if (disconnBtn) disconnBtn.style.display = 'inline-block';
+        } else {
+            statusText.innerHTML = '<span style="color:#9ca3af;">Google Calendar not connected</span>';
+            if (connectBtn) connectBtn.style.display = 'inline-block';
+            if (syncBtn)    syncBtn.style.display    = 'none';
+            if (disconnBtn) disconnBtn.style.display = 'none';
+        }
+    } catch (e) {
+        const statusText = document.getElementById('gcalStatusText');
+        if (statusText) statusText.textContent = 'Google Calendar';
+    }
+}
+
+function connectGoogleCalendar() {
+    const userId = (typeof getCurrentUser === 'function') ? getCurrentUser() : (window.currentUser || localStorage.getItem('currentUser'));
+    if (!userId || userId === 'User') return alert('Please log in first.');
+    const w = window.open(
+        `/api/google-calendar/auth?userId=${encodeURIComponent(userId)}`,
+        'GoogleCalendarAuth',
+        'width=520,height=620,resizable=yes'
+    );
+    // Listen for the popup to report back
+    const handler = (event) => {
+        if (!event.data || event.data.type !== 'google-calendar-auth') return;
+        window.removeEventListener('message', handler);
+        if (event.data.success) {
+            showToast('Google Calendar connected! Syncing…', 'success');
+            checkGoogleCalendarStatus();
+            // Auto-run a full sync after connecting
+            setTimeout(() => syncGoogleCalendar(true), 1500);
+        } else {
+            showToast('Google Calendar connection failed: ' + (event.data.error || 'Unknown error'), 'error');
+        }
+    };
+    window.addEventListener('message', handler);
+}
+
+async function syncGoogleCalendar(silent) {
+    const userId = (typeof getCurrentUser === 'function') ? getCurrentUser() : (window.currentUser || localStorage.getItem('currentUser'));
+    if (!userId || userId === 'User') return;
+
+    const syncBtn = document.getElementById('gcalSyncBtn');
+    if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing…';
+    }
+
+    try {
+        const resp = await fetch(`/api/google-calendar/sync?userId=${encodeURIComponent(userId)}`, { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+            if (!silent) showToast(data.message || 'Calendar synced!', 'success');
+            // Reload CRM calendar events to show anything pulled from Google
+            if (typeof loadServerCalendarEvents === 'function') await loadServerCalendarEvents();
+            if (typeof refreshCalendarDisplay === 'function') refreshCalendarDisplay();
+        } else {
+            if (!silent) showToast('Sync error: ' + (data.error || 'Unknown'), 'error');
+        }
+    } catch (e) {
+        if (!silent) showToast('Sync failed: ' + e.message, 'error');
+    } finally {
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Now';
+        }
+    }
+}
+
+async function disconnectGoogleCalendar() {
+    if (!confirm('Disconnect Google Calendar? Events already in the CRM will remain, but future sync will stop.')) return;
+    const userId = (typeof getCurrentUser === 'function') ? getCurrentUser() : (window.currentUser || localStorage.getItem('currentUser'));
+    if (!userId || userId === 'User') return;
+    try {
+        await fetch(`/api/google-calendar/disconnect?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+        showToast('Google Calendar disconnected', 'info');
+        checkGoogleCalendarStatus();
+    } catch (e) {
+        showToast('Error disconnecting: ' + e.message, 'error');
+    }
+}
+
+// Helper: show toast notification (reuse existing if available, else fallback)
+function showToast(msg, type) {
+    if (typeof window.showNotification === 'function') {
+        window.showNotification(msg, type);
+        return;
+    }
+    const colors = { success: '#22c55e', error: '#ef4444', info: '#3b82f6' };
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed;bottom:24px;right:24px;background:${colors[type]||'#374151'};color:white;padding:12px 20px;border-radius:8px;font-size:14px;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.2);max-width:360px;`;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// Auto-sync every 5 minutes when calendar is open
+(function startGCalAutoSync() {
+    setInterval(() => {
+        // Only sync if calendar modal is visible
+        const calModal = document.getElementById('calendarLeftPanel');
+        if (calModal && calModal.offsetParent !== null) {
+            syncGoogleCalendar(true); // silent = no toast
+        }
+    }, 5 * 60 * 1000);
+})();
+
+// ─── End Google Calendar Sync ─────────────────────────────────────────────────
 
 function changeMonth(direction) {
     if (!window.calendarState) return;
@@ -3393,7 +3566,7 @@ function generateTodaysEvents() {
             : '';
 
         return `
-        <div style="background: #f9fafb; border-left: 4px solid ${getEventColor(event.type)}; padding: 12px; margin-bottom: 8px; border-radius: 4px;">
+        <div style="background: #f9fafb; border-left: 4px solid ${event.isServerCallback ? getAgentColor(event.assignedAgent) : getEventColor(event.type)}; padding: 12px; margin-bottom: 8px; border-radius: 4px;">
             <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">${event.title}</div>
             <div style="font-size: 12px; color: #6b7280;">
                 <i class="fas fa-clock"></i> ${formatTime(event.time)} •
@@ -3445,7 +3618,7 @@ function generateEventsForDate(year, month, day) {
                 : '';
 
             return `
-            <div style="background: #f9fafb; border-left: 4px solid ${getEventColor(event.type)}; padding: 12px; margin-bottom: 8px; border-radius: 4px;">
+            <div style="background: #f9fafb; border-left: 4px solid ${event.isServerCallback ? getAgentColor(event.assignedAgent) : getEventColor(event.type)}; padding: 12px; margin-bottom: 8px; border-radius: 4px;">
                 <div style="font-weight: 600; color: #111827; margin-bottom: 4px;">${event.title}</div>
                 <div style="font-size: 12px; color: #6b7280;">
                     <i class="fas fa-clock"></i> ${formatTime(event.time)} •
@@ -3495,6 +3668,15 @@ function getEventColor(type) {
     return colors[type] || '#6b7280';
 }
 
+function getAgentColor(agent) {
+    const a = (agent || '').toLowerCase();
+    if (a.includes('carson')) return '#3b82f6';   // blue
+    if (a.includes('grant'))  return '#10b981';   // green
+    if (a.includes('maureen')) return '#8b5cf6';  // purple
+    if (a.includes('hunter')) return '#eab308';   // yellow
+    return '#f97316'; // orange fallback
+}
+
 function formatTime(time) {
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours);
@@ -3528,6 +3710,234 @@ function refreshCalendarDisplay() {
             );
         }
     }
+
+    // Sync new events to the dashboard widget if it's visible
+    if (window.dashCalState && document.getElementById('dashCalGrid')) {
+        window.dashCalState.serverEvents = window.calendarState.serverEvents || [];
+        window.dashCalState.serverCallbacks = window.calendarState.serverCallbacks || [];
+        const dashGrid = document.getElementById('dashCalGrid');
+        if (dashGrid) dashGrid.innerHTML = generateDashCalGrid(window.dashCalState.currentYear, window.dashCalState.currentMonth);
+        const sd = window.dashCalState.selectedDate || new Date();
+        const dashEvents = document.getElementById('dashCalEvents');
+        if (dashEvents) dashEvents.innerHTML = generateDashCalEventsHTML(sd.getFullYear(), sd.getMonth(), sd.getDate());
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD CALENDAR WIDGET
+// ═══════════════════════════════════════════════════════
+
+function generateDashCalGrid(year, month) {
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDow = firstDay.getDay();
+    const today = new Date();
+    const selectedDate = window.dashCalState?.selectedDate;
+
+    let html = `<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e5e7eb; border-radius: 6px; overflow: hidden;">
+        <div style="background:#374151;color:white;padding:5px 2px;text-align:center;font-weight:600;font-size:11px;">Sun</div>
+        <div style="background:#374151;color:white;padding:5px 2px;text-align:center;font-weight:600;font-size:11px;">Mon</div>
+        <div style="background:#374151;color:white;padding:5px 2px;text-align:center;font-weight:600;font-size:11px;">Tue</div>
+        <div style="background:#374151;color:white;padding:5px 2px;text-align:center;font-weight:600;font-size:11px;">Wed</div>
+        <div style="background:#374151;color:white;padding:5px 2px;text-align:center;font-weight:600;font-size:11px;">Thu</div>
+        <div style="background:#374151;color:white;padding:5px 2px;text-align:center;font-weight:600;font-size:11px;">Fri</div>
+        <div style="background:#374151;color:white;padding:5px 2px;text-align:center;font-weight:600;font-size:11px;">Sat</div>`;
+
+    for (let i = 0; i < startDow; i++) html += `<div style="background:#f9fafb;padding:4px;"></div>`;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
+        const isSel = selectedDate && selectedDate.getDate() === day && selectedDate.getMonth() === month && selectedDate.getFullYear() === year;
+        const events = getWidgetEventsForDate(year, month, day);
+        const bg = isSel ? '#dbeafe' : isToday ? '#eff6ff' : 'white';
+        const border = isSel ? '2px solid #2563eb' : isToday ? '2px solid #3b82f6' : 'none';
+        const dots = events.slice(0, 3).map(e => `<div style="background:${e.isServerCallback ? getAgentColor(e.assignedAgent) : getEventColor(e.type)};color:white;font-size:7px;padding:1px 2px;border-radius:2px;margin-bottom:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.title}">${e.title}</div>`).join('') + (events.length > 3 ? `<div style="font-size:7px;color:#6b7280;">+${events.length - 3}</div>` : '');
+
+        html += `<div onclick="dashCalSelectDate(${year},${month},${day})" style="background:${bg};padding:4px 3px;cursor:pointer;border:${border};min-height:40px;display:flex;flex-direction:column;" onmouseover="if(!this.dataset.sel)this.style.background='#f3f4f6'" onmouseout="if(!this.dataset.sel)this.style.background='${bg}'" ${isSel ? 'data-sel="1"' : ''}>
+            <div style="font-weight:${isToday?'700':'500'};color:${isToday?'#1e40af':'#374151'};font-size:12px;line-height:1;">${day}</div>
+            ${events.length > 0 ? `<div style="margin-top:1px;">${dots}</div>` : ''}
+        </div>`;
+    }
+
+    const remaining = 42 - (startDow + daysInMonth);
+    for (let i = 0; i < remaining; i++) html += `<div style="background:#f9fafb;padding:4px;"></div>`;
+    html += `</div>`;
+    return html;
+}
+
+function switchDashCalView(view) {
+    if (!window.dashCalState) return;
+    window.dashCalState.currentView = view;
+    const personalBtn = document.getElementById('dashCalPersonalBtn');
+    const agencyBtn = document.getElementById('dashCalAgencyBtn');
+    if (personalBtn) { personalBtn.style.background = view === 'personal' ? '#3b82f6' : 'white'; personalBtn.style.color = view === 'personal' ? 'white' : '#6b7280'; }
+    if (agencyBtn) { agencyBtn.style.background = view === 'agency' ? '#3b82f6' : 'white'; agencyBtn.style.color = view === 'agency' ? 'white' : '#6b7280'; }
+    const grid = document.getElementById('dashCalGrid');
+    if (grid) grid.innerHTML = generateDashCalGrid(window.dashCalState.currentYear, window.dashCalState.currentMonth);
+    const sd = window.dashCalState.selectedDate || new Date();
+    const eventsEl = document.getElementById('dashCalEvents');
+    if (eventsEl) eventsEl.innerHTML = generateDashCalEventsHTML(sd.getFullYear(), sd.getMonth(), sd.getDate());
+}
+
+function getWidgetEventsForDate(year, month, day) {
+    const dateStr = new Date(year, month, day).toISOString().split('T')[0];
+    const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const currentUser = (sessionData.username || '').toLowerCase();
+    const state = window.dashCalState || {};
+    const isPersonal = (state.currentView || 'personal') === 'personal';
+
+    const localEvents = JSON.parse(localStorage.getItem('calendarEvents') || '[]')
+        .filter(e => e.date === dateStr && (!isPersonal || !e.assignedAgent || e.assignedAgent.toLowerCase() === currentUser));
+
+    const serverEvents = (state.serverEvents || [])
+        .filter(e => e.date === dateStr && (!isPersonal || !e.created_by || e.created_by.toLowerCase() === currentUser))
+        .map(e => ({ id: `server_${e.id}`, title: e.title, time: e.time || '09:00', type: e.description || '', date: e.date, isServerEvent: true, assignedAgent: e.created_by }));
+
+    const serverCallbacks = (state.serverCallbacks || [])
+        .filter(cb => {
+            if (!cb.date_time) return false;
+            const cbDate = new Date(cb.date_time).toISOString().split('T')[0];
+            if (cbDate !== dateStr) return false;
+            return !isPersonal || !cb.assigned_agent || cb.assigned_agent.toLowerCase() === currentUser;
+        })
+        .map(cb => ({
+            id: `callback_${cb.id}`, callbackId: cb.id,
+            title: `CB: ${(typeof shortenCompanyName === 'function' ? shortenCompanyName(cb.lead_name || 'Unknown') : (cb.lead_name || 'Unknown'))}`,
+            time: new Date(cb.date_time).toTimeString().slice(0, 5),
+            type: 'callback', date: dateStr, leadId: cb.lead_id, notes: cb.notes,
+            assignedAgent: cb.assigned_agent, isServerCallback: true
+        }));
+
+    const todoKey = isPersonal ? 'syncedPersonalTodos' : 'syncedAgencyTodos';
+    const todoEvents = JSON.parse(localStorage.getItem(todoKey) || '[]')
+        .filter(t => t.targetDate && new Date(t.targetDate).toISOString().split('T')[0] === dateStr)
+        .map(t => ({ id: `todo_${t.id}`, title: t.text, time: new Date(t.targetDate).toTimeString().slice(0, 5), type: 'todo', date: dateStr, isTodo: true }));
+
+    return [...localEvents, ...serverEvents, ...serverCallbacks, ...todoEvents];
+}
+
+function dashCalChangeMonth(dir) {
+    if (!window.dashCalState) return;
+    window.dashCalState.currentMonth += dir;
+    if (window.dashCalState.currentMonth > 11) { window.dashCalState.currentMonth = 0; window.dashCalState.currentYear++; }
+    else if (window.dashCalState.currentMonth < 0) { window.dashCalState.currentMonth = 11; window.dashCalState.currentYear--; }
+    const el = document.getElementById('dashCalMonthYear');
+    if (el) el.textContent = `${getMonthName(window.dashCalState.currentMonth)} ${window.dashCalState.currentYear}`;
+    const grid = document.getElementById('dashCalGrid');
+    if (grid) grid.innerHTML = generateDashCalGrid(window.dashCalState.currentYear, window.dashCalState.currentMonth);
+}
+
+function dashCalSelectDate(year, month, day) {
+    if (!window.dashCalState) return;
+    window.dashCalState.selectedDate = new Date(year, month, day);
+    const eventsEl = document.getElementById('dashCalEvents');
+    if (eventsEl) eventsEl.innerHTML = generateDashCalEventsHTML(year, month, day);
+    const grid = document.getElementById('dashCalGrid');
+    if (grid) grid.innerHTML = generateDashCalGrid(window.dashCalState.currentYear, window.dashCalState.currentMonth);
+}
+
+function generateDashCalEventsHTML(year, month, day) {
+    const events = getWidgetEventsForDate(year, month, day).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    const dateDisplay = new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const isGrant = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase() === 'grant';
+
+    if (events.length === 0) {
+        return `<div style="text-align:center;color:#9ca3af;padding:20px;font-size:13px;"><i class="fas fa-calendar-day" style="display:block;font-size:22px;margin-bottom:8px;opacity:0.4;"></i>${dateDisplay}<br>No events scheduled</div>`;
+    }
+
+    const header = `<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #e5e7eb;">${dateDisplay} — ${events.length} event${events.length !== 1 ? 's' : ''}</div>`;
+    const items = events.map(event => {
+        const color = event.isServerCallback ? getAgentColor(event.assignedAgent) : getEventColor(event.type);
+        const timeStr = typeof formatTime === 'function' ? formatTime(event.time) : event.time;
+        const deleteRefresh = `setTimeout(()=>{const sd=window.dashCalState?.selectedDate||new Date();const el=document.getElementById('dashCalEvents');if(el)el.innerHTML=generateDashCalEventsHTML(sd.getFullYear(),sd.getMonth(),sd.getDate());const g=document.getElementById('dashCalGrid');if(g)g.innerHTML=generateDashCalGrid(window.dashCalState.currentYear,window.dashCalState.currentMonth);},400)`;
+        const actions = event.isServerCallback
+            ? `<button onclick="openLeadProfile('${event.leadId}')" style="margin-top:4px;padding:3px 7px;background:#3b82f6;color:white;border:none;border-radius:3px;font-size:10px;cursor:pointer;"><i class="fas fa-user"></i> Open Lead</button>
+               ${isGrant ? `<button onclick="deleteScheduledCallback('${event.callbackId||event.id}','${event.leadId}');${deleteRefresh}" style="margin-top:4px;margin-left:4px;padding:3px 7px;background:#ef4444;color:white;border:none;border-radius:3px;font-size:10px;cursor:pointer;"><i class="fas fa-trash"></i></button>` : ''}`
+            : `<button onclick="deleteEvent('${event.id}');${deleteRefresh}" style="margin-top:4px;padding:3px 7px;background:#ef4444;color:white;border:none;border-radius:3px;font-size:10px;cursor:pointer;"><i class="fas fa-trash"></i></button>`;
+        return `<div style="background:#f9fafb;border-left:3px solid ${color};padding:8px;margin-bottom:6px;border-radius:4px;">
+            <div style="font-weight:600;color:#111827;font-size:13px;">${event.title}</div>
+            <div style="font-size:11px;color:#6b7280;margin-top:2px;"><i class="fas fa-clock"></i> ${timeStr} · <span style="text-transform:capitalize;">${(event.type||'').replace('-',' ')}</span></div>
+            ${actions}
+        </div>`;
+    }).join('');
+    return header + items;
+}
+
+async function dashCalAddEvent() {
+    const titleEl = document.getElementById('dashCalTitle');
+    const timeEl = document.getElementById('dashCalTime');
+    const typeEl = document.getElementById('dashCalType');
+
+    if (!titleEl?.value.trim()) { showNotification('Please enter an event title', 'warning'); return; }
+
+    const btn = document.querySelector('button[onclick="dashCalAddEvent()"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...'; }
+
+    const sessionData = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const currentUser = sessionData.username || '';
+    const selectedDate = window.dashCalState?.selectedDate || new Date();
+
+    const eventData = {
+        title: titleEl.value.trim(),
+        time: timeEl?.value || '09:00',
+        description: typeEl?.value || 'meeting',
+        date: selectedDate.toISOString().split('T')[0],
+        userId: currentUser
+    };
+
+    const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:3001' : `http://${window.location.hostname}:3001`;
+
+    try {
+        const response = await fetch(`${apiUrl}/api/calendar-events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(eventData)
+        });
+
+        if (response.ok) {
+            titleEl.value = '';
+            showNotification('Event added to calendar!', 'success');
+            await loadServerCalendarEvents();
+            if (window.dashCalState) window.dashCalState.serverEvents = window.calendarState?.serverEvents || [];
+            // Also refresh the popup calendar if open
+            if (window.calendarState && document.getElementById('calendarGrid')) refreshCalendarDisplay();
+            const sd = window.dashCalState?.selectedDate || new Date();
+            const eventsEl = document.getElementById('dashCalEvents');
+            if (eventsEl) eventsEl.innerHTML = generateDashCalEventsHTML(sd.getFullYear(), sd.getMonth(), sd.getDate());
+            const grid = document.getElementById('dashCalGrid');
+            if (grid) grid.innerHTML = generateDashCalGrid(window.dashCalState.currentYear, window.dashCalState.currentMonth);
+        } else {
+            showNotification('Error adding event', 'error');
+        }
+    } catch(e) {
+        console.error('Dashboard calendar widget error:', e);
+        showNotification('Error adding event', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus"></i> Add Event'; }
+    }
+}
+
+function initDashCalWidget() {
+    if (!document.getElementById('dashCalGrid')) return;
+    const now = new Date();
+    const _widgetUser = (JSON.parse(sessionStorage.getItem('vanguard_user') || '{}').username || '').toLowerCase();
+    window.dashCalState = {
+        currentMonth: now.getMonth(),
+        currentYear: now.getFullYear(),
+        selectedDate: now,
+        currentView: 'personal',
+        serverEvents: window.calendarState?.serverEvents || [],
+        serverCallbacks: window.calendarState?.serverCallbacks || []
+    };
+    // Hide agency toggle for Maureen
+    const agencyBtn = document.getElementById('dashCalAgencyBtn');
+    if (agencyBtn && _widgetUser === 'maureen') agencyBtn.style.display = 'none';
+    const monthEl = document.getElementById('dashCalMonthYear');
+    if (monthEl) monthEl.textContent = `${getMonthName(now.getMonth())} ${now.getFullYear()}`;
+    const grid = document.getElementById('dashCalGrid');
+    if (grid) grid.innerHTML = generateDashCalGrid(now.getFullYear(), now.getMonth());
+    const eventsEl = document.getElementById('dashCalEvents');
+    if (eventsEl) eventsEl.innerHTML = generateDashCalEventsHTML(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 // Navigate from calendar to specific todo
@@ -3613,10 +4023,11 @@ async function deleteEvent(eventId) {
                     method: 'DELETE'
                 });
 
-                if (!response.ok) {
+                if (!response.ok && response.status !== 404) {
                     throw new Error(`Server error: ${response.status}`);
                 }
 
+                // 404 = already deleted (e.g. removed by Google Calendar sync) — treat as success
                 console.log('📅 Server event deleted successfully');
 
                 // Reload server events
@@ -4117,6 +4528,9 @@ window.setActiveTab = setActiveTab;
 
 // Add click handlers to navigation links
 document.addEventListener('DOMContentLoaded', function() {
+    // Start JenesisNow background auto-import
+    if (typeof jnStartAutoImport === 'function') jnStartAutoImport();
+
     console.log('🔥 Adding navigation click handlers...');
 
     // Handle all navigation links (main nav, sidebar nav)
@@ -4190,12 +4604,41 @@ function updateActiveMenuItem(hash) {
         }
     }
 
-    // Show Archived Leads nav item only when on leads or archived-leads
-    const archivedNavItem = document.getElementById('archived-leads-nav-item');
-    if (archivedNavItem) {
-        archivedNavItem.style.display = (normalizedHash === '#leads' || normalizedHash === '#archived-leads') ? '' : 'none';
-    }
+    // Auto-expand nav folders when on their child pages
+    const folders = [
+        { id: 'leads-nav-folder', menuId: 'leads-sub-menu', hashes: ['#leads', '#archived-leads'] },
+        { id: 'clients-nav-folder', menuId: 'clients-sub-menu', hashes: ['#clients', '#policies', '#renewals'] },
+        { id: 'leadgen-nav-folder', menuId: 'leadgen-sub-menu', hashes: ['#lead-generation', '#lead-gen-lookup', '#lead-gen-generate', '#lead-gen-sms'] }
+    ];
+    folders.forEach(f => {
+        const folder = document.getElementById(f.id);
+        const subMenu = document.getElementById(f.menuId);
+        if (folder && subMenu) {
+            if (f.hashes.includes(normalizedHash)) {
+                folder.classList.add('open');
+                subMenu.style.display = '';
+            } else {
+                folder.classList.remove('open');
+                subMenu.style.display = 'none';
+            }
+        }
+    });
 }
+
+// Nav folder toggles
+function toggleNavFolder(folderId, subMenuId) {
+    const folder = document.getElementById(folderId);
+    const subMenu = document.getElementById(subMenuId);
+    if (!folder || !subMenu) return;
+    const isOpen = folder.classList.toggle('open');
+    subMenu.style.display = isOpen ? '' : 'none';
+}
+function toggleLeadsFolder() { toggleNavFolder('leads-nav-folder', 'leads-sub-menu'); }
+function toggleClientsFolder() { toggleNavFolder('clients-nav-folder', 'clients-sub-menu'); }
+function toggleLeadGenFolder() { toggleNavFolder('leadgen-nav-folder', 'leadgen-sub-menu'); }
+window.toggleLeadsFolder = toggleLeadsFolder;
+window.toggleClientsFolder = toggleClientsFolder;
+window.toggleLeadGenFolder = toggleLeadGenFolder;
 
 // Modal Functions
 function showModal(modalId) {
@@ -4614,9 +5057,13 @@ function loadContent(section) {
             }
             break;
         case '#lead-generation':
+        case '#lead-gen-lookup':
+        case '#lead-gen-generate':
+        case '#lead-gen-sms':
             dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Lead Generation...</div>';
             try {
-                loadLeadGenerationView();
+                const tabMap = { '#lead-gen-lookup': 'lookup', '#lead-gen-generate': 'generate', '#lead-gen-sms': 'sms' };
+                loadLeadGenerationView(tabMap[section] || 'lookup');
                 setTimeout(() => {
                     if (dashboardContent.innerHTML.includes('loading-spinner')) {
                         console.error('🔥 ERROR: loadLeadGenerationView() did not replace loading content!');
@@ -4741,6 +5188,20 @@ function loadContent(section) {
             } catch (error) {
                 console.error('🔥 ERROR: loadSettingsView() threw an error:', error);
                 dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Settings</h2><p>There was a problem loading the settings view. Please try refreshing the page.</p></div>';
+            }
+            break;
+        case '#downloads':
+            dashboardContent.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading Downloads...</div>';
+            try {
+                loadDownloadsView();
+                setTimeout(() => {
+                    if (dashboardContent.innerHTML.includes('loading-spinner')) {
+                        dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Downloads</h2><p>There was a problem loading downloads. Please try refreshing.</p></div>';
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('ERROR: loadDownloadsView() threw:', error);
+                dashboardContent.innerHTML = '<div class="error-message"><h2>Error Loading Downloads</h2><p>' + error.message + '</p></div>';
             }
             break;
         case '#analytics':
@@ -5533,9 +5994,9 @@ function loadFullDashboard() {
         </div>
 
         <!-- Main Sections -->
-        <div class="dashboard-sections" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="dashboard-sections" style="display: grid; gap: 20px;">
             <!-- To-Do List -->
-            <div class="section-card todo-container" style="height: fit-content; min-height: 600px;">
+            <div class="section-card todo-container" style="height: 100%; min-height: 600px; box-sizing: border-box;">
                 <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="color: white;">To-Do</h2>
                     <div style="display: flex; gap: 5px;" id="dashboardTodoViewButtons">
@@ -5705,6 +6166,61 @@ function loadFullDashboard() {
                 </div>
             </div>
         </div>
+
+        <!-- Dashboard Calendar Widget -->
+        <div class="section-card" id="dashCalWidget" style="margin-top: 0;">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: white;"><i class="fas fa-calendar-alt" style="margin-right: 8px;"></i>Calendar</h2>
+                <button onclick="openCalendar()" style="padding: 5px 12px; font-size: 0.8rem; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; cursor: pointer; font-weight: 500;">
+                    <i class="fas fa-external-link-alt"></i> Open Full Calendar
+                </button>
+            </div>
+            <div style="display: flex; min-height: 380px;">
+                <!-- Left: Calendar Grid -->
+                <div style="flex: 0 0 58%; padding: 16px; background: #f9fafb; border-right: 1px solid #e5e7eb;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <button onclick="dashCalChangeMonth(-1)" style="padding: 6px 10px; border: 1px solid #d1d5db; background: white; border-radius: 6px; cursor: pointer;"><i class="fas fa-chevron-left"></i></button>
+                        <span id="dashCalMonthYear" style="font-size: 15px; font-weight: 600; color: #111827;"></span>
+                        <button onclick="dashCalChangeMonth(1)" style="padding: 6px 10px; border: 1px solid #d1d5db; background: white; border-radius: 6px; cursor: pointer;"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div style="display: flex; justify-content: center; margin-bottom: 12px; background: #f8fafc; border-radius: 8px; padding: 6px; border: 1px solid #e5e7eb;">
+                        <div style="display: flex; background: white; border-radius: 6px; border: 1px solid #d1d5db; overflow: hidden;">
+                            <button id="dashCalPersonalBtn" onclick="switchDashCalView('personal')" style="padding: 6px 14px; border: none; background: #3b82f6; color: white; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s ease;">
+                                <i class="fas fa-user" style="margin-right: 5px;"></i>Personal
+                            </button>
+                            <button id="dashCalAgencyBtn" onclick="switchDashCalView('agency')" style="padding: 6px 14px; border: none; background: white; color: #6b7280; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s ease;">
+                                <i class="fas fa-users" style="margin-right: 5px;"></i>Agency
+                            </button>
+                        </div>
+                    </div>
+                    <div id="dashCalGrid"></div>
+                </div>
+                <!-- Right: Quick Add + Events -->
+                <div style="flex: 1; padding: 16px; display: flex; flex-direction: column; min-width: 0;">
+                    <div style="background: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                        <h4 style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;">Quick Add Event</h4>
+                        <input type="text" id="dashCalTitle" placeholder="Event title..." style="width: calc(100% - 14px); padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 6px; font-size: 14px;">
+                        <div style="display: flex; gap: 2%;">
+                            <input type="time" id="dashCalTime" style="width: 48%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px;">
+                            <select id="dashCalType" style="width: 48%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px;">
+                                <option value="meeting">Meeting</option>
+                                <option value="call">Client Call</option>
+                                <option value="appointment">Appointment</option>
+                                <option value="reminder">Reminder</option>
+                                <option value="follow-up">Follow-up</option>
+                                <option value="callback">Callback</option>
+                            </select>
+                        </div>
+                        <button onclick="dashCalAddEvent()" style="width: 100%; margin-top: 8px; padding: 6px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                            <i class="fas fa-plus"></i> Add Event
+                        </button>
+                    </div>
+                    <div id="dashCalEvents" style="flex: 1; overflow-y: auto; max-height: 260px;">
+                        <div style="text-align: center; color: #9ca3af; padding: 20px; font-size: 13px;"><i class="fas fa-calendar-day" style="display: block; font-size: 22px; margin-bottom: 8px; opacity: 0.4;"></i>Select a date to view events</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 
     // Clear any existing cached dashboard to force reload with new layout
@@ -5765,6 +6281,9 @@ function loadDashboardView() {
 
             // Sync todos to backend for notifications
             syncTodosToBackend();
+
+            // Initialize the dashboard calendar widget
+            initDashCalWidget();
         }).catch(error => {
             console.error('⚠️ Error loading server data for dashboard, showing manual todos only:', error);
             // Server data failed, show manual todos at least
@@ -5772,6 +6291,9 @@ function loadDashboardView() {
 
             // Still try to sync todos even if server data failed
             syncTodosToBackend();
+
+            // Init widget with whatever data we have
+            initDashCalWidget();
         });
 
         loadReminderStats(); // Load reminder statistics
@@ -5937,16 +6459,18 @@ function _goalsFormatTime(secs) {
     return m + 'm';
 }
 
-function _goalBar(label, value, goal, color, icon, displayText, fractionOverride) {
+function _goalBar(label, value, goal, color, icon, displayText, fractionOverride, shortLabel) {
     const fraction = fractionOverride !== undefined ? Math.max(0, fractionOverride) : (goal > 0 ? value / goal : 0);
     const pct = Math.min(100, Math.round(fraction * 100));
     const achieved = pct >= 100;
     const barColor = achieved ? '#10b981' : color;
+    const short = shortLabel || label;
     return '<div style="background:#f9fafb;border-radius:8px;padding:10px 12px;border:1px solid #e5e7eb;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
             '<div style="display:flex;align-items:center;gap:6px;">' +
                 '<i class="fas ' + icon + '" style="color:' + barColor + ';font-size:0.8rem;"></i>' +
-                '<span style="font-size:0.78rem;font-weight:600;color:#374151;">' + label + '</span>' +
+                '<span class="goal-label-full" style="font-size:0.78rem;font-weight:600;color:#374151;">' + label + '</span>' +
+                '<span class="goal-label-short" style="font-size:0.78rem;font-weight:600;color:#374151;display:none;">' + short + '</span>' +
                 (achieved ? '<i class="fas fa-check-circle" style="color:#10b981;font-size:0.72rem;"></i>' : '') +
             '</div>' +
             '<span style="font-size:0.72rem;color:#6b7280;">' + displayText + '</span>' +
@@ -6144,7 +6668,7 @@ function renderPersonalGoals(data, period) {
     '</div>';
     if (fieldActive('totalTalkHours'))
         html += _goalBar('Total Talk Time', callSecsInRange, totalTalkGoal, '#3b82f6', 'fa-phone',
-            _goalsFormatTime(callSecsInRange) + ' / ' + g.totalTalkHours + 'h', callSecsInRange / totalTalkGoal);
+            _goalsFormatTime(callSecsInRange) + ' / ' + g.totalTalkHours + 'h', callSecsInRange / totalTalkGoal, 'Talk Time');
     if (fieldActive('sales'))
         html += _goalBar('Sales', salesInRange, g.sales, '#10b981', 'fa-trophy', salesInRange + ' / ' + g.sales);
     if (fieldActive('newLeads'))
@@ -6156,7 +6680,7 @@ function renderPersonalGoals(data, period) {
         html += _goalBar(appsLabel, appsInRange, g.apps, '#f59e0b', 'fa-paper-plane', appsInRange + ' / ' + g.apps);
     if (fieldActive('callbacks'))
         html += _goalBar('Scheduled Callbacks', Math.round(cbPct), g.callbacks, '#8b5cf6', 'fa-phone-alt',
-            Math.round(cbPct) + '% / ' + g.callbacks + '% goal', cbPct / g.callbacks);
+            Math.round(cbPct) + '%/' + g.callbacks + '%', cbPct / g.callbacks, 'Callbacks');
     if (!html)
         html = '<div style="color:#9ca3af;text-align:center;grid-column:1/-1;padding:10px;font-size:0.85rem;">All goals are currently disabled.</div>';
     container.innerHTML = html;
@@ -10764,16 +11288,19 @@ async function generateClientRows(page = 1) {
     console.log('🚨 GENERATECLIENTROWS - Syncing with server first...');
 
     // ALWAYS sync with server first to get latest data
+    let clients = [];
     try {
         const serverClients = await loadClientsFromServer();
         console.log(`🔄 Server sync: Retrieved ${serverClients.length} clients from API`);
+        // Prefer the server return value; fall back to localStorage if server returned nothing
+        clients = serverClients.length > 0
+            ? serverClients
+            : JSON.parse(localStorage.getItem('insurance_clients') || '[]');
     } catch (error) {
         console.error('⚠️ Server sync failed, proceeding with localStorage:', error);
+        clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
     }
-
-    // Now load from localStorage (which should now have fresh data)
-    let clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
-    console.log(`✅ Loaded ${clients.length} clients from localStorage (post-server-sync)`);
+    console.log(`✅ Working with ${clients.length} clients (post-server-sync)`);
 
     // USER-SPECIFIC FILTERING: Maureen can only see her assigned clients (secondary filter)
     const currentUserData = localStorage.getItem('user');
@@ -10811,19 +11338,21 @@ async function generateClientRows(page = 1) {
     let currentUser = null;
     let isAdmin = false;
 
+    let isCsrUser = false;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
             isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
-            console.log(`🔍 Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+            isCsrUser = (user.role || '') === 'csr';
+            console.log(`🔍 Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
             console.error('Error parsing session data:', error);
         }
     }
 
-    // Filter clients based on user role
-    if (!isAdmin && currentUser) {
+    // Filter clients based on user role — CSR sees all clients (gated by search in UI)
+    if (!isAdmin && !isCsrUser && currentUser) {
         const originalCount = clients.length;
         clients = clients.filter(client => {
             const assignedTo = client.assignedTo || client.agent || 'Grant'; // Default to Grant if no assignment
@@ -10929,10 +11458,10 @@ async function generateClientRows(page = 1) {
         `;
     }
     
-    // Calculate pagination
+    // Calculate pagination — CSR loads all clients so DOM-based search finds any client
     const totalPages = Math.ceil(clients.length / clientsPerPage);
-    const startIndex = (page - 1) * clientsPerPage;
-    const endIndex = Math.min(startIndex + clientsPerPage, clients.length);
+    const startIndex = isCsrUser ? 0 : (page - 1) * clientsPerPage;
+    const endIndex = isCsrUser ? clients.length : Math.min(startIndex + clientsPerPage, clients.length);
     const paginatedClients = clients.slice(startIndex, endIndex);
 
     // Store current page globally
@@ -11110,8 +11639,8 @@ async function loadClientsView() {
                         <option value="Hunter">Hunter</option>
                         <option value="Maureen" style="color: #2563eb;">MAUREEN</option>`}
                     </select>` : ''}
-                    <button class="btn-filter">
-                        <i class="fas fa-filter"></i> More Filters
+                    <button class="btn-filter" id="missing-data-btn" onclick="toggleMissingDataFilter()" style="transition:0.2s;">
+                        <i class="fas fa-exclamation-triangle"></i> Missing Data
                     </button>
                 </div>
             </div>
@@ -11153,8 +11682,11 @@ async function loadClientsView() {
     // Populate the table with actual client data
     const tbody = document.getElementById('clientsTableBody');
     if (tbody) {
-        // Check if we actually have clients after server load
-        const finalClients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+        // Check if we actually have clients — prefer serverClients return value over localStorage
+        // so a stale/empty cache doesn't block the view from loading
+        const finalClients = serverClients.length > 0
+            ? serverClients
+            : JSON.parse(localStorage.getItem('insurance_clients') || '[]');
         if (finalClients.length === 0) {
             console.log('⚠️ Still no clients after server load - showing empty state');
             tbody.innerHTML = `
@@ -11170,6 +11702,7 @@ async function loadClientsView() {
             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing clients...</td></tr>';
             generateClientRows(currentClientPage).then(content => {
                 tbody.innerHTML = content;
+                filterClients();
             }).catch(error => {
                 console.error('Error generating client rows:', error);
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc2626;">Error loading clients</td></tr>';
@@ -11196,6 +11729,7 @@ async function loadClientsView() {
                     tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing clients...</td></tr>';
                     generateClientRows(currentClientPage).then(content => {
                         tbody.innerHTML = content;
+                        filterClients();
                     }).catch(error => {
                         console.error('Error generating client rows:', error);
                         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc2626;">Error loading clients</td></tr>';
@@ -11423,6 +11957,7 @@ window.goToClientPage = function(page) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Syncing clients...</td></tr>';
         generateClientRows(page).then(content => {
             tbody.innerHTML = content;
+            filterClients();
         }).catch(error => {
             console.error('Error generating client rows:', error);
             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc2626;">Error loading clients</td></tr>';
@@ -11563,8 +12098,8 @@ function loadPoliciesView() {
                     padding: 8px 10px !important;
                 }
 
-                /* Card shell */
-                .policies-view .data-table tr {
+                /* Card shell — use :not([style*=none]) so JS display:none still works */
+                .policies-view .data-table tr:not([style*="display: none"]):not([style*="display:none"]) {
                     display: flex !important;
                     flex-wrap: wrap !important;
                     align-items: center !important;
@@ -11608,7 +12143,7 @@ function loadPoliciesView() {
                 .policies-view .data-table td:nth-child(10) {
                     display: flex !important;
                     position: absolute !important; top: 0 !important; bottom: 0 !important; right: 0 !important;
-                    width: 42px !important;
+                    width: 64px !important;
                     flex-direction: column !important; align-items: center !important; justify-content: center !important;
                     border-left: 1px solid #e5e7eb !important;
                     border-radius: 0 10px 10px 0 !important;
@@ -11616,13 +12151,13 @@ function loadPoliciesView() {
                     gap: 0 !important;
                 }
                 .policies-view .data-table td:nth-child(10) .action-buttons {
-                    display: flex !important; flex-direction: column !important; gap: 4px !important;
+                    display: flex !important; flex-direction: column !important; gap: 10px !important;
                 }
                 .policies-view .data-table td:nth-child(10) .btn-icon {
-                    width: 28px !important; height: 28px !important;
-                    padding: 0 !important; font-size: 12px !important;
+                    width: 44px !important; height: 44px !important;
+                    padding: 0 !important; font-size: 18px !important;
                     display: flex !important; align-items: center !important;
-                    justify-content: center !important; border-radius: 6px !important;
+                    justify-content: center !important; border-radius: 8px !important;
                 }
 
                 /* ── Row 2: client name (100% → forces new row) ── */
@@ -11690,7 +12225,7 @@ function loadPoliciesView() {
     let policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
     console.log('📊 Loading policies from localStorage:', policies.length);
 
-    // ── Filter by agent BEFORE computing stats — prevents total premium leaking to non-admins ──
+    // ── Filter by agent BEFORE computing stats — non-admins only see their own ──
     if (currentUser && currentUser.toLowerCase() === 'maureen') {
         policies = policies.filter(p => {
             const a = (p.assignedTo || p.agent || p.assignedAgent || p.producer || 'Grant').toLowerCase();
@@ -11703,24 +12238,11 @@ function loadPoliciesView() {
             return a === _cu;
         });
     }
+    // Admins see all policies — filterPolicies() adjusts after rows load
     // ─────────────────────────────────────────────────────────────────────────────────────────
 
-    // Update from server in background (non-blocking)
-    if (window.loadPoliciesFromServer) {
-        console.log('🔄 Updating policies from server in background...');
-        window.loadPoliciesFromServer().then(serverPolicies => {
-            if (serverPolicies && serverPolicies.length > 0) {
-                localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
-                console.log('✅ Updated policies from server');
-                // Refresh the view with new data
-                if (document.querySelector('.dashboard-content')?.innerHTML?.includes('Policies Management')) {
-                    loadPoliciesView();
-                }
-            }
-        }).catch(error => {
-            console.log('⚠️ Server update failed, using localStorage data');
-        });
-    }
+    // Server sync is handled by generatePolicyRows (fix-policy-display-limit.js override)
+    // No background fetch here to avoid race conditions with double rendering
 
     // Calculate actual statistics
     const totalPolicies = policies.length;
@@ -11742,14 +12264,20 @@ function loadPoliciesView() {
         return expDate >= today && expDate <= sixtyDaysFromNow;
     }).length;
     
-    // Calculate total premium
+    // Calculate total premium (exclude expired/inactive policies)
     let totalPremium = 0;
     policies.forEach(policy => {
-        const premiumValue = policy.financial?.['Annual Premium'] || 
-                           policy.financial?.['Premium'] || 
-                           policy.premium || 
+        // Skip expired policies
+        if (policy.expirationDate) {
+            const expDate = new Date(policy.expirationDate);
+            if (expDate < today) return;
+        }
+
+        const premiumValue = policy.financial?.['Annual Premium'] ||
+                           policy.financial?.['Premium'] ||
+                           policy.premium ||
                            policy.annualPremium || 0;
-        
+
         if (premiumValue) {
             let numValue = 0;
             if (typeof premiumValue === 'number') {
@@ -11801,7 +12329,7 @@ function loadPoliciesView() {
                 </div>
             </div>
 
-            <div class="policy-stats">
+            ${(function(){ const _s=JSON.parse(sessionStorage.getItem('vanguard_user')||'{}'); return _s.role==='csr'; })() ? '' : `<div class="policy-stats">
                 <div class="mini-stat">
                     <span class="mini-stat-value">${totalPolicies}</span>
                     <span class="mini-stat-label">Total Policies</span>
@@ -11818,12 +12346,12 @@ function loadPoliciesView() {
                     <span class="mini-stat-value">${formattedPremium}</span>
                     <span class="mini-stat-label">Total Premium</span>
                 </div>` : ''}
-            </div>
+            </div>`}
             
             <div class="filters-bar">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search by policy number, client name...">
+                    <input type="text" id="policySearch" placeholder="Search by policy number, client name..." onkeyup="filterPolicies()">
                 </div>
                 <div class="filter-group">
                     <select class="filter-select" id="policyTypeFilter" onchange="filterPolicies()">
@@ -11839,25 +12367,31 @@ function loadPoliciesView() {
                         <option value="">All Carriers</option>
                         <option value="progressive">Progressive</option>
                         <option value="geico">GEICO</option>
-                        <option value="state farm">State Farm</option>
-                        <option value="allstate">Allstate</option>
-                        <option value="liberty mutual">Liberty Mutual</option>
-                        <option value="farmers">Farmers</option>
+                        <option value="northland">Northland</option>
+                        <option value="canal">Canal</option>
+                        <option value="crum">Crum & Forster</option>
+                        <option value="nico">Nico</option>
+                        <option value="occidental">Occidental</option>
+                        <option value="berkley">Berkley Prime</option>
                     </select>
                     <select class="filter-select" id="policyStatusFilter" onchange="filterPolicies()">
                         <option value="">All Status</option>
-                        <option value="active">Active</option>
+                        <option value="active" selected>Active</option>
+                        <option value="inactive">Inactive</option>
                         <option value="pending">Pending</option>
                         <option value="cancelled">Cancelled</option>
+                        <option value="cancel-pending">Cancel Pending</option>
                         <option value="expired">Expired</option>
                     </select>
                     ${isAdmin ? `<select class="filter-select" id="policyAgentFilter" onchange="filterPolicies()">
-                        <option value="">${currentUser && currentUser.toLowerCase() === 'maureen' ? 'All My Policies' : 'All Agents'}</option>
+                        <option value="">${currentUser && currentUser.toLowerCase() === 'maureen' ? 'All My Policies' : 'All Agencies'}</option>
                         ${currentUser && currentUser.toLowerCase() === 'maureen' ? '<option value="Maureen">Maureen</option>' : `
-                        <option value="Grant">Grant</option>
-                        <option value="Carson">Carson</option>
-                        <option value="Hunter">Hunter</option>
-                        <option value="Maureen" style="color: #2563eb;">MAUREEN</option>`}
+                        <option value="Vanguard" style="font-weight:700;color:#2563eb;">Vanguard</option>
+                        <option value="Grant">&nbsp;&nbsp;Grant</option>
+                        <option value="Carson">&nbsp;&nbsp;Carson</option>
+                        <option value="Hunter">&nbsp;&nbsp;Hunter</option>
+                        <option value="United" style="font-weight:700;color:#2563eb;">United</option>
+                        <option value="Maureen">&nbsp;&nbsp;Maureen</option>`}
                     </select>` : ''}
                 </div>
             </div>
@@ -11899,19 +12433,11 @@ function loadPoliciesView() {
                     window.initializePolicyFilters();
                 }
 
-                // AUTO-FILTER FOR MAUREEN: Apply filter immediately after policies are loaded
-                if (currentUser && currentUser.toLowerCase() === 'maureen') {
-                    setTimeout(() => {
-                        const agentFilter = document.getElementById('policyAgentFilter');
-                        if (agentFilter) {
-                            agentFilter.value = '';
-                            console.log('🔒 IMMEDIATE POLICY AUTO-FILTER: Set policy filter to "All My Policies" for Maureen');
-                            // Trigger the filter function
-                            filterPolicies();
-                            console.log('✅ IMMEDIATE POLICY AUTO-FILTER: Applied Maureen "All My Policies" filter');
-                        }
-                    }, 200); // Small delay to ensure DOM is updated
-                }
+                // Apply filter immediately for ALL users to sync stats with visible rows
+                setTimeout(() => {
+                    filterPolicies();
+                    console.log('✅ IMMEDIATE POLICY FILTER: Applied after row load');
+                }, 50);
             } catch (error) {
                 console.error('Error generating policy rows:', error);
                 tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #dc2626;">Error loading policies</td></tr>';
@@ -11943,6 +12469,34 @@ function filterPolicies() {
         }
     }
 
+    const policySearchValue = (document.getElementById('policySearch')?.value || '').toLowerCase();
+    const tbody = document.getElementById('policyTableBody');
+
+    // CSR: require 4+ characters before showing any policies
+    const _csrPolicySession = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const _isCsrPolicy = (_csrPolicySession.role || '') === 'csr';
+    if (_isCsrPolicy) {
+        const dataRows = tbody ? tbody.querySelectorAll('tr:not(#csrPolicySearchPrompt)') : [];
+        let promptRow = document.getElementById('csrPolicySearchPrompt');
+        if (policySearchValue.length < 4) {
+            dataRows.forEach(r => r.style.display = 'none');
+            if (tbody && !promptRow) {
+                promptRow = document.createElement('tr');
+                promptRow.id = 'csrPolicySearchPrompt';
+                promptRow.innerHTML = `<td colspan="10" style="text-align:center;padding:40px;color:#6b7280;">
+                    <i class="fas fa-search" style="font-size:48px;margin-bottom:16px;opacity:0.3;"></i>
+                    <p style="font-size:16px;margin:0;">Search for policies in the top left</p>
+                    <p style="font-size:14px;margin-top:8px;">Type 4 or more characters to display results</p>
+                </td>`;
+                tbody.appendChild(promptRow);
+            } else if (promptRow) {
+                promptRow.style.display = '';
+            }
+            return;
+        }
+        if (promptRow) promptRow.style.display = 'none';
+    }
+
     const rows = document.querySelectorAll('#policyTableBody tr');
 
     // Variables to track filtered stats
@@ -11970,26 +12524,28 @@ function filterPolicies() {
         // Check carrier filter
         const matchesCarrier = !selectedCarrier || carrier.includes(selectedCarrier);
 
-        // Check status filter
-        const matchesStatus = !selectedStatus || status.includes(selectedStatus);
+        // Check status filter (exact match to prevent "active" matching "inactive")
+        const matchesStatus = !selectedStatus || status.trim() === selectedStatus;
 
         // Special filtering logic for agent filter
+        const vanguardAgents = ['Grant', 'Carson', 'Hunter'];
+        const unitedAgents = ['Maureen'];
         let matchesAgent;
         if (isMaureen) {
-            // For Maureen: if no specific agent selected ("All My Policies"), still only show Maureen's policies
             if (!selectedAgent) {
                 matchesAgent = assignedAgent === 'Maureen';
             } else {
                 matchesAgent = assignedAgent === selectedAgent;
             }
+        } else if (!selectedAgent) {
+            // "All Agencies" — show everyone
+            matchesAgent = true;
+        } else if (selectedAgent === 'Vanguard') {
+            matchesAgent = vanguardAgents.includes(assignedAgent);
+        } else if (selectedAgent === 'United') {
+            matchesAgent = unitedAgents.includes(assignedAgent);
         } else {
-            // For non-Maureen users: exclude Maureen policies when "All Agents" is selected
-            if (!selectedAgent) {
-                matchesAgent = assignedAgent !== 'Maureen';
-                console.log(`🔍 "All Agents" filter: ${matchesAgent ? 'SHOW' : 'HIDE'} policy assigned to "${assignedAgent}"`);
-            } else {
-                matchesAgent = assignedAgent === selectedAgent;
-            }
+            matchesAgent = assignedAgent === selectedAgent;
         }
 
         // Show row only if it matches all filters
@@ -12000,17 +12556,19 @@ function filterPolicies() {
         if (shouldShow) {
             visibleTotal++;
 
-            if (status.includes('active')) {
+            if (status.trim() === 'active') {
                 visibleActive++;
             }
 
-            if (status.includes('pending') && status.includes('renewal')) {
+            if (status.trim() === 'pending' || status.includes('renewal')) {
                 visiblePendingRenewal++;
             }
 
-            // Parse premium for total calculation
-            const premiumValue = parseFloat(premiumText.replace(/[$,]/g, '')) || 0;
-            visibleTotalPremium += premiumValue;
+            // Parse premium for total calculation (exclude inactive/expired policies)
+            if (!status.includes('inactive')) {
+                const premiumValue = parseFloat(premiumText.replace(/[$,]/g, '')) || 0;
+                visibleTotalPremium += premiumValue;
+            }
         }
     });
 
@@ -14253,18 +14811,7 @@ window.loadLeadGenerationView = function loadLeadGenerationView(activeTab = 'loo
                 <h1>Lead Generation Database</h1>
             </header>
 
-            <!-- Folder-style tabs -->
-            <div class="folder-tabs">
-                <button class="folder-tab ${activeTab === 'lookup' ? 'active' : ''}" onclick="switchLeadSection('lookup')">
-                    <i class="fas fa-search"></i> Carrier Lookup
-                </button>
-                <button class="folder-tab ${activeTab === 'generate' ? 'active' : ''}" onclick="switchLeadSection('generate')">
-                    <i class="fas fa-magic"></i> Generate Leads
-                </button>
-                <button class="folder-tab ${activeTab === 'sms' ? 'active' : ''}" onclick="switchLeadSection('sms')">
-                    <i class="fas fa-sms"></i> SMS Blast
-                </button>
-            </div>
+            <!-- Tabs removed — navigation is via sidebar sub-menu -->
             
             <div class="lead-gen-container">
                 <!-- Carrier Lookup Section -->
@@ -14319,7 +14866,7 @@ window.loadLeadGenerationView = function loadLeadGenerationView(activeTab = 'loo
                     ${getGenerateLeadsContent()}
                 </div>
 
-                <!-- SMS Blast Section -->
+                <!-- Email & SMS Blast Section -->
                 <div id="smsBlastSection" class="tab-section" style="display: ${activeTab === 'sms' ? 'block' : 'none'};">
                     ${getSMSBlastContent()}
                 </div>
@@ -15094,11 +15641,178 @@ function _acctCommissionsHTML(isAdmin) {
     if (statusF === 'paid') filtered = filtered.filter(p=>p.isPaid);
     if (statusF === 'pending') filtered = filtered.filter(p=>!p.isPaid);
 
+    // Commission statement state
+    if (!_acct._stmtAgent) _acct._stmtAgent = '';
+    if (!_acct._stmtPeriod) _acct._stmtPeriod = 'ytd';
+    if (!_acct._stmtCustomStart) _acct._stmtCustomStart = '';
+    if (!_acct._stmtCustomEnd) _acct._stmtCustomEnd = '';
+
+    // Build statement HTML
+    let stmtResultHTML = '';
+    if (_acct._stmtRunning) {
+        const now = new Date();
+        const agent = _acct._stmtAgent;
+        const period = _acct._stmtPeriod;
+
+        // Determine date range
+        let startDate, endDate = now;
+        if (period === 'ytd') {
+            startDate = new Date(now.getFullYear(), 0, 1);
+        } else if (period === 'q1') {
+            startDate = new Date(now.getFullYear(), 0, 1);
+            endDate = new Date(now.getFullYear(), 2, 31);
+        } else if (period === 'q2') {
+            startDate = new Date(now.getFullYear(), 3, 1);
+            endDate = new Date(now.getFullYear(), 5, 30);
+        } else if (period === 'q3') {
+            startDate = new Date(now.getFullYear(), 6, 1);
+            endDate = new Date(now.getFullYear(), 8, 30);
+        } else if (period === 'q4') {
+            startDate = new Date(now.getFullYear(), 9, 1);
+            endDate = new Date(now.getFullYear(), 11, 31);
+        } else if (period === 'last-month') {
+            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else if (period === 'this-month') {
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        } else if (period === 'custom') {
+            startDate = _acct._stmtCustomStart ? new Date(_acct._stmtCustomStart) : new Date(now.getFullYear(), 0, 1);
+            endDate = _acct._stmtCustomEnd ? new Date(_acct._stmtCustomEnd) : now;
+        } else {
+            startDate = new Date(now.getFullYear(), 0, 1);
+        }
+
+        // Filter policies by agent and date
+        let stmtPolicies = policies.filter(p => {
+            if (agent && (p.agent||'').toLowerCase() !== agent.toLowerCase()) return false;
+            // Use policy creation from ID timestamp: POL-{timestamp}-xxx
+            const match = (p.id||'').match(/POL-(\d+)-/);
+            if (match) {
+                const created = new Date(parseInt(match[1]));
+                return created >= startDate && created <= endDate;
+            }
+            return true;
+        });
+
+        // Determine transaction type for each policy
+        const stmtRows = stmtPolicies.map(p => {
+            // Determine type based on policy data
+            let txType = 'New Business';
+            const pNum = (p.policyNumber||'').toLowerCase();
+            const cName = (p.client||'').toLowerCase();
+            // Check if it's a renewal (same client appears multiple times)
+            const sameClient = policies.filter(pp => (pp.client||'').toLowerCase() === cName);
+            if (sameClient.length > 1) {
+                const thisIdx = sameClient.indexOf(p);
+                if (thisIdx > 0) txType = 'Renewal';
+            }
+            // Check for negative premium (cancellation/return)
+            if (p.premium < 0) txType = 'Cancellation / Return Premium';
+            // Check for endorsement indicators
+            if ((p.policyNumber||'').includes('END') || (p.client||'').includes('endorsement')) txType = 'Endorsement';
+
+            const commRate = 0.06;
+            const commAmt = p.premium * commRate;
+            return { ...p, txType, commAmt, commRate };
+        });
+
+        const stmtTotalPremium = stmtRows.reduce((a, r) => a + (r.premium||0), 0);
+        const stmtTotalComm = stmtRows.reduce((a, r) => a + r.commAmt, 0);
+        const stmtPaid = stmtRows.filter(r => r.isPaid).reduce((a, r) => a + r.commAmt, 0);
+        const stmtPending = stmtTotalComm - stmtPaid;
+
+        const periodLabel = period === 'ytd' ? 'Year to Date' : period === 'this-month' ? 'This Month' : period === 'last-month' ? 'Last Month' : period.startsWith('q') ? period.toUpperCase() + ' ' + now.getFullYear() : period === 'custom' ? ((startDate ? startDate.toLocaleDateString() : '') + ' — ' + (endDate ? endDate.toLocaleDateString() : '')) : period;
+
+        stmtResultHTML = `
+        <div style="margin-top:16px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+          <div style="background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);color:white;padding:20px 24px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="margin:0;font-size:18px;">Commission Statement</h3>
+                <p style="margin:4px 0 0;opacity:0.85;font-size:13px;">${agent || 'All Agents'} — ${periodLabel}</p>
+              </div>
+              <div style="text-align:right;display:flex;align-items:center;gap:14px;">
+                <div>
+                  <div style="font-size:24px;font-weight:700;">${fmtDollar(stmtTotalComm)}</div>
+                  <div style="font-size:12px;opacity:0.8;">Total Commission Earned</div>
+                </div>
+                <button onclick="printCommissionStatement()" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;backdrop-filter:blur(4px);" title="Print / Save as PDF"><i class="fas fa-print"></i></button>
+              </div>
+            </div>
+            <div style="display:flex;gap:24px;margin-top:14px;">
+              <div><span style="opacity:0.7;font-size:12px;">Total Premium</span><br><strong>${fmtDollar(stmtTotalPremium)}</strong></div>
+              <div><span style="opacity:0.7;font-size:12px;">Collected</span><br><strong style="color:#86efac;">${fmtDollar(stmtPaid)}</strong></div>
+              <div><span style="opacity:0.7;font-size:12px;">Pending</span><br><strong style="color:#fde68a;">${fmtDollar(stmtPending)}</strong></div>
+              <div><span style="opacity:0.7;font-size:12px;">Policies</span><br><strong>${stmtRows.length}</strong></div>
+            </div>
+          </div>
+          ${stmtRows.length ? `<table class="acct-table" style="margin:0;">
+            <thead><tr>
+              <th>Client</th>
+              <th>Policy #</th>
+              <th>Carrier</th>
+              <th>Transaction Type</th>
+              <th style="text-align:right">Premium</th>
+              <th style="text-align:right">Commission</th>
+              <th>Status</th>
+            </tr></thead>
+            <tbody>${stmtRows.map(r => `<tr>
+              <td>${r.client||'—'}</td>
+              <td style="font-family:monospace;font-size:12px;">${r.policyNumber||'—'}</td>
+              <td>${r.carrier||'—'}</td>
+              <td><span style="background:${r.txType==='New Business'?'#dbeafe':r.txType==='Renewal'?'#d1fae5':r.txType.includes('Cancellation')?'#fee2e2':'#fef3c7'};color:${r.txType==='New Business'?'#1e40af':r.txType==='Renewal'?'#065f46':r.txType.includes('Cancellation')?'#991b1b':'#92400e'};padding:2px 8px;border-radius:4px;font-size:12px;">${r.txType}</span></td>
+              <td style="text-align:right">${fmtDollar(r.premium)}</td>
+              <td style="text-align:right;font-weight:600;color:#2563eb">${fmtDollar(r.commAmt)}</td>
+              <td><span class="acct-badge ${r.isPaid?'paid':'pending'}">${r.isPaid?'Collected':'Pending'}</span></td>
+            </tr>`).join('')}</tbody>
+            <tfoot><tr style="font-weight:700;background:#f8fafc;">
+              <td colspan="4" style="text-align:right;">Totals</td>
+              <td style="text-align:right">${fmtDollar(stmtTotalPremium)}</td>
+              <td style="text-align:right;color:#2563eb">${fmtDollar(stmtTotalComm)}</td>
+              <td></td>
+            </tr></tfoot>
+          </table>` : `<div style="padding:40px;text-align:center;color:#9ca3af;"><i class="fas fa-file-invoice-dollar" style="font-size:32px;margin-bottom:8px;"></i><p>No policies found for this period</p></div>`}
+        </div>`;
+    }
+
     return `
 <div class="acct-kpi-grid" style="margin-bottom:16px;">
   ${_kpi('Total Commission', fmtDollar(totalComm), 'fa-percent', '#2563eb', `${policies.length} policies`)}
   ${_kpi('Collected', fmtDollar(paidComm), 'fa-check-circle', '#16a34a', `${policies.filter(p=>p.isPaid).length} policies`)}
   ${_kpi('Pending', fmtDollar(pendingComm), 'fa-clock', '#f59e0b', `${policies.filter(p=>!p.isPaid).length} policies`)}
+</div>
+
+<!-- Commission Statements -->
+<div class="acct-card" style="margin-bottom:16px;">
+  <div class="acct-card-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+    <span><i class="fas fa-file-invoice-dollar"></i> Commission Statements</span>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select id="stmtAgentSelect" onchange="_acct._stmtAgent=this.value;" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+        <option value="">All Agents</option>
+        <option value="Grant" ${_acct._stmtAgent==='Grant'?'selected':''}>Grant</option>
+        <option value="Carson" ${_acct._stmtAgent==='Carson'?'selected':''}>Carson</option>
+        <option value="Hunter" ${_acct._stmtAgent==='Hunter'?'selected':''}>Hunter</option>
+        <option value="Maureen" ${_acct._stmtAgent==='Maureen'?'selected':''}>Maureen</option>
+      </select>
+      <select id="stmtPeriodSelect" onchange="_acct._stmtPeriod=this.value;document.getElementById('stmtCustomDates').style.display=this.value==='custom'?'flex':'none';" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+        <option value="ytd" ${_acct._stmtPeriod==='ytd'?'selected':''}>Year to Date</option>
+        <option value="this-month" ${_acct._stmtPeriod==='this-month'?'selected':''}>This Month</option>
+        <option value="last-month" ${_acct._stmtPeriod==='last-month'?'selected':''}>Last Month</option>
+        <option value="q1" ${_acct._stmtPeriod==='q1'?'selected':''}>Q1</option>
+        <option value="q2" ${_acct._stmtPeriod==='q2'?'selected':''}>Q2</option>
+        <option value="q3" ${_acct._stmtPeriod==='q3'?'selected':''}>Q3</option>
+        <option value="q4" ${_acct._stmtPeriod==='q4'?'selected':''}>Q4</option>
+        <option value="custom" ${_acct._stmtPeriod==='custom'?'selected':''}>Custom Range</option>
+      </select>
+      <div id="stmtCustomDates" style="display:${_acct._stmtPeriod==='custom'?'flex':'none'};gap:6px;align-items:center;">
+        <input type="date" value="${_acct._stmtCustomStart||''}" onchange="_acct._stmtCustomStart=this.value" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+        <span style="color:#9ca3af;">to</span>
+        <input type="date" value="${_acct._stmtCustomEnd||''}" onchange="_acct._stmtCustomEnd=this.value" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+      </div>
+      <button onclick="_acct._stmtRunning=true;acctTab('commissions')" style="background:#2563eb;color:white;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;"><i class="fas fa-play"></i> Run Statement</button>
+    </div>
+  </div>
+  ${stmtResultHTML}
 </div>
 
 <div class="acct-card">
@@ -15399,6 +16113,122 @@ async function acctSaveRate(carrier, rateStr) {
         if (res.ok) showNotification(`Rate saved for ${carrier}`, 'success');
         else showNotification('Save failed', 'error');
     } catch(e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+function printCommissionStatement() {
+    const stmtEl = document.querySelector('.acct-card[style*="margin-bottom:16px"] > div[style*="border:1px solid"]');
+    if (!stmtEl) { showNotification('Run a statement first', 'warning'); return; }
+
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Commission Statement</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding:0; color:#1f2937; }
+  .header { background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%); color:white; padding:28px 32px; }
+  .header h3 { font-size:20px; margin:0; }
+  .header .sub { margin-top:4px; opacity:0.85; font-size:14px; }
+  .header .total { font-size:28px; font-weight:700; }
+  .header .total-label { font-size:12px; opacity:0.8; }
+  .header .kpis { display:flex; gap:28px; margin-top:16px; }
+  .header .kpis span { opacity:0.7; font-size:12px; }
+  .header .kpis strong { font-size:15px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; padding:10px 14px; background:#f8fafc; color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; border-bottom:2px solid #e5e7eb; }
+  td { padding:10px 14px; border-bottom:1px solid #f1f5f9; }
+  .right { text-align:right; }
+  .comm { font-weight:600; color:#2563eb; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+  .badge-new { background:#dbeafe; color:#1e40af; }
+  .badge-renewal { background:#d1fae5; color:#065f46; }
+  .badge-cancel { background:#fee2e2; color:#991b1b; }
+  .badge-endorse { background:#fef3c7; color:#92400e; }
+  .badge-paid { background:#d1fae5; color:#065f46; }
+  .badge-pending { background:#fef3c7; color:#92400e; }
+  tfoot td { font-weight:700; background:#f8fafc; border-top:2px solid #e5e7eb; }
+  .footer { text-align:center; padding:20px; color:#9ca3af; font-size:11px; border-top:1px solid #e5e7eb; margin-top:8px; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>`);
+
+    // Build clean print version
+    const s = _acct.summary || {};
+    const policies = s.policies || [];
+    const agent = _acct._stmtAgent || 'All Agents';
+    const period = _acct._stmtPeriod || 'ytd';
+    const now = new Date();
+    let startDate, endDate = now;
+    if (period === 'ytd') startDate = new Date(now.getFullYear(), 0, 1);
+    else if (period === 'q1') { startDate = new Date(now.getFullYear(), 0, 1); endDate = new Date(now.getFullYear(), 2, 31); }
+    else if (period === 'q2') { startDate = new Date(now.getFullYear(), 3, 1); endDate = new Date(now.getFullYear(), 5, 30); }
+    else if (period === 'q3') { startDate = new Date(now.getFullYear(), 6, 1); endDate = new Date(now.getFullYear(), 8, 30); }
+    else if (period === 'q4') { startDate = new Date(now.getFullYear(), 9, 1); endDate = new Date(now.getFullYear(), 11, 31); }
+    else if (period === 'last-month') { startDate = new Date(now.getFullYear(), now.getMonth()-1, 1); endDate = new Date(now.getFullYear(), now.getMonth(), 0); }
+    else if (period === 'this-month') startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    else if (period === 'custom') { startDate = _acct._stmtCustomStart ? new Date(_acct._stmtCustomStart) : new Date(now.getFullYear(),0,1); endDate = _acct._stmtCustomEnd ? new Date(_acct._stmtCustomEnd) : now; }
+    else startDate = new Date(now.getFullYear(), 0, 1);
+
+    const periodLabel = period === 'ytd' ? 'Year to Date' : period === 'this-month' ? 'This Month' : period === 'last-month' ? 'Last Month' : period.startsWith('q') ? period.toUpperCase()+' '+now.getFullYear() : period === 'custom' ? (startDate.toLocaleDateString()+' — '+endDate.toLocaleDateString()) : period;
+
+    let stmtPolicies = policies.filter(p => {
+        if (agent && agent !== 'All Agents' && (p.agent||'').toLowerCase() !== agent.toLowerCase()) return false;
+        const match = (p.id||'').match(/POL-(\d+)-/);
+        if (match) { const created = new Date(parseInt(match[1])); return created >= startDate && created <= endDate; }
+        return true;
+    });
+
+    const rows = stmtPolicies.map(p => {
+        let txType = 'New Business';
+        const cName = (p.client||'').toLowerCase();
+        const sameClient = policies.filter(pp => (pp.client||'').toLowerCase() === cName);
+        if (sameClient.length > 1 && sameClient.indexOf(p) > 0) txType = 'Renewal';
+        if (p.premium < 0) txType = 'Cancellation / Return Premium';
+        const commAmt = p.premium * 0.06;
+        return { ...p, txType, commAmt };
+    });
+
+    const totalPrem = rows.reduce((a,r) => a+(r.premium||0), 0);
+    const totalComm = rows.reduce((a,r) => a+r.commAmt, 0);
+    const paidComm = rows.filter(r=>r.isPaid).reduce((a,r) => a+r.commAmt, 0);
+    const pendComm = totalComm - paidComm;
+    const fD = v => '$' + (v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+    w.document.write(`
+    <div class="header">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><h3>Commission Statement</h3><p class="sub">${agent} — ${periodLabel}</p></div>
+        <div style="text-align:right;"><div class="total">${fD(totalComm)}</div><div class="total-label">Total Commission Earned</div></div>
+      </div>
+      <div class="kpis">
+        <div><span>Total Premium</span><br><strong>${fD(totalPrem)}</strong></div>
+        <div><span>Collected</span><br><strong style="color:#86efac;">${fD(paidComm)}</strong></div>
+        <div><span>Pending</span><br><strong style="color:#fde68a;">${fD(pendComm)}</strong></div>
+        <div><span>Policies</span><br><strong>${rows.length}</strong></div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Client</th><th>Policy #</th><th>Carrier</th><th>Transaction Type</th><th class="right">Premium</th><th class="right">Commission</th><th>Status</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const cls = r.txType==='New Business'?'new':r.txType==='Renewal'?'renewal':r.txType.includes('Cancel')?'cancel':'endorse';
+        return `<tr>
+          <td>${r.client||'—'}</td>
+          <td style="font-family:monospace;">${r.policyNumber||'—'}</td>
+          <td>${r.carrier||'—'}</td>
+          <td><span class="badge badge-${cls}">${r.txType}</span></td>
+          <td class="right">${fD(r.premium)}</td>
+          <td class="right comm">${fD(r.commAmt)}</td>
+          <td><span class="badge badge-${r.isPaid?'paid':'pending'}">${r.isPaid?'Collected':'Pending'}</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+      <tfoot><tr><td colspan="4" class="right">Totals</td><td class="right">${fD(totalPrem)}</td><td class="right comm">${fD(totalComm)}</td><td></td></tr></tfoot>
+    </table>
+    <div class="footer">Generated ${new Date().toLocaleString()} — Vanguard Insurance Group</div>
+    </body></html>`);
+
+    w.document.close();
+    setTimeout(() => {
+        w.print();
+        w.onafterprint = () => w.close();
+        setTimeout(() => { try { if (!w.closed) w.close(); } catch(e){} }, 1000);
+    }, 400);
 }
 
 async function acctTogglePaid(policyId, policyNumber, clientName, carrier, agent, premium, commissionRate, commission, currentlyPaid) {
@@ -16139,13 +16969,6 @@ function loadCommunicationsView() {
                 </div>
             </header>
             
-            <div class="tabs">
-                <button class="tab-btn active" onclick="loadCommunicationTab('reminders')">Reminders</button>
-                <button class="tab-btn" onclick="loadCommunicationTab('campaigns')">Campaigns</button>
-                <button class="tab-btn" onclick="loadCommunicationTab('email')">Email Blast</button>
-                <button class="tab-btn" onclick="loadCommunicationTab('sms')">SMS Blast</button>
-                <button class="tab-btn" onclick="loadCommunicationTab('history')">History</button>
-            </div>
             
             <div id="communicationTabContent">
                 <!-- Default to reminders tab content -->
@@ -18179,6 +19002,13 @@ function loadSettingsView() {
                     <div id="agency-drop-zone" style="display:none;"></div>
                     <div id="agency-file-list" style="margin-top:10px;"></div>
                 </div>
+
+                <div class="settings-section" id="teamManagementSection" style="display:none;">
+                    <h3>Team</h3>
+                    <div id="teamUserList" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+                        <p style="color:#9ca3af;font-size:13px;">Loading team...</p>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -18358,6 +19188,75 @@ function loadSettingsView() {
     }
     // initIvansSettingsPanel removed (panel replaced with simple upload button)
 
+    // ── Team Management section (admin only) ─────────────────────────────────
+    (function initTeamSection() {
+        const sessionUser = (() => { try { return JSON.parse(sessionStorage.getItem('vanguard_user') || '{}'); } catch(e) { return {}; } })();
+        if (!['master_admin','united_admin','vanguard_admin','admin'].includes(sessionUser.role)) return;
+        const section = document.getElementById('teamManagementSection');
+        if (section) section.style.display = '';
+
+        const ROLE_META = {
+            master_admin:   { label: 'Master Admin',   color: 'linear-gradient(135deg,#f59e0b,#d97706)', icon: 'fa-crown' },
+            united_admin:   { label: 'United Admin',   color: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', icon: 'fa-shield-alt' },
+            vanguard_admin: { label: 'Vanguard Admin', color: 'linear-gradient(135deg,#ff6b6b,#ee5a52)', icon: 'fa-crown' },
+            agent:          { label: 'Agent',          color: 'linear-gradient(135deg,#10b981,#059669)', icon: 'fa-user-tie' },
+            producer:       { label: 'Producer',       color: 'linear-gradient(135deg,#f59e0b,#d97706)', icon: 'fa-briefcase' },
+            csr:            { label: 'CSR',            color: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', icon: 'fa-headset' },
+        };
+
+        async function loadTeam() {
+            const list = document.getElementById('teamUserList');
+            if (!list) return;
+            try {
+                const token = sessionStorage.getItem('vanguard_jwt');
+                const res = await fetch('/api/auth/users', { headers: { 'Authorization': 'Bearer ' + token } });
+                const data = await res.json();
+                if (!data.users) throw new Error('Failed to load');
+                list.innerHTML = data.users.map(u => {
+                    const meta = ROLE_META[u.role] || ROLE_META.agent;
+                    return `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:36px;height:36px;border-radius:50%;background:${meta.color};display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">
+                                <i class="fas ${meta.icon}"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight:600;color:#111827;font-size:14px;">${u.username}</div>
+                                <div style="font-size:11px;color:#6b7280;">${u.active ? 'Active' : 'Inactive'} · ID ${u.id}</div>
+                            </div>
+                        </div>
+                        <select onchange="window.updateUserRole(${u.id}, this.value, this)"
+                                style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:white;cursor:pointer;">
+                            ${Object.entries(ROLE_META).map(([val, m]) =>
+                                `<option value="${val}" ${u.role === val ? 'selected' : ''}>${m.label}</option>`
+                            ).join('')}
+                        </select>
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                list.innerHTML = `<p style="color:#dc2626;font-size:13px;">Error loading team: ${e.message}</p>`;
+            }
+        }
+
+        window.updateUserRole = async function(userId, newRole, selectEl) {
+            const token = sessionStorage.getItem('vanguard_jwt');
+            try {
+                const res = await fetch(`/api/auth/users/${userId}/role`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole })
+                });
+                if (!res.ok) throw new Error('Failed');
+                showNotification('Role updated', 'success');
+            } catch(e) {
+                showNotification('Failed to update role', 'error');
+                loadTeam(); // reload to reset UI
+            }
+        };
+
+        loadTeam();
+    })();
+
     // Update average performance display after the HTML is loaded
     console.log('🔄 DEBUG: Setting timeout to update average performance display');
     setTimeout(async () => {
@@ -18392,6 +19291,592 @@ function loadSettingsView() {
         await updateAveragePerformanceDisplay();
     }, 100);
 }
+
+// ─── JenesisNow Downloads View ────────────────────────────────────────────────
+async function loadDownloadsView() {
+    const dashboardContent = document.querySelector('.dashboard-content');
+    if (!dashboardContent) return;
+
+    const apiUrl = window.location.origin;
+    const _myNavGen = window._navGen || 0;
+
+    // Helper: parse HTML string and extract text of a selector
+    function parseText(html, sel) {
+        try {
+            const d = new DOMParser().parseFromString(html, 'text/html');
+            const el = sel ? d.querySelector(sel) : d.body;
+            return el ? el.textContent.trim() : '';
+        } catch { return ''; }
+    }
+
+    // Helper: extract status text and badge class from status cell HTML
+    function parseStatus(html) {
+        const d = new DOMParser().parseFromString(html, 'text/html');
+        const span = d.querySelector('span[id^="ImportJobStatus"] a, span[id^="ImportJobStatus"]');
+        const text = span ? span.textContent.trim() : d.body.textContent.replace(/^\(\d+\)\s*/, '').trim();
+        const map = { Processed: 'badge-processed', Pending: 'badge-pending', Incomplete: 'badge-incomplete', 'On Hold': 'badge-onhold', Duplicate: 'badge-duplicate', Error: 'badge-error' };
+        const cls = Object.keys(map).find(k => text.includes(k)) || '';
+        const label = cls ? cls.replace('badge-', '').charAt(0).toUpperCase() + cls.replace('badge-', '').slice(1) : text;
+        return { text: label, cls: map[cls] || 'badge-processed' };
+    }
+
+    // Helper: extract policies from status cell popover table
+    function parsePolicies(html) {
+        const d = new DOMParser().parseFromString(html, 'text/html');
+        const rows = d.querySelectorAll('tbody tr');
+        return Array.from(rows).map(r => {
+            const tds = r.querySelectorAll('td');
+            return { client: tds[0]?.textContent.trim(), type: tds[1]?.textContent.trim(), purpose: tds[2]?.textContent.trim(), polNo: tds[3]?.textContent.trim() };
+        }).filter(p => p.client || p.polNo);
+    }
+
+    // Helper: extract import job ID from action cell
+    function parseJobId(html) {
+        const m = html.match(/ImportJobAction(\d+)/);
+        return m ? m[1] : '';
+    }
+
+    // Helper: extract policy job info from policyInfoHTML table
+    function parsePolicyInfo(html) {
+        const d = new DOMParser().parseFromString(html, 'text/html');
+        const rows = d.querySelectorAll('tr');
+        const info = {};
+        rows.forEach(r => {
+            const tds = r.querySelectorAll('td');
+            if (tds.length >= 2) {
+                const key = tds[0].textContent.trim().replace(/\s+$/, '');
+                const val = tds[1].textContent.trim();
+                if (key === 'Client') info.client = val;
+                else if (key === 'Company') info.company = val;
+                else if (key === 'Pol No') info.polNo = val;
+                else if (key === 'Pol Type') info.polType = val;
+                else if (key === 'Purpose') info.purpose = val;
+                else if (key === 'Effective Date') info.effectiveDate = val;
+            }
+        });
+        return info;
+    }
+
+    // Helper: extract job transaction ID from action cell
+    function parseTransactionId(html) {
+        const m = html.match(/jobtransactionid="?(\d+)/);
+        return m ? m[1] : '';
+    }
+
+    // Render the shell immediately, fetch data async
+    dashboardContent.innerHTML = `
+        <div class="downloads-view">
+            <header class="content-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+                <h1 style="margin:0;"><i class="fas fa-download" style="margin-right:8px; color:var(--primary,#2563eb);"></i>JenesisNow Downloads</h1>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button id="jn-import-btn" onclick="jnImportFromJenesis()" style="padding:6px 16px; font-size:13px; display:flex; align-items:center; gap:6px; border:none; border-radius:6px; background:#2563eb; cursor:pointer; color:#fff; font-weight:600;">
+                        <i class="fas fa-cloud-download-alt"></i> Import Latest
+                    </button>
+                    <button id="jn-refresh-btn" onclick="jnRefreshData()" class="btn-secondary" style="padding:6px 14px; font-size:13px; display:flex; align-items:center; gap:6px; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; color:#374151;">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <style>
+                .jn-card { background:#fff; border-radius:10px; border:1px solid #e5e7eb; margin-bottom:1.5rem; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+                .jn-card-header { padding:14px 20px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#f9fafb; }
+                .jn-card-header h2 { margin:0; font-size:15px; font-weight:600; color:#111827; }
+                .jn-card-body { padding:0; }
+                .jn-table { width:100%; border-collapse:collapse; font-size:13px; }
+                .jn-table th { padding:10px 14px; text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; background:#f9fafb; border-bottom:1px solid #e5e7eb; }
+                .jn-table td { padding:10px 14px; border-bottom:1px solid #f3f4f6; color:#374151; vertical-align:top; }
+                .jn-table tr:last-child td { border-bottom:none; }
+                .jn-table tr:hover td { background:#f9fafb; }
+                .badge { display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:600; }
+                .badge-processed { background:#d1fae5; color:#065f46; }
+                .badge-pending { background:#fef3c7; color:#92400e; }
+                .badge-incomplete { background:#fee2e2; color:#991b1b; }
+                .badge-onhold { background:#e0e7ff; color:#3730a3; }
+                .badge-duplicate { background:#f3f4f6; color:#374151; }
+                .badge-error { background:#fee2e2; color:#991b1b; }
+                .jn-link { color:#2563eb; text-decoration:none; font-size:12px; }
+                .jn-link:hover { text-decoration:underline; }
+                .jn-policies-list { font-size:12px; color:#6b7280; margin:0; padding:0; list-style:none; }
+                .jn-policies-list li { margin-top:2px; }
+                .jn-empty { padding:2.5rem; text-align:center; color:#9ca3af; font-size:14px; }
+                .jn-count-badge { background:#dbeafe; color:#1d4ed8; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; margin-left:8px; }
+                .jn-status-label { font-size:11px; color:#9ca3af; margin-left:6px; }
+                .jn-job-client { font-weight:600; color:#111827; font-size:13px; }
+                .jn-job-detail { font-size:12px; color:#6b7280; margin-top:1px; }
+                .jn-viewbtn { display:inline-block; padding:3px 10px; font-size:11px; border-radius:5px; background:#2563eb; color:#fff; text-decoration:none; }
+                .jn-viewbtn:hover { background:#1d4ed8; }
+            </style>
+
+            <div id="jn-downloads-section">
+                <div class="jn-card">
+                    <div class="jn-card-header">
+                        <h2><i class="fas fa-file-download" style="margin-right:6px; color:#2563eb;"></i>Download File List <span id="jn-dl-count" class="jn-count-badge">...</span></h2>
+                        <select id="jn-status-filter" onchange="jnApplyFilter()" style="font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:5px; color:#374151; background:#fff;">
+                            <option value="">All (Hide Processed)</option>
+                            <option value="All">Show All</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Incomplete">Incomplete</option>
+                            <option value="On Hold">On Hold</option>
+                        </select>
+                    </div>
+                    <div class="jn-card-body">
+                        <div id="jn-downloads-table-wrap"><div class="jn-empty"><i class="fas fa-spinner fa-spin"></i> Loading downloads...</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="jn-jobs-section">
+                <div class="jn-card">
+                    <div class="jn-card-header">
+                        <h2><i class="fas fa-tasks" style="margin-right:6px; color:#f59e0b;"></i>Policy Job List <span id="jn-jobs-count" class="jn-count-badge" style="background:#fef3c7;color:#92400e;">...</span></h2>
+                        <span style="font-size:12px; color:#9ca3af;">Unmatched policies requiring manual processing</span>
+                    </div>
+                    <div class="jn-card-body">
+                        <div id="jn-jobs-table-wrap"><div class="jn-empty"><i class="fas fa-spinner fa-spin"></i> Loading policy jobs...</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Store all downloads for client-side filtering
+    window._jnAllDownloads = [];
+
+    // Render downloads table
+    window.jnRenderDownloads = function(rows, filterStatus) {
+        const filtered = filterStatus
+            ? rows.filter(r => r.statusText.toLowerCase().includes(filterStatus.toLowerCase()))
+            : rows.filter(r => r.statusText !== 'Processed');
+
+        const wrap = document.getElementById('jn-downloads-table-wrap');
+        if (!wrap) return;
+
+        if (filtered.length === 0) {
+            wrap.innerHTML = '<div class="jn-empty">No downloads match the current filter.</div>';
+            return;
+        }
+
+        wrap.innerHTML = `
+            <table class="jn-table">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Status</th>
+                        <th>Method</th>
+                        <th>Type</th>
+                        <th>Date Downloaded</th>
+                        <th>Policies</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filtered.map(r => `
+                        <tr>
+                            <td style="font-weight:500;">${r.company}</td>
+                            <td><span class="badge ${r.statusCls}">${r.statusText}</span></td>
+                            <td>${r.method}</td>
+                            <td>${r.type}</td>
+                            <td style="white-space:nowrap; color:#6b7280;">${r.date}</td>
+                            <td>
+                                ${r.policies.length > 0 ? `<ul class="jn-policies-list">${r.policies.slice(0,3).map(p => `<li><span style="color:#374151;">${p.client || '—'}</span>${p.polNo ? ` <span style="color:#9ca3af;">#${p.polNo}</span>` : ''}${p.purpose ? ` <span style="color:#d1d5db;">· ${p.purpose}</span>` : ''}</li>`).join('')}${r.policies.length > 3 ? `<li style="color:#9ca3af;">+${r.policies.length - 3} more</li>` : ''}</ul>` : '<span style="color:#d1d5db;">—</span>'}
+                            </td>
+                            <td><a href="https://ww12.jenesisnow.net/download/view/${r.jobId}" target="_blank" class="jn-viewbtn">View</a></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    };
+
+    window.jnApplyFilter = function() {
+        const filter = document.getElementById('jn-status-filter')?.value || '';
+        jnRenderDownloads(window._jnAllDownloads, filter);
+    };
+
+    // Import Latest — fetch all processed Policy-type AL3 files and run through IVANS import flow
+    window.jnImportFromJenesis = async function() {
+        const btn = document.getElementById('jn-import-btn');
+        const resetBtn = () => {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Import Latest'; }
+        };
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fetching…'; }
+
+        try {
+            // Fetch all downloads (status=All) so we can find processed Policy entries
+            const listRes = await fetch(`${apiUrl}/api/jenesis/downloads?status=All`);
+            const listData = await listRes.json();
+            const allRows = (listData.data || []).map(row => ({
+                jobId: parseJobId(row[0]),
+                type: (row[4] || '').trim(),
+                statusText: parseStatus(row[2]).text,
+                date: (row[5] || '').replace(/<[^>]+>/g, '').trim(),
+            }));
+
+            const policyRows = allRows.filter(r => (r.type === 'Policy' || r.type === 'EDoc') && r.statusText === 'Processed' && r.jobId);
+
+            if (policyRows.length === 0) {
+                if (window.showNotification) showNotification('No processed Policy downloads found in JenesisNow', 'warning');
+                return resetBtn();
+            }
+
+            // Take the 10 most recent (list is already newest-first from JenesisNow)
+            const toFetch = policyRows.slice(0, 10);
+            let allPolicies = [];
+            let fileCount = 0;
+
+            for (let i = 0; i < toFetch.length; i++) {
+                const row = toFetch[i];
+                if (btn) btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Fetching file ${i + 1}/${toFetch.length}…`;
+                try {
+                    const fileRes = await fetch(`${apiUrl}/api/jenesis/file/${row.jobId}`);
+                    const fileData = await fileRes.json();
+                    const fname = fileData.filename || `jenesis_${row.jobId}.al3`;
+                    // Backend returns structured { policies: [...] } — use directly
+                    if (fileData.policies && fileData.policies.length) {
+                        fileData.policies.forEach(p => { p._srcFile = fname; });
+                        allPolicies = allPolicies.concat(fileData.policies);
+                        fileCount++;
+                    } else if (fileData.error) {
+                        console.warn(`[JenesisNow] job ${row.jobId}: ${fileData.error}`);
+                    }
+                } catch (e) {
+                    console.warn(`[JenesisNow] failed to fetch job ${row.jobId}:`, e.message);
+                }
+            }
+
+            if (allPolicies.length === 0) {
+                if (window.showNotification) showNotification('No policies found in JenesisNow download files', 'warning');
+                return resetBtn();
+            }
+
+            // Deduplicate: same policy number + insured → keep first (newest file)
+            const seen = new Set();
+            const deduped = allPolicies.filter(p => {
+                const key = ((p.policyNumber || '').replace(/\s/g, '').toLowerCase()) + '|' + ((p.insuredName || '').toLowerCase().trim());
+                if (!key || key === '|') return true;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+
+            resetBtn();
+
+            // Open IVANS review modal with JenesisNow data
+            showIvansUpload();
+            setTimeout(() => {
+                const statusEl = document.getElementById('ivans-parse-status');
+                if (statusEl) statusEl.innerHTML = `
+                    <div style="color:#15803d;font-size:13px;font-weight:600;padding:8px 14px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;margin-bottom:8px;">
+                        <i class="fas fa-check-circle"></i> Found <strong>${deduped.length}</strong> polic${deduped.length !== 1 ? 'ies' : 'y'} from <strong>${fileCount}</strong> JenesisNow file${fileCount !== 1 ? 's' : ''}
+                    </div>`;
+                showIvansReview(deduped);
+            }, 150);
+
+        } catch (err) {
+            console.error('[JenesisNow] import error:', err);
+            if (window.showNotification) showNotification('JenesisNow import error: ' + err.message, 'error');
+            resetBtn();
+        }
+    };
+
+    // ── jnRefreshData: re-fetch both tables without rebuilding DOM shell ──────────
+    async function jnRefreshData() {
+        const btn = document.getElementById('jn-refresh-btn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...'; }
+
+        const controller = new AbortController();
+        const abortTimer = setTimeout(() => controller.abort(), 15000);
+
+        try {
+        const [dlResult, jobsResult] = await Promise.allSettled([
+            fetch(`${apiUrl}/api/jenesis/downloads?status=-1`, { cache: 'no-store', signal: controller.signal }).then(r => r.json()),
+            fetch(`${apiUrl}/api/jenesis/policy-jobs`, { cache: 'no-store', signal: controller.signal }).then(r => r.json()),
+        ]);
+        clearTimeout(abortTimer);
+
+        // Downloads table
+        if (dlResult.status === 'fulfilled') {
+            const data = dlResult.value;
+            const rows = (data.data || []).map(row => {
+                const st = parseStatus(row[2]);
+                return {
+                    jobId: parseJobId(row[0]),
+                    company: parseText(row[1], null),
+                    statusText: st.text,
+                    statusCls: st.cls,
+                    method: row[3] || '',
+                    type: row[4] || '',
+                    date: row[5] || '',
+                    policies: parsePolicies(row[2])
+                };
+            });
+            window._jnAllDownloads = rows;
+            const countEl = document.getElementById('jn-dl-count');
+            if (countEl) countEl.textContent = data.recordsTotal || rows.length;
+            jnRenderDownloads(rows, document.getElementById('jn-status-filter')?.value || '');
+        } else {
+            const wrap = document.getElementById('jn-downloads-table-wrap');
+            if (wrap) wrap.innerHTML = `<div class="jn-empty" style="color:#ef4444;">Error loading downloads: ${dlResult.reason?.message}</div>`;
+        }
+
+        // Policy jobs table
+        if (jobsResult.status === 'fulfilled') {
+            const data = jobsResult.value;
+            const rows = (data.data || []).map(row => {
+                const info = parsePolicyInfo(row[1]);
+                const tid = parseTransactionId(row[0]);
+                return { tid, ...info, status: parseText(row[5], null), date: (row[6] || '').replace(/<[^>]+>/g, '').trim() };
+            });
+            const countEl = document.getElementById('jn-jobs-count');
+            if (countEl) {
+                countEl.textContent = rows.length;
+                if (rows.length > 0) countEl.style.cssText = 'background:#fee2e2;color:#991b1b;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:8px;';
+            }
+            const wrap = document.getElementById('jn-jobs-table-wrap');
+            if (!wrap) return;
+            if (rows.length === 0) {
+                wrap.innerHTML = '<div class="jn-empty"><i class="fas fa-check-circle" style="color:#10b981;"></i> No unmatched policy jobs.</div>';
+                return;
+            }
+            wrap.innerHTML = `
+                <table class="jn-table">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Company</th>
+                            <th>Policy #</th>
+                            <th>Type</th>
+                            <th>Purpose</th>
+                            <th>Effective Date</th>
+                            <th>Status</th>
+                            <th>File Date</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(r => `
+                            <tr>
+                                <td class="jn-job-client">${r.client || '—'}</td>
+                                <td class="jn-job-detail">${r.company || '—'}</td>
+                                <td style="font-family:monospace; font-size:12px;">${r.polNo || '—'}</td>
+                                <td class="jn-job-detail">${r.polType || '—'}</td>
+                                <td class="jn-job-detail">${r.purpose || '—'}</td>
+                                <td style="white-space:nowrap; color:#6b7280;">${r.effectiveDate || '—'}</td>
+                                <td><span class="badge badge-incomplete">${r.status || 'Unknown'}</span></td>
+                                <td style="white-space:nowrap; color:#6b7280; font-size:12px;">${r.date}</td>
+                                <td><a href="https://ww12.jenesisnow.net/download" target="_blank" class="jn-viewbtn" style="background:#f59e0b;">Process</a></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            const wrap = document.getElementById('jn-jobs-table-wrap');
+            if (wrap) wrap.innerHTML = `<div class="jn-empty" style="color:#ef4444;">Error loading policy jobs: ${jobsResult.reason?.message}</div>`;
+        }
+        } catch (e) {
+            const wrap = document.getElementById('jn-downloads-table-wrap');
+            if (wrap) wrap.innerHTML = `<div class="jn-empty" style="color:#ef4444;">${e.name === 'AbortError' ? 'Request timed out — JenesisNow took too long to respond.' : 'Error: ' + e.message}</div>`;
+        } finally {
+            clearTimeout(abortTimer);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh'; }
+        }
+    }
+    window.jnRefreshData = jnRefreshData;
+
+    // Initial load
+    jnRefreshData();
+
+    // Auto-poll every 90s; self-cancel when user navigates away
+    const _jnPollTimer = setInterval(() => {
+        if (window._navGen !== _myNavGen) { clearInterval(_jnPollTimer); return; }
+        jnRefreshData();
+    }, 90000);
+}
+// ─── End JenesisNow Downloads View ───────────────────────────────────────────
+
+// ─── JenesisNow Auto-Import ───────────────────────────────────────────────────
+
+// Silently import parsed policies without a review modal — updates existing, creates new
+async function _jnSilentImport(parsedPolicies) {
+    let updated = 0, created = 0;
+    const storedPols = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+    for (const p of parsedPolicies) {
+        const pNum = (p.policyNumber || '').replace(/\s+/g, '').toLowerCase();
+        const matchIdx = pNum ? storedPols.findIndex(ep =>
+            (ep.policyNumber || '').replace(/\s+/g, '').toLowerCase() === pNum
+        ) : -1;
+
+        if (matchIdx >= 0) {
+            const ep = storedPols[matchIdx];
+            if (p.effectiveDate)  ep.effectiveDate  = p.effectiveDate;
+            if (p.expirationDate) ep.expirationDate = p.expirationDate;
+            if (p.carrier)        ep.carrier        = p.carrier;
+            if (p.lob) { ep.lob = p.lob; const pt = _ivansLobToType(p.lob); if (pt) ep.policyType = pt; }
+            if (p.premium) { const n = parseFloat(p.premium); if (!isNaN(n)) { ep.premium = `$${n.toLocaleString()}/yr`; if (!ep.financial) ep.financial = {}; ep.financial['Annual Premium'] = n; } }
+            if (p.insuredName && !ep.clientName) ep.clientName = p.insuredName;
+            if (p.phone && ep.contact && !ep.contact['Phone']) ep.contact['Phone'] = p.phone;
+            if (p.email && ep.contact && !ep.contact['Email']) ep.contact['Email'] = p.email;
+            ep.ivansUpdated = new Date().toISOString();
+            ep.source = ep.source || 'jenesis';
+            updated++;
+            await _ivansUpsertClient(ep);
+            try { await fetch(`/api/policies/${ep.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ep) }); } catch (e) {}
+        } else {
+            const newId = `POL-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
+            const n = p.premium ? parseFloat(p.premium) : 0;
+            const conObj = {};
+            if (p.insuredName) conObj['Owner Name'] = p.insuredName;
+            if (p.phone) conObj['Phone'] = p.phone;
+            if (p.email) conObj['Email'] = p.email;
+            const newPol = {
+                id: newId,
+                policyNumber:   (p.policyNumber || '').replace(/\s+/g, ''),
+                policyType:     _ivansLobToType(p.lob),
+                insuredName:    p.insuredName || '',
+                clientName:     p.insuredName || '',
+                client:         p.insuredName || '',
+                carrier:        p.carrier || '',
+                effectiveDate:  p.effectiveDate || '',
+                expirationDate: p.expirationDate || '',
+                premium:        n ? `$${n.toLocaleString()}/yr` : '',
+                financial:      { 'Annual Premium': n || 0 },
+                lob:            p.lob || '',
+                policyStatus:   'active',
+                source:         'jenesis',
+                createdAt:      Date.now(),
+                ivansUpdated:   new Date().toISOString(),
+                contact:        conObj,
+            };
+            storedPols.push(newPol);
+            created++;
+            try { await fetch('/api/policies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newPol) }); } catch (e) {}
+            await _ivansUpsertClient(newPol);
+        }
+    }
+
+    localStorage.setItem('insurance_policies', JSON.stringify(storedPols));
+    return { updated, created };
+}
+
+// Mark policies as Cancel Pending based on Message-type downloads
+async function _jnMarkCancelPending(parsedPolicies) {
+    let count = 0;
+    const storedPols = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let changed = false;
+
+    for (const p of parsedPolicies) {
+        const pNum = (p.policyNumber || '').replace(/\s+/g, '').toLowerCase();
+        if (!pNum) continue;
+        const matchIdx = storedPols.findIndex(ep =>
+            (ep.policyNumber || '').replace(/\s+/g, '').toLowerCase() === pNum
+        );
+        if (matchIdx >= 0) {
+            const existing = storedPols[matchIdx];
+            const alreadyCancelled = ['cancelled', 'cancel pending', 'cancel-pending'].includes((existing.policyStatus || '').toLowerCase());
+            if (!alreadyCancelled) {
+                existing.policyStatus = 'Cancel Pending';
+                existing.ivansUpdated = new Date().toISOString();
+                count++;
+                changed = true;
+                try { await fetch(`/api/policies/${existing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(existing) }); } catch (e) {}
+            }
+        }
+    }
+
+    if (changed) localStorage.setItem('insurance_policies', JSON.stringify(storedPols));
+    return count;
+}
+
+// Poll JenesisNow for new downloads and auto-process them
+async function _jnCheckNewDownloads() {
+    const apiUrl = window.location.origin;
+
+    try {
+        const seenJobs = new Set(JSON.parse(localStorage.getItem('jn_seen_jobs') || '[]'));
+
+        const res = await fetch(`${apiUrl}/api/jenesis/downloads?status=All`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.data) return;
+
+        // Inline helpers (no DOM dependency)
+        function _pid(html) { const m = html.match(/ImportJobAction(\d+)/); return m ? m[1] : ''; }
+        function _pstat(html) {
+            const d = new DOMParser().parseFromString(html, 'text/html');
+            const span = d.querySelector('span[id^="ImportJobStatus"] a, span[id^="ImportJobStatus"]');
+            const text = (span ? span.textContent : d.body.textContent.replace(/^\(\d+\)\s*/, '')).trim();
+            return ['Processed','Pending','Incomplete','On Hold','Duplicate','Error'].find(s => text.includes(s)) || text;
+        }
+
+        const rows = data.data.map(row => ({
+            jobId:  _pid(row[0]),
+            type:   (row[4] || '').trim(),
+            status: _pstat(row[2]),
+        }));
+
+        // Find new rows BEFORE marking them seen
+        const newPolicyRows = rows.filter(r => r.jobId && !seenJobs.has(r.jobId) && (r.type === 'Policy' || r.type === 'EDoc') && r.status === 'Processed');
+        const newMsgRows    = rows.filter(r => r.jobId && !seenJobs.has(r.jobId) && r.type === 'Message' && r.status === 'Processed');
+
+        // Mark all current rows as seen
+        rows.forEach(r => { if (r.jobId) seenJobs.add(r.jobId); });
+        const seenArr = Array.from(seenJobs);
+        if (seenArr.length > 2000) seenArr.splice(0, seenArr.length - 2000);
+        localStorage.setItem('jn_seen_jobs', JSON.stringify(seenArr));
+
+        if (!newPolicyRows.length && !newMsgRows.length) return;
+
+        let totalUpdated = 0, totalCreated = 0, totalCancels = 0;
+
+        for (const row of newPolicyRows) {
+            try {
+                const fr = await fetch(`${apiUrl}/api/jenesis/file/${row.jobId}`);
+                const fd = await fr.json();
+                // Backend returns { policies: [...] } structured data
+                if (fd.policies && fd.policies.length) {
+                    const { updated, created } = await _jnSilentImport(fd.policies);
+                    totalUpdated += updated; totalCreated += created;
+                } else if (fd.error) {
+                    console.warn(`[JenesisNow] Auto job ${row.jobId}: ${fd.error}`);
+                }
+            } catch (e) { console.warn(`[JenesisNow] Auto job ${row.jobId}:`, e.message); }
+        }
+
+        for (const row of newMsgRows) {
+            try {
+                const fr = await fetch(`${apiUrl}/api/jenesis/file/${row.jobId}`);
+                const fd = await fr.json();
+                if (fd.policies && fd.policies.length) {
+                    totalCancels += await _jnMarkCancelPending(fd.policies);
+                }
+            } catch (e) { console.warn(`[JenesisNow] Cancel job ${row.jobId}:`, e.message); }
+        }
+
+        // Notify if anything happened
+        const parts = [];
+        if (totalUpdated) parts.push(`${totalUpdated} polic${totalUpdated !== 1 ? 'ies' : 'y'} updated`);
+        if (totalCreated) parts.push(`${totalCreated} new polic${totalCreated !== 1 ? 'ies' : 'y'}`);
+        if (totalCancels) parts.push(`${totalCancels} set to Cancel Pending`);
+        if (parts.length && window.showNotification) {
+            showNotification(`JenesisNow: ${parts.join(', ')}`, 'success');
+        }
+        if (parts.length) console.log('[JenesisNow] Auto-import:', parts.join(', '));
+
+    } catch (e) {
+        console.warn('[JenesisNow] Auto-import check failed:', e.message);
+    }
+}
+
+// Start background polling — called on app load
+function jnStartAutoImport() {
+    setTimeout(_jnCheckNewDownloads, 4000);           // initial check after 4s
+    setInterval(_jnCheckNewDownloads, 5 * 60 * 1000); // then every 5 minutes
+}
+
+// ─── End JenesisNow Auto-Import ───────────────────────────────────────────────
 
 function loadRenewalsData() {
     console.log('Loading renewals data...');
@@ -20869,6 +22354,19 @@ async function _ivansUpsertClient(policy) {
             return bizKey && _clientIdentityKey(cbiz, '') === bizKey;
         });
     }
+    // Last resort: match by phone or email — prevents duplicate client records for same person
+    if (!client) {
+        const polPhone = (policy.contact?.['Phone'] || '').replace(/\D/g, '');
+        const polEmail = (policy.contact?.['Email'] || '').toLowerCase().trim();
+        if (polPhone.length >= 10 || polEmail) {
+            client = clients.find(c => {
+                const cPhone = (c.phone || '').replace(/\D/g, '');
+                const cEmail = (c.email || '').toLowerCase().trim();
+                return (polPhone.length >= 10 && cPhone === polPhone) ||
+                       (polEmail && cEmail && cEmail === polEmail);
+            });
+        }
+    }
 
     if (client) {
         // Update missing fields
@@ -20969,11 +22467,197 @@ function importClients() {
     // Would open import wizard
 }
 
+function showMergeDuplicates() {
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+    // Group clients by normalized phone and email to find duplicates
+    const phoneMap = {}, emailMap = {};
+    clients.forEach(c => {
+        const ph = (c.phone || '').replace(/\D/g, '');
+        const em = (c.email || '').toLowerCase().trim();
+        if (ph.length >= 10) { if (!phoneMap[ph]) phoneMap[ph] = []; phoneMap[ph].push(c); }
+        if (em)              { if (!emailMap[em]) emailMap[em] = []; emailMap[em].push(c); }
+    });
+
+    // Collect duplicate groups (2+ clients sharing phone or email)
+    const seen = new Set();
+    const groups = [];
+    [...Object.values(phoneMap), ...Object.values(emailMap)].forEach(grp => {
+        if (grp.length < 2) return;
+        const key = grp.map(c => c.id).sort().join('|');
+        if (seen.has(key)) return;
+        seen.add(key);
+        // Dedupe within group (same client could appear via both phone+email)
+        const uniq = Object.values(Object.fromEntries(grp.map(c => [c.id, c])));
+        if (uniq.length >= 2) groups.push(uniq);
+    });
+
+    if (groups.length === 0) {
+        if (window.showNotification) showNotification('No duplicate clients found!', 'success');
+        return;
+    }
+
+    function polCount(cid) {
+        return policies.filter(p => String(p.clientId) === String(cid)).length;
+    }
+
+    const rows = groups.map((grp, gi) => {
+        // Suggest keeping the one with a person name (no BIZ_SUFFIX) or most policies
+        const BIZ = /\b(llc|inc|ltd|corp|trucking|transport|logistics|hauling|services|enterprises|towing|farms)\b/i;
+        grp.sort((a, b) => {
+            const aIsBiz = BIZ.test(a.name || '');
+            const bIsBiz = BIZ.test(b.name || '');
+            if (aIsBiz !== bIsBiz) return aIsBiz ? 1 : -1; // person first
+            return polCount(b.id) - polCount(a.id); // more policies first
+        });
+        const keepId = grp[0].id;
+        return `
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:12px;" data-group="${gi}">
+            <div style="font-size:12px;color:#6b7280;margin-bottom:10px;font-weight:600;">GROUP ${gi+1} — ${grp.length} clients share same phone/email</div>
+            ${grp.map((c, i) => `
+            <div style="display:flex;align-items:center;gap:12px;padding:8px;background:${c.id===keepId?'#ecfdf5':'white'};border:1px solid ${c.id===keepId?'#6ee7b7':'#e5e7eb'};border-radius:6px;margin-bottom:6px;">
+                <input type="radio" name="keep_${gi}" value="${c.id}" ${c.id===keepId?'checked':''} style="margin:0;">
+                <div style="flex:1;">
+                    <div style="font-weight:600;font-size:14px;color:#1f2937;">${c.name || '—'}</div>
+                    <div style="font-size:12px;color:#6b7280;">${c.businessName?'Biz: '+c.businessName+' · ':''} ${c.phone||'no phone'} · ${c.email||'no email'} · ${polCount(c.id)} polic${polCount(c.id)===1?'y':'ies'}</div>
+                </div>
+                <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:${c.id===keepId?'#d1fae5':'#f3f4f6'};color:${c.id===keepId?'#065f46':'#6b7280'};">${c.id===keepId?'KEEP':'MERGE INTO KEEP'}</span>
+            </div>`).join('')}
+        </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'merge-duplicates-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:32px;max-width:700px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div>
+                    <h2 style="margin:0;font-size:20px;font-weight:700;color:#1f2937;"><i class="fas fa-compress-alt" style="color:#f59e0b;margin-right:10px;"></i>Merge Duplicates</h2>
+                    <p style="margin:6px 0 0;font-size:14px;color:#6b7280;">Found ${groups.length} group${groups.length>1?'s':''} of duplicate clients. Select which record to keep for each group — all policies will be re-linked to the kept record, and the others will be removed.</p>
+                </div>
+                <button onclick="document.getElementById('merge-duplicates-overlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;">&times;</button>
+            </div>
+            ${rows}
+            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+                <button onclick="document.getElementById('merge-duplicates-overlay').remove()" style="padding:10px 20px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;">Cancel</button>
+                <button onclick="_executeMerge(${groups.length})" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;"><i class="fas fa-compress-alt"></i> Merge All</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+async function _executeMerge(groupCount) {
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let totalMerged = 0;
+
+    for (let gi = 0; gi < groupCount; gi++) {
+        const radios = document.querySelectorAll(`input[name="keep_${gi}"]`);
+        let keepId = null;
+        radios.forEach(r => { if (r.checked) keepId = r.value; });
+        if (!keepId) continue;
+
+        const groupIds = [...radios].map(r => r.value);
+        const removeIds = groupIds.filter(id => id !== keepId);
+
+        const keepClient = clients.find(c => String(c.id) === keepId);
+        if (!keepClient) continue;
+
+        // Merge fields from removed clients into kept client
+        removeIds.forEach(rid => {
+            const rc = clients.find(c => String(c.id) === rid);
+            if (!rc) return;
+            if (!keepClient.phone && rc.phone)           keepClient.phone = rc.phone;
+            if (!keepClient.email && rc.email)           keepClient.email = rc.email;
+            if (!keepClient.businessName && rc.businessName) keepClient.businessName = rc.businessName;
+            if (!keepClient.address && rc.address)       keepClient.address = rc.address;
+            if (!keepClient.dateOfBirth && rc.dateOfBirth) keepClient.dateOfBirth = rc.dateOfBirth;
+        });
+
+        // Re-link all policies from removed clients to kept client
+        policies.forEach(p => {
+            if (removeIds.includes(String(p.clientId))) {
+                p.clientId = keepId;
+                p.clientName = keepClient.name || keepClient.businessName || p.clientName;
+                fetch(`/api/policies/${p.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) }).catch(()=>{});
+            }
+        });
+
+        // Remove duplicate clients from array
+        const newClients = clients.filter(c => !removeIds.includes(String(c.id)));
+        clients.length = 0;
+        newClients.forEach(c => clients.push(c));
+
+        // Delete removed clients from server
+        for (const rid of removeIds) {
+            await fetch(`/api/clients/${rid}`, { method:'DELETE' }).catch(()=>{});
+            totalMerged++;
+        }
+
+        // Save kept client to server
+        await fetch('/api/clients', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(keepClient) }).catch(()=>{});
+    }
+
+    localStorage.setItem('insurance_clients', JSON.stringify(clients));
+    localStorage.setItem('insurance_policies', JSON.stringify(policies));
+    document.getElementById('merge-duplicates-overlay')?.remove();
+    if (window.showNotification) showNotification(`Merged ${totalMerged} duplicate client${totalMerged!==1?'s':''}`, 'success');
+    if (typeof loadClientsView === 'function') loadClientsView();
+}
+
+function toggleMissingDataFilter() {
+    window._missingDataFilterActive = !window._missingDataFilterActive;
+    const btn = document.getElementById('missing-data-btn');
+    if (btn) {
+        if (window._missingDataFilterActive) {
+            btn.style.cssText = 'background:#fef3c7;color:#92400e;border-color:#f59e0b;font-weight:700;transition:0.2s;';
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Missing Data <i class="fas fa-times" style="margin-left:4px;opacity:0.7;font-size:11px;"></i>';
+        } else {
+            btn.style.cssText = 'transition:0.2s;';
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Missing Data';
+        }
+    }
+    filterClients();
+}
+
 function filterClients() {
-    const searchValue = document.getElementById('clientSearch').value.toLowerCase();
+    const searchValue = (document.getElementById('clientSearch')?.value || '').toLowerCase();
     const agentFilter = document.getElementById('clientAgentFilter');
     const selectedAgent = agentFilter ? agentFilter.value : '';
-    const rows = document.querySelectorAll('#clientsTableBody tr');
+    const tbody = document.getElementById('clientsTableBody');
+    if (!tbody) return;
+
+    // CSR: require 4+ characters before showing any clients
+    const _csrSession = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
+    const _isCsr = (_csrSession.role || '') === 'csr';
+    if (_isCsr) {
+        const dataRows = tbody.querySelectorAll('tr:not(#csrClientSearchPrompt)');
+        let promptRow = document.getElementById('csrClientSearchPrompt');
+        if (searchValue.length < 4) {
+            dataRows.forEach(r => r.style.display = 'none');
+            if (!promptRow) {
+                promptRow = document.createElement('tr');
+                promptRow.id = 'csrClientSearchPrompt';
+                promptRow.innerHTML = `<td colspan="8" style="text-align:center;padding:40px;color:#6b7280;">
+                    <i class="fas fa-search" style="font-size:48px;margin-bottom:16px;opacity:0.3;"></i>
+                    <p style="font-size:16px;margin:0;">Search for clients in the top left</p>
+                    <p style="font-size:14px;margin-top:8px;">Type 4 or more characters to display results</p>
+                </td>`;
+                tbody.appendChild(promptRow);
+            } else {
+                promptRow.style.display = '';
+            }
+            return;
+        }
+        if (promptRow) promptRow.style.display = 'none';
+    }
+
+    // Remove existing warning banner rows
+    tbody.querySelectorAll('.missing-data-warning-row').forEach(r => r.remove());
+
+    const rows = tbody.querySelectorAll('tr');
 
     // Check if Maureen is logged in
     const sessionData = sessionStorage.getItem('vanguard_user');
@@ -20982,48 +22666,58 @@ function filterClients() {
         try {
             const user = JSON.parse(sessionData);
             isMaureen = user.username && user.username.toLowerCase() === 'maureen';
-        } catch (error) {
-            console.error('Error checking user in filterClients:', error);
-        }
+        } catch (error) {}
     }
 
-    rows.forEach(row => {
-        // Skip rows that don't have the expected structure
-        if (row.cells.length < 6) {
-            row.style.display = 'none';
-            return;
-        }
+    const missingActive = !!window._missingDataFilterActive;
 
-        // Get text for search filtering
+    rows.forEach(row => {
+        if (row.cells.length < 6) { row.style.display = 'none'; return; }
+
         const text = row.textContent.toLowerCase();
         const matchesSearch = !searchValue || text.includes(searchValue);
 
-        // Get assigned agent for agent filtering (6th column, index 5)
-        const assignedAgentCell = row.cells[5]; // "Assigned to" column
-        const assignedAgent = assignedAgentCell ? assignedAgentCell.textContent.trim() : '';
+        const assignedAgent = row.cells[5] ? row.cells[5].textContent.trim() : '';
 
-        // Special filtering logic for Maureen
         let matchesAgent;
-        if (isMaureen) {
-            // For Maureen: if no specific agent selected ("All My Clients"), still only show Maureen's clients
-            if (!selectedAgent) {
-                matchesAgent = assignedAgent === 'Maureen';
-                console.log(`🔍 Maureen "All My Clients" filter: ${assignedAgent === 'Maureen' ? 'SHOW' : 'HIDE'} client assigned to "${assignedAgent}"`);
-            } else {
-                matchesAgent = assignedAgent === selectedAgent;
-            }
+        if (_isCsr) {
+            // CSR can see all clients regardless of agent assignment
+            matchesAgent = !selectedAgent || assignedAgent === selectedAgent;
+        } else if (isMaureen) {
+            matchesAgent = !selectedAgent ? assignedAgent === 'Maureen' : assignedAgent === selectedAgent;
         } else {
-            // For non-Maureen users: exclude Maureen clients when "All Agents" is selected
-            if (!selectedAgent) {
-                matchesAgent = assignedAgent !== 'Maureen';
-                console.log(`🔍 "All Agents" filter: ${matchesAgent ? 'SHOW' : 'HIDE'} client assigned to "${assignedAgent}"`);
-            } else {
-                matchesAgent = assignedAgent === selectedAgent;
-            }
+            matchesAgent = !selectedAgent ? assignedAgent !== 'Maureen' : assignedAgent === selectedAgent;
         }
 
-        // Show row only if it matches both search and agent filters
-        row.style.display = (matchesSearch && matchesAgent) ? '' : 'none';
+        // Detect missing data fields
+        const phone    = row.cells[1] ? row.cells[1].textContent.trim() : '';
+        const email    = row.cells[2] ? row.cells[2].textContent.trim() : '';
+        const policies = row.cells[3] ? row.cells[3].textContent.trim() : '';
+        const agent    = row.cells[5] ? row.cells[5].textContent.trim() : '';
+
+        const missing = [];
+        if (!phone || phone === '—' || phone === '-' || phone === 'N/A')            missing.push('phone number');
+        if (!email || email === '—' || email === '-' || email === 'N/A')            missing.push('email address');
+        if (!policies || policies === '0' || policies === '—' || policies === '-')  missing.push('policies');
+        if (!agent  || agent  === '—' || agent  === '-' || agent  === 'Unassigned') missing.push('assigned agent');
+
+        const hasMissing = missing.length > 0;
+        const matchesMissing = !missingActive || hasMissing;
+
+        const visible = matchesSearch && matchesAgent && matchesMissing;
+        row.style.display = visible ? '' : 'none';
+
+        // Insert yellow warning banner before this row when filter is active and row is visible
+        if (visible && missingActive && hasMissing) {
+            const banner = document.createElement('tr');
+            banner.className = 'missing-data-warning-row';
+            banner.innerHTML = `<td colspan="7" style="background:#fef9c3;padding:4px 16px;border-bottom:none;border-top:2px solid #fde047;">
+                <span style="color:#b91c1c;font-size:12px;font-weight:600;">
+                    <i class="fas fa-exclamation-circle" style="margin-right:5px;"></i>Missing: ${missing.join(' · ')}
+                </span>
+            </td>`;
+            row.parentNode.insertBefore(banner, row);
+        }
     });
 }
 
@@ -21604,6 +23298,7 @@ function generateViewTabContent(tabId, policy) {
                 'coverage-medical': 'Medical Payments',
                 'coverage-um-uim': 'Uninsured/Underinsured Motorist',
                 'coverage-trailer-interchange': 'Trailer Interchange',
+                'coverage-non-owned-trailer': 'Non-Owned Trailer',
                 'coverage-non-trucking': 'Non-Trucking Liability',
                 'coverage-reefer': 'Reefer Breakdown',
             };
@@ -21622,7 +23317,7 @@ function generateViewTabContent(tabId, policy) {
             // Canonical display order for coverage fields
             const CVG_ORDER = ['Liability Limits','Uninsured/Underinsured Motorist','Medical Payments',
                 'Comprehensive Deductible','Collision Deductible','General Liability',
-                'Cargo Limit','Cargo Deductible','Trailer Interchange','Non-Trucking Liability',
+                'Cargo Limit','Cargo Deductible','Trailer Interchange','Non-Owned Trailer','Non-Trucking Liability',
                 'Reefer Breakdown','General Liability BI','General Liability PD',
                 'Products/Completed Ops','Personal Injury/Advertising','Fire Damage Liability',
                 'Medical Expense','UM Property Damage'];
@@ -22107,6 +23802,11 @@ async function generatePolicyRows() {
         // Check if policy is expired based on expiration date
         let statusClass = getStatusClass(policy.policyStatus || policy.status);
         let displayStatus = policy.policyStatus || policy.status || 'Active';
+        // Normalize any DB-stored "UPDATE POLICY" status
+        if (displayStatus.toUpperCase() === 'UPDATE POLICY') {
+            displayStatus = 'Inactive';
+            statusClass = 'inactive';
+        }
 
         // Override status if policy has expired
         if (policy.expirationDate) {
@@ -22114,8 +23814,8 @@ async function generatePolicyRows() {
             const expirationDate = new Date(policy.expirationDate);
 
             if (expirationDate < today) {
-                statusClass = 'pending'; // This will map to orange styling
-                displayStatus = 'UPDATE POLICY';
+                statusClass = 'inactive'; // Grey styling for expired policies
+                displayStatus = 'Inactive';
             }
         }
         // Check multiple possible locations for the premium
@@ -22236,17 +23936,19 @@ function getBadgeClass(type) {
 }
 
 function getStatusClass(status) {
-    if (!status) return 'active'; // Default to active if no status
-    const statusLower = status.toLowerCase();
-    if (statusLower === 'active' || statusLower === 'in-force') return 'active';
-    if (statusLower === 'pending') return 'pending';
-    if (statusLower === 'expired' || statusLower === 'cancelled' || statusLower === 'non-renewed') return 'pending'; // Use pending class for orange styling
+    if (!status) return 'active';
+    const s = status.toLowerCase();
+    if (s === 'active' || s === 'in-force' || s === 'in force') return 'active';
+    if (s === 'pending') return 'pending';
+    if (s === 'cancel-pending' || s === 'cancel pending') return 'pending';
+    if (s === 'expired' || s === 'cancelled' || s === 'non-renewed' || s === 'non renewed') return 'pending';
     return 'active';
 }
 
 function formatStatus(status) {
     if (!status) return 'Active';
-    return status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (status.toLowerCase() === 'cancel-pending') return 'Cancel Pending';
+    return status.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 
@@ -32032,6 +33734,7 @@ function loadNewPolicyCards(newPolicies) {
                         </div>
                     </div>
                     <div class="card-actions">
+                        ${item.clientId ? `<button class="btn-secondary btn-small" onclick="openClientFromComms('${item.clientId}')"><i class="fas fa-user"></i> View Client</button>` : ''}
                         ${!item.giftSent ? `
                             <button class="btn-primary btn-small" onclick="window.communicationsReminders.markGiftSent('${item.id}', '${item.clientName}')">
                                 <i class="fas fa-gift"></i> Mark Gift Sent
@@ -32049,8 +33752,6 @@ function loadNewPolicyCards(newPolicies) {
             `;
         } else {
             // Handle policies (existing logic)
-            const premium = typeof item.premium === 'number' ? item.premium.toLocaleString() : item.premium;
-
             return `
                 <div class="reminder-card new-policy-card ${item.giftSent ? 'completed' : ''}">
                     <div class="card-header">
@@ -32060,9 +33761,6 @@ function loadNewPolicyCards(newPolicies) {
                         <div class="card-info">
                             <h4>${item.clientName}</h4>
                             <p class="card-subtitle">${item.policyType}</p>
-                        </div>
-                        <div class="card-urgency">
-                            <span class="policy-premium">$${premium}</span>
                         </div>
                     </div>
                     <div class="card-body">
@@ -32076,6 +33774,7 @@ function loadNewPolicyCards(newPolicies) {
                         </div>
                     </div>
                     <div class="card-actions">
+                        ${item.clientId ? `<button class="btn-secondary btn-small" onclick="openClientFromComms('${item.clientId}')"><i class="fas fa-user"></i> View Client</button>` : ''}
                         ${!item.giftSent ? `
                             <button class="btn-primary btn-small" onclick="window.communicationsReminders.markGiftSent('${item.id}', '${item.clientName}')">
                                 <i class="fas fa-gift"></i> Mark Gift Sent
@@ -33025,6 +34724,11 @@ async function sendBirthdayMessageNow(clientName) {
         alert(`🎂 Birthday SMS sent to ${clientName} at ${to}!`);
         document.querySelector('.modal').remove();
     }
+}
+
+function openClientFromComms(clientId) {
+    window.location.hash = '#clients';
+    setTimeout(() => viewClient(clientId), 800);
 }
 
 function sendWelcomeMessage(clientName) {
@@ -35626,6 +37330,9 @@ window.sendCOIForPolicy = function(policyId) {
 
     console.log('📋 Final policy object:', policy);
 
+    // Expose policy so handleCheckboxChange (Add Agent / Add Insured) can read it
+    window.currentCOIPolicy = policy;
+
     // Create comprehensive COI modal similar to client portal
     const modal = document.createElement('div');
     modal.className = 'modal-overlay active';  // Add 'active' class
@@ -35633,20 +37340,39 @@ window.sendCOIForPolicy = function(policyId) {
     modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex !important; align-items: center; justify-content: center; z-index: 10000; opacity: 1; visibility: visible;';
 
     modal.innerHTML = `
-        <div class="modal-content coi-modal" onclick="event.stopPropagation()" style="background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+        <style>
+            #crmCOIModal .modal-body,
+            #crmCOIModal form,
+            #crmCOIModal .form-group,
+            #crmCOIModal #crmCoiEmailRecipientsContainer,
+            #crmCOIModal .crm-coi-email-recipient-row,
+            #crmCOIModal .policy-info-banner,
+            #crmCOIModal .form-actions {
+                display: block !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            #crmCOIModal .crm-coi-email-recipient-row {
+                display: flex !important;
+            }
+            #crmCOIModal .form-actions {
+                display: flex !important;
+            }
+        </style>
+        <div class="modal-content coi-modal" onclick="event.stopPropagation()" style="background: white; border-radius: 12px; width: 90%; max-width: 750px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
             <div class="modal-header" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px; border-radius: 12px 12px 0 0; position: relative;">
                 <h3 style="margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; color: white;">
                     <i class="fas fa-certificate" style="color: white;"></i> Request Certificate of Insurance
                 </h3>
                 <button class="modal-close-btn" onclick="closeCRMCOIModal()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">×</button>
             </div>
-            <div class="modal-body" style="padding: 20px;">
-                <div class="policy-info-banner" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 25px; color: #0c4a6e;">
+            <div class="modal-body" style="padding: 20px; width: 100%; box-sizing: border-box; display: block;">
+                <div class="policy-info-banner" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 25px; color: #0c4a6e; width: 100%; box-sizing: border-box;">
                     <strong>Policy:</strong> ${policy.policyNumber || policy.id} - ${policy.clientName || policy.insured_name || 'Unknown Client'}
                 </div>
 
-                <form id="crmCOIModalForm">
-                    <div class="form-group" style="margin-bottom: 25px;">
+                <form id="crmCOIModalForm" style="width: 100%; box-sizing: border-box; display: block;">
+                    <div class="form-group" style="margin-bottom: 25px; width: 100%; box-sizing: border-box; display: block;">
                         <label style="display: block; margin-bottom: 12px; font-weight: 600; color: #374151;">Certificate Holder Type</label>
                         <div class="radio-group" style="display: flex; gap: 20px;">
                             <label class="radio-option" style="display: flex; align-items: center; cursor: pointer;">
@@ -35660,7 +37386,7 @@ window.sendCOIForPolicy = function(policyId) {
                         </div>
                     </div>
 
-                    <div id="crmThirdPartyFields" class="hidden" style="display: none;">
+                    <div id="crmThirdPartyFields" class="hidden" style="display: none; width: 100%; box-sizing: border-box;">
                         <!-- Saved Certificate Holders Button -->
                         <div style="margin-bottom: 20px; text-align: center;">
                             <button type="button" onclick="showCRMSavedCertificateHolders()" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2); transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(5, 150, 105, 0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(5, 150, 105, 0.2)'">
@@ -35669,21 +37395,21 @@ window.sendCOIForPolicy = function(policyId) {
                             </button>
                         </div>
 
-                        <div class="form-group" style="margin-bottom: 20px;">
+                        <div class="form-group" style="margin-bottom: 20px; width: 100%; box-sizing: border-box; display: block;">
                             <label style="display: block; margin-bottom: 8px; font-weight: 500;">Certificate Holder Name *</label>
-                            <input type="text" id="crmHolderName" placeholder="Business or individual name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" required>
+                            <input type="text" id="crmHolderName" placeholder="Business or individual name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" required>
                         </div>
-                        <div class="form-group" style="margin-bottom: 20px;">
+                        <div class="form-group" style="margin-bottom: 20px; width: 100%; box-sizing: border-box; display: block;">
                             <label style="display: block; margin-bottom: 8px; font-weight: 500;">Certificate Holder Address *</label>
-                            <input type="text" id="crmHolderAddress" placeholder="Street address" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" required>
+                            <input type="text" id="crmHolderAddress" placeholder="Street address" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" required>
                         </div>
-                        <div class="form-group" style="margin-bottom: 20px;">
-                            <input type="text" id="crmHolderCity" placeholder="City, State ZIP" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <div class="form-group" style="margin-bottom: 20px; width: 100%; box-sizing: border-box; display: block;">
+                            <input type="text" id="crmHolderCity" placeholder="City, State ZIP" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                         </div>
                     </div>
 
-                    <div class="form-group" style="margin-bottom: 25px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div class="form-group" style="margin-bottom: 25px; width: 100%; box-sizing: border-box; display: block;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; width: 100%; box-sizing: border-box;">
                             <label style="font-weight: 600; color: #374151;"><strong>Email Recipients</strong></label>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <div style="display: flex; align-items: center; gap: 4px; color: #666; font-size: 11px;">
@@ -35699,11 +37425,11 @@ window.sendCOIForPolicy = function(policyId) {
                                 </button>
                             </div>
                         </div>
-                        <div id="crmCoiEmailRecipientsContainer">
-                            <div class="crm-coi-email-recipient-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
-                                <input type="email" class="crm-coi-email-recipient" required style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" placeholder="recipient@example.com" value="">
+                        <div id="crmCoiEmailRecipientsContainer" style="width: 100%; box-sizing: border-box;">
+                            <div class="crm-coi-email-recipient-row" style="display: flex; gap: 8px; margin-bottom: 8px; width: 100%; box-sizing: border-box;">
+                                <input type="email" class="crm-coi-email-recipient" required style="flex: 1; min-width: 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" placeholder="recipient@example.com" value="">
                                 <button type="button" onclick="removeCRMCOIEmailRecipient(this)" style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    Remove
+                                    <i class="fas fa-trash"></i><span class="coi-remove-label"> Remove</span>
                                 </button>
                             </div>
                         </div>
@@ -35722,6 +37448,37 @@ window.sendCOIForPolicy = function(policyId) {
     `;
 
     document.body.appendChild(modal);
+
+    // Auto-check Add Agent and Add Insured by default (silent — no alert if not found)
+    setTimeout(() => {
+        const agentCb = document.getElementById('addAgentCheck');
+        const insuredCb = document.getElementById('addInsuredCheck');
+        if (agentCb) { agentCb.checked = true; handleCheckboxChange('agent', true); }
+        if (insuredCb) { insuredCb.checked = true; handleCheckboxChange('insured', true); }
+
+        // Force pixel widths — percentage-based widths fail due to CSS cascade issues.
+        // getBoundingClientRect() reads the actual rendered width of the modal box,
+        // then setProperty(..., 'important') writes inline !important styles which
+        // are the absolute highest CSS priority and cannot be overridden by any rule.
+        // Only apply pixel-width fix on mobile — desktop layout is handled by CSS alone
+        if (window.innerWidth <= 768) requestAnimationFrame(() => {
+            const m = document.getElementById('crmCOIModal');
+            if (!m) return;
+            const mb = m.querySelector('.modal-body');
+            if (!mb) return;
+            // clientWidth excludes scrollbar — gives true available content width
+            const fw = mb.clientWidth - 40; // subtract 20px padding × 2 sides
+            if (fw <= 0) return;
+            m.querySelectorAll('form, .form-group, #crmCoiEmailRecipientsContainer, .policy-info-banner, .form-actions, .crm-coi-email-recipient-row').forEach(el => {
+                const isFlex = el.classList.contains('crm-coi-email-recipient-row') || el.classList.contains('form-actions');
+                el.style.setProperty('display', isFlex ? 'flex' : 'block', 'important');
+                el.style.setProperty('width', fw + 'px', 'important');
+                el.style.setProperty('min-width', fw + 'px', 'important');
+                el.style.setProperty('box-sizing', 'border-box', 'important');
+                el.style.setProperty('flex-shrink', '0', 'important');
+            });
+        });
+    }, 0);
 
     // Close modal when clicking outside - DISABLED per user request
     // modal.addEventListener('click', function(e) {
@@ -35837,12 +37594,12 @@ window.addCRMCOIEmailRecipient = function() {
     const container = document.getElementById('crmCoiEmailRecipientsContainer');
     const newRow = document.createElement('div');
     newRow.className = 'crm-coi-email-recipient-row';
-    newRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+    newRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; width: 100%; box-sizing: border-box;';
 
     newRow.innerHTML = `
-        <input type="email" class="crm-coi-email-recipient" required style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" placeholder="recipient@example.com" value="">
+        <input type="email" class="crm-coi-email-recipient" required style="flex: 1; min-width: 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" placeholder="recipient@example.com" value="">
         <button type="button" onclick="removeCRMCOIEmailRecipient(this)" style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-            Remove
+            <i class="fas fa-trash"></i><span class="coi-remove-label"> Remove</span>
         </button>
     `;
 
@@ -35882,7 +37639,7 @@ window.addCRMCOIEmailRecipientWithOptions = function() {
     // Add agent email if checkbox is checked
     if (addAgentCheck.checked) {
         // Try to get agent email from policy, then fall back to name→email map
-        const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'Grant@vigagency.com', maureen: 'Maureen@vigagency.com', carson: 'Carson@vigagency.com' };
+        const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'Grant@vigagency.com', maureen: 'Maureen.corp@vigagency.com', carson: 'Carson@vigagency.com' };
         const _agentKey = (currentPolicy.agent || currentPolicy.assignedTo || '').toLowerCase().trim();
         const agentEmail = currentPolicy.agentEmail || _agentEmailMap[_agentKey] || '';
 
@@ -35902,15 +37659,14 @@ window.addCRMCOIEmailRecipientWithOptions = function() {
     }
 };
 
-window.handleCheckboxChange = function(type) {
+window.handleCheckboxChange = function(type, silent) {
     const checkbox = document.getElementById(type === 'insured' ? 'addInsuredCheck' : 'addAgentCheck');
+    const dataAttr = type === 'insured' ? 'insured' : 'agent';
 
     if (checkbox.checked) {
-        // Auto-trigger add recipient when checkbox is checked
-        const currentPolicy = window.currentPolicy || {};
+        const currentPolicy = window.currentCOIPolicy || window.currentPolicy || {};
 
         if (type === 'insured') {
-            // Extract email from Contact Information section
             const insuredEmail = currentPolicy.contact?.['Email Address'] ||
                                currentPolicy.contact?.Email ||
                                currentPolicy.contact?.['Email'] ||
@@ -35918,37 +37674,63 @@ window.handleCheckboxChange = function(type) {
                                currentPolicy.policies?.[0]?.contact?.['Email Address'] ||
                                currentPolicy.policies?.[0]?.contact?.Email || '';
 
-            console.log('🔍 Debug insured email extraction:', {
-                currentPolicy: currentPolicy,
-                contact: currentPolicy.contact,
-                extractedEmail: insuredEmail
-            });
-
             if (insuredEmail) {
                 addCRMCOIEmailRecipient();
                 const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
                 const lastRow = newRows[newRows.length - 1];
+                lastRow.dataset.addedBy = 'insured';
                 const emailInput = lastRow.querySelector('.crm-coi-email-recipient');
                 emailInput.value = insuredEmail;
                 emailInput.placeholder = `${currentPolicy.clientName || currentPolicy.insured_name || 'Insured'} (Insured)`;
             } else {
-                alert('No email address found in Contact Information for this policy.');
+                checkbox.checked = false;
+                if (!silent) alert('No email address found in Contact Information for this policy.');
             }
         } else if (type === 'agent') {
-            const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'grant@vigagency.com', maureen: 'maureen.corp@uigagency.com', carson: 'carson@vigagency.com' };
-            const _agentRaw = (currentPolicy.agent || currentPolicy.assignedTo || '').toLowerCase().trim();
-            const _agentKey = Object.keys(_agentEmailMap).find(k => _agentRaw.includes(k)) || _agentRaw;
-            const agentEmail = currentPolicy.agentEmail || _agentEmailMap[_agentKey] || '';
+            const _agentEmailMap = { hunter: 'Hunter@vigagency.com', grant: 'Grant@vigagency.com', maureen: 'Maureen.corp@vigagency.com', carson: 'Carson@vigagency.com' };
+            // Primary: read from policy object
+            let _agentName = currentPolicy.agent || currentPolicy.assignedTo || '';
+            // Fallback: scrape from overview tab only (not edit form labels)
+            if (!_agentName) {
+                const _overviewTab = document.getElementById('overview-view-content');
+                if (_overviewTab) {
+                    const _labels = _overviewTab.querySelectorAll('label');
+                    for (const _lbl of _labels) {
+                        if (_lbl.textContent.trim() === 'Agent') {
+                            const _p = _lbl.nextElementSibling;
+                            if (_p && _p.textContent.trim() && _p.textContent.trim() !== 'N/A') {
+                                _agentName = _p.textContent.trim();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            const _agentRaw = _agentName.toLowerCase().trim();
+            const _agentKey = Object.keys(_agentEmailMap).find(k => _agentRaw.includes(k));
+            const agentEmail = currentPolicy.agentEmail || (_agentKey ? _agentEmailMap[_agentKey] : '') || '';
 
-            addCRMCOIEmailRecipient();
-            const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
-            const lastRow = newRows[newRows.length - 1];
-            const emailInput = lastRow.querySelector('.crm-coi-email-recipient');
-            emailInput.value = agentEmail;
-            emailInput.placeholder = `${currentPolicy.agent || 'Agent'} (Agent)`;
+            if (agentEmail) {
+                addCRMCOIEmailRecipient();
+                const newRows = document.querySelectorAll('.crm-coi-email-recipient-row');
+                const lastRow = newRows[newRows.length - 1];
+                lastRow.dataset.addedBy = 'agent';
+                const emailInput = lastRow.querySelector('.crm-coi-email-recipient');
+                emailInput.value = agentEmail;
+                emailInput.placeholder = `${_agentName || 'Agent'} (Agent)`;
+            } else {
+                checkbox.checked = false;
+                if (!silent) alert('No agent email found for this policy.');
+            }
         }
-
-        // Keep the checkbox checked to show it was used
+    } else {
+        // Unchecked — remove the row that was added by this checkbox
+        const container = document.getElementById('crmCoiEmailRecipientsContainer');
+        const rows = container.querySelectorAll('.crm-coi-email-recipient-row');
+        if (rows.length > 1) {
+            const toRemove = container.querySelector(`.crm-coi-email-recipient-row[data-added-by="${dataAttr}"]`);
+            if (toRemove) toRemove.remove();
+        }
     }
 };
 
@@ -36253,9 +38035,10 @@ window.submitCRMCOIModal = async function() {
         // Set sender email
         formData.append('from', 'contact@vigagency.com');
 
-        // Pass agent so backend can pick the correct sender address
+        // Pass agent and united flag so backend can pick the correct sender address
         const policyAgent = currentPolicy?.agent || '';
         formData.append('agent', policyAgent);
+        formData.append('united', currentPolicy?.united ? 'true' : 'false');
 
         // Set recipient emails (all emails from the array)
         formData.append('to', emails.join(', '));
@@ -36422,6 +38205,12 @@ window.showCRMSavedCertificateHolders = function() {
             city: 'San Francisco, CA 94114',
             email: 'transportation@registrymonitoring.com',
             phone: '(216) 316-1565'
+        },
+        {
+            name: 'Assure Assist',
+            address: '543 Country Club Dr, Unit B338',
+            city: 'Simi Valley, CA 93065',
+            email: 'coi@assureassist.com'
         }
     ];
 
@@ -36581,7 +38370,7 @@ window.selectCRMSavedHolder = function(name, address, city, emailData) {
                            placeholder="recipient@example.com" value="${email.trim()}">
                     <button type="button" onclick="removeCRMCOIEmailRecipient(this)"
                             style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                        Remove
+                        <i class="fas fa-trash"></i><span class="coi-remove-label"> Remove</span>
                     </button>
                 `;
 
@@ -36601,7 +38390,7 @@ window.selectCRMSavedHolder = function(name, address, city, emailData) {
                        placeholder="recipient@example.com" value="">
                 <button type="button" onclick="removeCRMCOIEmailRecipient(this)"
                         style="background: #dc3545; color: white; border: none; padding: 10px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                    Remove
+                    <i class="fas fa-trash"></i><span class="coi-remove-label"> Remove</span>
                 </button>
             `;
 
@@ -39107,11 +40896,13 @@ function filterTodosBySchedule(todos, scheduleView) {
             <div class="tool-window-header">
                 <div class="tool-window-title"><i class="fas fa-comments"></i><span>Team Chat</span></div>
                 <div class="tool-window-controls">
+                    <button class="tool-window-btn" title="Google Chat Settings" onclick="_toggleChatSettings()" id="chat-settings-btn" style="font-size:12px;"><i class="fab fa-google"></i></button>
                     <button class="tool-window-btn" title="Minimize" onclick="_minimizeChatWindow()"><i class="fas fa-minus"></i></button>
                     <button class="tool-window-btn" title="Close" onclick="_closeTeamChat()"><i class="fas fa-times"></i></button>
                 </div>
             </div>
-            <div class="chat-layout" style="flex:1;min-height:0;">
+            <div id="chat-settings-panel" style="display:none;flex:1;min-height:0;overflow-y:auto;padding:16px;background:#f8fafc;"></div>
+            <div class="chat-layout" style="flex:1;min-height:0;" id="chat-layout-area">
                 <div class="chat-sidebar" id="chat-sidebar"></div>
                 <div class="chat-main">
                     <div class="chat-header-bar" id="chat-header-bar"></div>
@@ -39153,6 +40944,216 @@ function filterTodosBySchedule(todos, scheduleView) {
         if (win) win.remove();
         _chatMinimized = false;
     };
+
+    // ── Google Chat Settings Panel ─────────────────────────────────────────────
+
+    const GCHAT_DM_CHANNELS = [
+        { key: 'dm_grant_hunter',  label: 'DM: Grant \u2194 Hunter' },
+        { key: 'dm_carson_grant',  label: 'DM: Grant \u2194 Carson' },
+        { key: 'dm_carson_hunter', label: 'DM: Hunter \u2194 Carson' }
+    ];
+
+    let _gchatSettingsOpen = false;
+    let _gchatStatus = null;
+    let _slackStatus = { hasWebhook: false, hasToken: false, webhookOk: false }; // cached status { connected, spaces }
+
+    window._toggleChatSettings = async function() {
+        const panel = document.getElementById('chat-settings-panel');
+        const layout = document.getElementById('chat-layout-area');
+        if (!panel || !layout) return;
+        _gchatSettingsOpen = !_gchatSettingsOpen;
+        panel.style.display  = _gchatSettingsOpen ? 'block' : 'none';
+        layout.style.display = _gchatSettingsOpen ? 'none'  : 'flex';
+        const btn = document.getElementById('chat-settings-btn');
+        if (btn) btn.style.color = _gchatSettingsOpen ? '#2563eb' : '';
+        if (_gchatSettingsOpen) {
+            panel.innerHTML = `<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading…</div>`;
+            try {
+                const resp = await fetch('/api/google-chat/status');
+                _gchatStatus = await resp.json();
+            } catch(e) {
+                _gchatStatus = { connected: {}, spaces: [] };
+            }
+            _renderGChatSettings();
+        }
+    };
+
+    function _renderGChatSettings() {
+        const panel = document.getElementById('chat-settings-panel');
+        if (!panel) return;
+        const { connected = {}, spaces = [] } = _gchatStatus || {};
+        const linkedMap = {};
+        (spaces || []).forEach(s => { linkedMap[s.channel] = s; });
+
+        const connRows = ['grant','hunter','carson'].map(u => {
+            const c = connected[u];
+            return `<tr>
+                <td style="padding:6px 10px;font-weight:600;font-size:13px;">${u.charAt(0).toUpperCase()+u.slice(1)}</td>
+                <td style="padding:6px 10px;font-size:12px;">
+                    ${c ? `<span style="color:#16a34a;"><i class="fas fa-check-circle"></i> ${c.email}</span>`
+                        : `<span style="color:#9ca3af;"><i class="fas fa-times-circle"></i> Not connected</span>`}
+                </td>
+                <td style="padding:6px 10px;">
+                    <a href="/api/google-chat/auth?user=${u}" target="_blank"
+                       style="font-size:12px;color:#2563eb;text-decoration:none;background:#eff6ff;padding:3px 9px;border-radius:6px;border:1px solid #bfdbfe;">
+                       ${c ? '<i class="fas fa-sync-alt"></i> Reconnect' : '<i class="fab fa-google"></i> Connect'}</a>
+                </td>
+            </tr>`;
+        }).join('');
+
+        const spaceChannels = [{ key: 'group', label: 'Team Channel' }, ...GCHAT_DM_CHANNELS];
+        const spaceRows = spaceChannels.map(ch => {
+            const linked = linkedMap[ch.key];
+            return `<tr id="gchat-space-row-${ch.key}">
+                <td style="padding:6px 10px;font-weight:600;font-size:13px;">${ch.label}</td>
+                <td style="padding:6px 10px;font-size:12px;color:${linked ? '#16a34a' : '#9ca3af'};">
+                    ${linked ? `<i class="fas fa-link"></i> ${linked.space_display_name || linked.space_name}` : 'Not linked'}
+                </td>
+                <td style="padding:6px 10px;display:flex;gap:6px;flex-wrap:wrap;">
+                    <button onclick="_gchatPickSpace('${ch.key}')"
+                        style="font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;cursor:pointer;">
+                        ${linked ? '<i class="fas fa-exchange-alt"></i> Change' : '<i class="fas fa-link"></i> Link Space'}</button>
+                    ${linked ? `<button onclick="_gchatUnlinkSpace('${ch.key}')"
+                        style="font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;cursor:pointer;">
+                        <i class="fas fa-unlink"></i> Unlink</button>` : ''}
+                </td>
+            </tr>`;
+        }).join('');
+
+        const anyConnected = Object.keys(connected).length > 0;
+
+        panel.innerHTML = `
+            <div style="max-width:500px;margin:0 auto;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                    <i class="fab fa-google" style="font-size:20px;color:#2563eb;"></i>
+                    <span style="font-size:15px;font-weight:700;color:#111827;">Google Chat Sync</span>
+                    <button onclick="_gchatRefreshStatus()" title="Refresh"
+                        style="margin-left:auto;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:13px;">
+                        <i class="fas fa-sync-alt"></i></button>
+                </div>
+
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:6px;">Connections</div>
+                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:16px;overflow:hidden;">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <tbody>${connRows}</tbody>
+                    </table>
+                </div>
+
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:6px;">Linked Spaces</div>
+                ${!anyConnected
+                    ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Connect at least one Google account above before linking spaces.</div>`
+                    : `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;" id="gchat-spaces-table">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <tbody>${spaceRows}</tbody>
+                        </table>
+                    </div>`}
+
+                <div style="margin-top:12px;font-size:11px;color:#9ca3af;line-height:1.5;">
+                    Messages sent in CRM chat will appear in the linked Google Chat space, and vice versa.
+                    Each user should connect their own Google account for accurate attribution.
+                </div>
+            </div>`;
+    }
+
+    window._gchatRefreshStatus = async function() {
+        const panel = document.getElementById('chat-settings-panel');
+        if (!panel) return;
+        try {
+            const resp = await fetch('/api/google-chat/status');
+            _gchatStatus = await resp.json();
+            _renderGChatSettings();
+        } catch(e) {}
+    };
+
+    window._gchatPickSpace = async function(channel) {
+        // Find a connected user to list spaces from
+        const connected = (_gchatStatus && _gchatStatus.connected) ? Object.keys(_gchatStatus.connected) : [];
+        if (!connected.length) { alert('Connect a Google account first.'); return; }
+
+        const btn = document.querySelector(`#gchat-space-row-${channel} button`);
+        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading…'; btn.disabled = true; }
+
+        let spaces = [];
+        try {
+            const resp = await fetch(`/api/google-chat/spaces?user=${connected[0]}`);
+            const data = await resp.json();
+            spaces = data.spaces || [];
+        } catch(e) {
+            alert('Failed to load spaces: ' + e.message);
+            if (btn) { btn.innerHTML = '<i class="fas fa-link"></i> Link Space'; btn.disabled = false; }
+            return;
+        }
+
+        if (!spaces.length) {
+            alert('No Google Chat spaces found for this account.');
+            if (btn) { btn.innerHTML = '<i class="fas fa-link"></i> Link Space'; btn.disabled = false; }
+            return;
+        }
+
+        // Show a simple modal picker
+        const picked = await _gchatSpacePicker(spaces);
+        if (btn) { btn.innerHTML = '<i class="fas fa-link"></i> Link Space'; btn.disabled = false; }
+        if (!picked) return;
+
+        try {
+            const resp = await fetch('/api/google-chat/link-space', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel, spaceName: picked.name, user: connected[0] })
+            });
+            const result = await resp.json();
+            if (result.ok) {
+                await _gchatRefreshStatus();
+            } else {
+                alert('Failed to link space: ' + (result.error || 'Unknown error'));
+            }
+        } catch(e) {
+            alert('Error: ' + e.message);
+        }
+    };
+
+    window._gchatUnlinkSpace = async function(channel) {
+        if (!confirm('Unlink this Google Chat space?')) return;
+        try {
+            await fetch('/api/google-chat/unlink-space', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel })
+            });
+            await _gchatRefreshStatus();
+        } catch(e) { alert('Error: ' + e.message); }
+    };
+
+    function _gchatSpacePicker(spaces) {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:20000;display:flex;align-items:center;justify-content:center;';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#fff;border-radius:12px;padding:20px;width:380px;max-height:480px;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+            box.innerHTML = `
+                <div style="font-weight:700;font-size:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>Pick a Google Chat Space</span>
+                    <button id="gchat-picker-close" style="background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;">&times;</button>
+                </div>
+                <div style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px;">
+                    ${spaces.map((s, i) => `
+                        <button data-idx="${i}" style="text-align:left;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;display:flex;flex-direction:column;gap:2px;transition:background 0.1s;"
+                            onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#fff'">
+                            <span style="font-weight:600;">${(s.displayName || s.name).replace(/</g,'&lt;')}</span>
+                            <span style="font-size:11px;color:#9ca3af;">${(s.type||'').replace(/_/g,' ')} &bull; ${s.name}</span>
+                        </button>`).join('')}
+                </div>`;
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+            box.querySelector('#gchat-picker-close').onclick = () => { overlay.remove(); resolve(null); };
+            overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(null); } };
+            box.querySelectorAll('button[data-idx]').forEach(b => {
+                b.onclick = () => { const idx = parseInt(b.dataset.idx); overlay.remove(); resolve(spaces[idx]); };
+            });
+        });
+    }
 
 })();
 
@@ -39673,11 +41674,13 @@ function filterTodosBySchedule(todos, scheduleView) {
                     <span>Team Chat</span>
                 </div>
                 <div class="tool-window-controls">
+                    <button class="tool-window-btn" title="Google Chat Settings" onclick="_toggleChatSettings()" id="chat-settings-btn" style="font-size:12px;"><i class="fab fa-google"></i></button>
                     <button class="tool-window-btn" title="Minimize" onclick="_minimizeChatWindow()"><i class="fas fa-minus"></i></button>
                     <button class="tool-window-btn" title="Close" onclick="_closeTeamChat()"><i class="fas fa-times"></i></button>
                 </div>
             </div>
-            <div class="chat-layout" style="flex:1;min-height:0;">
+            <div id="chat-settings-panel" style="display:none;flex:1;min-height:0;overflow-y:auto;padding:16px;background:#f8fafc;"></div>
+            <div class="chat-layout" style="flex:1;min-height:0;" id="chat-layout-area">
                 <div class="chat-sidebar" id="chat-sidebar"></div>
                 <div class="chat-main">
                     <div class="chat-header-bar" id="chat-header-bar"></div>
@@ -39722,6 +41725,308 @@ function filterTodosBySchedule(todos, scheduleView) {
         const win = document.getElementById('team-chat-window');
         if (win) win.remove();
         _chatMinimized = false;
+    };
+
+    // ── Google Chat Settings Panel ─────────────────────────────────────────────
+
+    const GCHAT_DM_CHANNELS = [
+        { key: 'dm_grant_hunter',  label: 'DM: Grant \u2194 Hunter' },
+        { key: 'dm_carson_grant',  label: 'DM: Grant \u2194 Carson' },
+        { key: 'dm_carson_hunter', label: 'DM: Hunter \u2194 Carson' }
+    ];
+
+    let _gchatSettingsOpen = false;
+    let _gchatStatus = null;
+    let _slackStatus = { hasWebhook: false, hasToken: false, webhookOk: false };
+
+    window._toggleChatSettings = async function() {
+        const panel  = document.getElementById('chat-settings-panel');
+        const layout = document.getElementById('chat-layout-area');
+        if (!panel || !layout) return;
+        _gchatSettingsOpen = !_gchatSettingsOpen;
+        panel.style.display  = _gchatSettingsOpen ? 'block' : 'none';
+        layout.style.display = _gchatSettingsOpen ? 'none'  : 'flex';
+        const btn = document.getElementById('chat-settings-btn');
+        if (btn) btn.style.color = _gchatSettingsOpen ? '#2563eb' : '';
+        if (_gchatSettingsOpen) {
+            panel.innerHTML = `<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading\u2026</div>`;
+            try {
+                const [gr, sr] = await Promise.all([fetch('/api/google-chat/status'), fetch('/api/slack/status')]);
+                _gchatStatus = await gr.json();
+                _slackStatus = await sr.json();
+            } catch(e) { _gchatStatus = { connected: {}, spaces: [] }; }
+            _renderGChatSettings();
+        }
+    };
+
+    function _renderGChatSettings() {
+        const panel = document.getElementById('chat-settings-panel');
+        if (!panel) return;
+        const { connected = {}, spaces = [] } = _gchatStatus || {};
+        const linkedMap = {};
+        (spaces || []).forEach(s => { linkedMap[s.channel] = s; });
+
+        const connRows = ['grant','hunter','carson'].map(u => {
+            const c = connected[u];
+            return `<tr>
+                <td style="padding:6px 10px;font-weight:600;font-size:13px;">${u.charAt(0).toUpperCase()+u.slice(1)}</td>
+                <td style="padding:6px 10px;font-size:12px;">
+                    ${c ? `<span style="color:#16a34a;"><i class="fas fa-check-circle"></i> ${c.email}</span>`
+                        : `<span style="color:#9ca3af;"><i class="fas fa-times-circle"></i> Not connected</span>`}
+                </td>
+                <td style="padding:6px 10px;">
+                    <a href="/api/google-chat/auth?user=${u}" target="_blank"
+                       style="font-size:12px;color:#2563eb;text-decoration:none;background:#eff6ff;padding:3px 9px;border-radius:6px;border:1px solid #bfdbfe;">
+                       ${c ? '<i class="fas fa-sync-alt"></i> Reconnect' : '<i class="fab fa-google"></i> Connect'}</a>
+                </td>
+            </tr>`;
+        }).join('');
+
+        const spaceChannels = [{ key: 'group', label: 'Team Channel' }, ...GCHAT_DM_CHANNELS];
+        const spaceRows = spaceChannels.map(ch => {
+            const linked = linkedMap[ch.key];
+            const isWebhook = linked && linked.space_name === 'webhook';
+            return `<div id="gchat-space-row-${ch.key}" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="font-weight:600;font-size:13px;min-width:130px;">${ch.label}</span>
+                <span style="font-size:12px;color:${linked ? '#16a34a' : '#9ca3af'};flex:1;">
+                    ${linked ? `<i class="fas fa-${isWebhook ? 'link' : 'check-circle'}"></i> ${linked.space_display_name || 'Linked'}${isWebhook ? ' (webhook)' : ''}` : 'Not linked'}
+                </span>
+                <button onclick="_gchatSetWebhook('${ch.key}')"
+                    style="font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;cursor:pointer;white-space:nowrap;">
+                    ${linked ? '<i class="fas fa-exchange-alt"></i> Change' : '<i class="fas fa-link"></i> Set Webhook'}</button>
+                ${linked ? `<button onclick="_gchatUnlinkSpace('${ch.key}')"
+                    style="font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;cursor:pointer;">
+                    <i class="fas fa-unlink"></i></button>` : ''}
+            </div>`;
+        }).join('');
+
+
+        panel.innerHTML = `
+            <div style="max-width:500px;margin:0 auto;">
+
+                <!-- SLACK SECTION -->
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <i class="fab fa-slack" style="font-size:20px;color:#4a154b;"></i>
+                    <span style="font-size:15px;font-weight:700;color:#111827;">Slack Sync</span>
+                    <button onclick="_gchatRefreshStatus()" title="Refresh" style="margin-left:auto;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:13px;"><i class="fas fa-sync-alt"></i></button>
+                </div>
+
+                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px;">
+                    <div style="display:flex;gap:16px;font-size:13px;">
+                        <span>${_slackStatus.hasWebhook ? '<span style="color:#16a34a"><i class="fas fa-check-circle"></i> Webhook set</span>' : '<span style="color:#9ca3af"><i class="fas fa-times-circle"></i> No webhook</span>'}</span>
+                        <span>${_slackStatus.hasToken ? '<span style="color:#16a34a"><i class="fas fa-check-circle"></i> Bot token set</span>' : '<span style="color:#9ca3af"><i class="fas fa-times-circle"></i> No bot token</span>'}</span>
+                        <span>${_slackStatus.webhookOk ? '<span style="color:#16a34a"><i class="fas fa-wifi"></i> Connected</span>' : '<span style="color:#f59e0b"><i class="fas fa-wifi"></i> Untested</span>'}</span>
+                    </div>
+                </div>
+
+                ${_slackStatus.hasWebhook && _slackStatus.hasToken ? `
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:12px;color:#166534;margin-bottom:12px;">
+                    <i class="fas fa-check-circle"></i> <strong>Slack is connected.</strong>
+                    Team chat messages will sync to your Slack channel.<br><br>
+                    <strong>One last step:</strong> complete the Events API setup below so Slack messages flow back into the CRM.
+                </div>` : ''}
+
+                <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;padding:10px 12px;font-size:12px;color:#6b21a8;margin-bottom:14px;line-height:1.8;">
+                    <strong>Complete the 2-way sync (do this once):</strong><br>
+                    1. Go to <a href="https://api.slack.com/apps" target="_blank" style="color:#7c3aed;">api.slack.com/apps</a> &rarr; your app<br>
+                    2. <strong>Features &rarr; Event Subscriptions &rarr; Enable Events</strong><br>
+                    3. Request URL: <code style="background:#ede9fe;padding:1px 5px;border-radius:4px;font-size:11px;">https://162-220-14-239.nip.io/api/slack/events</code><br>
+                    4. Subscribe to bot events &rarr; add <code style="background:#ede9fe;padding:1px 5px;border-radius:4px;font-size:11px;">message.channels</code> &rarr; Save<br>
+                    5. In your Slack channel, type <code style="background:#ede9fe;padding:1px 5px;border-radius:4px;font-size:11px;">/invite @Vanguard CRM</code>
+                </div>
+
+                <hr style="border:none;border-top:1px solid #e5e7eb;margin:14px 0;">
+
+                <!-- GOOGLE CHAT SECTION (collapsed) -->
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <i class="fab fa-google" style="font-size:16px;color:#9ca3af;"></i>
+                    <span style="font-size:13px;font-weight:600;color:#9ca3af;">Google Chat</span>
+                    <span style="font-size:11px;color:#d1d5db;margin-left:4px;">(requires Google Workspace)</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">${spaceRows}</div>
+
+            </div>`;
+    }
+
+    window._gchatRefreshStatus = async function() {
+        try {
+            const resp = await fetch('/api/google-chat/status');
+            _gchatStatus = await resp.json();
+            _renderGChatSettings();
+        } catch(e) {}
+    };
+
+    window._gchatSetWebhook = async function(channel) {
+        const chLabels = { group: 'Team Channel', dm_grant_hunter: 'DM: Grant \u2194 Hunter', dm_carson_grant: 'DM: Grant \u2194 Carson', dm_carson_hunter: 'DM: Hunter \u2194 Carson' };
+        const label = chLabels[channel] || channel;
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:20000;display:flex;align-items:center;justify-content:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:12px;padding:22px;width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+        box.innerHTML = `
+            <div style="font-weight:700;font-size:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                <span><i class="fab fa-google" style="color:#2563eb;margin-right:6px;"></i>Link ${label}</span>
+                <button id="wh-close" style="background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;">&times;</button>
+            </div>
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e40af;margin-bottom:14px;line-height:1.6;">
+                In Google Chat: open the space &rarr; click <strong>space name</strong> &rarr; <strong>Apps &amp; Integrations</strong> &rarr; <strong>Webhooks</strong> &rarr; <strong>Add webhook</strong> &rarr; copy the URL
+            </div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Webhook URL</label>
+            <input id="wh-url-input" type="text" placeholder="https://chat.googleapis.com/v1/spaces/..."
+                style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;margin-bottom:4px;"
+                onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#d1d5db'">
+            <div id="wh-err" style="font-size:11px;color:#dc2626;min-height:16px;margin-bottom:10px;"></div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Display name (optional)</label>
+            <input id="wh-name-input" type="text" placeholder="e.g. Vanguard Team"
+                style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;margin-bottom:14px;"
+                onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#d1d5db'">
+            <button id="wh-save"
+                style="width:100%;padding:10px;border-radius:8px;background:#2563eb;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+                <i class="fas fa-link"></i> Save &amp; Link
+            </button>`;
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        box.querySelector('#wh-close').onclick = () => overlay.remove();
+        overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+        box.querySelector('#wh-save').onclick = async () => {
+            const url = (box.querySelector('#wh-url-input').value || '').trim();
+            const name = (box.querySelector('#wh-name-input').value || '').trim();
+            const errEl = box.querySelector('#wh-err');
+            if (!url) { errEl.textContent = 'Please paste the webhook URL.'; return; }
+            if (!url.startsWith('https://chat.googleapis.com/')) { errEl.textContent = 'URL must start with https://chat.googleapis.com/'; return; }
+            errEl.textContent = '';
+            const btn = box.querySelector('#wh-save');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving\u2026'; btn.disabled = true;
+            try {
+                const resp = await fetch('/api/google-chat/link-webhook', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channel, webhookUrl: url, displayName: name || label })
+                });
+                const data = await resp.json();
+                if (data.ok) { overlay.remove(); await _gchatRefreshStatus(); }
+                else { errEl.textContent = data.error || 'Failed to save.'; btn.innerHTML = '<i class="fas fa-link"></i> Save & Link'; btn.disabled = false; }
+            } catch(e) { errEl.textContent = e.message; btn.innerHTML = '<i class="fas fa-link"></i> Save & Link'; btn.disabled = false; }
+        };
+    };
+
+    window._gchatPickSpace = async function(channel) {
+        const connected = (_gchatStatus && _gchatStatus.connected) ? Object.keys(_gchatStatus.connected) : [];
+        if (!connected.length) { alert('Connect a Google account first.'); return; }
+        const btn = document.querySelector(`#gchat-space-row-${channel} button`);
+        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading\u2026'; btn.disabled = true; }
+
+        // Try to load spaces from API; fall back to manual input if unavailable
+        let spaces = [], apiError = null;
+        try {
+            const resp = await fetch(`/api/google-chat/spaces?user=${connected[0]}`);
+            const data = await resp.json();
+            if (data.error) apiError = data.error;
+            else spaces = data.spaces || [];
+        } catch(e) { apiError = e.message; }
+
+        if (btn) { btn.innerHTML = '<i class="fas fa-link"></i> Link Space'; btn.disabled = false; }
+
+        // Show picker — always includes manual URL input as fallback
+        const result = await _gchatSpacePicker(spaces, apiError, connected[0]);
+        if (!result) return;
+
+        try {
+            const resp = await fetch('/api/google-chat/link-space', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel, spaceName: result.name, displayName: result.displayName, user: connected[0] })
+            });
+            const data = await resp.json();
+            if (data.ok) { await _gchatRefreshStatus(); }
+            else { alert('Failed to link space: ' + (data.error || 'Unknown error')); }
+        } catch(e) { alert('Error: ' + e.message); }
+    };
+
+    window._gchatUnlinkSpace = async function(channel) {
+        if (!confirm('Unlink this Google Chat space?')) return;
+        try {
+            await fetch('/api/google-chat/unlink-space', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel })
+            });
+            await _gchatRefreshStatus();
+        } catch(e) { alert('Error: ' + e.message); }
+    };
+
+    window._gchatSpacePicker = function(spaces, apiError, connectedUser) {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:20000;display:flex;align-items:center;justify-content:center;';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#fff;border-radius:12px;padding:20px;width:420px;max-height:540px;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+
+            const spaceListHtml = spaces.length
+                ? `<div style="margin-bottom:12px;">
+                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:6px;">Your Spaces</div>
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                        ${spaces.map((s,i) => `<button data-idx="${i}"
+                            style="text-align:left;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;"
+                            onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#fff'">
+                            <div style="font-weight:600;">${(s.displayName||s.name).replace(/</g,'&lt;')}</div>
+                            <div style="font-size:11px;color:#9ca3af;">${(s.type||'').replace(/_/g,' ')} &bull; ${s.name}</div>
+                        </button>`).join('')}
+                    </div>
+                  </div>`
+                : (apiError
+                    ? `<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:12px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Couldn't load spaces automatically. Paste your Chat link below instead.
+                       </div>`
+                    : '');
+
+            box.innerHTML = `
+                <div style="font-weight:700;font-size:15px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+                    <span><i class="fab fa-google" style="color:#2563eb;margin-right:6px;"></i>Link Google Chat Space</span>
+                    <button id="gchat-picker-close" style="background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;">&times;</button>
+                </div>
+                <div style="overflow-y:auto;flex:1;">${spaceListHtml}
+                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:6px;">
+                        ${spaces.length ? 'Or paste a link manually' : 'Paste the Google Chat space link'}
+                    </div>
+                    <input id="gchat-manual-url" type="text" placeholder="https://chat.google.com/room/... or spaces/XXXX"
+                        style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;margin-bottom:8px;"
+                        onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#d1d5db'">
+                    <button id="gchat-manual-link-btn"
+                        style="width:100%;padding:9px;border-radius:8px;background:#2563eb;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;">
+                        <i class="fas fa-link"></i> Link This Space
+                    </button>
+                </div>`;
+
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+
+            function close() { overlay.remove(); resolve(null); }
+            box.querySelector('#gchat-picker-close').onclick = close;
+            overlay.onclick = e => { if (e.target === overlay) close(); };
+
+            // Select from list
+            box.querySelectorAll('button[data-idx]').forEach(b => {
+                b.onclick = () => { overlay.remove(); resolve(spaces[parseInt(b.dataset.idx)]); };
+            });
+
+            // Manual URL/ID input
+            box.querySelector('#gchat-manual-link-btn').onclick = () => {
+                const raw = (box.querySelector('#gchat-manual-url').value || '').trim();
+                if (!raw) { box.querySelector('#gchat-manual-url').style.borderColor = '#ef4444'; return; }
+                // Extract space ID from various URL formats or bare IDs
+                let spaceId = raw;
+                const urlMatch = raw.match(/spaces\/([A-Za-z0-9_-]+)/);
+                const pathMatch = raw.match(/[/#]([A-Za-z0-9_-]{8,})\/?$/);
+                if (urlMatch) spaceId = 'spaces/' + urlMatch[1];
+                else if (!raw.startsWith('spaces/') && pathMatch) spaceId = 'spaces/' + pathMatch[1];
+                else if (!raw.startsWith('spaces/')) spaceId = 'spaces/' + raw;
+                overlay.remove();
+                resolve({ name: spaceId, displayName: spaceId });
+            };
+        });
     };
 
     // Show bubble on startup — poll until user session is available (up to ~10s)

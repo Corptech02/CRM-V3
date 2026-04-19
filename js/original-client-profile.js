@@ -31,22 +31,23 @@ window.viewClientOriginal = async function(id) {
         return;
     }
 
-    // Get policies for this client - ALWAYS get fresh data from localStorage
-    // First, try to sync policies from server to get latest data
+    // Merge server policies into localStorage without overwriting local-only entries
     try {
-        console.log('🔄 Attempting to sync from server...');
-        const response = await fetch('https://162-220-14-239.nip.io/api/policies?includeInactive=true', {
-            timeout: 5000  // 5 second timeout
-        });
+        const response = await fetch('/api/policies?includeInactive=true');
         if (response.ok) {
             const serverPolicies = await response.json();
-            localStorage.setItem('insurance_policies', JSON.stringify(serverPolicies));
-            console.log(`✅ Synced ${serverPolicies.length} policies from server to localStorage`);
-        } else {
-            console.log(`⚠️ Server returned ${response.status}, using localStorage data`);
+            const localPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            // Build map of server policies by id
+            const serverMap = {};
+            serverPolicies.forEach(p => { if (p.id) serverMap[p.id] = p; });
+            // Keep local-only policies (not on server) and merge with server data
+            const merged = [...serverPolicies];
+            localPolicies.forEach(p => { if (p.id && !serverMap[p.id]) merged.push(p); });
+            localStorage.setItem('insurance_policies', JSON.stringify(merged));
+            console.log(`✅ Merged ${serverPolicies.length} server + ${merged.length - serverPolicies.length} local-only policies`);
         }
     } catch (error) {
-        console.log('⚠️ Could not sync from server (timeout/error), using localStorage data:', error.message);
+        console.log('⚠️ Could not sync from server, using localStorage data:', error.message);
     }
 
     const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
@@ -394,6 +395,9 @@ window.viewClientOriginal = async function(id) {
                                 <p style="margin: 0 0 16px 0; font-size: 16px;">No policies found</p>
                                 <button onclick="addPolicyToClient('${id}')" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">
                                     <i class="fas fa-plus"></i> Add First Policy
+                                </button>
+                                <button onclick="syncPoliciesForClient('${id}')" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 8px;">
+                                    <i class="fas fa-sync-alt"></i> Sync Policies
                                 </button>
                             </div>
                         `}
@@ -977,5 +981,154 @@ window.togglePasswordVisibility = function(clientId, password, buttonElement) {
 
 // Override the current viewClient function with the original simple design
 window.viewClient = window.viewClientOriginal;
+
+// Sync Policies — find unlinked policies that match this client and let user attach them
+window.syncPoliciesForClient = async function(clientId) {
+    // Get client info
+    let client;
+    try {
+        const r = await fetch('/api/clients');
+        const d = await r.json();
+        const clients = Array.isArray(d) ? d : (d.clients || []);
+        client = clients.find(c => String(c.id) === String(clientId));
+    } catch(e) {}
+    if (!client) { showNotification('Client not found', 'error'); return; }
+
+    // Get all policies
+    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+
+    // Stop words that are too common to count as meaningful matches
+    const STOP_WORDS = new Set(['llc','inc','ltd','co','corp','lp','the','and','of','transport',
+        'trucking','transportation','logistics','hauling','services','enterprises','solutions',
+        'construction','group','global','management','systems','company','associates']);
+
+    function normalize(s) {
+        return (s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+    }
+    function meaningfulTokens(s) {
+        return normalize(s).split(/\s+/).filter(t => t.length > 1 && !STOP_WORDS.has(t));
+    }
+
+    const clientNameTokens = meaningfulTokens(client.name || '');
+    const clientBizTokens  = meaningfulTokens(client.businessName || '');
+    const clientBizNorm    = normalize(client.businessName || '');
+    const clientNameNorm   = normalize(client.name || '');
+
+    function nameScore(policyName) {
+        if (!policyName) return 0;
+        const pNorm   = normalize(policyName);
+        // Exact business name match → highest score
+        if (clientBizNorm && pNorm === clientBizNorm) return 10;
+        if (clientNameNorm && pNorm === clientNameNorm) return 10;
+        const pTokens = meaningfulTokens(policyName);
+        if (pTokens.length === 0) return 0;
+        let matches = 0;
+        for (const t of clientNameTokens) if (pTokens.includes(t)) matches++;
+        for (const t of clientBizTokens)  if (pTokens.includes(t)) matches++;
+        return matches;
+    }
+
+    // Find policies NOT already linked to this client but likely belonging to them (score >= 2)
+    const unlinked = allPolicies.filter(p => {
+        if (p.clientId && String(p.clientId) === String(clientId)) return false; // already linked
+        const pName = p.insuredName || p.clientName || p.contact?.['Owner Name'] ||
+                      p.insured?.['Name/Business Name'] || p.insured?.['Primary Named Insured'] || '';
+        return nameScore(pName) >= 2;
+    });
+
+    if (unlinked.length === 0) {
+        showNotification('No unlinked policies found matching this client', 'info');
+        return;
+    }
+
+    // Build modal
+    const overlay = document.createElement('div');
+    overlay.id = 'sync-policies-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    const rows = unlinked.map(p => {
+        const pName = p.insuredName || p.clientName || p.contact?.['Owner Name'] ||
+                      p.insured?.['Name/Business Name'] || p.insured?.['Primary Named Insured'] || '—';
+        const polNo  = p.policyNumber || p.id || '—';
+        const type   = p.policyType || p.type || '—';
+        const eff    = p.effectiveDate || p.overview?.['Effective Date'] || '—';
+        const exp    = p.expirationDate || p.overview?.['Expiration Date'] || '—';
+        const prem   = p.premium || p.financial?.['Annual Premium'] || p.financial?.premium || '—';
+        const score  = nameScore(pName);
+        const conf   = score >= 10 ? '🟢 Exact' : score >= 3 ? '🟢 High' : '🟡 Medium';
+        return `
+            <tr style="border-bottom:1px solid #f3f4f6;">
+                <td style="padding:10px 8px;"><input type="checkbox" class="sync-pol-cb" data-id="${p.id || ''}" data-polno="${polNo}" ${score >= 3 ? 'checked' : ''}></td>
+                <td style="padding:10px 8px;font-size:13px;font-weight:600;color:#1f2937;">${polNo}</td>
+                <td style="padding:10px 8px;font-size:13px;color:#374151;">${pName}</td>
+                <td style="padding:10px 8px;font-size:13px;color:#374151;">${type}</td>
+                <td style="padding:10px 8px;font-size:13px;color:#6b7280;">${eff} → ${exp}</td>
+                <td style="padding:10px 8px;font-size:13px;color:#059669;font-weight:600;">${prem ? '$'+String(prem).replace(/[^0-9.]/g,'') : '—'}</td>
+                <td style="padding:10px 8px;font-size:12px;">${conf}</td>
+            </tr>`;
+    }).join('');
+
+    overlay.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:32px;max-width:860px;width:95%;max-height:80vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+                <div>
+                    <h2 style="margin:0;font-size:20px;font-weight:700;color:#1f2937;"><i class="fas fa-sync-alt" style="color:#10b981;margin-right:10px;"></i>Sync Policies</h2>
+                    <p style="margin:6px 0 0;font-size:14px;color:#6b7280;">Found ${unlinked.length} unlinked ${unlinked.length === 1 ? 'policy' : 'policies'} matching <strong>${client.name || client.businessName}</strong>. Select the ones to link.</p>
+                </div>
+                <button onclick="document.getElementById('sync-policies-overlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;">&times;</button>
+            </div>
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:8px;width:36px;"><input type="checkbox" id="sync-pol-all" onchange="document.querySelectorAll('.sync-pol-cb').forEach(cb=>cb.checked=this.checked)" checked></th>
+                        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;">POLICY #</th>
+                        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;">INSURED NAME</th>
+                        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;">TYPE</th>
+                        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;">DATES</th>
+                        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;">PREMIUM</th>
+                        <th style="padding:8px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;">MATCH</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb;">
+                <button onclick="document.getElementById('sync-policies-overlay').remove()" style="padding:10px 20px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;font-size:14px;">Cancel</button>
+                <button onclick="window._confirmSyncPolicies('${clientId}')" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;"><i class="fas fa-link"></i> Link Selected Policies</button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+};
+
+window._confirmSyncPolicies = async function(clientId) {
+    const checked = [...document.querySelectorAll('.sync-pol-cb:checked')];
+    if (checked.length === 0) { showNotification('No policies selected', 'warning'); return; }
+
+    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    let linked = 0;
+
+    for (const cb of checked) {
+        const pid = cb.dataset.id;
+        const idx = allPolicies.findIndex(p => String(p.id) === String(pid));
+        if (idx === -1) continue;
+        allPolicies[idx].clientId = clientId;
+        // Persist to server
+        try {
+            await fetch(`/api/policies/${pid}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(allPolicies[idx])
+            });
+        } catch(e) { console.warn('Could not sync policy to server:', e); }
+        linked++;
+    }
+
+    localStorage.setItem('insurance_policies', JSON.stringify(allPolicies));
+    document.getElementById('sync-policies-overlay')?.remove();
+    showNotification(`Linked ${linked} ${linked === 1 ? 'policy' : 'policies'} to client`, 'success');
+
+    // Reload the profile to reflect changes
+    if (typeof window.viewClientOriginal === 'function') window.viewClientOriginal(clientId);
+};
 
 console.log('Original client profile design restored');

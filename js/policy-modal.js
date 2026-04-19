@@ -136,6 +136,7 @@ function showPolicyModal(existingPolicy = null) {
                                     <option value="pending">Pending</option>
                                     <option value="in-force">In Force</option>
                                     <option value="cancelled">Cancelled</option>
+                                    <option value="cancel-pending">Cancel Pending</option>
                                     <option value="non-renewed">Non-Renewed</option>
                                     <option value="expired">Expired</option>
                                 </select>
@@ -504,6 +505,7 @@ function generateTabContent(tabId, policyType) {
                                 <option value="Pending">Pending</option>
                                 <option value="In Force">In Force</option>
                                 <option value="Cancelled">Cancelled</option>
+                                <option value="Cancel Pending">Cancel Pending</option>
                                 <option value="Non-Renewed">Non-Renewed</option>
                                 <option value="Expired">Expired</option>
                             </select>
@@ -838,6 +840,22 @@ function generateTabContent(tabId, policyType) {
                                 <input type="text" class="form-control coverage-text-input" id="coverage-trailer-interchange-text" placeholder="e.g. $50,000" style="display: none;">
                                 <!-- Dropdown (default) -->
                                 <select class="form-control coverage-dropdown" id="coverage-trailer-interchange" style="display: block;">
+                                    <option value="">Select Limit</option>
+                                    <option value="0">No Coverage</option>
+                                    <option value="20000">$20,000</option>
+                                    <option value="25000">$25,000</option>
+                                    <option value="50000">$50,000</option>
+                                    <option value="60000/2000ded">$60,000/$2,000 Ded.</option>
+                                    <option value="75000">$75,000</option>
+                                    <option value="100000">$100,000</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Non-Owned Trailer</label>
+                                <!-- Text input (hidden by default) -->
+                                <input type="text" class="form-control coverage-text-input" id="coverage-non-owned-trailer-text" placeholder="e.g. $50,000" style="display: none;">
+                                <!-- Dropdown (default) -->
+                                <select class="form-control coverage-dropdown" id="coverage-non-owned-trailer" style="display: block;">
                                     <option value="">Select Limit</option>
                                     <option value="0">No Coverage</option>
                                     <option value="20000">$20,000</option>

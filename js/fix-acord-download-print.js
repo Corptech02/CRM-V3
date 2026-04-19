@@ -320,10 +320,14 @@ document.addEventListener('click', function(e) {
             return false;
         }
 
-        // Check for print buttons
-        if (element.textContent.includes('Print') ||
+        // Check for print buttons — ONLY intercept when ACORD viewer is active
+        if ((element.textContent.includes('Print') ||
             element.innerHTML.includes('fa-print') ||
-            (element.onclick && element.onclick.toString().includes('print'))) {
+            (element.onclick && element.onclick.toString().includes('print'))) &&
+            // Only intercept if ACORD viewer is visible on the page
+            document.querySelector('.pdf-container, .acord-viewer, #realPdfCanvas') &&
+            // Don't intercept commission statement print
+            !(element.onclick && element.onclick.toString().includes('printCommissionStatement'))) {
 
             console.log('🛑 Intercepted print click');
             e.preventDefault();

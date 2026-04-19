@@ -54,15 +54,53 @@
 
     // Logout function
     function logout() {
+        // Notify server (best-effort)
+        const token = sessionStorage.getItem('vanguard_jwt');
+        if (token) {
+            fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            }).catch(() => {});
+        }
         // Clear all session data
         sessionStorage.removeItem('vanguard_user');
-        window.location.href = '/login.html';
+        sessionStorage.removeItem('vanguard_jwt');
+        var portal = localStorage.getItem('vanguard_login_portal');
+        window.location.href = (portal === 'united') ? '/login-united.html' : '/login.html';
     }
 
-    // Check if user is admin
-    function isAdmin(username) {
-        const adminUsers = ['grant', 'maureen'];
-        return adminUsers.includes(username.toLowerCase());
+    // Get session user object
+    function getSessionUser() {
+        try { return JSON.parse(sessionStorage.getItem('vanguard_user') || '{}'); } catch(e) { return {}; }
+    }
+
+    const ADMIN_ROLES = ['admin', 'master_admin', 'united_admin', 'vanguard_admin'];
+
+    function _isAdmin() {
+        const u = getSessionUser();
+        return ADMIN_ROLES.includes(u.role);
+    }
+
+    function isCsr() {
+        return getSessionUser().role === 'csr';
+    }
+
+    // Badge config per role
+    const ROLE_BADGE = {
+        master_admin:  { text: 'Master Admin', icon: 'fa-crown',    bg: 'linear-gradient(135deg,#f59e0b,#d97706)' },
+        united_admin:  { text: 'United Admin', icon: 'fa-shield-alt', bg: 'linear-gradient(135deg,#8b5cf6,#6d28d9)' },
+        vanguard_admin:{ text: 'Vanguard Admin',icon:'fa-crown',    bg: 'linear-gradient(135deg,#ff6b6b,#ee5a52)' },
+        admin:         { text: 'Admin',         icon: 'fa-crown',    bg: 'linear-gradient(135deg,#ff6b6b,#ee5a52)' },
+        csr:           { text: 'CSR',           icon: 'fa-headset',  bg: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' },
+    };
+
+    function getRoleBadgeHTML() {
+        const role = getSessionUser().role;
+        const cfg = ROLE_BADGE[role];
+        if (!cfg) return '';
+        return `<span style="background:${cfg.bg};color:white;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.3);">
+            <i class="fas ${cfg.icon}" style="margin-right:3px;font-size:9px;"></i>${cfg.text}
+        </span>`;
     }
 
     // Display user info in header
@@ -72,76 +110,37 @@
 
         // Wait for DOM to be ready
         const setupUserDisplay = () => {
-            // Find or create user info element
+            // Inject role badge next to #userNameDisplay (the nav user menu)
+            const nameDisplay = document.getElementById('userNameDisplay');
+            if (nameDisplay && !document.getElementById('roleBadgeInNav')) {
+                const badgeHTML = getRoleBadgeHTML();
+                if (badgeHTML) {
+                    const wrapper = document.createElement('span');
+                    wrapper.id = 'roleBadgeInNav';
+                    wrapper.innerHTML = badgeHTML;
+                    nameDisplay.insertAdjacentElement('afterend', wrapper);
+                }
+            }
+
+            // Legacy: also inject into .top-header if present and not already done
             let userInfoElement = document.getElementById('userInfoDisplay');
-
             if (!userInfoElement) {
-                // Try to find the header
                 const header = document.querySelector('.top-header') || document.querySelector('.dashboard-header');
-
                 if (header) {
-                    // Create admin badge if user is admin
-                    const adminBadge = isAdmin(user.username) ? `
-                        <span style="
-                            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-                            color: white;
-                            padding: 4px 8px;
-                            border-radius: 12px;
-                            font-size: 11px;
-                            font-weight: 600;
-                            text-transform: uppercase;
-                            letter-spacing: 0.5px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                            border: 1px solid rgba(255,255,255,0.3);
-                        ">
-                            <i class="fas fa-crown" style="margin-right: 4px;"></i>ADMIN
-                        </span>
-                    ` : '';
-
-                    // Create user info display
+                    const adminBadge = getRoleBadgeHTML();
                     userInfoElement = document.createElement('div');
                     userInfoElement.id = 'userInfoDisplay';
-                    userInfoElement.style.cssText = `
-                        position: absolute;
-                        right: 20px;
-                        top: 50%;
-                        transform: translateY(-50%);
-                        display: flex;
-                        align-items: center;
-                        gap: 15px;
-                        color: white;
-                        font-size: 14px;
-                        z-index: 1000;
-                    `;
-
+                    userInfoElement.style.cssText = `position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:15px;color:white;font-size:14px;z-index:1000;`;
                     userInfoElement.innerHTML = `
-                        <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 30px;">
-                            <i class="fas fa-user-circle" style="font-size: 20px;"></i>
-                            <span style="font-weight: 500;">${user.username}</span>
+                        <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.1);padding:8px 16px;border-radius:30px;">
+                            <i class="fas fa-user-circle" style="font-size:20px;"></i>
+                            <span style="font-weight:500;">${user.username}</span>
                             ${adminBadge}
                         </div>
-                        <button onclick="logout()" style="
-                            background: rgba(255,255,255,0.2);
-                            border: 1px solid rgba(255,255,255,0.3);
-                            color: white;
-                            padding: 8px 16px;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-weight: 500;
-                            transition: all 0.3s;
-                        " onmouseover="this.style.background='rgba(255,255,255,0.3)'"
-                           onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                            <i class="fas fa-sign-out-alt" style="margin-right: 6px;"></i>
-                            Logout
-                        </button>
-                    `;
-
-                    // Make header relative if it's not already
-                    if (getComputedStyle(header).position === 'static') {
-                        header.style.position = 'relative';
-                    }
-
+                        <button onclick="logout()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                            <i class="fas fa-sign-out-alt" style="margin-right:6px;"></i>Logout
+                        </button>`;
+                    if (getComputedStyle(header).position === 'static') header.style.position = 'relative';
                     header.appendChild(userInfoElement);
                 }
             }
@@ -203,20 +202,11 @@
     function controlAdminUI(username) {
         console.log('AUTH-MANAGER: controlAdminUI called with username:', username);
 
-        const isAdmin = (username) => {
-            const adminUsers = ['grant', 'maureen'];
-            const isAdminUser = adminUsers.includes(username.toLowerCase());
-            console.log('AUTH-MANAGER: Checking admin status for:', username, '-> isAdmin:', isAdminUser);
-            return isAdminUser;
-        };
-
-        // Check if user can view premium fields (includes Carson and Hunter)
-        const canViewPremiums = (username) => {
-            const premiumViewUsers = ['grant', 'maureen', 'carson', 'hunter'];
-            const canView = premiumViewUsers.includes(username.toLowerCase());
-            console.log('AUTH-MANAGER: Checking premium view permission for:', username, '-> canView:', canView);
-            return canView;
-        };
+        const sessionUser = getSessionUser();
+        const userRole = sessionUser.role || 'agent';
+        const _isAdmin = () => ADMIN_ROLES.includes(userRole);
+        const isCsrRole = () => userRole === 'csr';
+        const canViewPremiums = () => ADMIN_ROLES.includes(userRole) || ['carson','hunter'].includes(username.toLowerCase());
 
         // Wait for DOM to be ready before manipulating elements
         const applyAdminControls = () => {
@@ -237,14 +227,12 @@
                         administrationSectionFound = true;
                         console.log('AUTH-MANAGER: Found Administration section!');
 
-                        if (isAdmin(username)) {
+                        if (_isAdmin()) {
                             section.style.display = 'block';
                             section.style.visibility = 'visible';
-                            console.log('AUTH-MANAGER: ✅ Admin user - Administration section visible');
                         } else {
                             section.style.display = 'none';
                             section.style.visibility = 'hidden';
-                            console.log('AUTH-MANAGER: ❌ Non-admin user - Administration section hidden');
                         }
                     }
                 }
@@ -272,7 +260,7 @@
                     console.log(`AUTH-MANAGER: Stat card ${index} title:`, titleText);
 
                     if (adminOnlyStats.includes(titleText)) {
-                        if (isAdmin(username)) {
+                        if (_isAdmin()) {
                             card.style.display = 'block';
                             card.style.visibility = 'visible';
                             console.log(`AUTH-MANAGER: ✅ Admin - Showing stat: ${titleText}`);
@@ -295,7 +283,7 @@
                 headers.forEach((header, index) => {
                     if (header.textContent.trim() === 'Premium') {
                         console.log(`AUTH-MANAGER: Found Premium column header at index ${index}`);
-                        if (isAdmin(username)) {
+                        if (_isAdmin()) {
                             header.style.display = 'table-cell';
                             header.style.visibility = 'visible';
                             console.log('AUTH-MANAGER: ✅ Admin - Showing Premium column header');
@@ -310,7 +298,7 @@
                         rows.forEach((row, rowIndex) => {
                             const cells = row.querySelectorAll('td');
                             if (cells[index]) {
-                                if (isAdmin(username)) {
+                                if (_isAdmin()) {
                                     cells[index].style.display = 'table-cell';
                                     cells[index].style.visibility = 'visible';
                                 } else {
@@ -333,7 +321,7 @@
                 headers.forEach((header, index) => {
                     if (header.textContent.trim() === 'Premium') {
                         console.log(`AUTH-MANAGER: Found Premium column header in policies table at index ${index}`);
-                        if (isAdmin(username)) {
+                        if (_isAdmin()) {
                             header.style.display = 'table-cell';
                             header.style.visibility = 'visible';
                             console.log('AUTH-MANAGER: ✅ Admin - Showing Premium column header in policies');
@@ -348,7 +336,7 @@
                         rows.forEach((row, rowIndex) => {
                             const cells = row.querySelectorAll('td');
                             if (cells[index]) {
-                                if (isAdmin(username)) {
+                                if (_isAdmin()) {
                                     cells[index].style.display = 'table-cell';
                                     cells[index].style.visibility = 'visible';
                                 } else {
@@ -366,7 +354,7 @@
             policyStats.forEach(stat => {
                 const label = stat.querySelector('.mini-stat-label');
                 if (label && label.textContent.trim() === 'Total Premium') {
-                    if (isAdmin(username)) {
+                    if (_isAdmin()) {
                         stat.style.display = 'block';
                         stat.style.visibility = 'visible';
                         console.log('AUTH-MANAGER: ✅ Admin - Showing Total Premium stat');
@@ -379,7 +367,7 @@
             });
 
             // Hide premium information in policy views for users without premium view permission
-            if (!canViewPremiums(username)) {
+            if (!canViewPremiums()) {
                 console.log('AUTH-MANAGER: User without premium permissions - applying continuous premium hiding...');
 
                 // Function to hide premium content aggressively
@@ -456,7 +444,7 @@
 
                 // Set up continuous monitoring every 500ms
                 const premiumHideInterval = setInterval(() => {
-                    if (!isAdmin(username)) {
+                    if (!_isAdmin()) {
                         hidePremiumContent();
                     } else {
                         clearInterval(premiumHideInterval);
@@ -541,6 +529,49 @@
         console.log('AUTH-MANAGER: MutationObserver set up for persistent admin controls');
     }
 
+    // Hide nav items that CSR cannot access
+    function applyCsrNavRestrictions() {
+        if (!isCsr()) return;
+
+        const hideNavItem = (el) => {
+            if (el) { el.style.display = 'none'; el.style.visibility = 'hidden'; }
+        };
+
+        // Hide entire Administration section
+        document.querySelectorAll('.menu-section').forEach(sec => {
+            const h3 = sec.querySelector('h3');
+            if (h3 && h3.textContent.trim() === 'Administration') hideNavItem(sec);
+        });
+
+        // Hide Lead Generation, Market, Leads nav links by matching href/onclick
+        document.querySelectorAll('.sidebar-menu a, .sidebar-menu li').forEach(el => {
+            const href = el.getAttribute('href') || '';
+            const onclick = el.getAttribute('onclick') || '';
+            const text = el.querySelector('span')?.textContent.trim() || el.textContent.trim();
+            if (
+                onclick.includes('toggleLeadGenFolder') ||
+                onclick.includes('toggleLeadsFolder') ||
+                href === '#market' ||
+                text === 'Lead Generation' ||
+                text === 'Market' ||
+                text === 'Leads'
+            ) {
+                const li = el.closest('li') || el;
+                hideNavItem(li);
+            }
+        });
+
+        // Also hide any lead-gen sub-folder items
+        const leadGenFolder = document.getElementById('leadGenFolder');
+        if (leadGenFolder) hideNavItem(leadGenFolder);
+        const leadsFolder = document.getElementById('leadsFolder');
+        if (leadsFolder) hideNavItem(leadsFolder);
+
+        // Hide goals bar
+        const goalsBar = document.getElementById('dashboard-goals-bar');
+        if (goalsBar) hideNavItem(goalsBar);
+    }
+
     // Check session expiry (not used with sessionStorage login)
     function checkSessionExpiry() {
         // No session expiry with the original login system
@@ -549,14 +580,21 @@
 
     // Initialize
     window.addEventListener('DOMContentLoaded', () => {
-        // Check authentication
         const user = checkAuth();
         if (user) {
             displayUserInfo();
             setDefaultAssignedAgent();
-
-            // Check session expiry every 30 minutes
             setInterval(checkSessionExpiry, 30 * 60 * 1000);
+
+            // Apply CSR nav restrictions with retries for dynamic sidebar
+            if (isCsr()) {
+                applyCsrNavRestrictions();
+                setTimeout(applyCsrNavRestrictions, 300);
+                setTimeout(applyCsrNavRestrictions, 1000);
+                setTimeout(applyCsrNavRestrictions, 2000);
+                const csrObserver = new MutationObserver(() => applyCsrNavRestrictions());
+                csrObserver.observe(document.body, { childList: true, subtree: true });
+            }
         }
     });
 

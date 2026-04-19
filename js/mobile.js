@@ -341,9 +341,13 @@ function enhanceMobileForms() {
         });
     });
 
-    // Add clear buttons to inputs
+    // Add clear buttons to inputs (skip todo input — breaks layout)
     const inputs = document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"]');
     inputs.forEach(input => {
+        // Skip inputs that wrapping would break
+        if (input.id === 'simpleTodoInput') return;
+        if (input.closest('.filters-bar') || input.closest('.search-box')) return;
+        if (input.closest('.acct-search') || input.classList.contains('acct-search')) return;
         const wrapper = document.createElement('div');
         wrapper.className = 'input-wrapper';
         input.parentNode.insertBefore(wrapper, input);

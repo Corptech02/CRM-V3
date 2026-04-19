@@ -7,13 +7,7 @@ window.generateClientRows = async function() {
     let allClients = [];
 
     try {
-        const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
-        const response = await fetch(`${API_URL}/api/clients`, {
-            headers: {
-                'Cache-Control': 'no-cache',
-                'Bypass-Tunnel-Reminder': 'true'
-            }
-        });
+        const response = await fetch(`/api/clients?limit=500&offset=0`);
 
         if (response.ok) {
             const _apiData = await response.json();
@@ -105,19 +99,21 @@ window.generateClientRows = async function() {
     let currentUser = null;
     let isAdmin = false;
 
+    let isCsrUser = false;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
             isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
-            console.log(`🔍 Fix-clients-view filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
+            isCsrUser = (user.role || '') === 'csr';
+            console.log(`🔍 Fix-clients-view filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
             console.error('Error parsing session data:', error);
         }
     }
 
-    // Filter clients based on user role
-    if (!isAdmin && currentUser) {
+    // Filter clients based on user role — CSR sees all clients (gated by search in UI)
+    if (!isAdmin && !isCsrUser && currentUser) {
         const originalCount = allClients.length;
         allClients = allClients.filter(client => {
             const assignedTo = client.assignedTo || client.agent || 'Grant'; // Default to Grant if no assignment
@@ -126,6 +122,8 @@ window.generateClientRows = async function() {
         console.log(`🔒 Fix-clients-view filtered: ${originalCount} -> ${allClients.length} (showing only ${currentUser}'s clients)`);
     } else if (isAdmin) {
         console.log(`👑 Fix-clients-view admin user - showing all ${allClients.length} clients`);
+    } else if (isCsrUser) {
+        console.log(`🎧 Fix-clients-view CSR user - showing all ${allClients.length} clients (search-gated)`);
     }
 
     // If no clients, show a message
@@ -224,13 +222,7 @@ window.loadClientsView = async function() {
         let allClients = [];
 
         try {
-            const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io';
-            const response = await fetch(`${API_URL}/api/clients`, {
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'Bypass-Tunnel-Reminder': 'true'
-                }
-            });
+            const response = await fetch(`/api/clients?limit=500&offset=0`);
 
             if (response.ok) {
                 allClients = await response.json();

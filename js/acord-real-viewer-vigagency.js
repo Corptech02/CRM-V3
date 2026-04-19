@@ -31,11 +31,18 @@ window.realPdfState = {
 };
 
 // Helper function to determine signature based on agent
-function getSignatureForAgent(agent) {
+function getSignatureForAgent(agent, united) {
     console.log('🖋️ DEBUGGING SIGNATURE SELECTION:');
     console.log('  - Raw agent value:', agent);
+    console.log('  - United flag:', united);
     console.log('  - Agent type:', typeof agent);
     console.log('  - Agent truthy?', !!agent);
+
+    // United policies always use Maureen's signature regardless of agent
+    if (united) {
+        console.log('✅ SIGNATURE: Using Maureen Corp signature (United policy)');
+        return 'Maureen Corp';
+    }
 
     if (agent) {
         const lowerAgent = agent.toLowerCase();
@@ -69,9 +76,10 @@ function getSignatureForAgency(agency) {
 }
 
 // Helper function to get company information based on agency
-function getCompanyInfoForAgency(agency, agent) {
-    console.log('🏢 Determining company info for agency:', agency, '| agent:', agent);
-    const isUIG = (agency && agency.toLowerCase().includes('united')) ||
+function getCompanyInfoForAgency(agency, agent, united) {
+    console.log('🏢 Determining company info for agency:', agency, '| agent:', agent, '| united:', united);
+    const isUIG = united ||
+                  (agency && agency.toLowerCase().includes('united')) ||
                   (agent && agent.toLowerCase() === 'maureen');
     if (isUIG) {
         console.log('🔄 Using United Insurance Group company info');
@@ -80,11 +88,11 @@ function getCompanyInfoForAgency(agency, agent) {
             email: 'Contact@uigagency.com',
             phone: '(330) 259-7438',
             fax: '(330) 259-7439',
-            address1: '2888 Nationwide Pkwy',
+            address1: '435 Abbeyville Rd. Unit F',
             address2: '',
-            city: 'Brunswick',
+            city: 'Medina',
             state: 'OH',
-            zip: '44212'
+            zip: '44256'
         };
     } else {
         console.log('🔄 Using Vanguard Insurance Group LLC company info');
@@ -621,27 +629,27 @@ function createRealFormFields(policyId, policyData) {
 
         // === PRODUCER SECTION (top left) ===
         { id: 'producer', x: 29, y: 172, width: 364, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).producer },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).producer },
         { id: 'producerAddress1', x: 29, y: 187, width: 364, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).address1 },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).address1 },
         { id: 'producerAddress2', x: 29, y: 203, width: 364, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).address2 },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).address2 },
         { id: 'producerCity', x: 29, y: 218, width: 281, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).city },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).city },
         { id: 'producerState', x: 309, y: 218, width: 23, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).state },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).state },
         { id: 'producerZip', x: 333, y: 218, width: 60, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).zip },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).zip },
 
         // === CONTACT INFO (right side of producer) ===
         { id: 'contactName', x: 450, y: 156, width: 317, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).producer },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).producer },
         { id: 'phone', x: 459, y: 172, width: 164, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).phone },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).phone },
         { id: 'fax', x: 673, y: 172, width: 94, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).fax },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).fax },
         { id: 'email', x: 450, y: 187, width: 317, height: 16,
-          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent).email },
+          value: getCompanyInfoForAgency(policyData?.agency, policyData?.agent, policyData?.united).email },
 
         // === INSURED SECTION ===
         { id: 'insured', x: 94, y: 250, width: 299, height: 16,
@@ -692,8 +700,8 @@ function createRealFormFields(policyId, policyData) {
           value: (() => {
             const raw = policyData?.carrier || policyData?.overview?.['Carrier'] || '';
             const lc = raw.toLowerCase().replace(/\s+/g, '');
-            if (lc.startsWith('geico')) return 'GEICO';
-            if (lc.startsWith('progressive')) return 'Progressive';
+            if (lc.startsWith('geico')) return 'GEICO MARINE INSURANCE COMPANY';
+            if (lc.startsWith('progressive')) return 'Progressive Preferred Insurance Co.';
             if (lc.startsWith('northland')) return 'NORTHLAND INSURANCE COMPANY';
             return raw;
           })() },
@@ -1070,12 +1078,7 @@ function createRealFormFields(policyId, policyData) {
         { id: 'damageRented', x: 684, y: 406, width: 83, height: 16,
           value: hasGL ? '100,000' : '' },
         { id: 'medExp', x: 684, y: 421, width: 83, height: 16,
-          value: (function() {
-              if (!hasGL) return '';
-              const medicalValue = policyData?.coverage?.medical_payments || policyData?.coverage?.['Medical Payments'] || '5,000';
-              console.log('💊 Medical Payments value:', medicalValue, 'from coverage:', policyData?.coverage);
-              return medicalValue;
-          })() },
+          value: hasGL ? '5,000' : '' },
         { id: 'personalAdv', x: 684, y: 437, width: 83, height: 16,
           value: hasGL ? (() => {
               if (_glOcc > 0) return _glOcc.toLocaleString();
@@ -1122,7 +1125,7 @@ function createRealFormFields(policyId, policyData) {
 
         // === AUTHORIZED REPRESENTATIVE (signature area) ===
         { id: 'authRep', x: 403, y: 936, width: 364, height: 31,
-          value: getSignatureForAgent(policyData?.agent), bold: true, size: 16, signature: true }
+          value: getSignatureForAgent(policyData?.agent, policyData?.united), bold: true, size: 16, signature: true }
     ];
 
     // Create each field
@@ -1854,7 +1857,11 @@ window.selectSignature = function(signatureName) {
             producer: 'United Insurance Group',
             email: 'Contact@uigagency.com',
             phone: '(330) 259-7438',
-            fax: '(330) 259-7439'
+            fax: '(330) 259-7439',
+            address1: '435 Abbeyville Rd. Unit F',
+            city: 'Medina',
+            state: 'OH',
+            zip: '44256'
         });
     } else {
         // Switch back to standard Vanguard info for Grant Corp or Hunter Brooks
@@ -1863,7 +1870,11 @@ window.selectSignature = function(signatureName) {
             producer: 'Vanguard Insurance Group LLC',
             email: 'contact@vigagency.com',
             phone: '(866) 628-9441',
-            fax: '(330) 779-1097'
+            fax: '(330) 779-1097',
+            address1: '2888 Nationwide Pkwy',
+            city: 'Brunswick',
+            state: 'OH',
+            zip: '44212'
         });
     }
 
@@ -1933,6 +1944,24 @@ window.updateCompanyInfo = function(companyData) {
         faxField.dispatchEvent(new Event('input', { bubbles: true }));
         window.realPdfState.formData['fax'] = companyData.fax;
         console.log('✅ Updated fax to:', companyData.fax);
+    }
+
+    // Update address line 1
+    const addr1Field = document.getElementById('field_producerAddress1');
+    if (addr1Field && companyData.address1) {
+        addr1Field.value = companyData.address1;
+        addr1Field.dispatchEvent(new Event('input', { bubbles: true }));
+        window.realPdfState.formData['producerAddress1'] = companyData.address1;
+        console.log('✅ Updated producerAddress1 to:', companyData.address1);
+    }
+
+    // Update zip
+    const zipField = document.getElementById('field_producerZip');
+    if (zipField && companyData.zip) {
+        zipField.value = companyData.zip;
+        zipField.dispatchEvent(new Event('input', { bubbles: true }));
+        window.realPdfState.formData['producerZip'] = companyData.zip;
+        console.log('✅ Updated producerZip to:', companyData.zip);
     }
 
     console.log('✅ Company information update complete');

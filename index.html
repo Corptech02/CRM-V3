@@ -1069,46 +1069,85 @@
                                 <span>Dashboard</span>
                             </a>
                         </li>
-                        <li>
-                            <a href="#leads" data-tooltip="Leads">
+                        <li class="nav-folder" id="leads-nav-folder">
+                            <a href="javascript:void(0)" data-tooltip="Leads" onclick="toggleLeadsFolder()">
                                 <i class="fas fa-user-plus"></i>
                                 <span>Leads</span>
+                                <i class="fas fa-chevron-down nav-folder-arrow" style="margin-left:auto;font-size:10px;transition:transform .2s;"></i>
                             </a>
+                            <ul class="nav-sub-menu" id="leads-sub-menu" style="display:none;">
+                                <li>
+                                    <a href="#leads" data-tooltip="Active Leads">
+                                        <i class="fas fa-user-check"></i>
+                                        <span>Active Leads</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#archived-leads" data-tooltip="Archived Leads">
+                                        <i class="fas fa-archive"></i>
+                                        <span>Archived Leads</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
-                        <li id="archived-leads-nav-item" style="display: none;">
-                            <a href="#archived-leads" data-tooltip="Archived Leads">
-                                <i class="fas fa-archive"></i>
-                                <span>Archived Leads</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#clients" data-tooltip="Clients">
+                        <li class="nav-folder" id="clients-nav-folder">
+                            <a href="javascript:void(0)" data-tooltip="Clients" onclick="toggleClientsFolder()">
                                 <i class="fas fa-users"></i>
                                 <span>Clients</span>
+                                <i class="fas fa-chevron-down nav-folder-arrow" style="margin-left:auto;font-size:10px;transition:transform .2s;"></i>
                             </a>
-                        </li>
-                        <li>
-                            <a href="#policies" data-tooltip="Policies">
-                                <i class="fas fa-file-contract"></i>
-                                <span>Policies</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#renewals" data-tooltip="Renewals">
-                                <i class="fas fa-sync-alt"></i>
-                                <span>Renewals</span>
-                            </a>
+                            <ul class="nav-sub-menu" id="clients-sub-menu" style="display:none;">
+                                <li>
+                                    <a href="#clients" data-tooltip="Clients">
+                                        <i class="fas fa-user-tie"></i>
+                                        <span>Clients</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#policies" data-tooltip="Policies">
+                                        <i class="fas fa-file-contract"></i>
+                                        <span>Policies</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#renewals" data-tooltip="Renewals">
+                                        <i class="fas fa-sync-alt"></i>
+                                        <span>Renewals</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     </ul>
                 </div>
                 <div class="menu-section">
                     <h3>Tools</h3>
                     <ul>
-                        <li>
-                            <a href="#lead-generation" data-tooltip="Lead Generation">
+                        <li class="nav-folder" id="leadgen-nav-folder">
+                            <a href="javascript:void(0)" data-tooltip="Lead Generation" onclick="toggleLeadGenFolder()">
                                 <i class="fas fa-search-location"></i>
                                 <span>Lead Generation</span>
+                                <i class="fas fa-chevron-down nav-folder-arrow" style="margin-left:auto;font-size:10px;transition:transform .2s;"></i>
                             </a>
+                            <ul class="nav-sub-menu" id="leadgen-sub-menu" style="display:none;">
+                                <li>
+                                    <a href="#lead-gen-lookup" data-tooltip="Carrier Lookup">
+                                        <i class="fas fa-search"></i>
+                                        <span>Carrier Lookup</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#lead-gen-generate" data-tooltip="Generate Leads">
+                                        <i class="fas fa-magic"></i>
+                                        <span>Generate Leads</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#lead-gen-sms" data-tooltip="Email & SMS Blast">
+                                        <i class="fas fa-envelope"></i>
+                                        <span>Email & SMS Blast</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                         <li>
                             <a href="#communications" data-tooltip="Communications">
@@ -1155,6 +1194,12 @@
                             <a href="#settings" data-tooltip="Settings">
                                 <i class="fas fa-cog"></i>
                                 <span>Settings</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#downloads" data-tooltip="Downloads">
+                                <i class="fas fa-download"></i>
+                                <span>Downloads</span>
                             </a>
                         </li>
                     </ul>
@@ -1599,8 +1644,10 @@
     <script src="js/sip-test.js?v=2"></script>
     <script src="js/vanguard-softphone.js?v=9"></script>
     <script src="js/sip-integration-bridge.js?v=1"></script>
-    <script src="js/force-policies-refresh.js?v=1"></script>
-    <script src="js/app.js?v=20260412aa"></script>
+    <!-- DISABLED: causes race conditions on refresh — loadPoliciesView + generatePolicyRows already handle server sync -->
+    <!-- <script src="js/force-policies-refresh.js?v=1"></script> -->
+    <script src="js/secure-fetch.js?v=1"></script>
+    <script src="js/app.js?v=20260419a"></script>
 
     <!-- Vicidial Stage Sync - Bidirectional synchronization -->
     <script src="js/vicidial-stage-sync.js?v=1"></script>
@@ -1831,7 +1878,7 @@
     <script src="js/debug-script-loading.js?v=1"></script>
     <script src="js/add-test-button.js"></script>
     <!-- Fixed with role-based filtering and assigned column -->
-    <script src="js/fix-clients-view.js?v=20260412_UNWRAP"></script>
+    <script src="js/fix-clients-view.js?v=20260419a"></script>
     <!-- DISABLED: Conflicts with original-client-profile.js
     <script src="js/fix-client-profile-policies.js"></script> -->
     <!-- TEMPORARILY DISABLED - This was blocking Vicidial lead imports -->
@@ -3338,7 +3385,8 @@
     <!-- <script src="js/emergency-callback-fix.js?v=INTEGRATED_COMPLETION"></script> -->
 
     <!-- POLICY FIXES -->
-    <script src="js/fix-policies-immediate-load.js"></script>
+    <!-- DISABLED: causes duplicate loadPoliciesView calls on refresh, creating race conditions -->
+    <!-- <script src="js/fix-policies-immediate-load.js"></script> -->
 
     <!-- CRITICAL: Harry Welling TODO Fix -->
     <script src="js/comprehensive-final-fix.js"></script>

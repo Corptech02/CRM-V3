@@ -420,18 +420,29 @@ router.get('/policies', requirePortalAuth, (req, res) => {
     const db = getDb();
     // Policies are stored with client_id lacking the ".0" suffix that JWTs carry
     const rawClientId = String(req.portalUser.sub).replace(/\.0$/, '');
+    // Also match policies where the inner JSON clientId is correct but the column was
+    // incorrectly set to the policy number (server.js fallback bug — 129 affected rows).
     db.all(
-        'SELECT id, data FROM policies WHERE client_id=? OR client_id=?',
-        [req.portalUser.sub, rawClientId],
+        `SELECT id, data FROM policies
+         WHERE client_id=? OR client_id=?
+            OR data LIKE '%"clientId":"' || ? || '"%'`,
+        [req.portalUser.sub, rawClientId, rawClientId],
         (err, rows) => {
         db.close();
         if (err) return res.status(500).json({ error: 'Database error' });
 
+        const unitedOnly = req.query.brand === 'united';
         const policies = [];
         for (const row of (rows || [])) {
             try {
                 const outer = JSON.parse(row.data);
                 for (const p of (outer.policies || [])) {
+                    // Brand filter: if brand=united only include United-flagged or Maureen-agent policies
+                    if (unitedOnly) {
+                        const isUnited = p.united === true || p.united === 'true' ||
+                                         (p.agent || '').toLowerCase().includes('maureen');
+                        if (!isUnited) continue;
+                    }
                     policies.push({
                         policyId        : String(row.id),
                         policyNumber    : p.policyNumber    || '',

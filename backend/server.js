@@ -133,10 +133,43 @@ app.get('/', (req, res) => {
     });
 });
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' }));
+// ── Security Middleware ──────────────────────────────────────────────────────
+const helmet = require('helmet');
+const { authenticateToken, requireRole, auditLog } = require('./auth-middleware');
+const authRoutes = require('./auth-routes');
+const { encryptField, decryptField } = require('./crypto-utils');
+
+app.use(helmet({
+    contentSecurityPolicy: false,       // CRM loads CDN scripts
+    crossOriginEmbedderPolicy: false
+}));
+
+app.use(cors({
+    origin: [
+        'https://162-220-14-239.nip.io',
+        'http://localhost:3000',
+        'http://localhost:3001'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use(bodyParser.json({ limit: '50mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+
+// Auth routes (public — no JWT required)
+app.use('/api/auth', authRoutes);
+
+// Protect all /api/* routes except public paths
+app.use('/api', (req, res, next) => {
+    const publicPaths = ['/auth/', '/health', '/portal/', '/twilio/incoming-call',
+                         '/twilio/call-status', '/twilio/recording-status',
+                         '/twilio/voicemail-transcription', '/twilio/recording-complete',
+                         '/twilio/conference-status', '/twilio/call-status-callback'];
+    if (publicPaths.some(p => req.path.startsWith(p))) return next();
+    return authenticateToken(req, res, next);
+});
 
 // Multer configuration for file uploads
 const uploadDir = '/var/www/vanguard/uploads/documents/';
@@ -1031,12 +1064,7 @@ app.post('/api/policies', (req, res) => {
         console.log('🔧 Generated policy ID:', id);
     }
 
-    // If no clientId but have client name, try to use policy number
-    if (!clientId && policy.policyNumber) {
-        clientId = policy.policyNumber;
-        policy.clientId = clientId;
-        console.log('🔧 Set client ID to policy number:', clientId);
-    }
+    // NOTE: do NOT fall back to policy number as clientId — that breaks portal lookups.
 
     // Structure data in the same nested format as existing policies
     const policyData = {
@@ -5025,6 +5053,20 @@ app.get('/api/all-data', (req, res) => {
 const gmailRoutes = require('./gmail-routes');
 app.use('/api/gmail', gmailRoutes);
 
+// Google Calendar bidirectional sync
+const googleCalendarModule = require('./google-calendar-routes');
+app.use('/api/google-calendar', googleCalendarModule.router);
+googleCalendarModule.startAutoSync(); // bidirectional sync — 5min (9am-6pm EST), 10min off-hours
+
+// Google Chat bidirectional sync
+const googleChatModule = require('./google-chat-routes');
+app.use('/api/google-chat', googleChatModule.router);
+googleChatModule.startSync(5000); // poll every 5 seconds
+
+// Slack bidirectional sync
+const slackModule = require('./slack-routes');
+app.use('/api/slack', slackModule.router);
+
 // Outlook routes for email
 const outlookRoutes = require('./outlook-routes');
 app.use('/api/outlook', outlookRoutes);
@@ -5036,6 +5078,10 @@ app.use('/api/titan', titanRoutes);
 // COI PDF Generator routes
 const coiPdfRoutes = require('./coi-pdf-generator');
 app.use('/api/coi', coiPdfRoutes);
+
+// JenesisNow integration routes
+const jenesisRoutes = require('./jenesis-routes');
+app.use('/api/jenesis', jenesisRoutes);
 
 // COI Request Email endpoint will be defined after multer configuration
 
@@ -5745,7 +5791,7 @@ app.post('/api/coi/send-request', (req, res, next) => {
     console.log('   Body fields:', Object.keys(req.body));
     console.log('   Files:', req.files ? req.files.length : 0);
 
-    const { from, to, subject, policyId, agent } = req.body;
+    const { from, to, subject, policyId, agent, united } = req.body;
 
     // Fix email formatting - remove bare CR characters that cause SMTP errors
     const message = req.body.message ? req.body.message.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : '';
@@ -5789,13 +5835,14 @@ app.post('/api/coi/send-request', (req, res, next) => {
         // Use nodemailer to send email
         const nodemailer = require('nodemailer');
 
-        // Pick sender based on agent — Maureen's policies send from UIG
-        const isUIG = agent && agent.toLowerCase() === 'maureen';
+        // Pick sender based on united flag or agent — United badge policies and Maureen's policies send from UIG
+        const isUIG = (united === 'true' || united === true) ||
+                      (agent && agent.toLowerCase() === 'maureen');
         const senderEmail = isUIG ? 'contact@uigagency.com' : 'contact@vigagency.com';
         const senderName  = isUIG ? 'UIG Agency'            : 'VIG Agency';
-        const senderPass  = isUIG ? '@Jacob2007'             : (process.env.GODADDY_PASSWORD || '25nickc124!');
+        const senderPass  = isUIG ? process.env.GODADDY_UIG_PASSWORD : (process.env.GODADDY_VIG_PASSWORD || process.env.GODADDY_PASSWORD);
 
-        console.log(`📧 COI sender: ${senderEmail} (agent: ${agent || 'none'})`);
+        console.log(`📧 COI sender: ${senderEmail} (agent: ${agent || 'none'}, united: ${united || 'false'})`);
 
         // Create transporter — both UIG and VIG use GoDaddy SMTP (secureserver.net)
         const transporter = nodemailer.createTransport({
@@ -9654,7 +9701,7 @@ app.post('/api/send-callback-reminder', async (req, res) => {
             secure: true,
             auth: {
                 user: 'contact@vigagency.com',
-                pass: process.env.GODADDY_PASSWORD || '25nickc124!'
+                pass: process.env.GODADDY_VIG_PASSWORD || process.env.GODADDY_PASSWORD
             }
         });
 
@@ -9900,7 +9947,7 @@ app.get('/api/calendar-events', (req, res) => {
 
     db.all(`
         SELECT * FROM calendar_events
-        WHERE created_by = ?
+        WHERE LOWER(created_by) = LOWER(?)
         ORDER BY date ASC, time ASC
     `, [userId], (err, events) => {
         if (err) {
@@ -9945,6 +9992,9 @@ app.post('/api/calendar-events', (req, res) => {
 
         console.log(`📅 Created calendar event: ${title} on ${date} for user ${userId}`);
         res.json(newEvent);
+        // Push to Google Calendar if user has it connected
+        googleCalendarModule.pushCRMEventToGoogle(userId, newEvent)
+            .catch(e => console.error('[GCal] push on create error:', e.message));
     });
 
     stmt.finalize();
@@ -9961,7 +10011,7 @@ app.put('/api/calendar-events/:id', (req, res) => {
     const stmt = db.prepare(`
         UPDATE calendar_events
         SET title = ?, date = ?, time = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND created_by = ?
+        WHERE id = ? AND LOWER(created_by) = LOWER(?)
     `);
 
     stmt.run(title, date, time || null, description || null, eventId, userId, function(err) {
@@ -9978,6 +10028,9 @@ app.put('/api/calendar-events/:id', (req, res) => {
 
         console.log(`📅 Updated calendar event ${eventId} for user ${userId}`);
         res.json({ success: true });
+        // Update in Google Calendar if connected
+        googleCalendarModule.pushCRMEventToGoogle(userId, { id: eventId, title, date, time, description })
+            .catch(e => console.error('[GCal] push on update error:', e.message));
     });
 
     stmt.finalize();
@@ -9993,7 +10046,7 @@ app.delete('/api/calendar-events/:id', (req, res) => {
 
     const stmt = db.prepare(`
         DELETE FROM calendar_events
-        WHERE id = ? AND created_by = ?
+        WHERE id = ? AND LOWER(created_by) = LOWER(?)
     `);
 
     stmt.run(eventId, userId, function(err) {
@@ -10010,6 +10063,9 @@ app.delete('/api/calendar-events/:id', (req, res) => {
 
         console.log(`📅 Deleted calendar event ${eventId} for user ${userId}`);
         res.json({ success: true });
+        // Remove from Google Calendar if connected
+        googleCalendarModule.deleteCRMEventFromGoogle(userId, eventId, 'calendar_event')
+            .catch(e => console.error('[GCal] delete sync error:', e.message));
     });
 
     stmt.finalize();
@@ -10048,7 +10104,7 @@ app.get('/api/calendar/feed.ics', (req, res) => {
 
     const calEvents = new Promise((resolve, reject) => {
         const q = userId
-            ? 'SELECT * FROM calendar_events WHERE created_by = ? ORDER BY date ASC'
+            ? 'SELECT * FROM calendar_events WHERE LOWER(created_by) = LOWER(?) ORDER BY date ASC'
             : 'SELECT * FROM calendar_events ORDER BY date ASC';
         const params = userId ? [userId] : [];
         db.all(q, params, (err, rows) => err ? reject(err) : resolve(rows || []));
@@ -10677,7 +10733,12 @@ function getPlaidConnection() {
     return new Promise((resolve, reject) => {
         db.get('SELECT * FROM plaid_connections ORDER BY created_at DESC LIMIT 1', (err, row) => {
             if (err) reject(err);
-            else resolve(row || null);
+            else if (row && row.access_token) {
+                row.access_token = decryptField(row.access_token);
+                resolve(row);
+            } else {
+                resolve(row || null);
+            }
         });
     });
 }
@@ -10759,7 +10820,7 @@ app.post('/api/plaid/exchange-token', async (req, res) => {
             db.run(
                 `INSERT INTO plaid_connections (access_token, item_id, institution_id, institution_name, account_id, account_name, account_type, account_subtype)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [accessToken, itemId, institutionId, institutionName,
+                [encryptField(accessToken), itemId, institutionId, institutionName,
                  account?.account_id || '', account?.name || 'Account',
                  account?.type || 'depository', account?.subtype || 'checking'],
                 (err) => { if (err) reject(err); else resolve(); }
@@ -11126,17 +11187,23 @@ app.post('/api/finance/transactions/bulk', (req, res) => {
     if (!Array.isArray(transactions) || !transactions.length) return res.status(400).json({ error: 'transactions array required' });
     const txOwner = owner || 'grant';
     let imported = 0, skipped = 0;
-    const stmt = db.prepare(
+    const checkStmt = db.prepare(
+        `SELECT id FROM financial_transactions WHERE date=? AND amount=? AND description=? LIMIT 1`
+    );
+    const insertStmt = db.prepare(
         `INSERT OR IGNORE INTO financial_transactions (id,date,description,amount,category,subcategory,vendor,client,source,owner)
          VALUES (?,?,?,?,?,?,?,?,?,?)`
     );
     for (const t of transactions) {
-        const id = `TXN-${txOwner}-${t.date}-${Math.abs(t.amount).toFixed(2)}-${(t.name||t.description||'').slice(0,20).replace(/\s/g,'')}`.replace(/[^a-zA-Z0-9\-_.]/g,'');
-        stmt.run([id, t.date, t.name||t.description||'Unknown', t.amount,
+        const desc = t.name || t.description || 'Unknown';
+        const existing = checkStmt.get([t.date, t.amount, desc]);
+        if (existing) { skipped++; continue; }
+        const id = `TXN-${txOwner}-${t.date}-${Math.abs(t.amount).toFixed(2)}-${desc.slice(0,20).replace(/\s/g,'')}`.replace(/[^a-zA-Z0-9\-_.]/g,'');
+        insertStmt.run([id, t.date, desc, t.amount,
                   t.category||'Uncategorized', t.subcategory||'', t.merchant_name||t.name||'', '', source||'csv', txOwner],
                  function(err) { if (!err && this.changes > 0) imported++; else skipped++; });
     }
-    stmt.finalize(() => res.json({ success: true, imported, skipped, total: transactions.length }));
+    insertStmt.finalize(() => res.json({ success: true, imported, skipped, total: transactions.length }));
 });
 
 // ---- P&L Statement ----
@@ -11577,16 +11644,27 @@ app.get('/api/chat/messages', (req, res) => {
 app.post('/api/chat/send', (req, res) => {
     const { sender, recipient, message } = req.body || {};
     if (!sender || !message) return res.status(400).json({ error: 'Missing fields' });
-    const readBy = JSON.stringify([sender]);
+    const senderLc    = sender.toLowerCase();
+    const recipientLc = recipient ? recipient.toLowerCase() : null;
+    const readBy = JSON.stringify([senderLc]);
     db.run(
         `INSERT INTO chat_messages (sender, recipient, message, read_by) VALUES (?, ?, ?, ?)`,
-        [sender.toLowerCase(), recipient ? recipient.toLowerCase() : null, message, readBy],
+        [senderLc, recipientLc, message, readBy],
         function(err) {
             if (err) return res.status(500).json({ error: err.message });
-            db.get('SELECT * FROM chat_messages WHERE id = ?', [this.lastID], (err2, row) => {
-                if (err2 || !row) return res.json({ ok: true, id: this.lastID });
+            const crmMessageId = this.lastID;
+            db.get('SELECT * FROM chat_messages WHERE id = ?', [crmMessageId], (err2, row) => {
+                if (err2 || !row) return res.json({ ok: true, id: crmMessageId });
                 res.json({ ok: true, message: { ...row, read_by: JSON.parse(row.read_by || '[]') } });
             });
+            // Forward to Google Chat + Slack asynchronously (non-blocking)
+            const channel = recipientLc
+                ? 'dm_' + [senderLc, recipientLc].sort().join('_')
+                : 'group';
+            googleChatModule.forwardToGChat(channel, senderLc, message, crmMessageId)
+                .catch(e => console.error('[GChat] Forward error:', e.message));
+            slackModule.forwardToSlack(channel, senderLc, message, crmMessageId)
+                .catch(e => console.error('[Slack] Forward error:', e.message));
         }
     );
 });

@@ -437,46 +437,38 @@
             buttonText.style.display = 'none';
             buttonSpinner.style.display = 'inline-block';
 
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 800));
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
 
-            // Check credentials — only Maureen and Grant allowed here
-            const matchingUser = validUsers.find(user => user.toLowerCase() === username.toLowerCase());
-            let isValidPassword = false;
+                const data = await response.json();
 
-            if (matchingUser) {
-                if (username.toLowerCase() === 'grant') {
-                    // Special password for Grant
-                    isValidPassword = password === '25Nickc124!';
+                if (response.ok && data.token) {
+                    sessionStorage.setItem('vanguard_jwt', data.token);
+                    sessionStorage.setItem('vanguard_user', JSON.stringify({
+                        username: data.user.username,
+                        loginTime: new Date().toISOString(),
+                        role: data.user.role,
+                        portal: data.user.portal || 'united'
+                    }));
+                    localStorage.setItem('vanguard_login_portal', 'united');
+                    window.location.href = '/';
                 } else {
-                    // Username and password are the same (case-insensitive)
-                    isValidPassword = password.toLowerCase() === username.toLowerCase();
+                    throw new Error(data.error || 'Invalid credentials');
                 }
-            }
-
-            if (matchingUser && isValidPassword) {
-                // Store user session (same key as main login so the app works identically)
-                sessionStorage.setItem('vanguard_user', JSON.stringify({
-                    username: username,
-                    loginTime: new Date().toISOString(),
-                    role: 'agent',
-                    portal: 'united'
-                }));
-
-                // Redirect to main application
-                window.location.href = '/';
-            } else {
-                // Show error
+            } catch (err) {
+                errorMessage.textContent = err.message || 'Login failed. Please try again.';
                 errorMessage.classList.add('show');
                 document.getElementById('username').classList.add('error');
                 document.getElementById('password').classList.add('error');
 
-                // Reset button state
                 loginButton.disabled = false;
                 buttonText.style.display = 'inline';
                 buttonSpinner.style.display = 'none';
 
-                // Shake the form
                 document.getElementById('loginForm').style.animation = 'shake 0.3s';
                 setTimeout(() => {
                     document.getElementById('loginForm').style.animation = '';
