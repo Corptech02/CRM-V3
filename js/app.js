@@ -26464,7 +26464,6 @@ function showAgentProfileModal(agentName) {
             ${card('Apps to Market', m.appsToMarket, avgs.appsToMarket, v => Math.round(v))}
             ${card('Sales (in range)', m.salesInRange, avgs.salesInRange, v => Math.round(v))}
             ${card('Premium (in range)', m.premiumInRange, avgs.premiumInRange, dollar)}
-            ${card('Total Premium (all time)', m.totalPremium, avgs.totalPremium, dollar)}
             ${card('Lead Callback %', m.totalLeads > 0 ? (m.callbackLeads / m.totalLeads) * 100 : 0, avgs.totalLeads > 0 ? (avgs.callbackLeads / avgs.totalLeads) * 100 : 0, v => parseFloat(v).toFixed(1) + '%')}
             ${card('Overdue Callback %', m.totalLeads > 0 ? (m.overdueCallbackLeads / m.totalLeads) * 100 : 0, avgs.totalLeads > 0 ? (avgs.overdueCallbackLeads / avgs.totalLeads) * 100 : 0, v => parseFloat(v).toFixed(1) + '%', false)}
         </div>`;
