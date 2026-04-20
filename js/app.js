@@ -22653,12 +22653,15 @@ function filterClients() {
     const tbody = document.getElementById('clientsTableBody');
     if (!tbody) return;
 
-    // All users: require 4+ characters before showing any clients
+    // Require 4+ characters before showing any clients (skip for admins)
     const _csrSession = JSON.parse(sessionStorage.getItem('vanguard_user') || '{}');
     const _isCsr = (_csrSession.role || '') === 'csr';
+    const _role = (_csrSession.role || '').toLowerCase();
+    const _isAdmin = ['master_admin', 'united_admin', 'vanguard_admin'].includes(_role) ||
+                     ['grant', 'maureen'].includes((_csrSession.username || '').toLowerCase());
     const dataRows = tbody.querySelectorAll('tr:not(#csrClientSearchPrompt)');
     let promptRow = document.getElementById('csrClientSearchPrompt');
-    if (searchValue.length < 4) {
+    if (!_isAdmin && searchValue.length < 4) {
         dataRows.forEach(r => r.style.display = 'none');
         if (!promptRow) {
             promptRow = document.createElement('tr');

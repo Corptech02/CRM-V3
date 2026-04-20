@@ -721,28 +721,21 @@
                                     return adminUsers.includes(username.toLowerCase());
                                 };
 
-                                // Create badge based on user type
+                                // Create badge based on user role
                                 let userBadge = '';
-                                console.log('🔍 DEBUG: Checking user for badge:', user.username, 'lowercase:', user.username.toLowerCase());
-                                if (user.username.toLowerCase() === 'maureen') {
-                                    console.log('✅ Maureen detected - applying EXCLUSIVE badge');
-                                    userBadge = `
-                                        <span style="
-                                            background: linear-gradient(135deg, #4fc3f7, #29b6f6);
-                                            color: white;
-                                            padding: 2px 6px;
-                                            border-radius: 10px;
-                                            font-size: 10px;
-                                            font-weight: 600;
-                                            text-transform: uppercase;
-                                            letter-spacing: 0.5px;
-                                            margin-left: 6px;
-                                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                                            border: 1px solid rgba(255,255,255,0.3);
-                                        ">
-                                            <i class="fas fa-crown" style="margin-right: 3px; font-size: 9px;"></i>EXCLUSIVE
-                                        </span>
-                                    `;
+                                const _role = (user.role || '').toLowerCase();
+                                const _uname = (user.username || '').toLowerCase();
+                                if (_uname === 'maureen') {
+                                    userBadge = `<span style="background:linear-gradient(135deg,#4fc3f7,#29b6f6);color:white;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.3);"><i class="fas fa-crown" style="margin-right:3px;font-size:9px;"></i>EXCLUSIVE</span>`;
+                                } else if (['master_admin','united_admin','vanguard_admin'].includes(_role)) {
+                                    const roleLabel = _role === 'master_admin' ? 'Master Admin' : _role === 'united_admin' ? 'United Admin' : 'Admin';
+                                    userBadge = `<span style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;box-shadow:0 2px 4px rgba(0,0,0,0.2);"><i class="fas fa-shield-alt" style="margin-right:3px;font-size:9px;"></i>${roleLabel}</span>`;
+                                } else if (_role === 'agent') {
+                                    userBadge = `<span style="background:linear-gradient(135deg,#059669,#10b981);color:white;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;box-shadow:0 2px 4px rgba(0,0,0,0.2);"><i class="fas fa-user-tie" style="margin-right:3px;font-size:9px;"></i>Agent</span>`;
+                                } else if (_role === 'producer') {
+                                    userBadge = `<span style="background:linear-gradient(135deg,#d97706,#f59e0b);color:white;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;box-shadow:0 2px 4px rgba(0,0,0,0.2);"><i class="fas fa-briefcase" style="margin-right:3px;font-size:9px;"></i>Producer</span>`;
+                                } else if (_role === 'csr') {
+                                    userBadge = `<span style="background:linear-gradient(135deg,#0284c7,#0ea5e9);color:white;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;box-shadow:0 2px 4px rgba(0,0,0,0.2);"><i class="fas fa-headset" style="margin-right:3px;font-size:9px;"></i>CSR</span>`;
                                 }
                                 const adminBadge = userBadge;
 
@@ -1629,7 +1622,7 @@
     <!-- DISABLED: causes race conditions on refresh — loadPoliciesView + generatePolicyRows already handle server sync -->
     <!-- <script src="js/force-policies-refresh.js?v=1"></script> -->
     <script src="js/secure-fetch.js?v=1"></script>
-    <script src="js/app.js?v=20260419e"></script>
+    <script src="js/app.js?v=20260420a"></script>
 
     <!-- Vicidial Stage Sync - Bidirectional synchronization -->
     <script src="js/vicidial-stage-sync.js?v=1"></script>
@@ -2023,7 +2016,7 @@
     <script src="js/clear-test-clients.js?v=1"></script>
 
     <!-- POLICY FILTERS FUNCTIONALITY -->
-    <script src="js/policy-filters.js?v=20260419b"></script>
+    <script src="js/policy-filters.js?v=20260420b"></script>
 
     <!-- EMERGENCY CALLBACK FIX - DISABLED for callback-only logic -->
     <!-- <script src="js/emergency-callback-fix.js?v=IMMEDIATE_FIX"></script> -->

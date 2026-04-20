@@ -23,10 +23,12 @@ window.filterPolicies = function() {
     // Check user role
     const sessionData = sessionStorage.getItem('vanguard_user');
     let isMaureen = false;
+    let isCsrUser = false;
     if (sessionData) {
         try {
             const user = JSON.parse(sessionData);
             isMaureen = user.username && user.username.toLowerCase() === 'maureen';
+            isCsrUser = (user.role || '') === 'csr';
         } catch (error) {
             console.error('Error checking user in filterPolicies:', error);
         }
@@ -41,8 +43,8 @@ window.filterPolicies = function() {
 
     const rows = tbody.querySelectorAll('tr');
 
-    // 4-char gate: hide all rows until 4+ characters are typed
-    if (searchValue.length < 4) {
+    // 4-char gate: CSR users only
+    if (isCsrUser && searchValue.length < 4) {
         rows.forEach(row => { row.style.display = 'none'; });
         const countDisplay = document.querySelector('.showing-info');
         if (countDisplay) countDisplay.textContent = 'Type 4+ characters to search policies';
