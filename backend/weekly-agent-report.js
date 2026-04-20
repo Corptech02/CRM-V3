@@ -53,6 +53,12 @@ function dbAll(db, sql, params) {
     });
 }
 
+function dbGet(db, sql, params) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+    });
+}
+
 // ── Duration string → seconds ─────────────────────────────────────────────────
 function parseDuration(str) {
     if (!str) return 0;
@@ -82,7 +88,7 @@ function dollar(v) {
 }
 
 // ── Compute metrics for an agent over a date range ────────────────────────────
-function computeMetrics(agentName, leads, policies, start, end) {
+function computeMetrics(agentName, leads, policies, callbacks, start, end) {
     const startTs = start.getTime();
     const endTs   = end.getTime();
     const agentLc = agentName.toLowerCase();
@@ -93,6 +99,16 @@ function computeMetrics(agentName, leads, policies, start, end) {
         return assigned === agentLc;
     });
 
+    // Build callback lookup: lead_id → [callbacks]
+    const cbByLead = {};
+    callbacks.forEach(cb => {
+        const lid = String(cb.lead_id);
+        if (!cbByLead[lid]) cbByLead[lid] = [];
+        cbByLead[lid].push(cb);
+    });
+
+    const nowTs = Date.now();
+
     let leadsInRange = 0;
     let callsInRange = 0;
     let connectedInRange = 0;
@@ -101,21 +117,28 @@ function computeMetrics(agentName, leads, policies, start, end) {
     let appsToMarket = 0;
     let callbackLeads = 0;
     let overdueLeads = 0;
+    // For goals: scheduled callback % = leadsWithCB / connectedLeads in range
+    let connectedLeadsInRange = 0;
+    let leadsWithCBInRange = 0;
 
     myLeads.forEach(lead => {
-        // Leads created in range (use lead.id timestamp or lead.created)
+        // Leads created in range
         const createdTs = lead.created ? new Date(lead.created).getTime()
                         : (lead.id && /^\d{10,}/.test(lead.id) ? parseInt(lead.id) : 0);
         if (createdTs >= startTs && createdTs <= endTs) leadsInRange++;
 
         // Call logs
         const calls = (lead.reachOut && lead.reachOut.callLogs) ? lead.reachOut.callLogs : [];
+        let hadConnectedInRange = false;
         calls.forEach(call => {
             totalCalls++;
             const callTs = call.timestamp ? new Date(call.timestamp).getTime() : 0;
             if (callTs >= startTs && callTs <= endTs) {
                 callsInRange++;
-                if (call.connected) connectedInRange++;
+                if (call.connected) {
+                    connectedInRange++;
+                    hadConnectedInRange = true;
+                }
                 callSecsInRange += parseDuration(call.duration);
             }
         });
@@ -124,11 +147,19 @@ function computeMetrics(agentName, leads, policies, start, end) {
         const app = lead.appStage || {};
         if (app.app || app.lossRuns || app.iftas || app.saa) appsToMarket++;
 
-        // Callback tracking
-        if (lead.reachOut && lead.reachOut.callbackDate) {
-            callbackLeads++;
-            const cbTs = new Date(lead.reachOut.callbackDate).getTime();
-            if (cbTs < Date.now()) overdueLeads++;
+        // Callback tracking via scheduled_callbacks table
+        const cbs = (cbByLead[String(lead.id)] || []).filter(cb => !cb.completed);
+        if (cbs.length > 0) {
+            const hasActive  = cbs.some(cb => new Date(cb.date_time).getTime() >= nowTs);
+            const hasOverdue = cbs.some(cb => new Date(cb.date_time).getTime() < nowTs);
+            if (hasActive)  callbackLeads++;
+            if (hasOverdue) overdueLeads++;
+        }
+
+        // For goals: connected-call leads that have a callback scheduled
+        if (hadConnectedInRange) {
+            connectedLeadsInRange++;
+            if (cbs.length > 0) leadsWithCBInRange++;
         }
     });
 
@@ -140,7 +171,6 @@ function computeMetrics(agentName, leads, policies, start, end) {
         const assigned = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || '').toLowerCase();
         if (assigned !== agentLc) return;
 
-        // Policy creation timestamp from ID: POL-{timestamp}-{random}
         const idMatch = (policy.id || '').match(/POL-(\d+)-/);
         const polTs   = idMatch ? parseInt(idMatch[1]) : 0;
 
@@ -153,8 +183,12 @@ function computeMetrics(agentName, leads, policies, start, end) {
 
     const convRate = myLeads.length > 0 ? ((salesInRange / myLeads.length) * 100).toFixed(1) : '—';
     const avgDur   = connectedInRange > 0 ? Math.round(callSecsInRange / connectedInRange) : 0;
-    const cbPct    = myLeads.length > 0 ? ((callbackLeads / myLeads.length) * 100).toFixed(1) : '—';
-    const ovPct    = myLeads.length > 0 ? ((overdueLeads  / myLeads.length) * 100).toFixed(1) : '—';
+    const cbPct    = myLeads.length > 0 ? ((callbackLeads / myLeads.length) * 100).toFixed(1) : '0.0';
+    const ovPct    = myLeads.length > 0 ? ((overdueLeads  / myLeads.length) * 100).toFixed(1) : '0.0';
+    // Dashboard-style scheduled callback %: connected leads in range that have a callback
+    const scheduledCbPct = connectedLeadsInRange > 0
+        ? Math.round((leadsWithCBInRange / connectedLeadsInRange) * 100)
+        : 0;
 
     return {
         agent: agentName,
@@ -171,13 +205,46 @@ function computeMetrics(agentName, leads, policies, start, end) {
         convRate,
         cbPct,
         ovPct,
+        scheduledCbPct,
+        newLeadsInRange: leadsInRange,
     };
 }
 
+// ── Progress bar row for email ────────────────────────────────────────────────
+function goalRow(icon, label, actual, goal, displayActual, displayGoal, color, pct) {
+    const clampedPct = Math.min(100, Math.round(pct));
+    const barColor   = clampedPct >= 100 ? '#10b981' : color;
+    const badge      = clampedPct >= 100
+        ? `<span style="font-size:11px;font-weight:700;color:#10b981;background:#dcfce7;padding:2px 8px;border-radius:20px">✓ Goal Met</span>`
+        : `<span style="font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;padding:2px 8px;border-radius:20px">${clampedPct}%</span>`;
+
+    return `
+    <tr>
+      <td style="padding:10px 14px 10px 0;vertical-align:top;width:38px;text-align:center">
+        <div style="background:${color}18;border-radius:8px;width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center">
+          <i class="${icon}" style="color:${color};font-size:14px"></i>
+        </div>
+      </td>
+      <td style="padding:10px 0;vertical-align:middle">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:12px;font-weight:700;color:#374151">${label}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:#6b7280">${displayActual} / ${displayGoal}</span>
+            ${badge}
+          </div>
+        </div>
+        <div style="background:#e5e7eb;border-radius:999px;height:8px;overflow:hidden">
+          <div style="width:${clampedPct}%;height:100%;background:linear-gradient(90deg,${barColor},${barColor}bb);border-radius:999px;transition:width .5s ease"></div>
+        </div>
+      </td>
+    </tr>`;
+}
+
 // ── Build HTML email for one agent ───────────────────────────────────────────
-function buildEmailHtml(metrics, start, end, periodLabel) {
+function buildEmailHtml(metrics, start, end, periodLabel, goalsConfig) {
     const m = metrics;
     const dateLabel = `${fmtDate(start)} – ${fmtDate(end)}`;
+    const agentLc = m.agent.toLowerCase();
 
     const stat = (label, value, sub) => `
         <td style="padding:16px 12px;text-align:center;border-right:1px solid #f1f5f9">
@@ -185,6 +252,44 @@ function buildEmailHtml(metrics, start, end, periodLabel) {
             <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-top:3px">${label}</div>
             ${sub ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px">${sub}</div>` : ''}
         </td>`;
+
+    // ── Goals section ──────────────────────────────────────────────────────────
+    const isMonthly = periodLabel === 'Monthly';
+    const periodKey = isMonthly ? 'month' : 'week';
+
+    // Default weekly/monthly goals per agent
+    const DEFAULTS = {
+        grant:  { week: { totalTalkHours:4.2, newLeads:9.7,  apps:4.8, callbacks:85 }, month: { totalTalkHours:18, newLeads:42, apps:21, callbacks:85 } },
+        carson: { week: { totalTalkHours:4.6, newLeads:12.7, apps:6.2, callbacks:85 }, month: { totalTalkHours:20, newLeads:55, apps:27, callbacks:85 } },
+        hunter: { week: { totalTalkHours:3.7, newLeads:7.4,  apps:3.5, callbacks:85 }, month: { totalTalkHours:16, newLeads:32, apps:15, callbacks:85 } },
+    };
+
+    const agentCfg = (goalsConfig && goalsConfig[agentLc]) || {};
+    const defG     = (DEFAULTS[agentLc] || DEFAULTS.hunter)[periodKey];
+    const g        = Object.assign({}, defG, agentCfg[periodKey] || {});
+
+    const talkGoalSecs = g.totalTalkHours * 3600;
+    const talkPct      = talkGoalSecs > 0 ? (m.callSecsInRange / talkGoalSecs) * 100 : 0;
+    const leadsPct     = g.newLeads > 0 ? (m.newLeadsInRange / g.newLeads) * 100 : 0;
+    const appsPct      = g.apps > 0 ? (m.appsToMarket / g.apps) * 100 : 0;
+    const cbGoalPct    = g.callbacks || 85;
+    const cbActualPct  = m.scheduledCbPct;
+    const cbBarPct     = cbGoalPct > 0 ? (cbActualPct / cbGoalPct) * 100 : 0;
+
+    const goalsHTML = `
+  <div style="padding:0 32px 28px">
+    <h3 style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px">
+      ${periodLabel} Goal Tracker
+    </h3>
+    <div style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;padding:8px 16px">
+      <table style="width:100%;border-collapse:collapse">
+        ${goalRow('fas fa-phone', 'Total Talk Time', m.callSecsInRange, talkGoalSecs, formatTime(m.callSecsInRange), g.totalTalkHours + 'h', '#3b82f6', talkPct)}
+        ${goalRow('fas fa-user-plus', 'New Leads', m.newLeadsInRange, g.newLeads, String(m.newLeadsInRange), String(Math.round(g.newLeads)), '#3b82f6', leadsPct)}
+        ${goalRow('fas fa-paper-plane', 'Apps Sent', m.appsToMarket, g.apps, String(m.appsToMarket), String(Math.round(g.apps * 10) / 10), '#f59e0b', appsPct)}
+        ${goalRow('fas fa-phone-alt', 'Scheduled Callbacks', cbActualPct, cbGoalPct, cbActualPct + '%', cbGoalPct + '%', '#8b5cf6', cbBarPct)}
+      </table>
+    </div>
+  </div>`;
 
     return `<!DOCTYPE html>
 <html>
@@ -222,6 +327,9 @@ function buildEmailHtml(metrics, start, end, periodLabel) {
       </tr>
     </table>
   </div>
+
+  <!-- Goal Tracker -->
+  ${goalsHTML}
 
   <!-- Detailed Stats -->
   <div style="padding:0 32px 28px">
@@ -274,17 +382,29 @@ function getLastMonthRange() {
 // ── Shared: load DB data ──────────────────────────────────────────────────────
 async function loadData() {
     const db = new sqlite3.Database(DB_PATH);
-    const leadRows   = await dbAll(db, 'SELECT id, data FROM leads', []);
-    const policyRows = await dbAll(db, 'SELECT id, data FROM policies', []);
+    const [leadRows, policyRows, callbackRows, goalsCfgRow] = await Promise.all([
+        dbAll(db, 'SELECT id, data FROM leads', []),
+        dbAll(db, 'SELECT id, data FROM policies', []),
+        dbAll(db, 'SELECT lead_id, date_time, completed FROM scheduled_callbacks WHERE completed = 0', []),
+        dbGet(db, "SELECT value FROM settings WHERE key = 'goals_config'", []),
+    ]);
     db.close();
+
     const leads    = leadRows.map(r => { try { return { id: r.id, ...JSON.parse(r.data) }; } catch { return { id: r.id }; } });
     const policies = policyRows.map(r => { try { return { id: r.id, ...JSON.parse(r.data) }; } catch { return { id: r.id }; } });
-    return { leads, policies };
+    const callbacks = callbackRows;
+
+    let goalsConfig = null;
+    if (goalsCfgRow && goalsCfgRow.value) {
+        try { goalsConfig = JSON.parse(goalsCfgRow.value); } catch { goalsConfig = null; }
+    }
+
+    return { leads, policies, callbacks, goalsConfig };
 }
 
 // ── Shared: send reports for all agents ──────────────────────────────────────
-async function sendReports(leads, policies, start, end, periodLabel, subjectPrefix) {
-    const allMetrics = REPORT_AGENTS.map(agent => computeMetrics(agent, leads, policies, start, end));
+async function sendReports(leads, policies, callbacks, goalsConfig, start, end, periodLabel, subjectPrefix) {
+    const allMetrics = REPORT_AGENTS.map(agent => computeMetrics(agent, leads, policies, callbacks, start, end));
 
     const transporter = nodemailer.createTransport({
         host: 'smtpout.secureserver.net',
@@ -297,7 +417,7 @@ async function sendReports(leads, policies, start, end, periodLabel, subjectPref
         const toEmail = AGENT_EMAILS[m.agent.toLowerCase()];
         if (!toEmail) { console.warn(`[${periodLabel}] No email for ${m.agent}, skipping`); continue; }
 
-        const html    = buildEmailHtml(m, start, end, periodLabel);
+        const html    = buildEmailHtml(m, start, end, periodLabel, goalsConfig);
         const subject = `📊 ${subjectPrefix}: ${fmtDate(start)} – ${fmtDate(end)}`;
 
         try {
@@ -314,9 +434,9 @@ async function runWeeklyReport() {
     console.log('[WeeklyReport] Starting...');
     const { start, end } = getLastWeekRange();
     console.log(`[WeeklyReport] Range: ${fmtDate(start)} – ${fmtDate(end)}`);
-    const { leads, policies } = await loadData();
-    console.log(`[WeeklyReport] Loaded ${leads.length} leads, ${policies.length} policies`);
-    await sendReports(leads, policies, start, end, 'Weekly', 'Your Weekly Report');
+    const { leads, policies, callbacks, goalsConfig } = await loadData();
+    console.log(`[WeeklyReport] Loaded ${leads.length} leads, ${policies.length} policies, ${callbacks.length} callbacks`);
+    await sendReports(leads, policies, callbacks, goalsConfig, start, end, 'Weekly', 'Your Weekly Report');
     console.log('[WeeklyReport] Done.');
 }
 
@@ -325,9 +445,9 @@ async function runMonthlyReport() {
     console.log('[MonthlyReport] Starting...');
     const { start, end } = getLastMonthRange();
     console.log(`[MonthlyReport] Range: ${fmtDate(start)} – ${fmtDate(end)}`);
-    const { leads, policies } = await loadData();
-    console.log(`[MonthlyReport] Loaded ${leads.length} leads, ${policies.length} policies`);
-    await sendReports(leads, policies, start, end, 'Monthly', 'Your Monthly Report');
+    const { leads, policies, callbacks, goalsConfig } = await loadData();
+    console.log(`[MonthlyReport] Loaded ${leads.length} leads, ${policies.length} policies, ${callbacks.length} callbacks`);
+    await sendReports(leads, policies, callbacks, goalsConfig, start, end, 'Monthly', 'Your Monthly Report');
     console.log('[MonthlyReport] Done.');
 }
 
