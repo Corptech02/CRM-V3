@@ -175,17 +175,9 @@ function computeMetrics(agentName, leads, policies, start, end) {
 }
 
 // ── Build HTML email for one agent ───────────────────────────────────────────
-function buildEmailHtml(metrics, allMetrics, start, end) {
+function buildEmailHtml(metrics, start, end, periodLabel) {
     const m = metrics;
     const dateLabel = `${fmtDate(start)} – ${fmtDate(end)}`;
-
-    // Team totals for context
-    const totals = {
-        leadsInRange:     allMetrics.reduce((s,x) => s + x.leadsInRange, 0),
-        callsInRange:     allMetrics.reduce((s,x) => s + x.callsInRange, 0),
-        salesInRange:     allMetrics.reduce((s,x) => s + x.salesInRange, 0),
-        premiumInRange:   allMetrics.reduce((s,x) => s + x.premiumInRange, 0),
-    };
 
     const stat = (label, value, sub) => `
         <td style="padding:16px 12px;text-align:center;border-right:1px solid #f1f5f9">
@@ -207,7 +199,7 @@ function buildEmailHtml(metrics, allMetrics, start, end) {
         <span style="font-size:22px">📊</span>
       </div>
       <div>
-        <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800">Weekly Performance Report</h1>
+        <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800">${periodLabel} Performance Report</h1>
         <p style="margin:4px 0 0;color:rgba(255,255,255,.7);font-size:13px">${m.agent} · ${dateLabel}</p>
       </div>
     </div>
@@ -216,7 +208,7 @@ function buildEmailHtml(metrics, allMetrics, start, end) {
   <!-- Greeting -->
   <div style="padding:24px 32px 0">
     <p style="font-size:15px;color:#374151;margin:0">Hi ${m.agent},</p>
-    <p style="font-size:14px;color:#6b7280;margin:8px 0 0">Here's your performance summary for the week of ${dateLabel}.</p>
+    <p style="font-size:14px;color:#6b7280;margin:8px 0 0">Here's your performance summary for ${dateLabel}.</p>
   </div>
 
   <!-- Key Stats Row -->
@@ -232,7 +224,7 @@ function buildEmailHtml(metrics, allMetrics, start, end) {
   </div>
 
   <!-- Detailed Stats -->
-  <div style="padding:0 32px 20px">
+  <div style="padding:0 32px 28px">
     <h3 style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px">Activity Detail</h3>
     <table style="width:100%;border-collapse:collapse">
       <tr style="background:#f8fafc">
@@ -262,104 +254,90 @@ function buildEmailHtml(metrics, allMetrics, start, end) {
     </table>
   </div>
 
-  <!-- Team Context -->
-  <div style="padding:0 32px 28px">
-    <div style="background:#eff6ff;border-radius:10px;padding:14px 18px">
-      <div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Team Totals This Week</div>
-      <div style="display:flex;gap:24px;font-size:13px;color:#374151">
-        <span><strong style="color:#111827">${totals.leadsInRange}</strong> Leads</span>
-        <span><strong style="color:#111827">${totals.callsInRange}</strong> Calls</span>
-        <span><strong style="color:#111827">${totals.salesInRange}</strong> Sales</span>
-        <span><strong style="color:#111827">${dollar(totals.premiumInRange)}</strong> Premium</span>
-      </div>
-    </div>
-  </div>
-
   <!-- Footer -->
   <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center">
-    <p style="font-size:12px;color:#94a3b8;margin:0">Vanguard Insurance Group · Automated Weekly Report · ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    <p style="font-size:12px;color:#94a3b8;margin:0">Vanguard Insurance Group · Automated ${periodLabel} Report · ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
   </div>
 </div>
 </body>
 </html>`;
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-async function runWeeklyReport() {
-    console.log('[WeeklyReport] Starting weekly agent report generation...');
+// ── Last calendar month range ─────────────────────────────────────────────────
+function getLastMonthRange() {
+    const now   = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    const end   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return { start, end };
+}
 
-    const { start, end } = getLastWeekRange();
-    console.log(`[WeeklyReport] Date range: ${fmtDate(start)} – ${fmtDate(end)}`);
-
+// ── Shared: load DB data ──────────────────────────────────────────────────────
+async function loadData() {
     const db = new sqlite3.Database(DB_PATH);
-
-    // Load all leads
-    const leadRows = await dbAll(db, 'SELECT id, data FROM leads', []);
-    const leads = leadRows.map(r => {
-        try { return { id: r.id, ...JSON.parse(r.data) }; } catch { return { id: r.id }; }
-    });
-
-    // Load all policies
+    const leadRows   = await dbAll(db, 'SELECT id, data FROM leads', []);
     const policyRows = await dbAll(db, 'SELECT id, data FROM policies', []);
-    const policies = policyRows.map(r => {
-        try { return { id: r.id, ...JSON.parse(r.data) }; } catch { return { id: r.id }; }
-    });
-
     db.close();
+    const leads    = leadRows.map(r => { try { return { id: r.id, ...JSON.parse(r.data) }; } catch { return { id: r.id }; } });
+    const policies = policyRows.map(r => { try { return { id: r.id, ...JSON.parse(r.data) }; } catch { return { id: r.id }; } });
+    return { leads, policies };
+}
 
-    console.log(`[WeeklyReport] Loaded ${leads.length} leads, ${policies.length} policies`);
+// ── Shared: send reports for all agents ──────────────────────────────────────
+async function sendReports(leads, policies, start, end, periodLabel, subjectPrefix) {
+    const allMetrics = REPORT_AGENTS.map(agent => computeMetrics(agent, leads, policies, start, end));
 
-    // Compute metrics for each agent
-    const allMetrics = REPORT_AGENTS.map(agent =>
-        computeMetrics(agent, leads, policies, start, end)
-    );
-
-    // Set up SMTP transporter
     const transporter = nodemailer.createTransport({
         host: 'smtpout.secureserver.net',
         port: 465,
         secure: true,
-        auth: {
-            user: 'contact@vigagency.com',
-            pass: process.env.GODADDY_VIG_PASSWORD,
-        },
+        auth: { user: 'contact@vigagency.com', pass: process.env.GODADDY_VIG_PASSWORD },
     });
 
-    // Send individual report to each agent
     for (const m of allMetrics) {
         const toEmail = AGENT_EMAILS[m.agent.toLowerCase()];
-        if (!toEmail) {
-            console.warn(`[WeeklyReport] No email for agent ${m.agent}, skipping`);
-            continue;
-        }
+        if (!toEmail) { console.warn(`[${periodLabel}] No email for ${m.agent}, skipping`); continue; }
 
-        const html = buildEmailHtml(m, allMetrics, start, end);
-        const subject = `📊 Your Weekly Report: ${fmtDate(start)} – ${fmtDate(end)}`;
+        const html    = buildEmailHtml(m, start, end, periodLabel);
+        const subject = `📊 ${subjectPrefix}: ${fmtDate(start)} – ${fmtDate(end)}`;
 
         try {
-            await transporter.sendMail({
-                from: '"Vanguard CRM" <contact@vigagency.com>',
-                to: toEmail,
-                subject,
-                html,
-            });
-            console.log(`[WeeklyReport] ✅ Sent to ${m.agent} (${toEmail})`);
+            await transporter.sendMail({ from: '"Vanguard CRM" <contact@vigagency.com>', to: toEmail, subject, html });
+            console.log(`[${periodLabel}] ✅ Sent to ${m.agent} (${toEmail})`);
         } catch (err) {
-            console.error(`[WeeklyReport] ❌ Failed to send to ${m.agent}: ${err.message}`);
+            console.error(`[${periodLabel}] ❌ Failed to send to ${m.agent}: ${err.message}`);
         }
     }
+}
 
+// ── Weekly report (previous Mon–Sun) ─────────────────────────────────────────
+async function runWeeklyReport() {
+    console.log('[WeeklyReport] Starting...');
+    const { start, end } = getLastWeekRange();
+    console.log(`[WeeklyReport] Range: ${fmtDate(start)} – ${fmtDate(end)}`);
+    const { leads, policies } = await loadData();
+    console.log(`[WeeklyReport] Loaded ${leads.length} leads, ${policies.length} policies`);
+    await sendReports(leads, policies, start, end, 'Weekly', 'Your Weekly Report');
     console.log('[WeeklyReport] Done.');
 }
 
+// ── Monthly report (previous calendar month) ─────────────────────────────────
+async function runMonthlyReport() {
+    console.log('[MonthlyReport] Starting...');
+    const { start, end } = getLastMonthRange();
+    console.log(`[MonthlyReport] Range: ${fmtDate(start)} – ${fmtDate(end)}`);
+    const { leads, policies } = await loadData();
+    console.log(`[MonthlyReport] Loaded ${leads.length} leads, ${policies.length} policies`);
+    await sendReports(leads, policies, start, end, 'Monthly', 'Your Monthly Report');
+    console.log('[MonthlyReport] Done.');
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
-// If called directly (node weekly-agent-report.js) → run immediately
-// If required as a module → export runWeeklyReport for use by scheduler
+// node weekly-agent-report.js         → weekly
+// node weekly-agent-report.js monthly → monthly
 if (require.main === module) {
-    runWeeklyReport().catch(err => {
-        console.error('[WeeklyReport] Fatal error:', err);
-        process.exit(1);
-    });
+    const mode = process.argv[2] || 'weekly';
+    const fn   = mode === 'monthly' ? runMonthlyReport : runWeeklyReport;
+    fn().catch(err => { console.error('Fatal error:', err); process.exit(1); });
 } else {
-    module.exports = { runWeeklyReport };
+    module.exports = { runWeeklyReport, runMonthlyReport };
 }
