@@ -11,6 +11,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const axios = require('axios');
+const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
@@ -234,6 +235,55 @@ async function uploadFileToSlack(token, channel, filename, content, contentType,
     }
 }
 
+const CRM_BASE = 'https://162-220-14-239.nip.io';
+
+// Resolve a CRM agent name → Slack @mention string (e.g. "<@U012AB3CD>")
+function resolveSlackMention(agentName) {
+    if (!agentName) return Promise.resolve(null);
+    const lower = agentName.toLowerCase().trim();
+    return new Promise((resolve) => {
+        const db = new sqlite3.Database(CONFIG.db, sqlite3.OPEN_READONLY);
+        db.get(
+            'SELECT slack_user_id FROM slack_user_map WHERE crm_username = ?',
+            [lower],
+            (err, row) => {
+                db.close();
+                resolve((err || !row) ? null : `<@${row.slack_user_id}>`);
+            }
+        );
+    });
+}
+
+// Generate a single-use magic link token stored in the DB (72hr expiry)
+// Returns the full button URL or falls back to login.html redirect
+function createMagicLink(redirectPath) {
+    return new Promise((resolve) => {
+        const token = crypto.randomBytes(32).toString('hex');
+        const db = new sqlite3.Database(CONFIG.db);
+        db.run(
+            `CREATE TABLE IF NOT EXISTS magic_link_tokens (
+                token TEXT PRIMARY KEY, redirect TEXT NOT NULL,
+                expires_at DATETIME NOT NULL, used_at DATETIME
+            )`,
+            () => {
+                db.run(
+                    `INSERT INTO magic_link_tokens (token, redirect, expires_at)
+                     VALUES (?, ?, datetime('now', '+72 hours'))`,
+                    [token, redirectPath],
+                    (err) => {
+                        db.close();
+                        if (err) {
+                            resolve(`${CRM_BASE}/login.html?redirect=${encodeURIComponent(redirectPath)}`);
+                        } else {
+                            resolve(`${CRM_BASE}/api/auth/magic-link?t=${token}`);
+                        }
+                    }
+                );
+            }
+        );
+    });
+}
+
 /**
  * Post a COI request notification to Slack #coi-requests with Block Kit card,
  * then upload any image/PDF attachments into the thread.
@@ -255,6 +305,9 @@ async function postCOIToSlack(fromEmail, subject, bodySnippet, policy, coiAttach
         ? `📎 ${coiAttachments.length} attachment(s): ${coiAttachments.map(a => a.filename || 'file').join(', ')}`
         : '📭 No attachments';
 
+    // Resolve agent's Slack @mention
+    const mention = await resolveSlackMention(agent);
+
     // Clean and trim body — show up to 800 chars
     const bodyClean = (bodySnippet || '')
         .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
@@ -265,9 +318,12 @@ async function postCOIToSlack(fromEmail, subject, bodySnippet, policy, coiAttach
         ? bodyClean + (bodySnippet.trim().length > 800 ? '…' : '')
         : null;
 
-    // Deep link to CRM client profile
-    const CRM_BASE = 'https://162-220-14-239.nip.io';
-    const clientUrl = clientId ? `${CRM_BASE}/?clientId=${clientId}#clients` : null;
+    // Deep link to CRM policy profile via magic link (no login required)
+    const clientUrl = polNum && polNum !== '—'
+        ? await createMagicLink(`/?policyNumber=${encodeURIComponent(polNum)}#policies`)
+        : null;
+
+    const agentField = mention ? `${agent} ${mention}` : agent;
 
     const blocks = [
         {
@@ -278,7 +334,7 @@ async function postCOIToSlack(fromEmail, subject, bodySnippet, policy, coiAttach
             type: 'section',
             fields: [
                 { type: 'mrkdwn', text: `*From:*\n${fromEmail || '—'}` },
-                { type: 'mrkdwn', text: `*Agent:*\n${agent}` },
+                { type: 'mrkdwn', text: `*Agent:*\n${agentField}` },
                 { type: 'mrkdwn', text: `*Policy #:*\n${polNum}` },
                 { type: 'mrkdwn', text: `*DOT #:*\n${dotNum}` }
             ]
@@ -296,7 +352,7 @@ async function postCOIToSlack(fromEmail, subject, bodySnippet, policy, coiAttach
             type: 'actions',
             elements: [{
                 type: 'button',
-                text: { type: 'plain_text', text: '🔗 View Client Profile', emoji: true },
+                text: { type: 'plain_text', text: '🔗 View Policy', emoji: true },
                 url: clientUrl,
                 style: 'primary'
             }]
@@ -305,7 +361,7 @@ async function postCOIToSlack(fromEmail, subject, bodySnippet, policy, coiAttach
     ];
 
     // Fallback plain text for notifications
-    const text = `COI Request from ${fromEmail} — ${bizName} | Agent: ${agent} | Policy: ${polNum}`;
+    const text = `COI Request from ${fromEmail} — ${bizName} | Agent: ${agentField} | Policy: ${polNum}`;
 
     try {
         const resp = await axios.post('https://slack.com/api/chat.postMessage', {

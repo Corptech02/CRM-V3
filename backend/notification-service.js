@@ -88,6 +88,20 @@ const sentEmailReminders = new Set();
 // Store sent Slack alerts to avoid duplicate pings
 const sentSlackAlerts = new Set();
 
+// Resolve a CRM username/agent name → Slack @mention string (e.g. "<@U012AB3CD>")
+// Falls back to null if not found in slack_user_map
+function resolveSlackMention(agentName) {
+    if (!agentName) return Promise.resolve(null);
+    const lower = agentName.toLowerCase().trim();
+    return new Promise((resolve) => {
+        db.get(
+            'SELECT slack_user_id FROM slack_user_map WHERE crm_username = ?',
+            [lower],
+            (err, row) => resolve((err || !row) ? null : `<@${row.slack_user_id}>`)
+        );
+    });
+}
+
 // Post a message to a Slack channel via bot token
 async function postSlackAlert(channel, text) {
     const token = process.env.SLACK_BOT_TOKEN;
@@ -453,9 +467,13 @@ function checkCallbacks() {
                     const slackKey = `cb_soon_${callbackId}`;
                     if (!sentSlackAlerts.has(slackKey)) {
                         sentSlackAlerts.add(slackKey);
-                        const agent = (leadData && leadData.assignedTo) ? ` · Agent: ${leadData.assignedTo}` : '';
-                        postSlackAlert(process.env.SLACK_CALLBACKS_CHANNEL,
-                            `⚡ *Callback Due Soon* — ${leadName}\nDue in *${minutesUntil} min*${agent}`);
+                        const agentName = leadData?.assignedTo || null;
+                        const agentLabel = agentName ? ` · Agent: ${agentName}` : '';
+                        resolveSlackMention(agentName).then(mention => {
+                            const mentionStr = mention ? `\n${mention}` : '';
+                            postSlackAlert(process.env.SLACK_CALLBACKS_CHANNEL,
+                                `⚡ *Callback Due Soon* — ${leadName}\nDue in *${minutesUntil} min*${agentLabel}${mentionStr}`);
+                        });
                     }
 
                     // Send email reminder if within 30 minutes
@@ -514,11 +532,15 @@ function checkCallbacks() {
                     const slackKey = `cb_now_${callbackId}`;
                     if (!sentSlackAlerts.has(slackKey)) {
                         sentSlackAlerts.add(slackKey);
-                        const agent = (leadData && leadData.assignedTo) ? ` · Agent: ${leadData.assignedTo}` : '';
-                        const slackMsg = minutesFromDue > 0
-                            ? `🚨 *Callback Due in ${minutesFromDue} min* — ${leadName}${agent}`
-                            : `🔴 *CALLBACK DUE NOW* — ${leadName}${agent}`;
-                        postSlackAlert(process.env.SLACK_CALLBACKS_CHANNEL, slackMsg);
+                        const agentName = leadData?.assignedTo || null;
+                        const agentLabel = agentName ? ` · Agent: ${agentName}` : '';
+                        resolveSlackMention(agentName).then(mention => {
+                            const mentionStr = mention ? `\n${mention}` : '';
+                            const slackMsg = minutesFromDue > 0
+                                ? `🚨 *Callback Due in ${minutesFromDue} min* — ${leadName}${agentLabel}${mentionStr}`
+                                : `🔴 *CALLBACK DUE NOW* — ${leadName}${agentLabel}${mentionStr}`;
+                            postSlackAlert(process.env.SLACK_CALLBACKS_CHANNEL, slackMsg);
+                        });
                     }
                 });
             }
@@ -599,8 +621,12 @@ function checkTrackedTodos(now, warningTime, overdueTime) {
                 const slackKey = `todo_overdue_${todoId}_${Math.floor(minutesOverdue / 30)}`;
                 if (!sentSlackAlerts.has(slackKey)) {
                     sentSlackAlerts.add(slackKey);
-                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL,
-                        `🔴 *Reminder Overdue* — ${todo.text}\nWas due *${minutesOverdue} min ago*${userId ? ` · ${userId}` : ''}`);
+                    resolveSlackMention(userId).then(mention => {
+                        const who = userId ? ` · ${userId}` : '';
+                        const mentionStr = mention ? `\n${mention}` : '';
+                        postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL,
+                            `🔴 *Reminder Overdue* — ${todo.text}\nWas due *${minutesOverdue} min ago*${who}${mentionStr}`);
+                    });
                 }
             }
             // Check if due soon OR just became due (bridges the 0–15 min gap)
@@ -629,11 +655,14 @@ function checkTrackedTodos(now, warningTime, overdueTime) {
                 const slackKey = `todo_soon_${todoId}`;
                 if (!sentSlackAlerts.has(slackKey)) {
                     sentSlackAlerts.add(slackKey);
-                    const who = userId ? ` · ${userId}` : '';
-                    const slackMsg = minutesFromNow > 0
-                        ? `⏰ *Reminder Due Soon* — ${todo.text}\nDue in *${minutesFromNow} min*${who}`
-                        : `🔔 *Reminder Due Now* — ${todo.text}${who}`;
-                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL, slackMsg);
+                    resolveSlackMention(userId).then(mention => {
+                        const who = userId ? ` · ${userId}` : '';
+                        const mentionStr = mention ? `\n${mention}` : '';
+                        const slackMsg = minutesFromNow > 0
+                            ? `⏰ *Reminder Due Soon* — ${todo.text}\nDue in *${minutesFromNow} min*${who}${mentionStr}`
+                            : `🔔 *Reminder Due Now* — ${todo.text}${who}${mentionStr}`;
+                        postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL, slackMsg);
+                    });
                 }
             }
         });
@@ -690,8 +719,12 @@ function checkCalendarEvents(now, warningTime, overdueTime) {
                 const slackKey = `event_overdue_${eventId}_${Math.floor(minutesOverdue / 30)}`;
                 if (!sentSlackAlerts.has(slackKey)) {
                     sentSlackAlerts.add(slackKey);
-                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL,
-                        `🔴 *Event Overdue* — ${event.title}\nWas due *${minutesOverdue} min ago*${userId ? ` · ${userId}` : ''}`);
+                    resolveSlackMention(userId).then(mention => {
+                        const who = userId ? ` · ${userId}` : '';
+                        const mentionStr = mention ? `\n${mention}` : '';
+                        postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL,
+                            `🔴 *Event Overdue* — ${event.title}\nWas due *${minutesOverdue} min ago*${who}${mentionStr}`);
+                    });
                 }
             }
             // Check if due soon OR just became due (bridges the 0–15 min gap)
@@ -720,11 +753,14 @@ function checkCalendarEvents(now, warningTime, overdueTime) {
                 const slackKey = `event_soon_${eventId}`;
                 if (!sentSlackAlerts.has(slackKey)) {
                     sentSlackAlerts.add(slackKey);
-                    const who = userId ? ` · ${userId}` : '';
-                    const slackMsg = minutesFromNow > 0
-                        ? `📅 *Reminder Due Soon* — ${event.title}\nDue in *${minutesFromNow} min*${who}`
-                        : `🔔 *Reminder Due Now* — ${event.title}${who}`;
-                    postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL, slackMsg);
+                    resolveSlackMention(userId).then(mention => {
+                        const who = userId ? ` · ${userId}` : '';
+                        const mentionStr = mention ? `\n${mention}` : '';
+                        const slackMsg = minutesFromNow > 0
+                            ? `📅 *Reminder Due Soon* — ${event.title}\nDue in *${minutesFromNow} min*${who}${mentionStr}`
+                            : `🔔 *Reminder Due Now* — ${event.title}${who}${mentionStr}`;
+                        postSlackAlert(process.env.SLACK_REMINDERS_CHANNEL, slackMsg);
+                    });
                 }
             }
         });

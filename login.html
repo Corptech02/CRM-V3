@@ -392,7 +392,8 @@
     <script>
         // Check if user is already logged in
         if (sessionStorage.getItem('vanguard_user')) {
-            window.location.href = '/';
+            const params = new URLSearchParams(window.location.search);
+            window.location.href = params.get('redirect') || '/';
         }
 
         // Remember this login portal so expired sessions redirect back here
@@ -455,7 +456,8 @@
                         portal: data.user.portal
                     }));
                     localStorage.setItem('vanguard_login_portal', 'vanguard');
-                    window.location.href = '/';
+                    const params = new URLSearchParams(window.location.search);
+                    window.location.href = params.get('redirect') || '/';
                 } else {
                     throw new Error(data.error || 'Invalid credentials');
                 }

@@ -31,7 +31,7 @@ window.generatePolicyRows = async function() {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
-            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
             isCsrUser = (user.role || '') === 'csr';
             console.log(`🔍 Policy Display Fix - Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
@@ -77,7 +77,7 @@ window.generatePolicyRows = async function() {
     }
 
     // Generate rows for actual saved policies - SHOW ALL POLICIES
-    return policies.map(policy => {
+    const _htmlRows = policies.map(policy => {
         // Ensure policy type is available - check multiple possible locations
         const policyType = policy.policyType || policy.type || (policy.overview && policy.overview['Policy Type'] ?
             policy.overview['Policy Type'].toLowerCase().replace(/\s+/g, '-') : 'unknown');
@@ -236,6 +236,24 @@ window.generatePolicyRows = async function() {
             </tr>
         `;
     }).join('');
+
+    // Auto-open a pending deep-link policy after rows are rendered into the DOM
+    const _pending = sessionStorage.getItem('vanguard_pending_policy');
+    if (_pending) {
+        sessionStorage.removeItem('vanguard_pending_policy');
+        // Wait for the caller to inject _htmlRows into innerHTML, then open modal
+        setTimeout(() => {
+            if (typeof window.viewPolicy === 'function') {
+                window.viewPolicy(_pending);
+                // Switch to Documents tab after modal renders
+                setTimeout(() => {
+                    if (typeof switchViewTab === 'function') switchViewTab('documents');
+                }, 400);
+            }
+        }, 600);
+    }
+
+    return _htmlRows;
 };
 
 console.log('Policy Display Fix: Override installed - all policies will be displayed');

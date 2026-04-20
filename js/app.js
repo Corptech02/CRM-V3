@@ -656,12 +656,61 @@ document.addEventListener('DOMContentLoaded', function() {
         const _openDeepLinkedClient = () => {
             if (typeof viewClient === 'function') {
                 viewClient(_dlClientId);
-                // Clean the URL without reloading
                 window.history.replaceState({}, '', window.location.origin + window.location.pathname + '#clients');
             }
         };
-        // Give clients view time to render before opening profile
-        setTimeout(_openDeepLinkedClient, 1500);
+        // Poll until the dashboard content is ready, then open the profile
+        let _dlAttempts = 0;
+        const _dlPoll = setInterval(() => {
+            _dlAttempts++;
+            if (document.querySelector('.dashboard-content') || _dlAttempts > 20) {
+                clearInterval(_dlPoll);
+                _openDeepLinkedClient();
+            }
+        }, 300);
+    }
+
+    // Deep-link support: ?policyNumber=XXX auto-opens the policy profile
+    const _dlPolicyNumber = _dlParams.get('policyNumber');
+    if (_dlPolicyNumber) {
+        if (_initialHash !== '#policies') {
+            window.location.hash = '#policies';
+        }
+        const _openDeepLinkedPolicy = () => {
+            // Step 1: clear status filter (default "active" may hide the policy)
+            const _sf = document.getElementById('policyStatusFilter');
+            if (_sf) _sf.value = '';
+            // Step 2: type the policy number into the search box and filter
+            const _sb = document.getElementById('policySearch');
+            if (_sb) {
+                _sb.value = _dlPolicyNumber;
+                if (typeof filterPolicies === 'function') filterPolicies();
+            }
+            // Step 3: after filter renders, click the view button on the first matching row
+            setTimeout(() => {
+                const _tbody = document.getElementById('policyTableBody');
+                const _row = _tbody && _tbody.querySelector('tr[data-policy-id]');
+                if (_row) {
+                    const _pid = _row.getAttribute('data-policy-id');
+                    if (typeof window.viewPolicy === 'function') window.viewPolicy(_pid);
+                } else {
+                    // Fallback: call by policy number directly
+                    if (typeof window.viewPolicy === 'function') window.viewPolicy(_dlPolicyNumber);
+                }
+                window.history.replaceState({}, '', window.location.origin + window.location.pathname + '#policies');
+            }, 400);
+        };
+        // Wait for policyTableBody to have actual policy rows (not just empty/spinner state)
+        let _dlpAttempts = 0;
+        const _dlpPoll = setInterval(() => {
+            _dlpAttempts++;
+            const tbody = document.getElementById('policyTableBody');
+            const hasRows = tbody && tbody.querySelector('tr[data-policy-id]');
+            if (hasRows || _dlpAttempts > 60) {
+                clearInterval(_dlpPoll);
+                _openDeepLinkedPolicy();
+            }
+        }, 300);
     }
 });
 
@@ -5865,7 +5914,7 @@ function updateClientCount() {
             try {
                 const user = JSON.parse(sessionData);
                 const currentUser = user.username;
-                const isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+                const isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
 
                 if (!isAdmin) {
                     clients = clients.filter(client => {
@@ -7284,7 +7333,7 @@ function getCurrentUser() {
 // Check if current user is admin
 function isCurrentUserAdmin() {
     const currentUser = getCurrentUser();
-    const isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+    const isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
     console.log('🔍 ADMIN CHECK:', {
         currentUser,
         currentUserLower: currentUser.toLowerCase(),
@@ -11343,7 +11392,7 @@ async function generateClientRows(page = 1) {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
-            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
             isCsrUser = (user.role || '') === 'csr';
             console.log(`🔍 Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
@@ -11595,7 +11644,7 @@ async function loadClientsView() {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
-            isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase());
+            isAdmin = ['grant', 'maureen'].includes(user.username.toLowerCase()) || (user.role || '').includes('admin');
         } catch (error) {
             console.error('Error parsing session data:', error);
         }
@@ -11844,7 +11893,7 @@ function updateClientsPagination() {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
-            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
         } catch (error) {
             console.error('Error parsing session data:', error);
         }
@@ -12214,7 +12263,7 @@ function loadPoliciesView() {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
-            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
             console.log(`🔍 Policies view - Current user: ${currentUser}, Is Admin: ${isAdmin}`);
         } catch (error) {
             console.error('Error parsing session data:', error);
@@ -12625,7 +12674,7 @@ async function loadRenewalsView() {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
-            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
             isCsrUser = (user.role || '') === 'csr';
             console.log(`🔍 Renewals filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
@@ -20922,7 +20971,8 @@ async function viewClient(id) {
         });
 
         if (response.ok) {
-            const clients = await response.json();
+            const data = await response.json();
+            const clients = Array.isArray(data) ? data : (data.clients || []);
             console.log('📋 API returned', clients.length, 'clients');
             console.log('🔍 Looking for client with ID:', id);
             console.log('🔍 Available client IDs:', clients.map(c => c.id).slice(0, 5));
@@ -22747,39 +22797,46 @@ function filterClients() {
 }
 
 // Policy Management Functions
-function viewPolicy(policyId) {
+async function viewPolicy(policyId) {
     console.log('Viewing policy:', policyId);
-    
-    // Get policy from localStorage (use insurance_policies)
-    const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
-    
-    // Convert policyId to string for comparison
-    const idStr = String(policyId);
-    
-    // Try to find policy by exact ID match first, then exact policy number match
-    let policy = policies.find(p => {
-        // Check exact ID match (most precise)
-        if (String(p.id) === idStr) return true;
-        return false;
-    });
 
-    // If not found by ID, try exact policy number match
-    if (!policy) {
-        policy = policies.find(p => String(p.policyNumber) === idStr);
+    const idStr = String(policyId);
+
+    function _findInList(policies) {
+        return policies.find(p => String(p.id) === idStr || String(p.policyNumber) === idStr) || null;
     }
 
-    console.log('🔍 Policy lookup debug:', {
-        searchingFor: policyId,
-        foundPolicy: policy ? { id: policy.id, policyNumber: policy.policyNumber, client: policy.namedInsured?.name || policy.client || policy.clientName } : null
-    });
-    
+    // 1. Try localStorage first (fast path for already-loaded sessions)
+    let policy = _findInList(JSON.parse(localStorage.getItem('insurance_policies') || '[]'));
+
+    // 2. Fallback: fetch from API (covers fresh/magic-link sessions)
     if (!policy) {
-        console.error('Policy not found. Looking for ID:', policyId);
-        console.error('Available policies:', policies.map(p => ({ id: p.id, policyNumber: p.policyNumber })));
+        try {
+            const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
+            const _jwt = sessionStorage.getItem('vanguard_jwt') || '';
+            const res = await fetch(`${API_URL}/api/policies?includeInactive=true&limit=500`, {
+                headers: { 'Cache-Control': 'no-cache', 'Bypass-Tunnel-Reminder': 'true', 'Authorization': `Bearer ${_jwt}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : (data.policies || []);
+                // Cache for subsequent calls this session
+                if (list.length) localStorage.setItem('insurance_policies', JSON.stringify(list));
+                policy = _findInList(list);
+            }
+        } catch(e) {
+            console.warn('Policy API fetch failed:', e);
+        }
+    }
+
+    console.log('🔍 Policy lookup:', { searchingFor: policyId, found: !!policy });
+
+    if (!policy) {
+        console.error('Policy not found:', policyId);
         showNotification('Policy not found', 'error');
         return;
     }
-    
+
     // Show the policy details in a tabbed modal
     showPolicyDetailsModal(policy);
 }
@@ -23778,7 +23835,7 @@ async function generatePolicyRows() {
         try {
             const user = JSON.parse(sessionData);
             currentUser = user.username;
-            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase());
+            isAdmin = ['grant', 'maureen'].includes(currentUser.toLowerCase()) || (user.role || '').includes('admin');
             isCsrUser = (user.role || '') === 'csr';
             console.log(`🔍 Policy filtering - Current user: ${currentUser}, Is Admin: ${isAdmin}, Is CSR: ${isCsrUser}`);
         } catch (error) {
