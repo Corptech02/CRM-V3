@@ -228,6 +228,8 @@ function logAudit(db, username, action, resource, resourceId, req, details) {
     );
 }
 
+const ADMIN_ROLES = ['master_admin', 'united_admin', 'vanguard_admin'];
+
 // ── GET /api/auth/users — list all CRM users (admin only) ───────────────────
 router.get('/users', async (req, res) => {
     const authHeader = req.headers['authorization'];
@@ -235,7 +237,7 @@ router.get('/users', async (req, res) => {
     if (!token) return res.status(401).json({ error: 'No token' });
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+        if (!ADMIN_ROLES.includes(decoded.role)) return res.status(403).json({ error: 'Admin only' });
         const db = new sqlite3.Database(DB_PATH);
         db.all('SELECT id, username, role, portal, active, created_at, last_login FROM users ORDER BY id', (err, rows) => {
             db.close();
@@ -257,7 +259,7 @@ router.put('/users/:id/role', async (req, res) => {
     if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role' });
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+        if (!ADMIN_ROLES.includes(decoded.role)) return res.status(403).json({ error: 'Admin only' });
         const db = new sqlite3.Database(DB_PATH);
         db.run('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id], function(err) {
             db.close();
