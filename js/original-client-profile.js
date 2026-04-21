@@ -210,87 +210,157 @@ window.viewClientOriginal = async function(id) {
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                <!-- Client Information - Left Side -->
-                <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
-                    <div style="display: flex; align-items: center; margin-bottom: 28px;">
-                        <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600; margin-right: 16px;">
-                            ${client.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 24px 24px 0;">
+                <!-- Left Side: People + Addresses -->
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+
+                    <!-- People Box -->
+                    <div style="background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden;">
+                        <div style="background: #3c8dbc; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: white; font-weight: 600; font-size: 14px;">People</span>
+                            <button onclick="window.addClientPerson && window.addClientPerson('${client.id}')" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35); color: white; border-radius: 5px; padding: 3px 9px; cursor: pointer; font-size: 13px;" title="Add Person">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
-                        <div>
-                            <h2 style="margin: 0; color: #1f2937; font-size: 22px; font-weight: 600;">Client Information</h2>
-                            <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Personal & Contact Details</p>
+                        <div style="padding: 0;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                <tbody>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 10px 8px; width: 60px; vertical-align: top;">
+                                            <button onclick="window.editClientPerson && window.editClientPerson('${client.id}')" style="background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 3px 6px; cursor: pointer; font-size: 11px; margin-right: 3px;" title="Edit"><i class="fas fa-pencil-alt"></i></button>
+                                        </td>
+                                        <td style="padding: 10px 8px; vertical-align: top;">
+                                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px;">
+                                                <!-- Col 1: Name + type + Added + DOB -->
+                                                <div>
+                                                    <div style="font-weight: 700; color: #111827; margin-bottom: 2px;">
+                                                        ${client.company || client.businessName ? `${client.company || client.businessName}` : resolvedFullName || client.name}
+                                                    </div>
+                                                    <div style="color: #6b7280; font-size: 12px;">(Insured)</div>
+                                                    <div style="margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap;">
+                                                        <div>
+                                                            <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Added</span>
+                                                            <span style="color: #374151; margin-left: 4px; font-size: 12px;">${client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'-') : 'N/A'}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span style="color: #6380b0; font-size: 11px; font-weight: 600;">DOB</span>
+                                                            <span style="color: #374151; margin-left: 4px; font-size: 12px;">${client.dateOfBirth || ''}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- Col 2: Email + Phone -->
+                                                <div>
+                                                    ${client.email ? `
+                                                    <div style="margin-bottom: 4px;">
+                                                        <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Email</span>
+                                                        <div style="font-size: 12px;"><a href="mailto:${client.email}" style="color: #3b82f6; text-decoration: none;">${client.email}</a></div>
+                                                    </div>` : ''}
+                                                    ${client.phone ? `
+                                                    <div style="margin-bottom: 4px;">
+                                                        <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Primary</span>
+                                                        <div style="font-size: 12px;"><a href="tel:${client.phone}" style="color: #374151; text-decoration: none;">${client.phone}</a></div>
+                                                    </div>` : ''}
+                                                    ${client.workPhone ? `
+                                                    <div>
+                                                        <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Work</span>
+                                                        <div style="font-size: 12px;"><a href="tel:${client.workPhone}" style="color: #374151; text-decoration: none;">${client.workPhone}</a></div>
+                                                    </div>` : ''}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div style="display: grid; gap: 24px;">
-                        <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
-                            <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Full Name</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937; font-weight: 500;">${resolvedFullName || 'N/A'}</p>
+                    <!-- Business Box -->
+                    <div style="background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden;">
+                        <div style="background: #3c8dbc; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: white; font-weight: 600; font-size: 14px;">Business</span>
+                            <button onclick="window.saveClientBusiness('${client.id}')" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35); color: white; border-radius: 5px; padding: 3px 10px; cursor: pointer; font-size: 12px; font-weight: 600;" title="Save Business Info">
+                                <i class="fas fa-save" style="margin-right:4px;"></i>Save
+                            </button>
                         </div>
-
-                        <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
-                            <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Business Name</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937; font-weight: 500;">
-                                ${client.company || client.businessName || client.name || 'N/A'}
-                            </p>
+                        <div style="padding: 14px 16px;">
+                            ${(() => {
+                                const fRow = (label, id, val, colW) => `
+                                    <div style="display:grid;grid-template-columns:${colW||'120px'} 1fr;gap:6px;align-items:center;margin-bottom:10px;">
+                                        <label style="font-size:12px;color:#4b5563;font-weight:600;text-align:right;padding-right:8px;">${label}</label>
+                                        <input id="biz-${id}" value="${String(val||'').replace(/"/g,'&quot;')}" style="border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:13px;width:100%;box-sizing:border-box;color:#111827;">
+                                    </div>`;
+                                const fRow2 = (label1, id1, val1, label2, id2, val2) => `
+                                    <div style="display:grid;grid-template-columns:120px 1fr 100px 1fr;gap:6px;align-items:center;margin-bottom:10px;">
+                                        <label style="font-size:12px;color:#4b5563;font-weight:600;text-align:right;padding-right:8px;">${label1}</label>
+                                        <input id="biz-${id1}" value="${String(val1||'').replace(/"/g,'&quot;')}" style="border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:13px;width:100%;box-sizing:border-box;color:#111827;">
+                                        <label style="font-size:12px;color:#4b5563;font-weight:600;text-align:right;padding-right:8px;">${label2}</label>
+                                        <input id="biz-${id2}" value="${String(val2||'').replace(/"/g,'&quot;')}" style="border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:13px;width:100%;box-sizing:border-box;color:#111827;">
+                                    </div>`;
+                                return fRow('Business Name','name', client.company||client.businessName||client.name||'')
+                                    + fRow('DBA','dba', client.dba||'')
+                                    + fRow2('Business Type','type', client.businessType||'', 'FEIN','fein', client.fein||'')
+                                    + fRow('Website','website', client.website||'')
+                                    + fRow('Email','email', client.businessEmail||client.email||'')
+                                    + fRow('GL Code','glCode', client.glCode||'')
+                                    + fRow('SIC Code','sicCode', client.sicCode||'')
+                                    + fRow('NAICS Code','naicsCode', client.naicsCode||'');
+                            })()}
                         </div>
-
-
-                        <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
-                            <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Phone</label>
-                            <p style="margin: 0; font-size: 16px;">
-                                <a href="tel:${client.phone}" style="color: #3b82f6; text-decoration: none; font-weight: 500; display: flex; align-items: center;">
-                                    <i class="fas fa-phone" style="margin-right: 8px; font-size: 14px;"></i>
-                                    ${client.phone || 'N/A'}
-                                </a>
-                            </p>
-                        </div>
-
-                        <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #667eea;">
-                            <label style="display: block; font-size: 11px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Email</label>
-                            <p style="margin: 0; font-size: 16px;">
-                                <a href="mailto:${client.email}" style="color: #3b82f6; text-decoration: none; font-weight: 500; display: flex; align-items: center;">
-                                    <i class="fas fa-envelope" style="margin-right: 8px; font-size: 14px;"></i>
-                                    ${client.email || 'N/A'}
-                                </a>
-                            </p>
-                        </div>
-
-                        <div>
-                            <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase;">Date of Birth</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937;">${client.dateOfBirth || 'N/A'}</p>
-                        </div>
-
-                        <div>
-                            <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase;">Address</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937;">${client.address || 'N/A'}</p>
-                        </div>
-
-                        <div>
-                            <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase;">Client Since</label>
-                            <p style="margin: 0; font-size: 16px; color: #1f2937;">
-                                ${client.createdAt ? new Date(client.createdAt).toLocaleDateString() : 'N/A'}
-                            </p>
-                        </div>
-
-                        <div style="padding: 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 10px; border: 1px solid #bfdbfe; text-align: center;">
-                            <label style="display: block; font-size: 12px; color: #1e40af; margin-bottom: 8px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Total Annual Premium</label>
-                            <p style="margin: 0; font-size: 32px; color: #059669; font-weight: 700;">
-                                $${totalPremium.toLocaleString()}
-                            </p>
-                            <p style="margin: 8px 0 0 0; font-size: 14px; color: #64748b;">Across ${clientPolicies.length} ${clientPolicies.length === 1 ? 'policy' : 'policies'}</p>
-                        </div>
-
-                        ${client.notes ? `
-                        <div>
-                            <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase;">Notes</label>
-                            <p style="margin: 0; font-size: 14px; color: #4b5563; background: #f9fafb; padding: 12px; border-radius: 6px;">
-                                ${client.notes}
-                            </p>
-                        </div>
-                        ` : ''}
                     </div>
+
+                    <!-- Addresses Box -->
+                    <div style="background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden;">
+                        <div style="background: #3c8dbc; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: white; font-weight: 600; font-size: 14px;">Addresses</span>
+                            <button onclick="window.addClientAddress && window.addClientAddress('${client.id}')" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35); color: white; border-radius: 5px; padding: 3px 9px; cursor: pointer; font-size: 13px;" title="Add Address">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                <thead>
+                                    <tr style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                                        <th style="padding: 8px; width: 50px;"></th>
+                                        <th style="padding: 8px; text-align: left; color: #374151; font-weight: 600;">Address</th>
+                                        <th style="padding: 8px; text-align: left; color: #374151; font-weight: 600;">City</th>
+                                        <th style="padding: 8px; text-align: left; color: #374151; font-weight: 600;">State</th>
+                                        <th style="padding: 8px; text-align: left; color: #374151; font-weight: 600;">Zip</th>
+                                        <th style="padding: 8px; text-align: left; color: #374151; font-weight: 600;">Type</th>
+                                        <th style="padding: 8px; width: 36px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(() => {
+                                        const addr = client.address || '';
+                                        if (!addr) return `<tr><td colspan="7" style="padding:16px;text-align:center;color:#9ca3af;font-size:13px;">No addresses on file</td></tr>`;
+                                        // Try to parse "Street, City, ST ZIP" format
+                                        const parts = addr.split(',').map(s => s.trim());
+                                        const street = parts[0] || addr;
+                                        const cityPart = parts[1] || '';
+                                        const stateZip = (parts[2] || '').trim().split(/\s+/);
+                                        const state = stateZip[0] || '';
+                                        const zip = stateZip[1] || '';
+                                        const city = cityPart;
+                                        const gmapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(addr)}`;
+                                        return `<tr style="border-bottom: 1px solid #f3f4f6;">
+                                            <td style="padding: 8px;">
+                                                <button onclick="window.editClientAddress && window.editClientAddress('${client.id}')" style="background:#3b82f6;color:white;border:none;border-radius:3px;padding:2px 5px;cursor:pointer;font-size:11px;margin-right:2px;" title="Edit"><i class="fas fa-pencil-alt"></i></button>
+                                            </td>
+                                            <td style="padding: 8px; color: #111827;">${street}</td>
+                                            <td style="padding: 8px; color: #374151;">${city}</td>
+                                            <td style="padding: 8px; color: #374151;">${state}</td>
+                                            <td style="padding: 8px; color: #374151;">${zip}</td>
+                                            <td style="padding: 8px; color: #374151;">Mailing &amp; Physical</td>
+                                            <td style="padding: 8px;">
+                                                <a href="${gmapsUrl}" target="_blank" style="background:#17a2b8;color:white;border:none;border-radius:3px;padding:3px 6px;cursor:pointer;font-size:11px;text-decoration:none;" title="Map"><i class="fas fa-map-marked"></i></a>
+                                            </td>
+                                        </tr>`;
+                                    })()}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Policies - Right Side -->
@@ -405,27 +475,63 @@ window.viewClientOriginal = async function(id) {
                 </div>
             </div>
 
-            <!-- Documents Section -->
-            <div style="padding: 24px; margin-top: 4px;">
-                <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; width: 100%;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
-                        <div style="display: flex; align-items: center;">
-                            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; margin-right: 12px;">
-                                <i class="fas fa-folder" style="font-size: 20px;"></i>
-                            </div>
-                            <div>
-                                <h3 style="margin: 0; color: #1f2937; font-size: 20px; font-weight: 600;">Documents</h3>
-                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Client Files</p>
-                            </div>
-                        </div>
-                        <button onclick="window.uploadClientDocument('${id}')" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px;">
-                            <i class="fas fa-upload"></i> Upload
+            <!-- Media / Files + Notes Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 24px;">
+
+                <!-- Media / Files -->
+                <div style="background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden;">
+                    <div style="background: #3c8dbc; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: white; font-weight: 600; font-size: 14px;"><i class="far fa-folder-open" style="margin-right:7px;"></i>Media / Files</span>
+                        <button onclick="window.uploadClientDocument('${id}')" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35); color: white; border-radius: 5px; padding: 3px 10px; cursor: pointer; font-size: 13px;" title="Upload file">
+                            <i class="fas fa-plus"></i>
                         </button>
                     </div>
-                    <div id="client-documents-list" style="display: grid; gap: 12px;">
-                        ${window.renderClientDocuments(id)}
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                                    <th style="padding: 7px 10px; width: 28px;"></th>
+                                    <th style="padding: 7px 10px; text-align: left; color: #374151; font-weight: 600;">File Name</th>
+                                    <th style="padding: 7px 10px; text-align: right; color: #374151; font-weight: 600; white-space: nowrap;">Date</th>
+                                    <th style="padding: 7px 10px; width: 60px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="client-documents-list">
+                                ${window.renderClientDocuments(id)}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+
+                <!-- Notes -->
+                <div style="background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column;">
+                    <div style="background: #3c8dbc; padding: 10px 16px; display: flex; align-items: center; flex-shrink: 0;">
+                        <span style="color: white; font-weight: 600; font-size: 14px;"><i class="fas fa-sticky-note" style="margin-right:7px;"></i>Notes</span>
+                    </div>
+                    <div style="flex: 1; overflow-y: auto; max-height: 320px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;" id="client-notes-table">
+                            <tbody id="client-notes-list">
+                                ${(() => {
+                                    const notesArr = Array.isArray(client.notesLog) ? client.notesLog
+                                        : (client.notes && typeof client.notes === 'string' && client.notes.trim())
+                                            ? [{ text: client.notes, date: client.updatedAt || client.createdAt || '' }]
+                                            : [];
+                                    if (!notesArr.length) return `<tr><td style="padding:24px;text-align:center;color:#9ca3af;font-size:13px;"><i class="fas fa-sticky-note" style="margin-right:6px;opacity:0.4;"></i>No notes yet</td></tr>`;
+                                    return notesArr.map((n, i) => {
+                                        const dateStr = n.date ? new Date(n.date).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '';
+                                        const text = typeof n === 'string' ? n : (n.text || n.content || '');
+                                        const preview = text.length > 120 ? text.slice(0, 120) + '…' : text;
+                                        return `<tr style="border-bottom:1px solid #f3f4f6;cursor:pointer;${i%2===1?'background:#fafafa;':''}" onclick="window.viewClientNote && window.viewClientNote('${id}', ${i})" title="${String(text).replace(/"/g,'&quot;')}">
+                                            <td style="padding:8px 10px;color:#374151;line-height:1.4;">${preview}</td>
+                                            <td style="padding:8px 10px;text-align:right;white-space:nowrap;color:#9ca3af;font-size:11px;vertical-align:top;">${dateStr}</td>
+                                        </tr>`;
+                                    }).join('');
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
             </div>
         </div>
@@ -434,18 +540,9 @@ window.viewClientOriginal = async function(id) {
 
 // Document Management Functions
 window.renderClientDocuments = function(clientId) {
-    // This will be populated by loadClientDocuments function
-    const loadingHtml = `
-        <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
-            <p style="margin: 0; font-size: 16px;">Loading documents...</p>
-        </div>
-    `;
-
     // Load documents from server asynchronously
     loadClientDocuments(clientId);
-
-    return loadingHtml;
+    return `<tr><td colspan="4" style="padding:20px;text-align:center;color:#9ca3af;font-size:13px;"><i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Loading...</td></tr>`;
 };
 
 // Load client documents from server
@@ -471,36 +568,21 @@ async function loadClientDocuments(clientId) {
         const documentsList = document.getElementById('client-documents-list');
         if (documentsList) {
             if (clientDocs.length === 0) {
-                documentsList.innerHTML = `
-                    <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
-                        <i class="fas fa-folder-open" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
-                        <p style="margin: 0; font-size: 16px;">No documents uploaded yet</p>
-                        <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Click Upload to add files</p>
-                    </div>
-                `;
+                documentsList.innerHTML = `<tr><td colspan="4" style="padding:24px;text-align:center;color:#9ca3af;font-size:13px;"><i class="fas fa-folder-open" style="margin-right:6px;opacity:0.4;"></i>No documents uploaded yet</td></tr>`;
             } else {
-                documentsList.innerHTML = clientDocs.map(doc => {
+                documentsList.innerHTML = clientDocs.map((doc, i) => {
                     const fileIcon = getFileIcon(doc.type);
-                    const fileSize = formatFileSize(doc.size);
-                    const uploadDate = new Date(doc.uploadDate).toLocaleDateString();
-
+                    const uploadDate = doc.uploadDate ? new Date(doc.uploadDate).toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'}) + ' ' + new Date(doc.uploadDate).toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}) : '';
                     return `
-                        <div style="display: flex; align-items: center; padding: 12px; background: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb;">
-                            <i class="${fileIcon.icon}" style="color: ${fileIcon.color}; margin-right: 12px; font-size: 20px;"></i>
-                            <div style="flex: 1;">
-                                <p style="margin: 0; font-weight: 500; color: #1f2937; font-size: 14px;">${doc.name}</p>
-                                <p style="margin: 2px 0 0 0; font-size: 12px; color: #6b7280;">${fileSize} • Uploaded ${uploadDate} • by ${doc.uploadedBy}</p>
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button onclick="window.downloadClientDocument('${clientId}', '${doc.id}')" style="padding: 6px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" title="Download">
-                                    <i class="fas fa-download"></i>
-                                </button>
-                                <button onclick="window.deleteClientDocument('${clientId}', '${doc.id}')" style="padding: 6px 10px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" title="Delete">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
+                        <tr style="border-bottom:1px solid #f3f4f6;${i%2===1?'background:#fafafa;':''}">
+                            <td style="padding:6px 10px;"><i class="fas fa-pencil-alt" style="color:#6b7280;cursor:pointer;font-size:11px;" onclick="window.editClientDocument && window.editClientDocument('${clientId}','${doc.id}')" title="Edit"></i></td>
+                            <td style="padding:6px 10px;"><i class="${fileIcon.icon}" style="color:${fileIcon.color};margin-right:6px;font-size:13px;"></i><a href="/api/documents/${doc.id}/download" target="_blank" style="color:#374151;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${doc.name}</a></td>
+                            <td style="padding:6px 10px;text-align:right;white-space:nowrap;color:#6b7280;font-size:12px;">${uploadDate}</td>
+                            <td style="padding:6px 10px;text-align:center;white-space:nowrap;">
+                                <button onclick="window.downloadClientDocument('${clientId}','${doc.id}')" style="background:#3b82f6;color:white;border:none;border-radius:3px;padding:2px 6px;cursor:pointer;font-size:11px;margin-right:2px;" title="Download"><i class="fas fa-download"></i></button>
+                                <button onclick="window.deleteClientDocument('${clientId}','${doc.id}')" style="background:#dc2626;color:white;border:none;border-radius:3px;padding:2px 6px;cursor:pointer;font-size:11px;" title="Delete"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>`;
                 }).join('');
             }
         }
@@ -508,13 +590,7 @@ async function loadClientDocuments(clientId) {
         console.error('📁 Error loading documents:', error);
         const documentsList = document.getElementById('client-documents-list');
         if (documentsList) {
-            documentsList.innerHTML = `
-                <div style="text-align: center; padding: 40px 20px; color: #ef4444;">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px; opacity: 0.7;"></i>
-                    <p style="margin: 0; font-size: 16px;">Error loading documents</p>
-                    <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.7;">Please refresh the page and try again</p>
-                </div>
-            `;
+            documentsList.innerHTML = `<tr><td colspan="4" style="padding:24px;text-align:center;color:#ef4444;font-size:13px;"><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>Error loading documents</td></tr>`;
         }
     }
 }
@@ -1129,6 +1205,61 @@ window._confirmSyncPolicies = async function(clientId) {
 
     // Reload the profile to reflect changes
     if (typeof window.viewClientOriginal === 'function') window.viewClientOriginal(clientId);
+};
+
+window.saveClientBusiness = async function(clientId) {
+    const g = id => (document.getElementById('biz-' + id) || {}).value || '';
+    const updates = {
+        company: g('name'), businessName: g('name'), dba: g('dba'),
+        businessType: g('type'), fein: g('fein'),
+        website: g('website'), businessEmail: g('email'),
+        glCode: g('glCode'), sicCode: g('sicCode'), naicsCode: g('naicsCode'),
+    };
+    // Update localStorage
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const idx = clients.findIndex(c => String(c.id) === String(clientId));
+    if (idx !== -1) {
+        Object.assign(clients[idx], updates);
+        localStorage.setItem('insurance_clients', JSON.stringify(clients));
+    }
+    // Sync to server
+    try {
+        const API = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
+        const jwt = sessionStorage.getItem('vanguard_jwt') || '';
+        const payload = idx !== -1 ? clients[idx] : { id: clientId, ...updates };
+        const r = await fetch(`${API}/api/clients/${clientId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`, 'Bypass-Tunnel-Reminder': 'true' },
+            body: JSON.stringify(payload)
+        });
+        if (typeof showNotification === 'function') showNotification(r.ok ? 'Business info saved' : 'Saved locally (server error)', r.ok ? 'success' : 'warning');
+    } catch(e) {
+        if (typeof showNotification === 'function') showNotification('Saved locally (offline)', 'warning');
+    }
+};
+
+window.viewClientNote = function(clientId, idx) {
+    const clients = JSON.parse(localStorage.getItem('insurance_clients') || '[]');
+    const client = clients.find(c => String(c.id) === String(clientId));
+    if (!client || !Array.isArray(client.notesLog)) return;
+    const note = client.notesLog[idx];
+    if (!note) return;
+    const text = typeof note === 'string' ? note : (note.text || note.content || '');
+    const date = note.date ? new Date(note.date).toLocaleString() : '';
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    modal.innerHTML = `<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+        <div style="background:#3c8dbc;border-radius:12px 12px 0 0;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:white;font-weight:600;"><i class="fas fa-sticky-note" style="margin-right:7px;"></i>Note</span>
+            <button onclick="this.closest('[style*=fixed]').remove()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:15px;">&times;</button>
+        </div>
+        <div style="padding:20px;">
+            <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">${date}</p>
+            <p style="margin:0;font-size:14px;color:#111827;line-height:1.6;white-space:pre-wrap;">${text}</p>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 };
 
 console.log('Original client profile design restored');

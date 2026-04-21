@@ -401,10 +401,7 @@ function showTabbedPolicyForm(isEditing = false) {
                 window.initQuickFill();
             }
 
-            // Initialize coverage mode to dropdown (default)
-            if (window.toggleCoverageMode && typeof window.toggleCoverageMode === 'function') {
-                window.toggleCoverageMode('dropdown');
-            }
+            // (Coverage datatable is initialized via addCoverageRow when policy data is loaded)
         }, 200);
     }
 }
@@ -421,8 +418,9 @@ function generateTabsForPolicyType(policyType) {
     ];
     
     // Add type-specific tabs
-    if (policyType === 'personal-auto' || policyType === 'commercial-auto') {
-        baseTabs.splice(4, 0, 
+    // commercial-auto: vehicles/drivers are embedded in the coverage tab (JenesisNow-style)
+    if (policyType === 'personal-auto') {
+        baseTabs.splice(4, 0,
             { id: 'vehicles', name: 'Vehicles', icon: 'fas fa-car' },
             { id: 'drivers', name: 'Drivers', icon: 'fas fa-id-card' }
         );
@@ -656,254 +654,147 @@ function generateTabContent(tabId, policyType) {
         case 'coverage':
             if (policyType === 'commercial-auto') {
                 return `
-                    <div class="form-section">
-                        <!-- Coverage Input Mode Toggle -->
-                        <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-                            <h3 style="margin-bottom: 16px; color: #495057;">Coverage Input Mode</h3>
-                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500;">
-                                    <input type="radio" name="coverage-input-mode" value="text" onchange="toggleCoverageMode(this.value)" style="margin: 0;">
-                                    <span>Text Input</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500;">
-                                    <input type="radio" name="coverage-input-mode" value="dropdown" checked onchange="toggleCoverageMode(this.value)" style="margin: 0;">
-                                    <span>Dropdown Selection (Default)</span>
-                                </label>
+                    <!-- Automotive Liability Checkboxes -->
+                    <div class="form-section" style="margin-bottom: 16px;">
+                        <h3 style="margin-bottom: 12px;"><i class="far fa-check-square" style="margin-right:8px;"></i>Automotive Liability</h3>
+                        <div style="display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0;">
+                            <label style="display:flex;align-items:center;gap:7px;font-weight:500;cursor:pointer;font-size:14px;">
+                                <input type="checkbox" id="al-any-auto" name="al-any-auto" style="width:15px;height:15px;"> Any Auto
+                            </label>
+                            <label style="display:flex;align-items:center;gap:7px;font-weight:500;cursor:pointer;font-size:14px;">
+                                <input type="checkbox" id="al-all-owned" name="al-all-owned" style="width:15px;height:15px;"> All Owned
+                            </label>
+                            <label style="display:flex;align-items:center;gap:7px;font-weight:500;cursor:pointer;font-size:14px;">
+                                <input type="checkbox" id="al-scheduled" name="al-scheduled" style="width:15px;height:15px;"> All Scheduled
+                            </label>
+                            <label style="display:flex;align-items:center;gap:7px;font-weight:500;cursor:pointer;font-size:14px;">
+                                <input type="checkbox" id="al-hired" name="al-hired" style="width:15px;height:15px;"> All Hired
+                            </label>
+                            <label style="display:flex;align-items:center;gap:7px;font-weight:500;cursor:pointer;font-size:14px;">
+                                <input type="checkbox" id="al-non-owned" name="al-non-owned" style="width:15px;height:15px;"> All Non-Owned
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Two-column: Coverages (left) + Vehicles/Drivers (right) -->
+                    <div style="display: grid; grid-template-columns: 44% 56%; gap: 20px; align-items: start;">
+
+                        <!-- LEFT: Coverages -->
+                        <div class="form-section" style="margin-bottom:0;">
+                            <h3 style="margin-bottom: 12px;"><i class="far fa-check-square" style="margin-right:8px;"></i>Coverages</h3>
+
+                            <!-- Coverage selector -->
+                            <div style="margin-bottom: 12px;">
+                                <select id="coverage-add-select" class="form-control" style="width:100%; margin-bottom:8px;">
+                                    <option value="">-- Select Coverage to Add --</option>
+                                    <optgroup label="Liability">
+                                        <option value="CSL">CSL - Combined Single Limit</option>
+                                        <option value="BISPL">BISPL - Bodily Injury Split Limit</option>
+                                        <option value="BOBTL">BOBTL - Bobtail Operations</option>
+                                        <option value="NTL">NTL - Non-Trucking Liability</option>
+                                        <option value="NOWND">NOWND - Non Owned</option>
+                                        <option value="HRDBD">HRDBD - Hired/Borrowed</option>
+                                        <option value="CONTG">CONTG - Contingent Liability</option>
+                                        <option value="EMPIN">EMPIN - Employees as Insureds</option>
+                                        <option value="FELIA">FELIA - Fellow Employee Coverage</option>
+                                        <option value="DOC">DOC - Driver of Other Car</option>
+                                        <option value="UNLIC">UNLIC - Unlicensed Liability</option>
+                                        <option value="HNTL">HNTL - Hired Non-Trucking Liability</option>
+                                    </optgroup>
+                                    <optgroup label="Uninsured / Underinsured">
+                                        <option value="UMCSL">UMCSL - Uninsured Motorist CSL</option>
+                                        <option value="UMISP">UMISP - Uninsured Motorist BI Split</option>
+                                        <option value="UMPD">UMPD - Uninsured Motorist Property Damage</option>
+                                        <option value="UMCPD">UMCPD - UM Combined BI/PD Single Limit</option>
+                                        <option value="UNCSL">UNCSL - Underinsured Motorist CSL</option>
+                                        <option value="UNDSP">UNDSP - Underinsured Motorist BI Split</option>
+                                        <option value="UNDPD">UNDPD - Underinsured Motorist Property Damage</option>
+                                        <option value="UMUIM">UMUIM - Uninsured/Underinsured Combined</option>
+                                    </optgroup>
+                                    <optgroup label="Medical / PIP">
+                                        <option value="MEDPM">MEDPM - Medical Payments</option>
+                                        <option value="PIP">PIP - Personal Injury Protection</option>
+                                        <option value="OBEL">OBEL - Optional Basic Economic Loss</option>
+                                        <option value="EXCMED">EXCMED - Excess Medical Payments</option>
+                                    </optgroup>
+                                    <optgroup label="Physical Damage">
+                                        <option value="COMP">COMP - Comprehensive</option>
+                                        <option value="COLL">COLL - Collision</option>
+                                        <option value="BCOLL">BCOLL - Broadened Collision</option>
+                                        <option value="LCOLL">LCOLL - Limited Collision</option>
+                                        <option value="COMTI">COMTI - Comprehensive w/ Trailer Interchange</option>
+                                        <option value="COLTI">COLTI - Collision w/ Trailer Interchange</option>
+                                        <option value="CPD">CPD - Combined Physical Damages</option>
+                                        <option value="OTC">OTC - Other Than Collision</option>
+                                        <option value="GAP">GAP - Lease/Loan Gap</option>
+                                        <option value="OEM">OEM - Original Equipment Parts</option>
+                                        <option value="VANIS">VANIS - Vanishing Deductible</option>
+                                    </optgroup>
+                                    <optgroup label="Cargo &amp; Specialty">
+                                        <option value="MTCARGO">MTCARGO - Motor Truck Cargo</option>
+                                        <option value="REEFER">REEFER - Refrigeration Breakdown</option>
+                                        <option value="COLTI">COLTI - Trailer Interchange</option>
+                                        <option value="HOOK">HOOK - Grapple Hook / On-Hook</option>
+                                        <option value="TL">TL - Towing and Labor</option>
+                                        <option value="RREIM">RREIM - Rental Reimbursement</option>
+                                        <option value="HAC">HAC - Hired Auto Cargo</option>
+                                    </optgroup>
+                                    <optgroup label="General Liability">
+                                        <option value="GLCBI">GLCBI - GL Commercial BI</option>
+                                        <option value="GLCPD">GLCPD - GL Commercial PD</option>
+                                        <option value="PRDCO">PRDCO - Products/Completed Operations</option>
+                                        <option value="PIADV">PIADV - Personal and Advertising Injury</option>
+                                        <option value="FIRDM">FIRDM - Fire Damage</option>
+                                        <option value="MDEXP">MDEXP - Medical Expense</option>
+                                    </optgroup>
+                                </select>
+                                <button type="button" class="btn-secondary" onclick="addCoverageRow()" style="width:100%;">
+                                    <i class="fas fa-plus"></i> Add Coverage
+                                </button>
+                            </div>
+
+                            <!-- Coverage Datatable -->
+                            <div style="overflow-x: auto;">
+                                <table id="coverages-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+                                    <thead>
+                                        <tr style="background:#f3f4f6;border-bottom:2px solid #d1d5db;">
+                                            <th style="padding:8px 6px;text-align:left;color:#374151;white-space:nowrap;">Coverage</th>
+                                            <th style="padding:8px 6px;text-align:left;color:#374151;width:110px;">Limit</th>
+                                            <th style="padding:8px 6px;text-align:left;color:#374151;width:90px;">Deductible</th>
+                                            <th style="padding:8px 6px;text-align:left;color:#374151;width:90px;">Premium</th>
+                                            <th style="padding:8px 6px;width:36px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="coverages-tbody"></tbody>
+                                </table>
+                                <div id="coverages-empty" style="text-align:center;padding:24px;color:#9ca3af;font-style:italic;border:1px dashed #d1d5db;border-top:none;font-size:13px;">
+                                    No coverages added yet. Use the selector above to add coverages.
+                                </div>
                             </div>
                         </div>
 
-                        <h3>Primary Liability Coverage</h3>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Liability Limits</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-liability-limits-text" placeholder="e.g. $1,000,000 CSL" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-liability-limits" style="display: block;">
-                                    <option value="">Select Liability Limits</option>
-                                    <option value="750000">$750,000 CSL</option>
-                                    <option value="1000000">$1,000,000 CSL</option>
-                                    <option value="1500000">$1,500,000 CSL</option>
-                                    <option value="2000000">$2,000,000 CSL</option>
-                                    <option value="5000000">$5,000,000 CSL</option>
-                                    <option value="100/300/100">$100K/$300K/$100K Split Limit</option>
-                                    <option value="250/500/250">$250K/$500K/$250K Split Limit</option>
-                                    <option value="500/1000/500">$500K/$1M/$500K Split Limit</option>
-                                    <option value="1000/2000/1000">$1M/$2M/$1M Split Limit</option>
-                                </select>
+                        <!-- RIGHT: Vehicles + Drivers -->
+                        <div>
+                            <div class="form-section" style="margin-bottom:16px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                    <h3 style="margin:0;"><i class="fas fa-car" style="margin-right:8px;"></i>Vehicles</h3>
+                                    <button type="button" class="btn-secondary" onclick="addVehicle()" style="padding:5px 12px;font-size:13px;">
+                                        <i class="fas fa-plus"></i> Add Vehicle
+                                    </button>
+                                </div>
+                                <div id="vehiclesList"></div>
                             </div>
-                            <div class="form-group">
-                                <label>General Liability</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-general-aggregate-text" placeholder="e.g. $1,000,000/$2,000,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-general-aggregate" style="display: block;">
-                                    <option value="">Select General Liability Limit</option>
-                                    <option value="excluded">No Coverage</option>
-                                    <option value="1000/2000">$1,000/$2,000</option>
-                                    <option value="500000/1000000">$500,000/$1,000,000</option>
-                                    <option value="1000000/1000000">$1,000,000/$1,000,000</option>
-                                    <option value="1000000/2000000">$1,000,000/$2,000,000</option>
-                                    <option value="1000000">$1,000,000</option>
-                                    <option value="2000000">$2,000,000</option>
-                                    <option value="3000000">$3,000,000</option>
-                                    <option value="4000000">$4,000,000</option>
-                                    <option value="5000000">$5,000,000</option>
-                                    <option value="10000000">$10,000,000</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <h3>Physical Damage Coverage</h3>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Comprehensive Deductible</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-comp-deduct-text" placeholder="e.g. $1,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-comp-deduct" style="display: block;">
-                                    <option value="">Select Deductible</option>
-                                    <option value="0">$0</option>
-                                    <option value="250">$250</option>
-                                    <option value="500">$500</option>
-                                    <option value="1000">$1,000</option>
-                                    <option value="2500">$2,500</option>
-                                    <option value="5000">$5,000</option>
-                                    <option value="7500">$7,500</option>
-                                    <option value="10000">$10,000</option>
-                                    <option value="15000">$15,000</option>
-                                    <option value="25000">$25,000</option>
-                                    <option value="50000">$50,000</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Collision Deductible</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-coll-deduct-text" placeholder="e.g. $1,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-coll-deduct" style="display: block;">
-                                    <option value="">Select Deductible</option>
-                                    <option value="0">$0</option>
-                                    <option value="500">$500</option>
-                                    <option value="1000">$1,000</option>
-                                    <option value="2500">$2,500</option>
-                                    <option value="5000">$5,000</option>
-                                    <option value="10000">$10,000</option>
-                                    <option value="15000">$15,000</option>
-                                    <option value="25000">$25,000</option>
-                                    <option value="50000">$50,000</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <h3>Cargo Coverage</h3>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Cargo Limit</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-cargo-limit-text" placeholder="e.g. $100,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-cargo-limit" style="display: block;" onchange="handleCargoLimitChange(this)">
-                                    <option value="">Select Cargo Limit</option>
-                                    <option value="0">No Cargo Coverage</option>
-                                    <option value="10000">$10,000</option>
-                                    <option value="25000">$25,000</option>
-                                    <option value="50000">$50,000</option>
-                                    <option value="100000">$100,000</option>
-                                    <option value="150000">$150,000</option>
-                                    <option value="200000">$200,000</option>
-                                    <option value="250000">$250,000</option>
-                                    <option value="500000">$500,000</option>
-                                    <option value="1000000">$1,000,000</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Cargo Deductible</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-cargo-deduct-text" placeholder="e.g. $2,500" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-cargo-deduct" style="display: block;">
-                                    <option value="">Select Deductible</option>
-                                    <option value="0">$0</option>
-                                    <option value="1000">$1,000</option>
-                                    <option value="2500">$2,500</option>
-                                    <option value="5000">$5,000</option>
-                                    <option value="7500">$7,500</option>
-                                    <option value="10000">$10,000</option>
-                                    <option value="15000">$15,000</option>
-                                    <option value="20000">$20,000</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <h3>Other Coverages</h3>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Medical Payments</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-medical-text" placeholder="e.g. $5,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-medical" style="display: block;">
-                                    <option value="">Select Limit</option>
-                                    <option value="0">No Coverage</option>
-                                    <option value="1000">$1,000</option>
-                                    <option value="2500">$2,500</option>
-                                    <option value="5000">$5,000</option>
-                                    <option value="10000">$10,000</option>
-                                    <option value="25000">$25,000</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Uninsured/Underinsured Motorist</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-um-uim-text" placeholder="e.g. $75,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-um-uim" style="display: block;">
-                                    <option value="">Select Limit</option>
-                                    <option value="0">Rejected</option>
-                                    <option value="25/50">$25K/$50K</option>
-                                    <option value="50/100">$50K/$100K</option>
-                                    <option value="100/300">$100K/$300K</option>
-                                    <option value="75000">$75,000 CSL</option>
-                                    <option value="100000">$100,000 CSL</option>
-                                    <option value="250/500">$250K/$500K</option>
-                                    <option value="300000">$300,000 CSL</option>
-                                    <option value="500/1000">$500K/$1M</option>
-                                    <option value="500000">$500,000 CSL</option>
-                                    <option value="750000">$750,000 CSL</option>
-                                    <option value="1000000">$1,000,000 CSL</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Trailer Interchange Limit</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-trailer-interchange-text" placeholder="e.g. $50,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-trailer-interchange" style="display: block;">
-                                    <option value="">Select Limit</option>
-                                    <option value="0">No Coverage</option>
-                                    <option value="20000">$20,000</option>
-                                    <option value="25000">$25,000</option>
-                                    <option value="50000">$50,000</option>
-                                    <option value="60000/2000ded">$60,000/$2,000 Ded.</option>
-                                    <option value="75000">$75,000</option>
-                                    <option value="100000">$100,000</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Non-Owned Trailer</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-non-owned-trailer-text" placeholder="e.g. $50,000" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-non-owned-trailer" style="display: block;">
-                                    <option value="">Select Limit</option>
-                                    <option value="0">No Coverage</option>
-                                    <option value="20000">$20,000</option>
-                                    <option value="25000">$25,000</option>
-                                    <option value="50000">$50,000</option>
-                                    <option value="60000/2000ded">$60,000/$2,000 Ded.</option>
-                                    <option value="75000">$75,000</option>
-                                    <option value="100000">$100,000</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Non-Trucking Liability</label>
-                                <!-- Text input (hidden by default) -->
-                                <input type="text" class="form-control coverage-text-input" id="coverage-non-trucking-text" placeholder="e.g. $1,000,000 CSL" style="display: none;">
-                                <!-- Dropdown (default) -->
-                                <select class="form-control coverage-dropdown" id="coverage-non-trucking" style="display: block;">
-                                    <option value="">Select Limit</option>
-                                    <option value="0">No Coverage</option>
-                                    <option value="30/60/25">$30K/$60K/$25K</option>
-                                    <option value="100/300/100">$100K/$300K/$100K</option>
-                                    <option value="300000">$300,000 CSL</option>
-                                    <option value="500000">$500,000 CSL</option>
-                                    <option value="750000">$750,000 CSL</option>
-                                    <option value="1000000">$1,000,000 CSL</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Reefer Breakdown</label>
-                                <select class="form-control coverage-dropdown" id="coverage-reefer" style="display: block;">
-                                    <option value="">Select Deductible</option>
-                                    <option value="0">No Coverage</option>
-                                    <option value="included">Included / No Deductible</option>
-                                    <option value="500">$500 Deductible</option>
-                                    <option value="1000">$1,000 Deductible</option>
-                                    <option value="2500">$2,500 Deductible</option>
-                                    <option value="5000">$5,000 Deductible</option>
-                                </select>
+                            <div class="form-section" style="margin-bottom:0;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                    <h3 style="margin:0;"><i class="fas fa-id-card" style="margin-right:8px;"></i>Drivers</h3>
+                                    <button type="button" class="btn-secondary" onclick="addDriver()" style="padding:5px 12px;font-size:13px;">
+                                        <i class="fas fa-plus"></i> Add Driver
+                                    </button>
+                                </div>
+                                <div id="driversList"></div>
                             </div>
                         </div>
 
-                        <h3>Additional Coverages</h3>
-                        <div class="checkbox-group">
-                            <label><input type="checkbox" id="coverage-hired"> Hired Auto Physical Damage</label>
-                            <label><input type="checkbox" id="coverage-non-owned"> Non-Owned Auto Liability</label>
-                            <label><input type="checkbox" id="coverage-towing"> Towing & Labor</label>
-                            <label><input type="checkbox" id="coverage-rental"> Rental Reimbursement</label>
-                            <label><input type="checkbox" id="coverage-general-liability"> General Liability</label>
-                        </div>
                     </div>
                 `;
             } else {
@@ -1057,19 +948,91 @@ function generateTabContent(tabId, policyType) {
                 </div>
             `;
             
-        case 'documents':
+        case 'documents': {
+            const docPolicyId = window.editingPolicyId || '';
             return `
+                ${docPolicyId ? `
+                <!-- Certificate of Insurance -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+                    <div class="form-section" style="padding: 24px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0; color: #111827; font-size: 18px; font-weight: 600;">Certificate of Insurance</h3>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;">
+                                <button onclick="window.sendCOIForPolicy('${docPolicyId}')" class="btn-secondary" style="padding: 7px 13px; font-size: 12px; border-radius: 6px; background: #3b82f6; border-color: #3b82f6; color: white;">
+                                    <i class="fas fa-envelope"></i> Send
+                                </button>
+                                <button onclick="window.generateCertificateForPolicy('${docPolicyId}')" class="btn-secondary" style="padding: 7px 13px; font-size: 12px; border-radius: 6px; background: #10b981; border-color: #10b981; color: white;">
+                                    <i class="fas fa-certificate"></i> Generate
+                                </button>
+                                <button onclick="window.uploadCOIForPolicy('${docPolicyId}')" class="btn-secondary" style="padding: 7px 13px; font-size: 12px; border-radius: 6px; background: #f59e0b; border-color: #f59e0b; color: white;">
+                                    <i class="fas fa-upload"></i> Upload
+                                </button>
+                            </div>
+                        </div>
+                        <div id="coiFilesContainer-${docPolicyId}" style="min-height: 80px;">
+                            <div style="text-align: center; padding: 24px; color: #6b7280;">
+                                <i class="fas fa-file-certificate" style="font-size: 36px; margin-bottom: 10px; opacity: 0.3;"></i>
+                                <p style="margin: 0; font-size: 14px;">Loading COI documents...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ID Cards -->
+                    <div class="form-section" style="padding: 24px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0; color: #111827; font-size: 18px; font-weight: 600;">Insurance ID Cards</h3>
+                            <button onclick="window.uploadIdCardsForPolicy('${docPolicyId}')" class="btn-secondary" style="padding: 7px 13px; font-size: 12px; border-radius: 6px; background: #10b981; border-color: #10b981; color: white;">
+                                <i class="fas fa-upload"></i> Upload
+                            </button>
+                        </div>
+                        <div id="idCardsContainer-${docPolicyId}" style="min-height: 80px; text-align: center; padding: 24px; color: #6b7280;">
+                            <i class="fas fa-id-card" style="font-size: 36px; margin-bottom: 10px; opacity: 0.3;"></i>
+                            <p style="margin: 0; font-size: 14px;">No ID cards uploaded yet</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Policy Documents -->
+                <div class="form-section" style="padding: 24px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: #111827; font-size: 18px; font-weight: 600;">Policy Documents</h3>
+                        <button onclick="window.uploadPolicyDocument('${docPolicyId}')" class="btn-secondary" style="padding: 7px 13px; font-size: 12px; border-radius: 6px; background: #10b981; border-color: #10b981; color: white;">
+                            <i class="fas fa-upload"></i> Upload Document
+                        </button>
+                    </div>
+                    <div id="policy-documents-list">
+                        ${typeof window.renderPolicyDocuments === 'function' ? window.renderPolicyDocuments(docPolicyId) : '<p style="color:#6b7280;font-size:14px;">No documents uploaded yet.</p>'}
+                    </div>
+                </div>
+
+                <!-- Application Submissions -->
+                <div class="form-section" style="padding: 24px; background: linear-gradient(to bottom, #f9fafb, #ffffff); border-radius: 12px; border: 1px solid #e5e7eb;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: #111827; font-size: 18px; font-weight: 600;">Application Submissions</h3>
+                        <button onclick="window.createQuoteApplicationForPolicy('${docPolicyId}')" class="btn-secondary" style="padding: 7px 13px; font-size: 12px; border-radius: 6px; background: #10b981; border-color: #10b981; color: white;">
+                            <i class="fas fa-plus"></i> New Application
+                        </button>
+                    </div>
+                    <div id="policy-applications-list-${docPolicyId}">
+                        <div style="text-align: center; padding: 24px; color: #6b7280;">
+                            <i class="fas fa-file-alt" style="font-size: 36px; margin-bottom: 10px; opacity: 0.3;"></i>
+                            <p style="margin: 0; font-size: 14px;">No applications submitted yet</p>
+                        </div>
+                    </div>
+                </div>
+                ` : `
+                <!-- New policy — no ID yet -->
                 <div class="form-section">
                     <h3>Policy Documents</h3>
                     <div class="document-upload">
                         <i class="fas fa-cloud-upload-alt"></i>
-                        <p>Drag and drop files here or click to browse</p>
-                        <input type="file" multiple style="display: none;">
+                        <p>Save the policy first, then you can upload documents and generate COIs.</p>
                     </div>
                     <div id="documentsList"></div>
                 </div>
-            `;
-            
+                `}
+            `;}
+
         case 'notes':
             return `
                 <div class="form-section">
@@ -1095,6 +1058,13 @@ function switchTab(tabId) {
     // Add active class to selected tab and content
     document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
     document.getElementById(`${tabId}-content`).classList.add('active');
+
+    // When switching to documents tab, trigger COI file load
+    if (tabId === 'documents' && window.editingPolicyId) {
+        setTimeout(() => {
+            if (window.loadCOIFiles) window.loadCOIFiles(window.editingPolicyId);
+        }, 100);
+    }
 }
 
 // Make switchTab globally available
@@ -1790,21 +1760,36 @@ async function savePolicy() {
             console.log('Drivers tab not opened — preserving existing drivers:', policyData.drivers.length);
         }
 
-        // Collect Additional Coverages checkboxes (they're in .checkbox-group, not .form-group)
-        const additionalCoverageMap = {
-            'coverage-hired': 'Hired Auto Physical Damage',
-            'coverage-non-owned': 'Non-Owned Auto Liability',
-            'coverage-towing': 'Towing & Labor',
-            'coverage-rental': 'Rental Reimbursement',
-            'coverage-general-liability': 'General Liability'
-        };
-        const additionalCoverages = [];
-        Object.entries(additionalCoverageMap).forEach(([id, name]) => {
-            const el = document.getElementById(id);
-            if (el && el.checked) additionalCoverages.push(name);
-        });
+        // Collect CoveragesArray and AL checkboxes from the coverage tab (commercial-auto)
         if (!policyData.coverage) policyData.coverage = {};
-        policyData.coverage.additionalCoverages = additionalCoverages;
+        const alAnyAuto = document.getElementById('al-any-auto');
+        if (alAnyAuto !== null) {
+            policyData.coverage.automotiveLiability = {
+                anyAuto:    document.getElementById('al-any-auto')?.checked || false,
+                allOwned:   document.getElementById('al-all-owned')?.checked || false,
+                allScheduled: document.getElementById('al-scheduled')?.checked || false,
+                allHired:   document.getElementById('al-hired')?.checked || false,
+                allNonOwned: document.getElementById('al-non-owned')?.checked || false
+            };
+        } else if (currentPolicyData?.coverage?.automotiveLiability) {
+            policyData.coverage.automotiveLiability = currentPolicyData.coverage.automotiveLiability;
+        }
+        const coverageTbody = document.getElementById('coverages-tbody');
+        if (coverageTbody) {
+            const coveragesArray = {};
+            coverageTbody.querySelectorAll('tr[data-coverage-code]').forEach(row => {
+                const code = row.getAttribute('data-coverage-code');
+                const desc = row.getAttribute('data-coverage-desc') || '';
+                const amount = row.querySelector('.cov-amount')?.value || '';
+                const deduct = row.querySelector('.cov-deduct')?.value || '';
+                const premium = row.querySelector('.cov-premium')?.value || '';
+                coveragesArray[code] = { Code: code, Description: desc, Amount: amount, Deductible: deduct, Premium: premium };
+            });
+            policyData.coverage.CoveragesArray = coveragesArray;
+        } else if (currentPolicyData?.coverage?.CoveragesArray) {
+            // Coverage tab not opened — preserve existing CoveragesArray
+            policyData.coverage.CoveragesArray = currentPolicyData.coverage.CoveragesArray;
+        }
 
         // Ensure policyType is not lost - use initial type if current is empty
         if (!policyData.policyType || policyData.policyType === '') {
@@ -2533,25 +2518,36 @@ function populatePolicyForm(policyData) {
         }
     }
     
-    // Restore Additional Coverages checkboxes
-    const additionalCoverages = policyData.coverage?.additionalCoverages || [];
-    const coverageCheckboxMap = {
-        'coverage-hired': 'Hired Auto Physical Damage',
-        'coverage-non-owned': 'Non-Owned Auto Liability',
-        'coverage-towing': 'Towing & Labor',
-        'coverage-rental': 'Rental Reimbursement',
-        'coverage-general-liability': 'General Liability'
-    };
-    Object.entries(coverageCheckboxMap).forEach(([id, name]) => {
-        const el = document.getElementById(id);
-        if (el) el.checked = additionalCoverages.includes(name);
-    });
+    // Restore Automotive Liability checkboxes
+    const alData = policyData.coverage?.automotiveLiability;
+    if (alData && document.getElementById('al-any-auto')) {
+        document.getElementById('al-any-auto').checked = !!alData.anyAuto;
+        document.getElementById('al-all-owned').checked = !!alData.allOwned;
+        document.getElementById('al-scheduled').checked = !!alData.allScheduled;
+        document.getElementById('al-hired').checked = !!alData.allHired;
+        document.getElementById('al-non-owned').checked = !!alData.allNonOwned;
+    }
 
-    // Backward compat: if old policy had Reefer Breakdown in additionalCoverages,
-    // map it to the new dropdown as "Included / No Deductible"
-    const reeferSelect = document.getElementById('coverage-reefer');
-    if (reeferSelect && !reeferSelect.value && additionalCoverages.includes('Reefer Breakdown')) {
-        reeferSelect.value = 'included';
+    // Render CoveragesArray into the coverage datatable (commercial-auto)
+    const coveragesTbody = document.getElementById('coverages-tbody');
+    if (coveragesTbody) {
+        coveragesTbody.innerHTML = '';
+        let coveragesArray = policyData.coverage?.CoveragesArray;
+
+        // Backward compat: migrate old named-field coverage data to CoveragesArray
+        if (!coveragesArray || Object.keys(coveragesArray).length === 0) {
+            coveragesArray = migrateLegacyCoverageData(policyData);
+        }
+
+        const emptyMsg = document.getElementById('coverages-empty');
+        if (coveragesArray && Object.keys(coveragesArray).length > 0) {
+            Object.values(coveragesArray).forEach(cov => {
+                if (cov && cov.Code) addCoverageRow(cov.Code, cov);
+            });
+            if (emptyMsg) emptyMsg.style.display = 'none';
+        } else {
+            if (emptyMsg) emptyMsg.style.display = 'block';
+        }
     }
 
     // Populate financial/coverage data from root level if not in tabs
@@ -2773,52 +2769,144 @@ window.addPolicyTrailer = addPolicyTrailer;
 window.addPolicyDriver = addPolicyDriver;
 
 // Coverage input mode toggle function
-window.toggleCoverageMode = function(mode) {
-    console.log('Switching coverage input mode to:', mode);
+// Coverage codes dictionary for the datatable
+const COVERAGE_CODES = {
+    'CSL':   'Combined Single Limit',
+    'BSPL':  'BI/PD Split Limit',
+    'COMP':  'Comprehensive',
+    'COLL':  'Collision',
+    'MEDPM': 'Medical Payments',
+    'UMCSL': 'Uninsured Motorist CSL',
+    'UMSPL': 'Uninsured Motorist Split',
+    'NOWND': 'Non-Owned Auto',
+    'HRDBD': 'Hired/Borrowed Auto',
+    'GLCBI': 'General Liability BI',
+    'GLCPD': 'General Liability PD',
+    'MTGL':  'Motor Truck General Liability',
+    'CARGO': 'Motor Truck Cargo',
+    'TI':    'Trailer Interchange',
+    'NOT':   'Non-Owned Trailer',
+    'NTL':   'Non-Trucking Liability',
+    'REEFR': 'Reefer Breakdown',
+    'TOWIN': 'Towing & Labor',
+    'RENTAL':'Rental Reimbursement',
+    'HOOK':  'Grapple Hook/Crane',
+    'PIP':   'Personal Injury Protection',
+    'UMPD':  'Uninsured Motorist Prop. Damage',
+};
 
-    const textInputs = document.querySelectorAll('.coverage-text-input');
-    const dropdowns = document.querySelectorAll('.coverage-dropdown');
+window.addCoverageRow = function(code, existing) {
+    if (!code) {
+        const sel = document.getElementById('coverage-add-select');
+        code = sel ? sel.value : '';
+    }
+    if (!code) return;
 
-    if (mode === 'text') {
-        // Show text inputs, hide dropdowns
-        textInputs.forEach(input => {
-            input.style.display = 'block';
-        });
-        dropdowns.forEach(select => {
-            select.style.display = 'none';
-        });
-        console.log('✅ Switched to text input mode');
-    } else {
-        // Show dropdowns, hide text inputs
-        textInputs.forEach(input => {
-            input.style.display = 'none';
-        });
-        dropdowns.forEach(select => {
-            select.style.display = 'block';
-        });
-        console.log('✅ Switched to dropdown mode');
+    // Don't add duplicates
+    if (document.querySelector(`#coverages-tbody tr[data-coverage-code="${CSS.escape(code)}"]`)) {
+        if (typeof showNotification === 'function') showNotification(`Coverage ${code} is already in the list.`, 'warning');
+        return;
+    }
+
+    const tbody = document.getElementById('coverages-tbody');
+    const emptyMsg = document.getElementById('coverages-empty');
+    if (!tbody) return;
+
+    const desc = COVERAGE_CODES[code] || (existing && existing.Description) || code;
+    const amount  = (existing && existing.Amount  != null) ? existing.Amount  : '';
+    const deduct  = (existing && existing.Deductible != null) ? existing.Deductible : '';
+    const premium = (existing && existing.Premium != null) ? existing.Premium : '';
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-coverage-code', code);
+    tr.setAttribute('data-coverage-desc', desc);
+    tr.style.borderBottom = '1px solid #dee2e6';
+    tr.innerHTML = `
+        <td style="padding: 8px 12px; white-space: nowrap;">
+            <strong style="font-size: 14px;">${code}</strong><br>
+            <small style="color: #6c757d;">${desc}</small>
+        </td>
+        <td style="padding: 8px 12px;">
+            <input type="text" class="form-control cov-amount" data-code="${code}" value="${amount}" placeholder="e.g. 1,000,000">
+        </td>
+        <td style="padding: 8px 12px;">
+            <input type="text" class="form-control cov-deduct" data-code="${code}" value="${deduct}" placeholder="e.g. 1,000">
+        </td>
+        <td style="padding: 8px 12px;">
+            <input type="text" class="form-control cov-premium" data-code="${code}" value="${premium}" placeholder="0.00">
+        </td>
+        <td style="padding: 8px 12px; text-align: center;">
+            <button type="button" onclick="removeCoverageRow('${code}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 16px;" title="Remove">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+    if (emptyMsg) emptyMsg.style.display = 'none';
+
+    // Reset the add-select dropdown
+    const sel = document.getElementById('coverage-add-select');
+    if (sel) sel.value = '';
+};
+
+window.removeCoverageRow = function(code) {
+    const row = document.querySelector(`#coverages-tbody tr[data-coverage-code="${code}"]`);
+    if (row) row.remove();
+    const tbody = document.getElementById('coverages-tbody');
+    const emptyMsg = document.getElementById('coverages-empty');
+    if (tbody && emptyMsg && tbody.querySelectorAll('tr[data-coverage-code]').length === 0) {
+        emptyMsg.style.display = 'block';
     }
 };
 
-// Handle cargo limit change — auto-exclude deductible when no cargo coverage
-window.handleCargoLimitChange = function(select) {
-    const isExcluded = select.value === '0' || select.value === '';
-    const deductSelect = document.getElementById('coverage-cargo-deduct');
-    const deductTextInput = document.getElementById('coverage-cargo-deduct-text');
-    const deductGroup = deductSelect ? deductSelect.closest('.form-group') : null;
+// Migrate old named-field coverage data to CoveragesArray format (backward compat)
+function migrateLegacyCoverageData(policyData) {
+    const cov = policyData.coverage || {};
+    const arr = {};
 
-    if (deductGroup) {
-        if (isExcluded && select.value === '0') {
-            deductGroup.style.opacity = '0.4';
-            deductGroup.style.pointerEvents = 'none';
-            deductSelect.value = '';
-            if (deductTextInput) deductTextInput.value = '';
-        } else {
-            deductGroup.style.opacity = '';
-            deductGroup.style.pointerEvents = '';
-        }
-    }
-};
+    const liability = cov['Liability Limits'] || cov['liability-limits'];
+    if (liability && liability !== '') arr['CSL'] = { Code: 'CSL', Description: 'Combined Single Limit', Amount: liability, Deductible: '0', Premium: '0' };
+
+    const compDed = cov['Comprehensive Deductible'] || cov['comp-deduct'];
+    if (compDed && compDed !== '') arr['COMP'] = { Code: 'COMP', Description: 'Comprehensive', Amount: '', Deductible: compDed, Premium: '0' };
+
+    const collDed = cov['Collision Deductible'] || cov['coll-deduct'];
+    if (collDed && collDed !== '') arr['COLL'] = { Code: 'COLL', Description: 'Collision', Amount: '', Deductible: collDed, Premium: '0' };
+
+    const cargoLim = cov['Cargo Limit'] || cov['cargo-limit'];
+    const cargoDed = cov['Cargo Deductible'] || cov['cargo-deduct'];
+    if (cargoLim && cargoLim !== '0' && cargoLim !== '') arr['CARGO'] = { Code: 'CARGO', Description: 'Motor Truck Cargo', Amount: cargoLim, Deductible: cargoDed || '0', Premium: '0' };
+
+    const medPay = cov['Medical Payments'] || cov['medical'];
+    if (medPay && medPay !== '0' && medPay !== '') arr['MEDPM'] = { Code: 'MEDPM', Description: 'Medical Payments', Amount: medPay, Deductible: '0', Premium: '0' };
+
+    const um = cov['Uninsured/Underinsured Motorist'] || cov['Uninsured Motorist CSL'] || cov['um-uim'];
+    if (um && um !== '0' && um !== '') arr['UMCSL'] = { Code: 'UMCSL', Description: 'Uninsured Motorist CSL', Amount: um, Deductible: '0', Premium: '0' };
+
+    const ti = cov['Trailer Interchange Limit'] || cov['trailer-interchange'];
+    if (ti && ti !== '0' && ti !== '') arr['TI'] = { Code: 'TI', Description: 'Trailer Interchange', Amount: ti, Deductible: '0', Premium: '0' };
+
+    const not = cov['Non-Owned Trailer'] || cov['non-owned-trailer'];
+    if (not && not !== '0' && not !== '') arr['NOT'] = { Code: 'NOT', Description: 'Non-Owned Trailer', Amount: not, Deductible: '0', Premium: '0' };
+
+    const ntl = cov['Non-Trucking Liability'] || cov['non-trucking'];
+    if (ntl && ntl !== '0' && ntl !== '') arr['NTL'] = { Code: 'NTL', Description: 'Non-Trucking Liability', Amount: ntl, Deductible: '0', Premium: '0' };
+
+    const reefer = cov['Reefer Breakdown'] || cov['reefer'];
+    if (reefer && reefer !== '0' && reefer !== '') arr['REEFR'] = { Code: 'REEFR', Description: 'Reefer Breakdown', Amount: '', Deductible: reefer === 'included' ? '0' : reefer, Premium: '0' };
+
+    const gl = cov['General Liability'] || cov['general-aggregate'] || cov['General Liability BI'];
+    if (gl && gl !== 'excluded' && gl !== '0' && gl !== '') arr['GLCBI'] = { Code: 'GLCBI', Description: 'General Liability BI', Amount: gl, Deductible: '0', Premium: '0' };
+
+    // Handle old additionalCoverages checkbox array
+    const addlCovs = cov.additionalCoverages || [];
+    if (addlCovs.includes('Hired Auto Physical Damage') && !arr['HRDBD']) arr['HRDBD'] = { Code: 'HRDBD', Description: 'Hired/Borrowed Auto', Amount: '0', Deductible: '0', Premium: '0' };
+    if (addlCovs.includes('Non-Owned Auto Liability') && !arr['NOWND']) arr['NOWND'] = { Code: 'NOWND', Description: 'Non-Owned Auto', Amount: '0', Deductible: '0', Premium: '0' };
+    if (addlCovs.includes('Towing & Labor') && !arr['TOWIN']) arr['TOWIN'] = { Code: 'TOWIN', Description: 'Towing & Labor', Amount: '0', Deductible: '0', Premium: '0' };
+    if (addlCovs.includes('Rental Reimbursement') && !arr['RENTAL']) arr['RENTAL'] = { Code: 'RENTAL', Description: 'Rental Reimbursement', Amount: '0', Deductible: '0', Premium: '0' };
+
+    return arr;
+}
 
 // Handle carrier dropdown change to "Other"
 function handleCarrierChange(selectElement) {

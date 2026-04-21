@@ -202,6 +202,8 @@ window.generateLeadsFromForm = async function() {
 
             xhr.open('GET', apiUrl, true);
             xhr.setRequestHeader('Accept', 'application/json');
+            const authToken = localStorage.getItem('authToken') || localStorage.getItem('auth_token') || sessionStorage.getItem('vanguard_jwt');
+            if (authToken) xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
 
             // Add progress logging
             xhr.onreadystatechange = function() {

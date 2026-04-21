@@ -45,106 +45,38 @@
         }
     };
     
-    // Fix the view modal switchViewTab function
+    // Fix the view page switchViewTab function
     window.switchViewTab = function(tabId) {
         console.log('Switching view tab:', tabId);
-        
-        // Find the policy view modal
-        const modal = document.getElementById('policyViewModal');
-        if (!modal) {
-            console.error('Policy view modal not found');
+
+        // Policy view is now a page inside #policyDetailPage (not a modal)
+        const page = document.getElementById('policyDetailPage');
+        if (!page) {
+            if (originalSwitchViewTab) return originalSwitchViewTab.call(this, tabId);
             return;
         }
-        
-        // Remove active class from all tabs
-        modal.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
+
+        // Update tab buttons
+        page.querySelectorAll('.policy-view-tab-btn').forEach(btn => {
+            const isActive = btn.getAttribute('data-tab') === tabId;
+            btn.classList.toggle('pv-tab-active', isActive);
+            btn.style.borderBottom = isActive ? '3px solid #0066cc' : '3px solid transparent';
+            btn.style.color = isActive ? '#0066cc' : '#6b7280';
         });
-        
-        // Remove active class from all content sections and hide them
-        modal.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
+
+        // Show/hide content panels
+        page.querySelectorAll('.tab-content').forEach(content => {
             content.style.display = 'none';
         });
-        
-        // Add active class to selected tab
-        const selectedTab = modal.querySelector(`.tab-btn[data-tab="${tabId}"]`);
-        if (selectedTab) {
-            selectedTab.classList.add('active');
-        }
-        
-        // Show selected content
-        const selectedContent = modal.querySelector(`#${tabId}-view-content`);
-        if (selectedContent) {
-            selectedContent.classList.add('active');
-            selectedContent.style.display = 'block';
-        }
+        const selectedContent = document.getElementById(`${tabId}-view-content`);
+        if (selectedContent) selectedContent.style.display = 'block';
     };
     
-    // Add styles for proper tab display
+    // Add styles for policy edit modal tab display
     const style = document.createElement('style');
     style.textContent = `
-        /* Policy modals tab content styles */
-        #policyModal .tab-content,
-        #policyViewModal .tab-content {
-            display: none;
-        }
-        
-        #policyModal .tab-content.active,
-        #policyViewModal .tab-content.active {
-            display: block !important;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        /* Tab button styles */
-        #policyViewModal .tab-btn {
-            background: white;
-            border: 1px solid #e5e7eb;
-            color: #6b7280;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        #policyViewModal .tab-btn:hover {
-            background: #f9fafb;
-            color: #1f2937;
-        }
-        
-        #policyViewModal .tab-btn.active {
-            background: #0066cc;
-            color: white;
-            border-color: #0066cc;
-            box-shadow: 0 2px 4px rgba(0, 102, 204, 0.2);
-        }
-        
-        /* Policy tabs container */
-        #policyViewModal .policy-tabs {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        
-        /* Tab content container */
-        #policyViewModal .tab-contents {
-            min-height: 400px;
-        }
-        
-        /* Fix for content visibility */
-        #policyViewModal .tab-content > * {
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
+        #policyModal .tab-content { display: none; }
+        #policyModal .tab-content.active { display: block !important; }
     `;
     document.head.appendChild(style);
     
@@ -176,16 +108,11 @@
         });
     }
     
-    // Watch for when policy modals are added to the DOM
+    // Watch for when policy edit modal is added to the DOM
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-                if (node.id === 'policyViewModal') {
-                    console.log('Policy view modal detected, initializing tabs...');
-                    setTimeout(() => {
-                        initializeModalTabs('policyViewModal');
-                    }, 100);
-                } else if (node.id === 'policyModal') {
+                if (node.id === 'policyModal') {
                     console.log('Policy edit/create modal detected, initializing tabs...');
                     setTimeout(() => {
                         initializeModalTabs('policyModal');
@@ -200,36 +127,6 @@
         childList: true,
         subtree: true
     });
-    
-    // Override viewPolicy function to ensure tabs are initialized
-    const originalViewPolicy = window.viewPolicy;
-    if (originalViewPolicy) {
-        window.viewPolicy = function(...args) {
-            const result = originalViewPolicy.apply(this, args);
-            
-            // Wait for modal to render then initialize tabs
-            setTimeout(() => {
-                initializeModalTabs('policyViewModal');
-            }, 200);
-            
-            return result;
-        };
-    }
-    
-    // Override showPolicyDetailsModal if it exists
-    const originalShowPolicyDetailsModal = window.showPolicyDetailsModal;
-    if (originalShowPolicyDetailsModal) {
-        window.showPolicyDetailsModal = function(...args) {
-            const result = originalShowPolicyDetailsModal.apply(this, args);
-            
-            // Wait for modal to render then initialize tabs
-            setTimeout(() => {
-                initializeModalTabs('policyViewModal');
-            }, 200);
-            
-            return result;
-        };
-    }
     
     // Override showPolicyModal for edit/create
     const originalShowPolicyModal = window.showPolicyModal;
