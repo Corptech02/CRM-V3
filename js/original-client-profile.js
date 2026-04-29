@@ -33,7 +33,7 @@ window.viewClientOriginal = async function(id) {
 
     // Merge server policies into localStorage without overwriting local-only entries
     try {
-        const response = await fetch('/api/policies?includeInactive=true');
+        const response = await fetch('/api/policies?includeInactive=true&limit=500');
         if (response.ok) {
             const serverPolicies = await response.json();
             const localPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
@@ -58,6 +58,15 @@ window.viewClientOriginal = async function(id) {
     const clientDob = client.dateOfBirth || client['Date of Birth'] || '';
     const clientKey = _clientIdentityKey(client.name || client.businessName || '', clientDob);
 
+    // Normalize helpers for broad matching
+    const _nStr = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+    const _nPh  = s => (s || '').replace(/\D/g, '');
+    const clientNameN = _nStr(client.name);
+    const clientBizN  = _nStr(client.businessName || client.companyName || '');
+    const clientEmailN = (client.email || '').toLowerCase().trim();
+    const clientPhoneN = _nPh(client.phone);
+    const clientPeopleNames = (client.people || []).map(p => _nStr((p.firstName || '') + ' ' + (p.lastName || '') || p.name || '')).filter(Boolean);
+
     const clientPolicies = allPolicies.filter(policy => {
         // 1. Exact clientId match — always wins
         if (policy.clientId && String(policy.clientId) === String(id)) return true;
@@ -68,27 +77,61 @@ window.viewClientOriginal = async function(id) {
         const polKey   = _clientIdentityKey(polOwner, polDob);
         if (clientKey && polKey && polKey === clientKey) return true;
 
-        // 3. Insured name exact match against client name
-        const insuredName = policy.insured?.['Name/Business Name'] ||
-                           policy.insured?.['Primary Named Insured'] ||
-                           policy.insured?.['Full Name'] ||
-                           policy.insured?.['Business Name'] ||
-                           policy.insuredName ||
-                           policy.clientName;
-        if (insuredName && client.name && insuredName.toLowerCase() === client.name.toLowerCase()) return true;
+        // Gather all name variants from the policy
+        const polNames = [
+            policy.insured?.['Name/Business Name'],
+            policy.insured?.['Primary Named Insured'],
+            policy.insured?.['Business Name'],
+            policy.insured?.['Full Name'],
+            policy.insuredName,
+            policy.clientName,
+            policy.contact?.['Owner Name'],
+            policy.contact?.['Business Name']
+        ].filter(Boolean);
+
+        // 3. Exact name match (person name, business name, people contacts)
+        for (const pn of polNames) {
+            const pnN = _nStr(pn);
+            if (pnN && clientNameN && pnN === clientNameN) return true;
+            if (pnN && clientBizN && pnN === clientBizN) return true;
+            if (pnN && clientPeopleNames.some(cn => cn === pnN)) return true;
+        }
 
         // 4. Fuzzy identity key on insured/client name
-        if (insuredName) {
-            const polKeyFallback = _clientIdentityKey(insuredName, '');
+        for (const pn of polNames) {
+            const polKeyFallback = _clientIdentityKey(pn, '');
             if (clientKey && polKeyFallback && polKeyFallback === clientKey) return true;
         }
 
-        // 5. Business name match (catches policies where auto-created client biz name = real client biz name)
-        const polBizName = policy.contact?.['Business Name'] || policy.clientName || '';
-        if (polBizName && client.businessName) {
-            const polBizKey    = _clientIdentityKey(polBizName, '');
-            const clientBizKey = _clientIdentityKey(client.businessName, '');
-            if (polBizKey && clientBizKey && polBizKey === clientBizKey) return true;
+        // 5. Business name containment (handles "LOPEZ TRUCKING COMPANY LLC" vs "Lopez Trucking")
+        if (clientBizN && clientBizN.length >= 4) {
+            for (const pn of polNames) {
+                const pnN = _nStr(pn);
+                if (pnN && (pnN.includes(clientBizN) || clientBizN.includes(pnN))) return true;
+            }
+        }
+
+        // 6. Email match
+        const polEmail = (policy.contact?.['Email'] || policy.contact?.['email'] || policy.contact?.['Email Address'] || policy.insured?.['Email'] || '').toLowerCase().trim();
+        if (clientEmailN && polEmail && clientEmailN === polEmail) return true;
+
+        // 7. Phone match
+        const polPhone = _nPh(policy.contact?.['Phone'] || policy.contact?.['phone'] || policy.contact?.['Phone Number'] || policy.insured?.['Phone'] || '');
+        if (clientPhoneN && clientPhoneN.length >= 10 && polPhone.length >= 10 && clientPhoneN === polPhone) return true;
+
+        // 8. Client name match against policy.clientName (IVANS imports set this)
+        if (policy.clientName && client.name) {
+            const pcN = _nStr(policy.clientName);
+            if (pcN && clientNameN && pcN === clientNameN) return true;
+        }
+
+        // 9. Legacy client.policies array
+        if (client.policies && Array.isArray(client.policies)) {
+            return client.policies.some(p => {
+                if (typeof p === 'string') return p === policy.id || p === policy.policyNumber;
+                if (typeof p === 'object' && p) return p.id === policy.id || p.policyNumber === policy.policyNumber;
+                return false;
+            });
         }
 
         return false;
@@ -223,7 +266,45 @@ window.viewClientOriginal = async function(id) {
                             </button>
                         </div>
                         <div style="padding: 0;">
-                            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            ${(() => {
+                                // Companies (LLC, Inc, Corp, etc.) belong in the Business box.
+                                // For company clients, pull driver[0] from the first policy as the owner.
+                                const _isCompany = n => /LLC|Inc\b|Corp\b|L\.L\.C|Incorporated|Company|Transport|Trucking|Logistics|Enterprise|Services|Group|Industries|Solutions|Associates|Partners/i.test(n || '');
+                                const _primaryName = resolvedFullName || client.name || '';
+                                const _clientIsCompany = _isCompany(_primaryName) || _isCompany(client.businessName);
+
+                                // Find first driver from linked policies to use as owner
+                                let _owner = null;
+                                if (_clientIsCompany) {
+                                    for (const _p of clientPolicies) {
+                                        if (Array.isArray(_p.drivers) && _p.drivers.length > 0) {
+                                            const _d = _p.drivers[0];
+                                            _owner = {
+                                                name:  _d.name || _d['Full Name'] || '',
+                                                dob:   _d.dateOfBirth || _d['Date of Birth'] || '',
+                                                email: _p.contact?.['Email'] || _p.contact?.['Email Address'] || client.email || '',
+                                                phone: _p.contact?.['Phone'] || _p.contact?.['Phone Number'] || client.phone || '',
+                                                license: _d.licenseNumber ? `${_d.licenseState || ''} ${_d.licenseNumber}`.trim() : '',
+                                            };
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                const _personName  = _clientIsCompany ? (_owner?.name || '') : _primaryName;
+                                const _personEmail = _clientIsCompany ? (_owner?.email || '') : (client.email || '');
+                                const _personPhone = _clientIsCompany ? (_owner?.phone || '') : (client.phone || '');
+                                const _personDob   = _clientIsCompany ? (_owner?.dob   || '') : (client.dateOfBirth || '');
+                                const _personRole  = _clientIsCompany ? 'Owner / Primary Driver' : 'Insured';
+
+                                if (!_personName) {
+                                    return `<div style="padding:20px 16px;text-align:center;color:#9ca3af;font-size:13px;">
+                                        <i class="fas fa-user-slash" style="margin-right:6px;opacity:0.4;"></i>No individual contacts on file
+                                        <div style="margin-top:6px;font-size:12px;">Use <strong>Add Person</strong> to add a contact for this business</div>
+                                    </div>`;
+                                }
+
+                                return `<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                                 <tbody>
                                     <tr style="border-bottom: 1px solid #f3f4f6;">
                                         <td style="padding: 10px 8px; width: 60px; vertical-align: top;">
@@ -231,36 +312,40 @@ window.viewClientOriginal = async function(id) {
                                         </td>
                                         <td style="padding: 10px 8px; vertical-align: top;">
                                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px;">
-                                                <!-- Col 1: Name + type + Added + DOB -->
+                                                <!-- Col 1: Name + role + Added + DOB -->
                                                 <div>
                                                     <div style="font-weight: 700; color: #111827; margin-bottom: 2px;">
-                                                        ${client.company || client.businessName ? `${client.company || client.businessName}` : resolvedFullName || client.name}
+                                                        ${_personName}
                                                     </div>
-                                                    <div style="color: #6b7280; font-size: 12px;">(Insured)</div>
+                                                    <div style="color: #6b7280; font-size: 12px;">(${_personRole})</div>
                                                     <div style="margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap;">
                                                         <div>
                                                             <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Added</span>
                                                             <span style="color: #374151; margin-left: 4px; font-size: 12px;">${client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}).replace(/\//g,'-') : 'N/A'}</span>
                                                         </div>
-                                                        <div>
+                                                        ${_personDob ? `<div>
                                                             <span style="color: #6380b0; font-size: 11px; font-weight: 600;">DOB</span>
-                                                            <span style="color: #374151; margin-left: 4px; font-size: 12px;">${client.dateOfBirth || ''}</span>
-                                                        </div>
+                                                            <span style="color: #374151; margin-left: 4px; font-size: 12px;">${_personDob}</span>
+                                                        </div>` : ''}
+                                                        ${_owner?.license ? `<div>
+                                                            <span style="color: #6380b0; font-size: 11px; font-weight: 600;">License</span>
+                                                            <span style="color: #374151; margin-left: 4px; font-size: 12px;">${_owner.license}</span>
+                                                        </div>` : ''}
                                                     </div>
                                                 </div>
                                                 <!-- Col 2: Email + Phone -->
                                                 <div>
-                                                    ${client.email ? `
+                                                    ${_personEmail ? `
                                                     <div style="margin-bottom: 4px;">
                                                         <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Email</span>
-                                                        <div style="font-size: 12px;"><a href="mailto:${client.email}" style="color: #3b82f6; text-decoration: none;">${client.email}</a></div>
+                                                        <div style="font-size: 12px;"><a href="mailto:${_personEmail}" style="color: #3b82f6; text-decoration: none;">${_personEmail}</a></div>
                                                     </div>` : ''}
-                                                    ${client.phone ? `
+                                                    ${_personPhone ? `
                                                     <div style="margin-bottom: 4px;">
                                                         <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Primary</span>
-                                                        <div style="font-size: 12px;"><a href="tel:${client.phone}" style="color: #374151; text-decoration: none;">${client.phone}</a></div>
+                                                        <div style="font-size: 12px;"><a href="tel:${_personPhone}" style="color: #374151; text-decoration: none;">${_personPhone}</a></div>
                                                     </div>` : ''}
-                                                    ${client.workPhone ? `
+                                                    ${!_clientIsCompany && client.workPhone ? `
                                                     <div>
                                                         <span style="color: #6380b0; font-size: 11px; font-weight: 600;">Work</span>
                                                         <div style="font-size: 12px;"><a href="tel:${client.workPhone}" style="color: #374151; text-decoration: none;">${client.workPhone}</a></div>
@@ -270,7 +355,8 @@ window.viewClientOriginal = async function(id) {
                                         </td>
                                     </tr>
                                 </tbody>
-                            </table>
+                            </table>`;
+                            })()}
                         </div>
                     </div>
 
@@ -332,15 +418,15 @@ window.viewClientOriginal = async function(id) {
                                 <tbody>
                                     ${(() => {
                                         const addr = client.address || '';
-                                        if (!addr) return `<tr><td colspan="7" style="padding:16px;text-align:center;color:#9ca3af;font-size:13px;">No addresses on file</td></tr>`;
-                                        // Try to parse "Street, City, ST ZIP" format
+                                        if (!addr && !client.city && !client.state && !client.zip) return `<tr><td colspan="7" style="padding:16px;text-align:center;color:#9ca3af;font-size:13px;">No addresses on file</td></tr>`;
+                                        // Use dedicated fields first, fall back to parsing address string
                                         const parts = addr.split(',').map(s => s.trim());
                                         const street = parts[0] || addr;
-                                        const cityPart = parts[1] || '';
-                                        const stateZip = (parts[2] || '').trim().split(/\s+/);
-                                        const state = stateZip[0] || '';
-                                        const zip = stateZip[1] || '';
-                                        const city = cityPart;
+                                        const parsedCityPart = parts[1] || '';
+                                        const parsedStateZip = (parts[2] || '').trim().split(/\s+/);
+                                        const city = client.city || parsedCityPart;
+                                        const state = client.state || parsedStateZip[0] || '';
+                                        const zip = client.zip || parsedStateZip[1] || '';
                                         const gmapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(addr)}`;
                                         return `<tr style="border-bottom: 1px solid #f3f4f6;">
                                             <td style="padding: 8px;">
@@ -364,6 +450,30 @@ window.viewClientOriginal = async function(id) {
                 </div>
 
                 <!-- Policies - Right Side -->
+                ${(() => {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const _parseExpDate = (d) => {
+                        if (!d) return null;
+                        // Handle MM/DD/YYYY
+                        const slashMatch = String(d).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                        if (slashMatch) return new Date(slashMatch[3], slashMatch[1]-1, slashMatch[2]);
+                        // Handle YYYY-MM-DD
+                        const dashMatch = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (dashMatch) return new Date(dashMatch[1], dashMatch[2]-1, dashMatch[3]);
+                        const parsed = new Date(d);
+                        return isNaN(parsed) ? null : parsed;
+                    };
+                    const activePolicies = clientPolicies.filter(p => {
+                        const exp = _parseExpDate(p.expirationDate || p.overview?.['Expiration Date']);
+                        return !exp || exp >= today;
+                    });
+                    const expiredPolicies = clientPolicies.filter(p => {
+                        const exp = _parseExpDate(p.expirationDate || p.overview?.['Expiration Date']);
+                        return exp && exp < today;
+                    });
+                    window._clientExpiredPolicies = expiredPolicies;
+                    return `
                 <div style="background: white; border-radius: 12px; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px;">
                         <div style="display: flex; align-items: center;">
@@ -372,13 +482,14 @@ window.viewClientOriginal = async function(id) {
                             </div>
                             <div>
                                 <h2 style="margin: 0; color: #1f2937; font-size: 22px; font-weight: 600;">Active Policies</h2>
-                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">${clientPolicies.length} ${clientPolicies.length === 1 ? 'Policy' : 'Policies'} Found</p>
+                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">${activePolicies.length} Active${expiredPolicies.length ? ', ' + expiredPolicies.length + ' Expired' : ''}</p>
                             </div>
                         </div>
+                        ${expiredPolicies.length ? `<button onclick="window._showExpiredPolicies()" style="display:flex;align-items:center;gap:6px;background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'"><i class="fas fa-history"></i> Policy History (${expiredPolicies.length})</button>` : ''}
                     </div>
 
                     <div style="display: grid; gap: 16px;">
-                        ${clientPolicies.length > 0 ? clientPolicies.map(policy => {
+                        ${activePolicies.length > 0 ? activePolicies.map(policy => {
                             const premium = policy.financial?.['Annual Premium'] ||
                                           policy.financial?.['Premium'] ||
                                           policy.premium || 0;
@@ -462,9 +573,10 @@ window.viewClientOriginal = async function(id) {
                         }).join('') : `
                             <div style="text-align: center; padding: 40px; color: #9ca3af;">
                                 <i class="fas fa-file-contract" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
-                                <p style="margin: 0 0 16px 0; font-size: 16px;">No policies found</p>
+                                <p style="margin: 0 0 16px 0; font-size: 16px;">No active policies</p>
+                                ${expiredPolicies.length ? `<p style="margin: 0 0 16px 0; font-size: 14px;">Check <strong>Policy History</strong> for ${expiredPolicies.length} expired ${expiredPolicies.length === 1 ? 'policy' : 'policies'}</p>` : ''}
                                 <button onclick="addPolicyToClient('${id}')" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                                    <i class="fas fa-plus"></i> Add First Policy
+                                    <i class="fas fa-plus"></i> Add Policy
                                 </button>
                                 <button onclick="syncPoliciesForClient('${id}')" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 8px;">
                                     <i class="fas fa-sync-alt"></i> Sync Policies
@@ -472,7 +584,7 @@ window.viewClientOriginal = async function(id) {
                             </div>
                         `}
                     </div>
-                </div>
+                </div>`; })()}
             </div>
 
             <!-- Media / Files + Notes Row -->
@@ -1055,6 +1167,77 @@ window.togglePasswordVisibility = function(clientId, password, buttonElement) {
     }
 };
 
+// Show expired policies history popup
+window._showExpiredPolicies = function() {
+    const policies = window._clientExpiredPolicies || [];
+    if (!policies.length) { _showInlineToast('No expired policies found', 'info'); return; }
+
+    const formatDate = d => {
+        if (!d) return 'N/A';
+        const s = String(d);
+        if (s.match(/^\d{4}-\d{2}-\d{2}/)) { const p = s.split('-'); return `${p[1]}/${p[2].substring(0,2)}/${p[0]}`; }
+        return s;
+    };
+
+    const rows = policies.map(p => {
+        const prem = p.financial?.['Annual Premium'] || p.financial?.['Premium'] || p.premium || '';
+        const fmtPrem = prem ? '$' + String(prem).replace(/[^0-9.]/g, '').replace(/(\d)(?=(\d{3})+\.)/g,'$1,') + '/yr' : 'N/A';
+        return `<tr style="border-bottom:1px solid #f3f4f6;">
+            <td style="padding:10px 12px;font-weight:600;color:#1f2937;font-size:13px;">${p.policyNumber || p.id || '—'}</td>
+            <td style="padding:10px 8px;font-size:13px;color:#374151;">${p.carrier || 'N/A'}</td>
+            <td style="padding:10px 8px;font-size:13px;color:#374151;">${p.policyType || p.type || 'N/A'}</td>
+            <td style="padding:10px 8px;font-size:13px;color:#374151;">${formatDate(p.effectiveDate)}</td>
+            <td style="padding:10px 8px;font-size:13px;color:#dc2626;font-weight:500;">${formatDate(p.expirationDate)}</td>
+            <td style="padding:10px 8px;font-size:13px;color:#059669;font-weight:600;">${fmtPrem}</td>
+            <td style="padding:10px 8px;"><button onclick="document.getElementById('expired-policies-overlay').remove();viewPolicy('${p.id}')" style="background:#3b82f6;color:white;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;"><i class="fas fa-eye"></i></button></td>
+        </tr>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'expired-policies-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:32px;max-width:820px;width:95%;max-height:80vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:40px;height:40px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;"><i class="fas fa-history" style="font-size:18px;"></i></div>
+                    <div>
+                        <h2 style="margin:0;font-size:20px;font-weight:700;color:#1f2937;">Policy History</h2>
+                        <p style="margin:2px 0 0;font-size:13px;color:#6b7280;">${policies.length} expired ${policies.length === 1 ? 'policy' : 'policies'}</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('expired-policies-overlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;">&times;</button>
+            </div>
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Policy #</th>
+                        <th style="padding:8px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Carrier</th>
+                        <th style="padding:8px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Type</th>
+                        <th style="padding:8px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Effective</th>
+                        <th style="padding:8px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Expired</th>
+                        <th style="padding:8px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Premium</th>
+                        <th style="padding:8px;width:50px;"></th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+};
+
+// Inline toast that always shows (bypasses disable-popups.js)
+function _showInlineToast(msg, type) {
+    const bg = type === 'success' ? '#059669' : type === 'error' ? '#dc2626' : type === 'warning' ? '#d97706' : '#1e40af';
+    const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;top:80px;right:24px;background:${bg};color:white;padding:14px 22px;border-radius:10px;font-size:14px;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.25);display:flex;align-items:center;gap:10px;max-width:420px;`;
+    t.innerHTML = `<i class="fas fa-${icon}"></i> ${msg}`;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 4000);
+}
+
 // Override the current viewClient function with the original simple design
 window.viewClient = window.viewClientOriginal;
 
@@ -1070,8 +1253,13 @@ window.syncPoliciesForClient = async function(clientId) {
     } catch(e) {}
     if (!client) { showNotification('Client not found', 'error'); return; }
 
-    // Get all policies
-    const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+    // Fetch fresh policies with high limit to ensure we find all matches
+    let allPolicies = [];
+    try {
+        const polRes = await fetch('/api/policies?includeInactive=true&limit=500');
+        if (polRes.ok) allPolicies = await polRes.json();
+    } catch(e) {}
+    if (!allPolicies.length) allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
 
     // Stop words that are too common to count as meaningful matches
     const STOP_WORDS = new Set(['llc','inc','ltd','co','corp','lp','the','and','of','transport',
@@ -1104,16 +1292,49 @@ window.syncPoliciesForClient = async function(clientId) {
         return matches;
     }
 
-    // Find policies NOT already linked to this client but likely belonging to them (score >= 2)
+    // Also match by email, phone, and business-name containment
+    const _syncNormPhone = ph => (ph || '').replace(/\D/g, '');
+    const clientEmail = (client.email || '').toLowerCase().trim();
+    const clientPhone = _syncNormPhone(client.phone);
+    const clientBizStripped = (client.businessName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Find policies NOT already linked to this client but likely belonging to them
     const unlinked = allPolicies.filter(p => {
         if (p.clientId && String(p.clientId) === String(clientId)) return false; // already linked
-        const pName = p.insuredName || p.clientName || p.contact?.['Owner Name'] ||
-                      p.insured?.['Name/Business Name'] || p.insured?.['Primary Named Insured'] || '';
-        return nameScore(pName) >= 2;
+
+        // Gather all name candidates from the policy
+        const polNameCandidates = [
+            p.insuredName, p.clientName, p.contact?.['Owner Name'],
+            p.insured?.['Name/Business Name'], p.insured?.['Primary Named Insured'],
+            p.insured?.['Business Name'], p.contact?.['Business Name']
+        ].filter(Boolean);
+
+        // Name token score check (original logic)
+        for (const pName of polNameCandidates) {
+            if (nameScore(pName) >= 2) return true;
+        }
+
+        // Business name containment check
+        if (clientBizStripped && clientBizStripped.length >= 4) {
+            for (const pName of polNameCandidates) {
+                const pStripped = (pName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (pStripped && (pStripped.includes(clientBizStripped) || clientBizStripped.includes(pStripped))) return true;
+            }
+        }
+
+        // Email match
+        const polEmail = (p.contact?.['Email'] || p.contact?.['email'] || p.insured?.['Email'] || '').toLowerCase().trim();
+        if (clientEmail && polEmail && clientEmail === polEmail) return true;
+
+        // Phone match
+        const polPhone = _syncNormPhone(p.contact?.['Phone'] || p.contact?.['phone'] || p.insured?.['Phone'] || '');
+        if (clientPhone && clientPhone.length >= 10 && polPhone.length >= 10 && clientPhone === polPhone) return true;
+
+        return false;
     });
 
     if (unlinked.length === 0) {
-        showNotification('No unlinked policies found matching this client', 'info');
+        _showInlineToast('No unlinked policies found — all policies are already linked or no matches found.', 'info');
         return;
     }
 
@@ -1178,7 +1399,7 @@ window.syncPoliciesForClient = async function(clientId) {
 
 window._confirmSyncPolicies = async function(clientId) {
     const checked = [...document.querySelectorAll('.sync-pol-cb:checked')];
-    if (checked.length === 0) { showNotification('No policies selected', 'warning'); return; }
+    if (checked.length === 0) { _showInlineToast('No policies selected', 'warning'); return; }
 
     const allPolicies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
     let linked = 0;
@@ -1201,7 +1422,7 @@ window._confirmSyncPolicies = async function(clientId) {
 
     localStorage.setItem('insurance_policies', JSON.stringify(allPolicies));
     document.getElementById('sync-policies-overlay')?.remove();
-    showNotification(`Linked ${linked} ${linked === 1 ? 'policy' : 'policies'} to client`, 'success');
+    _showInlineToast(`Linked ${linked} ${linked === 1 ? 'policy' : 'policies'} to client`, 'success');
 
     // Reload the profile to reflect changes
     if (typeof window.viewClientOriginal === 'function') window.viewClientOriginal(clientId);

@@ -9,12 +9,12 @@
     <!-- Cache buster: 2026-02-22-DOT-SPAM-COMPLETELY-DISABLED-V9 -->
     <title>Vanguard Insurance Software - All-in-One Agency Management Platform</title>
     <link rel="icon" type="image/png" href="images/V-Logo.png">
-    <link rel="stylesheet" href="css/styles.css?v=38_WHITE_CLOSE_BTN">
+    <link rel="stylesheet" href="css/styles.css?v=39_OVERLAY_FIX">
     <link rel="stylesheet" href="css/carrier-profile.css?v=2">
     <link rel="stylesheet" href="css/carrier-profile-display.css?v=1">
     <link rel="stylesheet" href="css/policy-modal.css?v=4_BADGE_FIX">
     <link rel="stylesheet" href="css/coi-upload-styles.css?v=1">
-    <link rel="stylesheet" href="css/mobile.css?v=COI_FIX_v13">
+    <link rel="stylesheet" href="css/mobile.css?v=PDP_MOB_20260423c">
     <link rel="stylesheet" href="css/fix-sidebar-text.css?v=1">
     <!-- Enhanced Lead Management Action Button Fixes -->
     <link rel="stylesheet" href="css/enhanced-lead-actions.css?v=1">
@@ -1622,7 +1622,7 @@
     <!-- DISABLED: causes race conditions on refresh — loadPoliciesView + generatePolicyRows already handle server sync -->
     <!-- <script src="js/force-policies-refresh.js?v=1"></script> -->
     <script src="js/secure-fetch.js?v=1"></script>
-    <script src="js/app.js?v=20260420e"></script>
+    <script src="js/app.js?v=20260428b"></script>
 
     <!-- Vicidial Stage Sync - Bidirectional synchronization -->
     <script src="js/vicidial-stage-sync.js?v=1"></script>
@@ -1834,7 +1834,7 @@
     <script src="js/telnyx-webrtc.js?v=1"></script>
     <script src="js/tool-windows.js?v=11"></script>
     <script src="js/twilio-sip.js?v=3"></script>
-    <script src="js/click-to-dial-email.js"></script>
+    <script src="js/click-to-dial-email.js?v=2"></script>
     <script src="js/integrations-config.js"></script>
     <script src="js/dashboard-stats.js?v=27"></script>
     <!-- <script src="js/recent-activities.js?v=32"></script> Temporarily disabled -->
@@ -1980,7 +1980,62 @@
     <script src="js/fix-policy-stats.js?v=1"></script>
 
     <!-- Fix Policy Display Limit - Resolves 2-policy display limitation -->
-    <script src="js/fix-policy-display-limit.js?v=20260420g"></script>
+    <script src="js/fix-policy-display-limit.js?v=20260423a"></script>
+
+    <!-- Deep-link auto-open: waits for viewPolicy + localStorage, opens directly -->
+    <script>
+    (function(){
+        var pending = sessionStorage.getItem('vanguard_pending_policy');
+        if (!pending) return;
+        sessionStorage.removeItem('vanguard_pending_policy');
+        window._magicLinkPending = true;
+
+        // Show loading overlay immediately
+        document.addEventListener('DOMContentLoaded', function(){
+            var overlay = document.createElement('div');
+            overlay.id = 'magic-link-loading';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+            overlay.innerHTML = '<div style="text-align:center;">' +
+                '<div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:mlspin 0.8s linear infinite;margin:0 auto 16px;"></div>' +
+                '<p style="margin:0;font-size:16px;font-weight:600;color:#1f2937;">Opening Policy</p>' +
+                '<p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Policy #' + pending + '</p>' +
+                '</div>';
+            var style = document.createElement('style');
+            style.textContent = '@keyframes mlspin{to{transform:rotate(360deg)}}';
+            document.head.appendChild(style);
+            document.body.appendChild(overlay);
+        });
+
+        // Use window.load to ensure ALL scripts have executed
+        window.addEventListener('load', function(){
+            var attempts = 0;
+            var timer = setInterval(function(){
+                attempts++;
+                if (typeof window.viewPolicy !== 'function') { if (attempts > 30) { clearInterval(timer); window._magicLinkPending = false; var lo = document.getElementById('magic-link-loading'); if(lo) lo.remove(); } return; }
+                var policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+                if (policies.length === 0) { if (attempts > 30) { clearInterval(timer); window._magicLinkPending = false; var lo = document.getElementById('magic-link-loading'); if(lo) lo.remove(); } return; }
+                var match = null;
+                for (var i = 0; i < policies.length; i++) {
+                    if (policies[i].policyNumber === pending || policies[i].id === pending ||
+                        (policies[i].policyNumber || '').trim() === pending.trim()) {
+                        match = policies[i]; break;
+                    }
+                }
+                if (!match) { if (attempts > 30) { clearInterval(timer); window._magicLinkPending = false; var lo = document.getElementById('magic-link-loading'); if(lo) lo.remove(); } return; }
+                clearInterval(timer);
+                window._magicLinkPending = false;
+                var openId = match.id || match.policyNumber;
+                window.viewPolicy(openId);
+                // Switch to Documents tab and remove loading overlay
+                setTimeout(function(){
+                    if (typeof switchViewTab === 'function') switchViewTab('documents');
+                    var lo = document.getElementById('magic-link-loading');
+                    if (lo) lo.remove();
+                }, 800);
+            }, 500);
+        });
+    })();
+    </script>
 
     <!-- Policy Fix - Ensures policies always load from server first -->
     <script src="js/policy-fix.js?v=1"></script>
@@ -2152,7 +2207,7 @@
     <!-- Save to Profile functionality - MUST load before ACORD viewers -->
     <script src="js/save-to-profile.js?v=14"></script>
     <!-- Load ACORD Real Viewer for PDF with fillable fields overlay -->
-    <script src="js/acord-real-viewer-vigagency.js?v=2026021302_TI_FIX_ROW"></script>
+    <script src="js/acord-real-viewer-vigagency.js?v=20260427_GLFIX"></script>
     <!-- Load the ACORD 25 Display with download/print functions -->
     <!-- Disabled because it conflicts with real viewer -->
     <!-- <script src="js/acord-25-display.js?v=2"></script> -->
