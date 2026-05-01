@@ -6,7 +6,7 @@
 async function loadPoliciesFromServer() {
     try {
         console.log('Loading policies from server...');
-        const response = await fetch('/api/policies?limit=1000'); // Get more policies
+        const response = await fetch('/api/policies?limit=1000&includeInactive=true'); // Get all policies including inactive
         if (response.ok) {
             const serverPolicies = await response.json();
             console.log(`Loaded ${serverPolicies.length} policies from server`);
@@ -21,6 +21,12 @@ async function loadPoliciesFromServer() {
                 const merged = { ...sp };
                 if (!sp.clientId && lp.clientId) { merged.clientId = lp.clientId; merged.clientName = lp.clientName || sp.clientName; }
                 if (!sp.contact?.['Owner Name'] && lp.contact?.['Owner Name']) merged.contact = { ...lp.contact, ...sp.contact };
+                // Preserve locally-saved coverage edits (CoveragesArray) when server lacks them
+                const lpCovArr = lp.coverage?.CoveragesArray;
+                const spCovArr = sp.coverage?.CoveragesArray;
+                if (lpCovArr && Object.keys(lpCovArr).length > 0 && (!spCovArr || Object.keys(spCovArr).length === 0)) {
+                    merged.coverage = { ...(sp.coverage || {}), CoveragesArray: lpCovArr };
+                }
                 return merged;
             });
             localStorage.setItem('insurance_policies', JSON.stringify(mergedPolicies));
@@ -23342,8 +23348,13 @@ async function viewPolicy(policyId) {
         return policies.find(p => String(p.id) === idStr || String(p.policyNumber) === idStr) || null;
     }
 
-    // 1. Try localStorage first (fast path for already-loaded sessions)
-    let policy = _findInList(JSON.parse(localStorage.getItem('insurance_policies') || '[]'));
+    // 1. Try localStorage first — use raw getItem to bypass performance-optimization.js cache
+    // which can return stale data after coverage saves bypass the setItem interceptor chain
+    const _rawGetPol = Storage.prototype.getItem.bind(localStorage);
+    const _lsPolicies = JSON.parse(_rawGetPol('insurance_policies') || '[]');
+    let policy = _findInList(_lsPolicies);
+    console.log('📋 viewPolicy localStorage lookup:', policyId, '→', policy ? 'FOUND' : 'NOT FOUND',
+        policy ? `coverage.CoveragesArray: ${policy.coverage?.CoveragesArray ? Object.keys(policy.coverage.CoveragesArray).length + ' entries' : 'NONE'}` : '');
 
     // 2. Fallback: fetch from API (covers fresh/magic-link sessions)
     if (!policy) {
@@ -23371,6 +23382,11 @@ async function viewPolicy(policyId) {
         console.error('Policy not found:', policyId);
         showNotification('Policy not found', 'error');
         return;
+    }
+
+    // Ensure clientId is set if we came from a client profile
+    if (!policy.clientId && window.currentViewingClientId) {
+        policy.clientId = window.currentViewingClientId;
     }
 
     // Show the policy details in a tabbed modal
@@ -23905,10 +23921,22 @@ function generateViewTabContent(tabId, policy) {
 
             if (isCommercialAuto) {
                 // Build INTERACTIVE coverage table (left column)
-                const coveragesArray = coverageData.CoveragesArray;
                 const _pId = policy.id || policy.policyNumber || '';
+                // Check dedicated override key first (bypasses all 22+ localStorage interceptors)
+                let coveragesArray = coverageData.CoveragesArray;
+                try {
+                    const _covRaw = Storage.prototype.getItem.call(localStorage, '_covOverride_' + _pId);
+                    if (_covRaw) {
+                        const parsed = JSON.parse(_covRaw);
+                        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                            coveragesArray = parsed;
+                            console.log('📋 COVERAGE TAB: Loaded', Object.keys(parsed).length, 'coverages from override key for', _pId);
+                        }
+                    }
+                } catch(e) {}
                 const _eQ = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
                 let initRows = '';
+                console.log('📋 COVERAGE TAB RENDER:', _pId, '| CoveragesArray:', coveragesArray ? Object.keys(coveragesArray).length + ' entries' : 'NONE');
 
                 if (coveragesArray && typeof coveragesArray === 'object' && Object.keys(coveragesArray).length > 0) {
                     Object.values(coveragesArray).filter(c => c && c.Code).forEach(cov => {
@@ -24775,7 +24803,7 @@ function _jnDateToISO(jnDate) {
             ['DIS','Total Disability Benefits'],['DTH','Death Indemnity'],['ADDA','Automobile Death Indemnity Benefits'],['ADDG','Total Disability for Gainfully Employed'],['ADDN','Total Disability for Not Gainfully Employed'],['WLB','Work Loss Benefits'],['GAP','Lease/Loan Gap'],
         ]],
         ['Physical Damage', [
-            ['COMP','Comprehensive'],['COLL','Collision'],['BCOLL','Broadened Collision'],['LCOLL','Limited Collision'],['COMTI','Comprehensive with Trailer Interchange'],['COLTI','Collision with Trailer Interchange'],
+            ['COMP','Comprehensive'],['COLL','Collision'],['BCOLL','Broadened Collision'],['LCOLL','Limited Collision'],['COMTI','Comprehensive with Trailer Interchange'],['COLTI','Collision with Trailer Interchange'],['TI','Trailer Interchange'],['NOTI','Non-Owned Trailer Interchange'],
             ['CPD','Combined Physical Damages'],['CPDBC','Combined Physical Damages w/ Broadened Collision'],['CPDC','Combined Physical Damages w/ Collision'],['CPDLC','Combined Physical Damages w/ Limited Collision'],['OTC','Other Than Collision'],
             ['CWAIV','Waiver of Collision Deductible'],['MEXCO','Mexico Coverage'],['NDCOL','Named Driver Collision Coverage'],['NYMA','New York Mutual Aid'],['OEM','Original Equipment Manufactured Parts'],['PDBY','Property Damage Buy Back'],
             ['SRCOL','Sound Receiving Collision'],['SORCV','Sound Receiving'],['SORPE','Sound Reproducing Equipment'],['SROTC','Sound Receiving Other than Collision'],
@@ -24838,7 +24866,7 @@ function _jnDateToISO(jnDate) {
             opt.style.display = (!q || opt.text.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q)) ? '' : 'none';
         });
         Array.from(sel.querySelectorAll('optgroup')).forEach(grp => {
-            const visible = Array.from(grp.options).some(o => o.style.display !== 'none');
+            const visible = Array.from(grp.querySelectorAll('option')).some(o => o.style.display !== 'none');
             grp.style.display = visible ? '' : 'none';
         });
     };
@@ -24891,23 +24919,33 @@ function _jnDateToISO(jnDate) {
             CoveragesArray[code] = { Code: code, Description: desc, Amount: amount, Premium: premium };
             if (isGL) { CoveragesArray[code].Aggregate = deductible; } else { CoveragesArray[code].Deductible = deductible; }
         });
-        const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+        // Save CoveragesArray to a DEDICATED key that no interceptor touches.
+        // 22+ scripts wrap localStorage.setItem/getItem with caches and formatters
+        // that corrupt or clobber policy coverage data. This dedicated key is safe.
+        const _raw = { get: Storage.prototype.getItem.bind(localStorage), set: Storage.prototype.setItem.bind(localStorage) };
+        const covKey = '_covOverride_' + policyId;
+        _raw.set(covKey, JSON.stringify(CoveragesArray));
+        console.log('Coverage saved to', covKey, ':', Object.keys(CoveragesArray).length, 'entries');
+        // Also try to update the main policies array (best-effort, may be clobbered by interceptors)
+        const policies = JSON.parse(_raw.get('insurance_policies') || '[]');
         const idx = policies.findIndex(p => String(p.id) === String(policyId) || p.policyNumber === policyId);
         if (idx === -1) {
-            if(typeof showNotification==='function') showNotification('Policy not found in local cache', 'error');
+            // Still show success since dedicated key was saved
+            if(typeof showNotification==='function') showNotification('Coverages saved', 'success');
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save" style="margin-right:5px;"></i>Save Coverages'; }
             return;
         }
         if (!policies[idx].coverage) policies[idx].coverage = {};
         policies[idx].coverage.CoveragesArray = CoveragesArray;
-        localStorage.setItem('insurance_policies', JSON.stringify(policies));
+        const policyToSave = JSON.parse(JSON.stringify(policies[idx])); // deep copy for server
+        _raw.set('insurance_policies', JSON.stringify(policies));
         try {
             const API = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001';
             const jwt = sessionStorage.getItem('vanguard_jwt') || '';
             const r = await fetch(`${API}/api/policies/${policyId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`, 'Bypass-Tunnel-Reminder': 'true' },
-                body: JSON.stringify(policies[idx])
+                body: JSON.stringify(policyToSave)
             });
             if(typeof showNotification==='function') showNotification(r.ok ? 'Coverages saved' : 'Saved locally (server error)', r.ok ? 'success' : 'warning');
         } catch(e) {
@@ -33219,7 +33257,9 @@ async function applyStateDropdownStyling() {
         if (!type) return;
         // Colors
         if (type === 'green' || type === 'green-split') {
-            opt.style.color = opt.value === 'OH' ? '#7c3aed' : '#16a34a';
+            opt.style.color = ['OH','NC','SC','TX'].includes(opt.value) ? '#7c3aed' : '#16a34a';
+        } else if (['OH','NC','SC','TX'].includes(opt.value)) {
+            opt.style.color = '#7c3aed';
         }
         // Default labels (stripped clean first)
         const bare = opt.text.replace(/ \(Split\)\(Closed\)$/, '').replace(/ \(Split\)$/, '').replace(/ \((Open|Closed)\)$/, '');
@@ -33243,24 +33283,24 @@ async function applyStateDropdownStyling() {
             if (closedSet.has(opt.value)) {
                 if (type === 'green-split') {
                     opt.text = bare + ' (Split)(Closed)';
-                    opt.style.color = opt.value === 'OH' ? '#6d28d9' : '#15803d';
+                    opt.style.color = ['OH','NC','SC','TX'].includes(opt.value) ? '#6d28d9' : '#15803d';
                 } else if (type === 'green') {
                     opt.text = bare + ' (Closed)';
-                    opt.style.color = opt.value === 'OH' ? '#6d28d9' : '#15803d';
+                    opt.style.color = ['OH','NC','SC','TX'].includes(opt.value) ? '#6d28d9' : '#15803d';
                 } else {
                     opt.text = bare + ' (Closed)';
-                    opt.style.color = '#dc2626';
+                    opt.style.color = ['OH','NC','SC','TX'].includes(opt.value) ? '#6d28d9' : '#dc2626';
                 }
             } else {
                 if (type === 'green-split') {
                     opt.text = bare + ' (Split)';
-                    opt.style.color = opt.value === 'OH' ? '#7c3aed' : '#16a34a';
+                    opt.style.color = ['OH','NC','SC','TX'].includes(opt.value) ? '#7c3aed' : '#16a34a';
                 } else if (type === 'green') {
                     opt.text = bare + ' (Open)';
-                    opt.style.color = opt.value === 'OH' ? '#7c3aed' : '#16a34a';
+                    opt.style.color = ['OH','NC','SC','TX'].includes(opt.value) ? '#7c3aed' : '#16a34a';
                 } else {
                     opt.text = bare + ' (Open)';
-                    opt.style.color = '';
+                    opt.style.color = ['OH','NC','SC','TX'].includes(opt.value) ? '#7c3aed' : '';
                 }
             }
         });
