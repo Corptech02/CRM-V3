@@ -163,7 +163,8 @@ app.use('/api/auth', authRoutes);
 
 // Protect all /api/* routes except public paths
 app.use('/api', (req, res, next) => {
-    const publicPaths = ['/auth/', '/health', '/portal/', '/twilio/incoming-call',
+    const publicPaths = ['/auth/', '/health', '/portal/', '/bug-report',
+                         '/twilio/incoming-call',
                          '/twilio/call-status', '/twilio/recording-status',
                          '/twilio/voicemail-transcription', '/twilio/recording-complete',
                          '/twilio/conference-status', '/twilio/call-status-callback'];
@@ -1557,6 +1558,24 @@ app.post('/api/id-cards', (req, res) => {
                 console.error('Error storing ID cards:', err);
                 res.status(500).json({ error: 'Failed to store ID cards' });
             });
+    });
+});
+
+// Delete an ID card
+app.delete('/api/id-cards/:cardId', (req, res) => {
+    const { cardId } = req.params;
+    console.log('🗑️ ID Cards API: Deleting ID card:', cardId);
+
+    db.run('DELETE FROM id_cards WHERE id = ?', [cardId], function(err) {
+        if (err) {
+            console.error('Error deleting ID card:', err);
+            return res.status(500).json({ error: 'Failed to delete ID card' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'ID card not found' });
+        }
+        console.log('✅ ID Cards API: Deleted ID card:', cardId);
+        res.json({ success: true });
     });
 });
 
@@ -5082,6 +5101,29 @@ app.use('/api/coi', coiPdfRoutes);
 // JenesisNow integration routes
 const jenesisRoutes = require('./jenesis-routes');
 app.use('/api/jenesis', jenesisRoutes);
+
+// JenesisNow live policy scraper (Puppeteer-based)
+app.get('/api/jenesis/scrape-policy/:policyNumber', async (req, res) => {
+    const { policyNumber } = req.params;
+    if (!policyNumber || policyNumber.length < 4) {
+        return res.status(400).json({ error: 'Invalid policy number' });
+    }
+    try {
+        const { scrapePolicyByNumber } = require('./jenesis-scraper');
+        const clientName = req.query.client || '';
+        console.log(`[JenesisNow Scraper] Looking up policy ${policyNumber} (client: ${clientName || 'unknown'})...`);
+        const data = await scrapePolicyByNumber(policyNumber.trim(), clientName);
+        if (data.error) {
+            console.warn(`[JenesisNow Scraper] ${data.error}`);
+            return res.status(404).json(data);
+        }
+        console.log(`[JenesisNow Scraper] Found policy ${policyNumber} (JN ID: ${data.jenesisId})`);
+        res.json(data);
+    } catch (err) {
+        console.error('[JenesisNow Scraper] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // COI Request Email endpoint will be defined after multer configuration
 
@@ -8623,7 +8665,7 @@ app.post('/api/documents', uploadDocumentFiles.single('file'), (req, res) => {
         });
     }
 
-    const { clientId, policyId, uploadedBy } = req.body;
+    const { clientId, policyId, uploadedBy, docType } = req.body;
 
     if (!clientId) {
         // Clean up uploaded file if clientId is missing
@@ -8646,13 +8688,14 @@ app.post('/api/documents', uploadDocumentFiles.single('file'), (req, res) => {
         file_path: req.file.path,
         file_size: req.file.size,
         file_type: req.file.mimetype,
-        uploaded_by: uploadedBy || 'Unknown'
+        uploaded_by: uploadedBy || 'Unknown',
+        doc_type: docType || 'general'
     };
 
     // Save metadata to database
     db.run(
-        `INSERT INTO documents (id, client_id, policy_id, filename, original_name, file_path, file_size, file_type, uploaded_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO documents (id, client_id, policy_id, filename, original_name, file_path, file_size, file_type, uploaded_by, doc_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             documentData.id,
             documentData.client_id,
@@ -8662,7 +8705,8 @@ app.post('/api/documents', uploadDocumentFiles.single('file'), (req, res) => {
             documentData.file_path,
             documentData.file_size,
             documentData.file_type,
-            documentData.uploaded_by
+            documentData.uploaded_by,
+            documentData.doc_type
         ],
         function(err) {
             if (err) {
@@ -8704,12 +8748,12 @@ app.get('/api/documents', (req, res) => {
 
     if (clientId) {
         query = `SELECT id, original_name as name, file_type as type, file_size as size,
-                        upload_date as uploadDate, uploaded_by as uploadedBy
+                        upload_date as uploadDate, uploaded_by as uploadedBy, doc_type as docType
                  FROM documents WHERE client_id = ? ORDER BY upload_date DESC`;
         params = [clientId];
     } else {
         query = `SELECT id, original_name as name, file_type as type, file_size as size,
-                        upload_date as uploadDate, uploaded_by as uploadedBy
+                        upload_date as uploadDate, uploaded_by as uploadedBy, doc_type as docType
                  FROM documents WHERE policy_id = ? ORDER BY upload_date DESC`;
         params = [policyId];
     }
@@ -9728,6 +9772,69 @@ app.post('/api/send-callback-reminder', async (req, res) => {
             success: false,
             error: error.message
         });
+    }
+});
+
+// Bug Report endpoint
+app.post('/api/bug-report', async (req, res) => {
+    const { title, area, description, reportedBy, consoleLogs, url, timestamp } = req.body;
+
+    if (!title || !description) {
+        return res.status(400).json({ success: false, error: 'Title and description are required' });
+    }
+
+    try {
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+            host: 'smtpout.secureserver.net',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'contact@vigagency.com',
+                pass: process.env.GODADDY_VIG_PASSWORD || process.env.GODADDY_PASSWORD
+            }
+        });
+
+        const logsHtml = consoleLogs && consoleLogs.length > 0
+            ? `<div style="background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px;font-family:monospace;font-size:12px;max-height:400px;overflow-y:auto;white-space:pre-wrap;">${consoleLogs.map(l => {
+                const color = l.type === 'error' ? '#f87171' : l.type === 'warn' ? '#fbbf24' : '#d4d4d4';
+                return `<div style="color:${color};margin-bottom:2px;">[${l.time}] ${l.type.toUpperCase()}: ${l.message}</div>`;
+              }).join('')}</div>`
+            : '<p style="color:#9ca3af;">No console logs captured</p>';
+
+        const html = `
+<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">
+  <div style="background:#dc2626;color:#fff;padding:20px 24px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;">Bug Report</h2>
+    <p style="margin:4px 0 0;opacity:.85;">Vanguard CRM</p>
+  </div>
+  <div style="background:#f8fafc;padding:24px;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px;">
+      <tr><td style="width:120px;color:#666;padding:6px 0;font-weight:600;">Reported By</td><td style="color:#111;font-weight:500;">${reportedBy || 'Unknown'}</td></tr>
+      <tr><td style="color:#666;padding:6px 0;font-weight:600;">Area</td><td>${area || 'Not specified'}</td></tr>
+      <tr><td style="color:#666;padding:6px 0;font-weight:600;">Title</td><td style="font-weight:700;color:#111;">${title}</td></tr>
+      <tr><td style="color:#666;padding:6px 0;font-weight:600;">Time</td><td>${timestamp || new Date().toLocaleString()}</td></tr>
+      <tr><td style="color:#666;padding:6px 0;font-weight:600;">URL</td><td style="font-size:12px;word-break:break-all;">${url || ''}</td></tr>
+    </table>
+    <h3 style="margin:0 0 8px;color:#111;font-size:15px;">Description</h3>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:14px;margin-bottom:20px;white-space:pre-wrap;font-size:14px;line-height:1.6;">${description}</div>
+    <h3 style="margin:0 0 8px;color:#111;font-size:15px;">Console Logs (last 50)</h3>
+    ${logsHtml}
+  </div>
+</div>`;
+
+        await transporter.sendMail({
+            from: '"VIG Bug Report" <contact@vigagency.com>',
+            to: 'Grant@vigagency.com',
+            subject: `[BUG] ${title} — reported by ${reportedBy || 'Unknown'}`,
+            html
+        });
+
+        console.log('Bug report sent from', reportedBy, ':', title);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Bug report email failed:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

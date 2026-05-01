@@ -322,9 +322,13 @@ router.get('/magic-link', (req, res) => {
             const redirect = row.redirect || '/';
             const userJson = JSON.stringify({ username: 'csr', role: 'csr', portal: 'vanguard', loginTime: new Date().toISOString() });
 
-            // Extract policyNumber from redirect so we can store it as a pending open
+            // Extract policyNumber from redirect (supports both ?policyNumber=X and #policy/X)
             const _rUrl = new URL(redirect, 'https://x');
-            const _pendingPolicy = _rUrl.searchParams.get('policyNumber') || '';
+            let _pendingPolicy = _rUrl.searchParams.get('policyNumber') || '';
+            if (!_pendingPolicy) {
+                const _hashMatch = redirect.match(/#policy\/([^&?#]+)/);
+                if (_hashMatch) _pendingPolicy = decodeURIComponent(_hashMatch[1]);
+            }
 
             // Return a page that sets the session and redirects.
             // Append _t=timestamp to bust the browser's cached index.html so
@@ -342,12 +346,14 @@ router.get('/magic-link', (req, res) => {
   if (${JSON.stringify(_pendingPolicy)}) {
     sessionStorage.setItem('vanguard_pending_policy', ${JSON.stringify(_pendingPolicy)});
   }
-  // Cache-bust index.html so the browser always loads the latest JS versions
+  // Always redirect to #policies — the pending policy in sessionStorage handles the auto-open
   var dest = ${JSON.stringify(redirect)};
-  var hashPart = dest.indexOf('#') >= 0 ? dest.slice(dest.indexOf('#')) : '';
-  var basePart = dest.indexOf('#') >= 0 ? dest.slice(0, dest.indexOf('#')) : dest;
-  var sep = basePart.includes('?') ? '&' : '?';
-  window.location.href = basePart + sep + '_t=' + Date.now() + hashPart;
+  // If dest has #policy/X format, redirect to #policies instead (sessionStorage handles the open)
+  var hashPart = '#policies';
+  if (dest.indexOf('#') >= 0 && dest.indexOf('#policy/') === -1) {
+    hashPart = dest.slice(dest.indexOf('#'));
+  }
+  window.location.href = '/?_t=' + Date.now() + hashPart;
 </script></body></html>`);
         }
     );

@@ -1524,17 +1524,24 @@ protectedFunctions.loadLossRuns = function(leadId) {
 };
 
 // View loss runs function (server version)
-protectedFunctions.viewLossRuns = function(leadId, fileId, originalName) {
+protectedFunctions.viewLossRuns = async function(leadId, fileId, originalName) {
     console.log('👁️ Viewing loss runs from server:', leadId, fileId, originalName);
 
-    // Open file from server in new window
     const fileUrl = `/api/loss-runs-download?fileId=${encodeURIComponent(fileId)}`;
-    const newWindow = window.open(fileUrl, '_blank');
+    const jwt = sessionStorage.getItem('vanguard_jwt') || '';
 
-    if (!newWindow) {
-        alert('Pop-up blocked. Please allow pop-ups and try again.');
-    } else {
+    try {
+        const resp = await fetch(fileUrl, {
+            headers: { 'Authorization': `Bearer ${jwt}` }
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
         console.log('✅ File opened from server:', originalName);
+    } catch (e) {
+        console.error('Error viewing loss run:', e);
+        alert('Error opening document. Please try again.');
     }
 };
 

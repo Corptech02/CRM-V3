@@ -244,6 +244,15 @@
     function processTextNode(textNode) {
         const text = textNode.textContent;
         if (!text.trim()) return;
+
+        // Skip if any ancestor is already a clickable wrapper (prevents recursive nesting)
+        let ancestor = textNode.parentElement;
+        while (ancestor) {
+            if (ancestor.classList && (ancestor.classList.contains('clickable-wrapper') || ancestor.classList.contains('clickable-phone') || ancestor.classList.contains('clickable-email'))) {
+                return;
+            }
+            ancestor = ancestor.parentElement;
+        }
         
         let hasMatch = false;
         let html = text;
@@ -303,7 +312,7 @@
         }
         
         // Skip if element already has clickable classes
-        if (element.classList && (element.classList.contains('clickable-phone') || element.classList.contains('clickable-email'))) {
+        if (element.classList && (element.classList.contains('clickable-phone') || element.classList.contains('clickable-email') || element.classList.contains('clickable-wrapper'))) {
             return;
         }
         
@@ -318,22 +327,22 @@
             NodeFilter.SHOW_TEXT,
             {
                 acceptNode: function(node) {
-                    // Skip empty text nodes
                     if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
-                    
-                    // Skip if parent is already a clickable element
-                    if (node.parentElement.classList && 
-                        (node.parentElement.classList.contains('clickable-phone') || 
-                         node.parentElement.classList.contains('clickable-email'))) {
-                        return NodeFilter.FILTER_REJECT;
+
+                    // Walk ancestors to skip if already inside a clickable element
+                    let el = node.parentElement;
+                    while (el) {
+                        if (el.classList && (el.classList.contains('clickable-phone') ||
+                            el.classList.contains('clickable-email') ||
+                            el.classList.contains('clickable-wrapper'))) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        if (el.tagName && ['INPUT', 'TEXTAREA', 'SCRIPT', 'STYLE'].includes(el.tagName)) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        el = el.parentElement;
                     }
-                    
-                    // Skip if parent is an input or textarea
-                    if (node.parentElement.tagName && 
-                        ['INPUT', 'TEXTAREA', 'SCRIPT', 'STYLE'].includes(node.parentElement.tagName)) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-                    
+
                     return NodeFilter.FILTER_ACCEPT;
                 }
             }
@@ -356,43 +365,38 @@
     // Public function to scan content (can be called from other scripts)
     window.scanForClickableContent = function(element) {
         if (!element) element = document.body;
-        
-        // Clear all processed flags in the element
-        element.querySelectorAll('[data-clickable-processed]').forEach(el => {
-            delete el.dataset.clickableProcessed;
-        });
-        
-        // Reset regex lastIndex
+
+        // Do NOT clear processed flags — that causes recursive re-processing
+        // Only reset regex lastIndex
         phoneRegex.lastIndex = 0;
         emailRegex.lastIndex = 0;
-        
-        // Also look specifically for table cells with phone/email patterns
+
+        // Scan unprocessed table cells for phone/email patterns
         element.querySelectorAll('td').forEach(td => {
+            if (td.dataset && td.dataset.clickableProcessed) return;
             const text = td.textContent.trim();
-            
-            // Reset regex before testing
+
             phoneRegex.lastIndex = 0;
             emailRegex.lastIndex = 0;
-            
-            // Check if this looks like a phone or email
+
             if (phoneRegex.test(text) || emailRegex.test(text)) {
-                // Process all text nodes in this cell
                 const walker = document.createTreeWalker(
                     td,
                     NodeFilter.SHOW_TEXT,
                     {
                         acceptNode: function(node) {
                             if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
-                            if (node.parentElement.classList && 
-                                (node.parentElement.classList.contains('clickable-phone') || 
-                                 node.parentElement.classList.contains('clickable-email'))) {
+                            if (node.parentElement.classList &&
+                                (node.parentElement.classList.contains('clickable-phone') ||
+                                 node.parentElement.classList.contains('clickable-email') ||
+                                 node.parentElement.classList.contains('clickable-wrapper'))) {
                                 return NodeFilter.FILTER_REJECT;
                             }
                             return NodeFilter.FILTER_ACCEPT;
                         }
                     }
                 );
-                
+
                 const textNodes = [];
                 while (walker.nextNode()) {
                     textNodes.push(walker.currentNode);
@@ -400,7 +404,7 @@
                 textNodes.forEach(processTextNode);
             }
         });
-        
+
         // Then do the regular scan
         scanElement(element);
     }
@@ -427,35 +431,31 @@
         scanElement(document.body);
         
         // Set up mutation observer to handle dynamically added content
+        let isProcessing = false;
         const observer = new MutationObserver(function(mutations) {
+            if (isProcessing) return; // Skip mutations caused by our own processing
             mutations.forEach(function(mutation) {
-                // Handle added nodes
                 mutation.addedNodes.forEach(function(node) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        // Small delay to ensure content is fully rendered
-                        setTimeout(() => {
-                            // Clear the processed flag for new content
-                            if (node.dataset) {
-                                delete node.dataset.clickableProcessed;
-                            }
-                            scanElement(node);
-                        }, 100);
-                    } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                        // Also handle text nodes that might contain phone/email
-                        const parent = node.parentElement;
-                        if (parent && !parent.dataset.clickableProcessed) {
-                            setTimeout(() => scanElement(parent), 100);
+                        // Skip nodes created by this scanner
+                        if (node.classList && (node.classList.contains('clickable-wrapper') ||
+                            node.classList.contains('clickable-phone') ||
+                            node.classList.contains('clickable-email'))) {
+                            return;
                         }
+                        setTimeout(() => {
+                            isProcessing = true;
+                            try { scanElement(node); } finally { isProcessing = false; }
+                        }, 100);
                     }
                 });
             });
         });
-        
+
         // Start observing
         observer.observe(document.body, {
             childList: true,
-            subtree: true,
-            characterData: true
+            subtree: true
         });
         
         console.log('Click-to-dial and Click-to-email functionality initialized');
@@ -469,30 +469,20 @@
         setTimeout(initialize, 100);
     }
     
-    // Hook into navigation changes
-    // Re-scan after hash changes (navigation)
+    // Hook into navigation changes — scan new content without clearing flags
     window.addEventListener('hashchange', function() {
         setTimeout(() => {
-            console.log('Hash changed, rescanning for clickable content...');
             const content = document.querySelector('.dashboard-content') || document.body;
-            // Clear processed flags
-            content.querySelectorAll('[data-clickable-processed]').forEach(el => {
-                delete el.dataset.clickableProcessed;
-            });
             scanElement(content);
         }, 300);
     });
-    
+
     // Also hook into clicks on sidebar menu items
     document.addEventListener('click', function(e) {
         const target = e.target.closest('.sidebar-menu a, .nav-link');
         if (target) {
             setTimeout(() => {
                 const content = document.querySelector('.dashboard-content') || document.body;
-                // Clear processed flags
-                content.querySelectorAll('[data-clickable-processed]').forEach(el => {
-                    delete el.dataset.clickableProcessed;
-                });
                 scanElement(content);
             }, 500);
         }

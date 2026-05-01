@@ -1541,14 +1541,30 @@ function loadLossRuns(leadId) {
 }
 
 // View loss runs function
-window.viewLossRuns = function(leadId, filename, originalName) {
+window.viewLossRuns = async function(leadId, filename, originalName) {
     console.log('👁️ Viewing loss runs:', leadId, filename, originalName);
 
-    const API_URL = window.VANGUARD_API_URL || 'http://162-220-14-239.nip.io:3001/api';
-    const url = `${API_URL}/loss-runs/${leadId}/${filename}`;
+    // If filename is a numeric ID, use the download endpoint
+    const isFileId = /^\d+$/.test(filename);
+    const jwt = sessionStorage.getItem('vanguard_jwt') || '';
 
-    // Open in new window
-    window.open(url, '_blank');
+    const url = isFileId
+        ? `/api/loss-runs-download?fileId=${encodeURIComponent(filename)}`
+        : `/api/loss-runs/${leadId}/${filename}`;
+
+    try {
+        const resp = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${jwt}` }
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+        console.log('✅ File opened:', originalName);
+    } catch (e) {
+        console.error('Error viewing loss run:', e);
+        alert('Error opening document. Please try again.');
+    }
 };
 
 // Remove loss runs function

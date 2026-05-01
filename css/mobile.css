@@ -1770,7 +1770,7 @@
         height: 120px !important;
     }
 
-    canvas {
+    canvas:not(#realPdfCanvas) {
         max-height: 120px !important;
     }
 
@@ -2191,7 +2191,7 @@
     }
 
     .chart-container,
-    canvas {
+    canvas:not(#realPdfCanvas) {
         height: 100px !important;
         max-height: 100px !important;
     }
@@ -4169,5 +4169,520 @@
     #genSkipDays {
         max-width: 80px !important;
         margin: 0 !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   POLICY DETAIL PAGE — Mobile Responsive
+   ═══════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* ── Page Header (gradient bar) ── */
+    .pdp-header {
+        padding: 0 12px !important;
+    }
+    .pdp-header-inner {
+        flex-wrap: wrap !important;
+        height: auto !important;
+        padding: 10px 0 !important;
+        gap: 8px !important;
+    }
+    .pdp-back-btn {
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+    }
+    .pdp-back-btn span,
+    .pdp-back-btn .fa-arrow-left + span {
+        display: inline !important;
+    }
+    .pdp-type-badge {
+        padding: 3px 8px !important;
+        font-size: 10px !important;
+        order: 3 !important;
+    }
+    .pdp-policy-num {
+        font-size: 16px !important;
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+    }
+    .pdp-premium {
+        font-size: 15px !important;
+    }
+
+    /* ── Status + Action Bar ── */
+    .pdp-status-bar {
+        padding: 10px 12px !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        align-items: stretch !important;
+    }
+    .pdp-status-info {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    .pdp-carrier,
+    .pdp-client {
+        font-size: 12px !important;
+    }
+    .pdp-actions {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 6px !important;
+    }
+    .pdp-actions button {
+        padding: 8px 6px !important;
+        font-size: 12px !important;
+        justify-content: center !important;
+    }
+    .pdp-actions button .fa-save,
+    .pdp-actions button .fa-print,
+    .pdp-actions button .fa-trash {
+        margin-right: 0 !important;
+    }
+
+    /* ── Tab Navigation ── */
+    .pdp-tabs {
+        padding: 0 8px !important;
+        -webkit-overflow-scrolling: touch;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        white-space: nowrap !important;
+        position: relative !important;
+        z-index: 10 !important;
+        touch-action: pan-x !important;
+    }
+    .pdp-tabs .policy-view-tab-btn {
+        padding: 10px 12px !important;
+        font-size: 12px !important;
+        gap: 5px !important;
+        position: relative !important;
+        z-index: 11 !important;
+        touch-action: manipulation !important;
+        -webkit-tap-highlight-color: rgba(0,0,0,0.1) !important;
+        cursor: pointer !important;
+    }
+
+    /* ── Tab Contents wrapper ── */
+    .pdp-tab-contents {
+        padding: 12px !important;
+    }
+
+    /* ── Overview Tab: 2-col → 1-col ── */
+    .pdp-overview-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .pdp-status-card {
+        grid-column: auto !important;
+    }
+    /* Status fields: 5-col → 2-col */
+    .pdp-status-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 0 10px !important;
+    }
+
+    /* ── Documents Tab: 3-col → 1-col ── */
+    .pdp-docs-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .pdp-docs-grid .form-section {
+        padding: 14px !important;
+    }
+
+    /* ── Financials Tab: 2-col → 1-col ── */
+    .pdp-financials-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* ── Contact Tab: 2-col → 1-col ── */
+    .pdp-contact-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .pdp-contact-grid > div[style*="grid-column:1/-1"] {
+        grid-column: auto !important;
+    }
+    .pdp-contact-grid div[style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+    /* Contact row label/value: tighter on mobile */
+    .pdp-contact-grid div[style*="grid-template-columns:160px"] {
+        grid-template-columns: 100px 1fr !important;
+    }
+
+    /* ── Cards: reduce padding on mobile ── */
+    .pdp-card,
+    #policyDetailPage .pdp-card {
+        padding: 14px !important;
+    }
+
+    /* ── Tables inside policy detail (vehicles, drivers, coverage) ── */
+    #policyDetailPage table {
+        font-size: 12px !important;
+    }
+    #policyDetailPage table th,
+    #policyDetailPage table td {
+        padding: 6px 5px !important;
+    }
+    /* VIN column: allow wrapping */
+    #policyDetailPage table td[style*="font-family:monospace"] {
+        word-break: break-all !important;
+        font-size: 10px !important;
+    }
+
+    /* ── Inputs/selects inside policy detail ── */
+    #policyDetailPage input,
+    #policyDetailPage select,
+    #policyDetailPage textarea {
+        font-size: 14px !important;
+        padding: 8px !important;
+    }
+
+    /* ── Coverage tab: automotive liability flex row ── */
+    #coverage-view-content div[style*="flex-wrap:wrap"] {
+        gap: 8px 12px !important;
+    }
+
+    /* ── Documents tab: button groups ── */
+    #documents-view-content .form-section > div:first-child {
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+    #documents-view-content .form-section button {
+        font-size: 11px !important;
+        padding: 5px 8px !important;
+    }
+    /* Application submission grid */
+    #documents-view-content div[style*="grid-template-columns:1fr 1fr 1fr 1fr"] {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    /* ── Financial producer grid ── */
+    .pdp-financials-grid div[style*="grid-template-columns:1fr auto"] {
+        grid-template-columns: 1fr 60px !important;
+    }
+
+    /* ── Insured tab ── */
+    #policyDetailPage .view-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    /* ── Coverage Tab: side-by-side → stacked vertically ── */
+    .pdp-coverage-grid {
+        grid-template-columns: 1fr !important;
+    }
+    /* Coverage add-row */
+    .pdp-coverage-grid .form-section select {
+        min-width: 0 !important;
+        font-size: 12px !important;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       ACORD 25 Certificate Viewer — Mobile
+       Full-size readable form inside a scrollable container.
+       User swipes to pan around the form (like a mobile PDF viewer).
+       ═══════════════════════════════════════════════════════════════════ */
+
+    /* The outer acord-container: stay within viewport, clip overflow */
+    .acord-container {
+        max-width: 100vw !important;
+        overflow: hidden !important;
+    }
+
+    /* Header: stack title + buttons vertically */
+    .acord-container > .acord-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 12px !important;
+        gap: 10px !important;
+    }
+    .acord-header h2 {
+        font-size: 16px !important;
+    }
+    .acord-header p {
+        font-size: 12px !important;
+    }
+    /* Hide header action buttons on mobile — bottom bar has the actions */
+    .acord-header > div:last-child {
+        display: none !important;
+    }
+
+    /*
+     * PDF container: the scrollable viewport into the full-size form.
+     * This creates an independent scroll context — body overflow-x:hidden
+     * doesn't prevent THIS element from scrolling its own content.
+     */
+    .acord-container .pdf-container {
+        padding: 0 !important;
+        overflow: scroll !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-x pan-y !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+
+    /* Inner wrapper: exempt from global max-width clamp, stay at natural size */
+    .acord-container .pdf-container > div {
+        max-width: none !important;
+        width: fit-content !important;
+        height: auto !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+    }
+
+    /* Canvas + Overlay: full size, no transforms, exempt from max-width */
+    #realPdfCanvas {
+        transform: none !important;
+        max-width: none !important;
+        width: 795px !important;
+        height: 1029px !important;
+        display: block !important;
+    }
+    #realFormOverlay {
+        transform: translateZ(1px) !important;
+        max-width: none !important;
+        width: 795px !important;
+        height: 1029px !important;
+        z-index: 10 !important;
+        isolation: isolate !important;
+    }
+    #realPdfCanvas {
+        z-index: 1 !important;
+    }
+    /* ACORD overlay fields: iOS Safari needs appearance:none to respect
+       our sizing, and explicit color to render text visibly. */
+    #realFormOverlay input[type="text"],
+    #realFormOverlay textarea {
+        max-width: none !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        border-radius: 0 !important;
+        background: rgba(255,255,255,0.8) !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        opacity: 1 !important;
+        height: 11px !important;
+        padding: 0 1px !important;
+        line-height: 11px !important;
+        border: none !important;
+    }
+    #realFormOverlay textarea {
+        height: auto !important;
+    }
+    #realFormOverlay input[type="checkbox"] {
+        max-width: none !important;
+        -webkit-appearance: checkbox !important;
+        width: 11px !important;
+        height: 11px !important;
+        padding: 0 !important;
+    }
+
+    /* Status bar at bottom */
+    .acord-container > div:last-child {
+        padding: 8px 12px !important;
+        flex-wrap: wrap !important;
+    }
+    .acord-container > div:last-child span {
+        font-size: 11px !important;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       Send COI Modal — Mobile
+       ═══════════════════════════════════════════════════════════════════ */
+    /* Overlay: stretch to fill, no centering offset */
+    #crmCOIModal {
+        align-items: stretch !important;
+        justify-content: stretch !important;
+        padding: 0 !important;
+    }
+    #crmCOIModal .modal-content.coi-modal,
+    #crmCOIModal > .coi-modal,
+    #crmCOIModal > div {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Header: cleaner, tighter */
+    #crmCOIModal .modal-header {
+        padding: 14px 16px !important;
+        background: linear-gradient(135deg, #1e40af, #1d4ed8) !important;
+        flex-shrink: 0 !important;
+    }
+    #crmCOIModal .modal-header h3 {
+        font-size: 16px !important;
+    }
+    /* Hide the X close button — Cancel handles closing */
+    #crmCOIModal .modal-close-btn {
+        display: none !important;
+    }
+
+    /* Body: full width, scrollable, stretch children to fill */
+    #crmCOIModal .modal-body {
+        padding: 16px !important;
+        flex: 1 !important;
+        overflow-y: auto !important;
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Policy info banner: subtle, full width */
+    #crmCOIModal .policy-info-banner {
+        width: calc(100vw - 32px) !important;
+        min-width: 0 !important;
+        padding: 10px 12px !important;
+        margin-bottom: 16px !important;
+        font-size: 13px !important;
+        background: #f0f9ff !important;
+        border: 1px solid #bae6fd !important;
+    }
+
+    /* Form + children: full viewport width minus padding */
+    #crmCOIModal form {
+        width: calc(100vw - 32px) !important;
+        max-width: calc(100vw - 32px) !important;
+        min-width: 0 !important;
+        margin: 0 auto !important;
+    }
+    #crmCOIModal .form-group,
+    #crmCOIModal .form-actions,
+    #crmCOIModal #crmThirdPartyFields {
+        width: calc(100vw - 32px) !important;
+        min-width: 0 !important;
+    }
+
+    /* Form groups: tighter spacing */
+    #crmCOIModal .form-group {
+        margin-bottom: 14px !important;
+    }
+
+    /* Hide the original "+ Add Recipient" button */
+    #crmCOIModal button[onclick*="addCRMCOIEmailRecipient"] {
+        display: none !important;
+    }
+
+    /* Recipient rows: tighter, full width */
+    #crmCOIModal .crm-coi-email-recipient-row {
+        width: 100% !important;
+        min-width: 0 !important;
+        gap: 6px !important;
+        margin-bottom: 6px !important;
+    }
+    #crmCOIModal .crm-coi-email-recipient-row input[type="email"] {
+        padding: 8px !important;
+        font-size: 14px !important;
+    }
+
+    /* Remove/trash button: compact square, icon-only */
+    #crmCOIModal .crm-coi-email-recipient-row button[onclick*="removeCRMCOI"] {
+        padding: 0 !important;
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        font-size: 13px !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 6px !important;
+    }
+    #crmCOIModal .coi-remove-label {
+        display: none !important;
+    }
+
+    /* Mobile "+" add button injected by JS */
+    #crmCOIModal .coi-mobile-add-btn {
+        width: 36px !important;
+        height: 36px !important;
+        padding: 0 !important;
+        border: 2px dashed #10b981 !important;
+        background: #f0fdf4 !important;
+        color: #10b981 !important;
+        border-radius: 6px !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-left: auto !important;
+        margin-top: 4px !important;
+    }
+
+    /* Email recipients header: stack label above controls, full width */
+    #crmCOIModal .form-group > div[style*="justify-content: space-between"],
+    #crmCOIModal .form-group > div[style*="justify-content:space-between"] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        gap: 8px !important;
+        width: calc(100vw - 32px) !important;
+    }
+    /* Checkboxes row: side by side, wrap if needed */
+    #crmCOIModal .form-group > div[style*="justify-content"] > div {
+        flex-wrap: wrap !important;
+        flex-direction: row !important;
+        width: 100% !important;
+    }
+    /* Radio group (Myself / Third-Party): always side by side */
+    #crmCOIModal .radio-group {
+        flex-direction: row !important;
+        gap: 16px !important;
+    }
+    /* Force recipients container full width */
+    #crmCOIModal #crmCoiEmailRecipientsContainer {
+        width: calc(100vw - 32px) !important;
+        min-width: calc(100vw - 32px) !important;
+        max-width: calc(100vw - 32px) !important;
+    }
+    #crmCOIModal .crm-coi-email-recipient-row {
+        width: calc(100vw - 32px) !important;
+    }
+
+    /* Checkboxes row */
+    #crmCOIModal #addInsuredCheck,
+    #crmCOIModal #addAgentCheck {
+        transform: scale(1) !important;
+    }
+
+    /* Form actions: full width buttons */
+    #crmCOIModal .form-actions {
+        flex-direction: column !important;
+        gap: 8px !important;
+        padding-top: 14px !important;
+    }
+    #crmCOIModal .form-actions button {
+        width: 100% !important;
+        padding: 12px !important;
+        font-size: 15px !important;
+        border-radius: 8px !important;
+    }
+    #crmCOIModal .btn-submit {
+        order: -1 !important;
+    }
+
+    /* Radio group */
+    #crmCOIModal .radio-group {
+        gap: 16px !important;
+    }
+
+    /* Saved Certificate Holders button */
+    #crmCOIModal #crmThirdPartyFields button[onclick*="showCRMSaved"] {
+        width: 100% !important;
+        padding: 10px !important;
+        font-size: 13px !important;
+    }
+
+    /* Help text */
+    #crmCOIModal .help-text {
+        display: none !important;
     }
 }

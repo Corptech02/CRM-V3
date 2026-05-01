@@ -25,21 +25,22 @@ const AGENT_EMAILS = {
 // Agents to include in the report (case-insensitive match on assignedTo)
 const REPORT_AGENTS = ['Grant', 'Hunter', 'Carson'];
 
-// ── Date range: previous Mon–Sun ─────────────────────────────────────────────
+// ── Date range: current Mon–Fri (the week the report fires) ─────────────────
 function getLastWeekRange() {
-    const now   = new Date();
-    const day   = now.getDay(); // 0=Sun … 6=Sat
-    // Days since last Monday
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun … 6=Sat
+    // Days since this Monday
     const sinceMonday = (day === 0 ? 6 : day - 1);
-    const lastSun = new Date(now);
-    lastSun.setDate(now.getDate() - sinceMonday - 1);
-    lastSun.setHours(23, 59, 59, 999);
 
-    const lastMon = new Date(lastSun);
-    lastMon.setDate(lastSun.getDate() - 6);
-    lastMon.setHours(0, 0, 0, 0);
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - sinceMonday);
+    monday.setHours(0, 0, 0, 0);
 
-    return { start: lastMon, end: lastSun };
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    friday.setHours(23, 59, 59, 999);
+
+    return { start: monday, end: friday };
 }
 
 function fmtDate(d) {
@@ -181,6 +182,21 @@ function computeMetrics(agentName, leads, policies, callbacks, start, end) {
         }
     });
 
+    // YTD premium before the report month (for monthly quota calculation)
+    let ytdPremiumBeforeMonth = 0;
+    const reportYear = start.getFullYear();
+    const yearStartTs = new Date(reportYear, 0, 1).getTime();
+    policies.forEach(policy => {
+        const assigned = (policy.assignedTo || policy.agent || policy.assignedAgent || policy.producer || '').toLowerCase();
+        if (assigned !== agentLc) return;
+        const idMatch = (policy.id || '').match(/POL-(\d+)-/);
+        const polTs   = idMatch ? parseInt(idMatch[1]) : 0;
+        if (polTs >= yearStartTs && polTs < startTs) {
+            const raw = String(policy.premium || policy.annualPremium || policy.financial?.['Annual Premium'] || 0);
+            ytdPremiumBeforeMonth += parseFloat(raw.replace(/[^0-9.]/g, '')) || 0;
+        }
+    });
+
     const convRate = myLeads.length > 0 ? ((salesInRange / myLeads.length) * 100).toFixed(1) : '—';
     const avgDur   = connectedInRange > 0 ? Math.round(callSecsInRange / connectedInRange) : 0;
     const cbPct    = myLeads.length > 0 ? ((callbackLeads / myLeads.length) * 100).toFixed(1) : '0.0';
@@ -207,6 +223,7 @@ function computeMetrics(agentName, leads, policies, callbacks, start, end) {
         ovPct,
         scheduledCbPct,
         newLeadsInRange: leadsInRange,
+        ytdPremiumBeforeMonth,
     };
 }
 
@@ -291,6 +308,52 @@ function buildEmailHtml(metrics, start, end, periodLabel, goalsConfig) {
     </div>
   </div>`;
 
+    // ── Monthly Quota % ───────────────────────────────────────────────────────
+    let quotaHTML = '';
+    if (isMonthly) {
+        const ANNUAL_DEFAULTS = { grant: 800000, carson: 1200000, hunter: 1000000 };
+        const annualGoal = agentCfg.annualGoal || ANNUAL_DEFAULTS[agentLc] || 1000000;
+        const ytdBefore = m.ytdPremiumBeforeMonth || 0;
+        const remaining = Math.max(0, annualGoal - ytdBefore);
+        const monthsLeft = 12 - start.getMonth(); // includes the report month
+        const monthlyQuota = monthsLeft > 0 ? remaining / monthsLeft : 0;
+        const annualGoalMet = ytdBefore >= annualGoal;
+        const quotaPct = annualGoalMet ? 100 : (monthlyQuota > 0 ? (m.premiumInRange / monthlyQuota) * 100 : 0);
+        const quotaDisplay = Math.round(quotaPct);
+        const quotaColor = quotaPct >= 100 ? '#10b981' : quotaPct >= 75 ? '#f59e0b' : '#ef4444';
+        const ytdTotal = ytdBefore + m.premiumInRange;
+
+        const quotaLabel = annualGoalMet
+            ? '<div style="font-size:13px;color:#10b981;font-weight:700;margin-top:6px">Annual Goal Already Met!</div>'
+            : '<div style="font-size:13px;color:#78716c;margin-top:6px">' + dollar(m.premiumInRange) + ' written vs ' + dollar(Math.round(monthlyQuota)) + ' quota</div>';
+
+        quotaHTML = `
+  <div style="padding:0 32px 28px">
+    <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:24px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Monthly Quota</div>
+      <div style="font-size:48px;font-weight:900;color:${quotaColor};line-height:1">${quotaDisplay}%</div>
+      ${quotaLabel}
+      <div style="background:#e5e7eb;border-radius:999px;height:10px;overflow:hidden;margin:16px auto 0;max-width:400px">
+        <div style="width:${Math.min(100, quotaDisplay)}%;height:100%;background:linear-gradient(90deg,#f59e0b,${quotaColor});border-radius:999px"></div>
+      </div>
+      <table style="width:100%;max-width:400px;margin:16px auto 0;border-collapse:collapse">
+        <tr>
+          <td style="padding:6px 8px;font-size:12px;color:#78716c;text-align:left">Annual Goal</td>
+          <td style="padding:6px 8px;font-size:12px;font-weight:700;color:#1f2937;text-align:right">${dollar(annualGoal)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;font-size:12px;color:#78716c;text-align:left">YTD Premium</td>
+          <td style="padding:6px 8px;font-size:12px;font-weight:700;color:#1f2937;text-align:right">${dollar(ytdTotal)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;font-size:12px;color:#78716c;text-align:left">Remaining</td>
+          <td style="padding:6px 8px;font-size:12px;font-weight:700;color:#1f2937;text-align:right">${dollar(Math.max(0, annualGoal - ytdTotal))}</td>
+        </tr>
+      </table>
+    </div>
+  </div>`;
+    }
+
     return `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -330,6 +393,9 @@ function buildEmailHtml(metrics, start, end, periodLabel, goalsConfig) {
 
   <!-- Goal Tracker -->
   ${goalsHTML}
+
+  <!-- Monthly Quota -->
+  ${quotaHTML}
 
   <!-- Detailed Stats -->
   <div style="padding:0 32px 28px">

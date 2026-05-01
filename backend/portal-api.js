@@ -457,6 +457,7 @@ router.get('/policies', requirePortalAuth, (req, res) => {
                         dotNumber       : p.dotNumber       || '',
                         mcNumber        : p.mcNumber        || '',
                         agent           : p.agent           || '',
+                        united          : p.united === true || p.united === 'true',
                     });
                 }
             } catch { /* skip unparseable rows */ }
@@ -492,12 +493,19 @@ router.get('/policies/:policyId/documents', requirePortalAuth, (req, res) => {
                 return res.status(403).json({ error: 'Policy not found or access denied' });
             }
 
-            // Also fetch ID cards from id_cards table (stored separately from policy JSON)
+            // Fetch ID cards, coi_documents table, and uploaded documents in parallel
             db.all('SELECT id, policy_id, name, type, upload_date, size FROM id_cards WHERE policy_id=?',
                 [policyId],
                 (e2, idCardRows) => {
+                db.all('SELECT id, policy_id, name, type, upload_date FROM coi_documents WHERE policy_id=?',
+                    [policyId],
+                    (e3, coiDocRows) => {
+                db.all('SELECT id, filename, original_name, file_path, file_size, file_type, upload_date, doc_type FROM documents WHERE policy_id=?',
+                    [policyId],
+                    (e4, docRows) => {
                     db.close();
                     const result = [];
+                    const seenIds = new Set();
 
                     try {
                         const pdata = JSON.parse(pol.data || '{}');
@@ -505,6 +513,7 @@ router.get('/policies/:policyId/documents', requirePortalAuth, (req, res) => {
                         // ── COIs stored as coiDocuments[] inside the policy JSON ──
                         for (const c of (pdata.coiDocuments || [])) {
                             if (!c.id) continue;
+                            seenIds.add(c.id);
                             result.push({
                                 id          : c.id,
                                 docType     : 'coi',
@@ -516,6 +525,21 @@ router.get('/policies/:policyId/documents', requirePortalAuth, (req, res) => {
                             });
                         }
                     } catch { /* unparseable policy data */ }
+
+                    // ── COIs from coi_documents table (if not already included) ──
+                    for (const cd of (coiDocRows || [])) {
+                        if (seenIds.has(cd.id)) continue;
+                        seenIds.add(cd.id);
+                        result.push({
+                            id          : cd.id,
+                            docType     : 'coi',
+                            name        : cd.name || 'Certificate of Insurance',
+                            mimeType    : cd.type || 'image/png',
+                            uploadDate  : cd.upload_date || '',
+                            downloadUrl : `/api/portal/coi-documents/${cd.id}/download`,
+                            source      : 'coi_documents_table',
+                        });
+                    }
 
                     // ── ID cards from id_cards table ──
                     for (const card of (idCardRows || [])) {
@@ -531,15 +555,41 @@ router.get('/policies/:policyId/documents', requirePortalAuth, (req, res) => {
                         });
                     }
 
+                    // ── Uploaded documents from documents table ──
+                    for (const doc of (docRows || [])) {
+                        result.push({
+                            id          : doc.id,
+                            docType     : (doc.doc_type && doc.doc_type !== 'general') ? doc.doc_type : normalizeDocType(doc.original_name || doc.filename || ''),
+                            name        : doc.original_name || doc.filename,
+                            mimeType    : doc.file_type || 'application/octet-stream',
+                            fileSize    : doc.file_size,
+                            uploadDate  : doc.upload_date || '',
+                            downloadUrl : `/api/portal/documents/${doc.id}/download`,
+                            source      : 'documents_table',
+                        });
+                    }
+
                     result.sort((a, b) =>
                         (b.uploadDate || '').localeCompare(a.uploadDate || ''));
 
                     res.json({ documents: result, count: result.length });
+                });
+                });
                 }
             );
         }
     );
 });
+
+// Helper: normalize document type from filename
+function normalizeDocType(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('id-card') || n.includes('id_card') || n.includes('idcard')) return 'id_card';
+    if (n.includes('coi') || n.includes('certificate') || n.includes('acord')) return 'coi';
+    if (n.includes('declaration') || n.includes('dec_') || n.includes('dec ')) return 'declaration';
+    if (n.includes('billing') || n.includes('invoice')) return 'billing';
+    return 'document';
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROTECTED: GET /api/portal/policies/:policyId/coi/:coiId/download
@@ -610,9 +660,10 @@ router.get('/policies/:policyId/id-card/:cardId/download', requirePortalAuth, (r
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/documents/:docId/download', requirePortalAuth, (req, res) => {
     const db = getDb();
+    const rawClientId = String(req.portalUser.sub).replace(/\.0$/, '');
     db.get(
-        'SELECT * FROM documents WHERE id=? AND client_id=?',
-        [req.params.docId, req.portalUser.sub],
+        `SELECT * FROM documents WHERE id=? AND (client_id=? OR client_id=? OR policy_id IN (SELECT id FROM policies WHERE client_id=? OR client_id=?))`,
+        [req.params.docId, req.portalUser.sub, rawClientId, req.portalUser.sub, rawClientId],
         (err, doc) => {
             db.close();
             if (err || !doc) return res.status(404).json({ error: 'Document not found' });
@@ -766,6 +817,15 @@ router.post('/coi/request', requirePortalAuth, (req, res, next) => {
                           || (policyInfo.insured || {})['Primary Named Insured']
                           || req.portalUser.email;
 
+        // Determine if this is a United policy
+        const isUIG = policyInfo.united === true || policyInfo.united === 'true'
+                   || (policyInfo.agent || '').toLowerCase().includes('maureen');
+        const agencyName  = isUIG ? 'United Insurance Group LLC'  : 'Vanguard Insurance Group LLC';
+        const agencyShort = isUIG ? 'UIG Agency'                  : 'VIG Agency';
+        const agencyEmail = isUIG ? 'contact@uigagency.com'       : 'contact@vigagency.com';
+        const agencyPass  = isUIG ? 'Jacob2007'                   : (process.env.GODADDY_PASSWORD || '25nickc124!');
+        const agencyPhone = isUIG ? '(866) 628-9441'              : '(866) 628-9441';
+
         // ── 2. Always build overlaid PDF from the DB COI + cert holder + date ──
         // (server-side overlay matches exactly what the CRM browser does)
         const coiDocs   = pdata.coiDocuments || [];
@@ -861,13 +921,13 @@ ${h.city||h.state||h.zip ? `<tr><td>City/State/Zip</td><td>${[h.city,h.state,h.z
         }
 
         const plainText = (req.body.message || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-            || `Dear Certificate Holder,\n\nPlease find your Certificate of Insurance attached.\n\nInsured: ${insuredName}\nPolicy: ${policyNumber}\nCarrier: ${policyInfo.carrier || ''}\n\nVanguard Insurance Group LLC`;
+            || `Dear Certificate Holder,\n\nPlease find your Certificate of Insurance attached.\n\nInsured: ${insuredName}\nPolicy: ${policyNumber}\nCarrier: ${policyInfo.carrier || ''}\n\n${agencyName}`;
 
         const htmlBody = `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
   <div style="background:#1a365d;color:#fff;padding:20px 24px;border-radius:8px 8px 0 0;">
     <h2 style="margin:0;">Certificate of Insurance</h2>
-    <p style="margin:4px 0 0;opacity:.85;">Vanguard Insurance Group LLC</p>
+    <p style="margin:4px 0 0;opacity:.85;">${agencyName}</p>
   </div>
   <div style="background:#f8fafc;padding:24px;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;">
     <p>Please find your Certificate of Insurance attached.</p>
@@ -881,7 +941,7 @@ ${h.city||h.state||h.zip ? `<tr><td>City/State/Zip</td><td>${[h.city,h.state,h.z
     </table>
     ${additionalNotes ? `<p style="margin-top:16px;"><strong>Notes:</strong> ${additionalNotes}</p>` : ''}
     <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;">
-    <p style="font-size:12px;color:#666;">Vanguard Insurance Group LLC · (866) 628-9441 · contact@vigagency.com</p>
+    <p style="font-size:12px;color:#666;">${agencyName} · ${agencyPhone} · ${agencyEmail}</p>
   </div>
 </div>`;
 
@@ -892,13 +952,13 @@ ${h.city||h.state||h.zip ? `<tr><td>City/State/Zip</td><td>${[h.city,h.state,h.z
             port   : 465,
             secure : true,
             auth   : {
-                user : 'contact@vigagency.com',
-                pass : process.env.GODADDY_PASSWORD || '25nickc124!'
+                user : agencyEmail,
+                pass : agencyPass
             }
         });
 
         await transporter.sendMail({
-            from        : '"VIG Agency" <contact@vigagency.com>',
+            from        : `"${agencyShort}" <${agencyEmail}>`,
             to          : toAddresses.join(', '),
             subject     : emailSubject,
             text        : plainText,

@@ -9424,7 +9424,7 @@ async function loadLeadsView() {
                     <tbody id="leadsTableBody">
                         ${(() => {
                             const _leadsForTable = (window.myLeadsOnlyActive && currentUser)
-                                ? leads.filter(l => (l.assignedTo || '').toLowerCase() === currentUser)
+                                ? leads.filter(l => (l.assignedTo || '').toLowerCase() === currentUser.toLowerCase())
                                 : leads;
                             return generateSimpleLeadRowsWithDividers(_leadsForTable);
                         })()}

@@ -110,17 +110,8 @@
 
         // Wait for DOM to be ready
         const setupUserDisplay = () => {
-            // Inject role badge next to #userNameDisplay (the nav user menu)
-            const nameDisplay = document.getElementById('userNameDisplay');
-            if (nameDisplay && !document.getElementById('roleBadgeInNav')) {
-                const badgeHTML = getRoleBadgeHTML();
-                if (badgeHTML) {
-                    const wrapper = document.createElement('span');
-                    wrapper.id = 'roleBadgeInNav';
-                    wrapper.innerHTML = badgeHTML;
-                    nameDisplay.insertAdjacentElement('afterend', wrapper);
-                }
-            }
+            // Badge is already injected by index.html's updateUserDisplay() inside #userNameDisplay.
+            // Skipping duplicate injection here to avoid showing two badges.
 
             // Legacy: also inject into .top-header if present and not already done
             let userInfoElement = document.getElementById('userInfoDisplay');

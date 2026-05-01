@@ -96,7 +96,15 @@ window.generatePolicyRows = async function() {
                 'workers-comp': 'Workers Compensation',
                 'umbrella': 'Umbrella',
                 'life': 'Life',
-                'health': 'Health'
+                'health': 'Health',
+                'trucking': 'Trucking',
+                'commercial-trucking': 'Commercial Trucking',
+                'owner-operator': 'Owner Operator',
+                'motor-carrier': 'Motor Carrier',
+                'cargo': 'Cargo',
+                'non-trucking': 'Non-Trucking Liability',
+                'bobtail': 'Bobtail',
+                'physical-damage': 'Physical Damage'
             };
             return labels[normalizedType] || type;
         }
@@ -104,6 +112,7 @@ window.generatePolicyRows = async function() {
         function getBadgeClass(type) {
             if (!type) return 'badge-gray';
             const typeStr = type.toString().toLowerCase();
+            if (typeStr.includes('truck') || typeStr.includes('motor-carrier') || typeStr.includes('owner-operator') || typeStr.includes('cargo') || typeStr.includes('bobtail')) return 'badge-orange';
             if (typeStr.includes('commercial')) return 'badge-orange';
             if (typeStr.includes('auto')) return 'badge-blue';
             if (typeStr.includes('home')) return 'badge-green';
@@ -211,7 +220,7 @@ window.generatePolicyRows = async function() {
                 <td>
                     ${expirationDate}
                 </td>
-                <td style="display: none; visibility: hidden;">
+                <td>
                     ${premium}/yr
                 </td>
                 <td>
@@ -241,16 +250,26 @@ window.generatePolicyRows = async function() {
     const _pending = sessionStorage.getItem('vanguard_pending_policy');
     if (_pending) {
         sessionStorage.removeItem('vanguard_pending_policy');
-        // Wait for the caller to inject _htmlRows into innerHTML, then open modal
-        setTimeout(() => {
-            if (typeof window.viewPolicy === 'function') {
-                window.viewPolicy(_pending);
-                // Switch to Documents tab after modal renders
+        // Poll until the policy exists in localStorage AND the table has rows,
+        // then open it. Handles slow mobile / Slack WebView load times.
+        let _pendAttempts = 0;
+        const _pendPoll = setInterval(() => {
+            _pendAttempts++;
+            const policies = JSON.parse(localStorage.getItem('insurance_policies') || '[]');
+            const found = policies.find(p => p.policyNumber === _pending || p.id === _pending);
+            const tbody = document.getElementById('policyTableBody');
+            const hasRows = tbody && tbody.querySelector('tr[data-policy-id]');
+            if ((found || hasRows) && typeof window.viewPolicy === 'function') {
+                clearInterval(_pendPoll);
+                // Use the policy ID if we found it, otherwise use the number
+                const openId = found ? (found.id || found.policyNumber) : _pending;
+                window.viewPolicy(openId);
                 setTimeout(() => {
                     if (typeof switchViewTab === 'function') switchViewTab('documents');
-                }, 400);
+                }, 500);
             }
-        }, 600);
+            if (_pendAttempts > 40) clearInterval(_pendPoll); // give up after ~12 seconds
+        }, 300);
     }
 
     return _htmlRows;

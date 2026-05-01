@@ -310,7 +310,7 @@ window.createRealACORDViewer = async function(policyId, policyData = null) {
                 </span>
             </div>
             <div class="coi-action-buttons" style="display: flex; gap: 10px; align-items: center;">
-                <button type="button" class="coi-btn coi-btn-secondary" onclick="document.getElementById('acordViewerModal').remove()" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                <button type="button" class="coi-btn coi-btn-secondary coi-cancel-btn" onclick="document.getElementById('acordViewerModal').remove()" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">
                     <i class="fas fa-times"></i>
                     Cancel
                 </button>
@@ -330,6 +330,16 @@ window.createRealACORDViewer = async function(policyId, policyData = null) {
         modalContent.appendChild(actionFooter);
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
+
+        // Mobile: swap Cancel button → Sign As
+        if (window.innerWidth <= 768) {
+            const cancelBtn = modal.querySelector('.coi-cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.style.background = '#8b5cf6';
+                cancelBtn.innerHTML = '<i class="fas fa-signature"></i> Sign As';
+                cancelBtn.onclick = function() { window.showSignAsModal && window.showSignAsModal(policyId); };
+            }
+        }
 
         console.log('✅ Created policy viewer modal');
     }
@@ -532,6 +542,11 @@ async function loadRealPDF(policyId, policyData) {
             }
         }
 
+        // Mobile: attach pinch-to-zoom exclusively to the PDF container
+        if (window.innerWidth <= 768) {
+            _initPdfPinchZoom();
+        }
+
     } catch (error) {
         console.error('Error loading PDF:', error);
         // Fallback to embedded PDF
@@ -539,6 +554,97 @@ async function loadRealPDF(policyId, policyData) {
             <embed src="/ACORD_25_fillable.pdf#zoom=125" type="application/pdf" width="100%" height="100%" style="min-height: 800px;">
         `;
     }
+}
+
+// ── Pinch-to-zoom for PDF container on mobile ────────────────────────────────
+function _initPdfPinchZoom() {
+    const container = document.querySelector('.acord-container .pdf-container');
+    const wrapper = container && container.querySelector(':scope > div');
+    if (!container || !wrapper) return;
+
+    let currentScale = 1;
+    let startDist = 0;
+    let startScale = 1;
+    let originX = 0, originY = 0;
+
+    function getDist(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function getMidpoint(touches) {
+        const rect = container.getBoundingClientRect();
+        return {
+            x: ((touches[0].clientX + touches[1].clientX) / 2) - rect.left + container.scrollLeft,
+            y: ((touches[0].clientY + touches[1].clientY) / 2) - rect.top + container.scrollTop
+        };
+    }
+
+    let isPinching = false;
+
+    container.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            e.stopPropagation();
+            isPinching = true;
+            startDist = getDist(e.touches);
+            startScale = currentScale;
+            const mid = getMidpoint(e.touches);
+            originX = mid.x;
+            originY = mid.y;
+            wrapper.style.transition = 'none';
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 2 && isPinching) {
+            e.preventDefault();
+            e.stopPropagation();
+            const dist = getDist(e.touches);
+            const newScale = Math.min(3, Math.max(0.25, startScale * (dist / startDist)));
+            currentScale = newScale;
+            wrapper.style.transformOrigin = `${originX}px ${originY}px`;
+            wrapper.style.transform = `scale(${currentScale})`;
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchend', function(e) {
+        if (isPinching && e.touches.length < 2) {
+            isPinching = false;
+            // No snap-back — stay at whatever zoom level the user set
+        }
+    }, { passive: false });
+
+    // Double-tap to toggle zoom
+    let lastTap = 0;
+    container.addEventListener('touchend', function(e) {
+        if (isPinching) return;
+        if (e.touches.length === 0 && e.changedTouches.length === 1) {
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                e.preventDefault();
+                const targetScale = currentScale > 1.1 ? 1 : 2;
+                wrapper.style.transition = 'transform 0.25s ease';
+                if (targetScale === 1) {
+                    currentScale = 1;
+                    wrapper.style.transform = 'scale(1)';
+                    wrapper.style.transformOrigin = 'top left';
+                } else {
+                    const rect = container.getBoundingClientRect();
+                    const x = e.changedTouches[0].clientX - rect.left + container.scrollLeft;
+                    const y = e.changedTouches[0].clientY - rect.top + container.scrollTop;
+                    currentScale = targetScale;
+                    wrapper.style.transformOrigin = `${x}px ${y}px`;
+                    wrapper.style.transform = `scale(${currentScale})`;
+                }
+                setTimeout(() => { wrapper.style.transition = 'none'; }, 300);
+                lastTap = 0; // Reset to prevent triple-tap
+            } else {
+                lastTap = now;
+            }
+        }
+    }, { passive: false });
 }
 
 // Render a page of the PDF
@@ -601,22 +707,51 @@ function createRealFormFields(policyId, policyData) {
     overlay.innerHTML = '';
 
     // Determine if GL coverage is present and not excluded
+    // Check flat keys first, then CoveragesArray for GL/GLCBI/GLACC/GLAGG codes
+    const _covArrPreGL = policyData?.coverage?.CoveragesArray || {};
+    const _glFromCovArr = _covArrPreGL['GL'] || _covArrPreGL['GLCBI'] || _covArrPreGL['GLACC'] || _covArrPreGL['GLAGG'] || null;
     const glAggregateRaw = policyData?.coverage?.['coverage-general-aggregate'] ||
                            policyData?.coverage?.['General Aggregate'] ||
                            policyData?.coverage?.['General Liability'] ||
-                           policyData?.coverage?.['General Liability BI'] || '';
+                           policyData?.coverage?.['General Liability BI'] ||
+                           (_glFromCovArr?.Amount || _glFromCovArr?.Aggregate || '') || '';
     const hasGL = !!glAggregateRaw && glAggregateRaw !== 'excluded';
-    // Helper: parse GL occurrence and aggregate from BI field (e.g. "1000000/2000000")
+    // Helper: parse GL occurrence and aggregate from BI field (e.g. "1000000/2000000") or CoveragesArray
     const _glBIRaw = policyData?.coverage?.['General Liability BI'] || '';
     const _glBIParts = _glBIRaw.replace(/[$,]/g,'').split('/');
-    const _glOcc = _glBIParts[0] ? parseFloat(_glBIParts[0]) : 0;
-    const _glAgg = _glBIParts[1] ? parseFloat(_glBIParts[1]) : (_glOcc ? _glOcc * 2 : 0);
+    let _glOcc = _glBIParts[0] ? parseFloat(_glBIParts[0]) : 0;
+    let _glAgg = _glBIParts[1] ? parseFloat(_glBIParts[1]) : (_glOcc ? _glOcc * 2 : 0);
+    // Override from CoveragesArray GL entry if present
+    if (_glFromCovArr && (!_glOcc || !_glAgg)) {
+        const occRaw = parseFloat((_glFromCovArr.Amount || '0').toString().replace(/[$,]/g, ''));
+        const aggRaw = parseFloat((_glFromCovArr.Aggregate || '0').toString().replace(/[$,]/g, ''));
+        if (occRaw > 0) _glOcc = occRaw;
+        if (aggRaw > 0) _glAgg = aggRaw;
+        if (_glOcc && !_glAgg) _glAgg = _glOcc * 2;
+    }
 
     // Pre-compute cargo and physical damage presence
-    const _cargoLimitRaw = policyData?.coverage?.cargo_limit || policyData?.coverage?.['Cargo Limit'] || '';
+    // Check flat keys, CoveragesArray (policy-level), and vehicle-level coverages
+    const _covArr = policyData?.coverage?.CoveragesArray || {};
+    const _vehs = Array.isArray(policyData?.vehicles) ? policyData.vehicles : [];
+    // Helper: find a coverage by code in CoveragesArray or vehicle CoveragesArrays
+    function _findCov(code) {
+        if (_covArr[code]) return _covArr[code];
+        for (const v of _vehs) {
+            const vc = v.CoveragesArray || {};
+            if (vc[code]) return vc[code];
+        }
+        return null;
+    }
+    const _mtcCov = _findCov('MTC') || _findCov('MTRTK') || _findCov('MTCARGO');
+    const _compCov = _findCov('COMP');
+    const _collCov = _findCov('COLL');
+
+    const _cargoLimitRaw = policyData?.coverage?.cargo_limit || policyData?.coverage?.['Cargo Limit'] || (_mtcCov?.Amount || _mtcCov?.Limit || '') || '';
+    const _cargoDeductRaw = policyData?.coverage?.cargo_deductible || policyData?.coverage?.['Cargo Deductible'] || (_mtcCov?.Deductible || '') || '';
     const hasCargoRow = !!_cargoLimitRaw && _cargoLimitRaw !== '0' && _cargoLimitRaw !== 'None';
-    const _compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || '0';
-    const _collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || '0';
+    const _compDedRaw = policyData?.coverage?.comprehensive_deductible || policyData?.coverage?.['Comprehensive Deductible'] || (_compCov?.Deductible || '') || '0';
+    const _collDedRaw = policyData?.coverage?.collision_deductible || policyData?.coverage?.['Collision Deductible'] || (_collCov?.Deductible || '') || '0';
     const hasPhysDmg = _compDedRaw !== 'None' && _collDedRaw !== 'None' &&
                        parseFloat(String(_compDedRaw).replace(/[$,]/g,'')) > 0 &&
                        parseFloat(String(_collDedRaw).replace(/[$,]/g,'')) > 0;
@@ -822,15 +957,11 @@ function createRealFormFields(policyId, policyData) {
         { id: 'glSubrWvd', x: 252, y: 437, width: 23, height: 16,
           value: '' },
         { id: 'glPolicyNum', x: 281, y: 437, width: 146, height: 16,
-          value: (hasGL && policyData?.policyType !== 'commercial-auto') ? (policyData?.policyNumber || '') : '' },
+          value: hasGL ? (policyData?.policyNumber || '') : '' },
         { id: 'glEffDate', x: 430, y: 437, width: 61, height: 16,
-          value: (hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.effectiveDate) ?
-                 formatDateForACORD(policyData.effectiveDate) :
-                 ((hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.overview?.['Effective Date']) ? formatDateForACORD(policyData.overview['Effective Date']) : '') },
+          value: hasGL ? (formatDateForACORD(policyData?.effectiveDate) || formatDateForACORD(policyData?.overview?.['Effective Date']) || '') : '' },
         { id: 'glExpDate', x: 491, y: 437, width: 61, height: 16,
-          value: (hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.expirationDate) ?
-                 formatDateForACORD(policyData.expirationDate) :
-                 ((hasGL && policyData?.policyType !== 'commercial-auto' && policyData?.overview?.['Expiration Date']) ? formatDateForACORD(policyData.overview['Expiration Date']) : '') },
+          value: hasGL ? (formatDateForACORD(policyData?.expirationDate) || formatDateForACORD(policyData?.overview?.['Expiration Date']) || '') : '' },
 
         // === AUTOMOBILE LIABILITY FIELDS ===
         { id: 'autoInsurer', x: 23, y: 530, width: 23, height: 16,
@@ -913,7 +1044,7 @@ function createRealFormFields(policyId, policyData) {
           skip: !hasCargoRow && !hasPhysDmg,
           value: (function() {
               if (hasCargoRow) {
-                  const cargoDeductible = policyData?.coverage?.cargo_deductible || policyData?.coverage?.['Cargo Deductible'] || '';
+                  const cargoDeductible = _cargoDeductRaw || '';
                   if (cargoDeductible && cargoDeductible !== 'None') {
                       const dedNum = parseFloat(cargoDeductible.toString().replace(/[$,]/g,''));
                       return `DED. $${isNaN(dedNum) ? cargoDeductible : dedNum.toLocaleString()}`;

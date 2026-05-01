@@ -247,6 +247,33 @@ async function loadRealPDF(policyId, policyData) {
         // Load any saved data
         await loadSavedData(policyId);
 
+        // Mobile: scale the canvas+overlay wrapper to fit viewport
+        if (window.innerWidth <= 768) {
+            requestAnimationFrame(() => {
+                const canvas = document.getElementById('realPdfCanvas');
+                const overlay = document.getElementById('realFormOverlay');
+                if (canvas && overlay) {
+                    const wrapper = canvas.parentElement;
+                    const containerWidth = wrapper.parentElement.clientWidth - 16;
+                    const canvasWidth = canvas.width;
+                    if (canvasWidth > containerWidth) {
+                        const scale = containerWidth / canvasWidth;
+                        wrapper.style.width = containerWidth + 'px';
+                        wrapper.style.height = (canvas.height * scale) + 'px';
+                        wrapper.style.overflow = 'hidden';
+                        canvas.style.transformOrigin = 'top left';
+                        canvas.style.transform = `scale(${scale})`;
+                        canvas.style.width = canvasWidth + 'px';
+                        canvas.style.height = canvas.height + 'px';
+                        overlay.style.transformOrigin = 'top left';
+                        overlay.style.transform = `scale(${scale})`;
+                        overlay.style.width = canvasWidth + 'px';
+                        overlay.style.height = canvas.height + 'px';
+                    }
+                }
+            });
+        }
+
     } catch (error) {
         console.error('Error loading PDF:', error);
         // Fallback to embedded PDF

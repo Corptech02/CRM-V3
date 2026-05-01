@@ -320,8 +320,10 @@ async function postCOIToSlack(fromEmail, subject, bodySnippet, policy, coiAttach
 
     // Deep link to CRM policy profile via magic link (no login required)
     const clientUrl = polNum && polNum !== '—'
-        ? await createMagicLink(`/?policyNumber=${encodeURIComponent(polNum)}#policies`)
+        ? await createMagicLink(`/#policy/${encodeURIComponent(polNum)}`)
         : null;
+    // Note: auth-routes.js extracts polNum from #policy/X and stores in sessionStorage.
+    // fix-policy-display-limit.js picks it up after policies load and opens the profile.
 
     const agentField = mention ? `${agent} ${mention}` : agent;
 
